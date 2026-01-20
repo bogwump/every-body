@@ -1,24 +1,30 @@
 import { useSyncExternalStore } from "react";
-import type { UserData } from "../types";
+import type { UserData, CheckInEntry } from "../types";
 
 export const APP_NAME = "EveryBody";
 export const COMPANION_NAME = "Eve";
-
 
 // Storage keys
 const USER_KEY = "everybody:user";
 const ENTRIES_KEY = "everybody:entries";
 const CHAT_KEY = "everybody:chat";
 
-// ---- Types (use your real ones if you have them elsewhere) ----
-export type CheckInEntry = any;
-export type ChatMessage = any;
+// ---- Chat Types ----
+export type ChatMessageStored = {
+  sender: "user" | "ai";
+  text: string;
+  timestampISO: string;
+};
+
+export type ChatMessageWithDate = ChatMessageStored & {
+  timestamp: Date;
+};
 
 // ---- Stable fallbacks (must be stable references) ----
 const EMPTY_ENTRIES: CheckInEntry[] = [];
-const EMPTY_CHAT: ChatMessage[] = [];
+const EMPTY_CHAT: ChatMessageStored[] = [];
 
-// ---- Per-key pub/sub (avoids re-rendering everything) ----
+// ---- Per-key pub/sub ----
 type Listener = () => void;
 const listenersByKey = new Map<string, Set<Listener>>();
 
@@ -38,14 +44,14 @@ function emitKey(key: string) {
   for (const l of set) l();
 }
 
-// ---- Cached snapshot layer (prevents infinite loops) ----
+// ---- Cached snapshot layer ----
 const parsedCache = new Map<string, unknown>();
 const rawCache = new Map<string, string | null>();
 
 function readCached<T>(key: string, fallback: T): T {
   const raw = localStorage.getItem(key);
 
-  // If raw hasn't changed, return the same parsed reference
+  // If localStorage value hasn't changed, return the same parsed reference
   if (rawCache.get(key) === raw && parsedCache.has(key)) {
     return parsedCache.get(key) as T;
   }
@@ -70,27 +76,22 @@ function readCached<T>(key: string, fallback: T): T {
 
 function writeCached<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value));
-
-  // Keep caches in sync so the next snapshot is stable
   rawCache.set(key, localStorage.getItem(key));
   parsedCache.set(key, value);
-
   emitKey(key);
 }
 
-// Cross-tab updates (storage event fires in other tabs)
+// Cross-tab updates (fires in other tabs)
 window.addEventListener("storage", (e) => {
   if (!e.key) return;
-
   if (e.key === USER_KEY || e.key === ENTRIES_KEY || e.key === CHAT_KEY) {
-    // Invalidate caches for that key and notify subscribers
     rawCache.delete(e.key);
     parsedCache.delete(e.key);
     emitKey(e.key);
   }
 });
 
-// ---- Hooks ----
+// ---- User ----
 export function useUser(defaultUser: UserData) {
   const user = useSyncExternalStore(
     (listener) => subscribeKey(USER_KEY, listener),
@@ -100,33 +101,70 @@ export function useUser(defaultUser: UserData) {
 
   const updateUser = (updater: UserData | ((prev: UserData) => UserData)) => {
     const prev = readCached<UserData>(USER_KEY, defaultUser);
-    const next = typeof updater === "function" ? (updater as (p: UserData) => UserData)(prev) : updater;
+    const next =
+      typeof updater === "function"
+        ? (updater as (p: UserData) => UserData)(prev)
+        : updater;
     writeCached<UserData>(USER_KEY, next);
   };
 
   return { user, updateUser };
 }
 
-export function useEntries(): CheckInEntry[] {
-  return useSyncExternalStore(
+// ---- Entries ----
+// Components expect: const { entries, upsertEntry } = useEntries();
+export function useEntries() {
+  const entries = useSyncExternalStore(
     (listener) => subscribeKey(ENTRIES_KEY, listener),
     () => readCached<CheckInEntry[]>(ENTRIES_KEY, EMPTY_ENTRIES),
     () => EMPTY_ENTRIES
   );
+
+  const setEntries = (next: CheckInEntry[]) => writeCached(ENTRIES_KEY, next);
+
+  const upsertEntry = (entry: CheckInEntry) => {
+    const prev = readCached<CheckInEntry[]>(ENTRIES_KEY, EMPTY_ENTRIES);
+    const idx = prev.findIndex((e) => e.dateISO === entry.dateISO);
+    const next =
+      idx >= 0 ? prev.map((e, i) => (i === idx ? entry : e)) : [...prev, entry];
+    writeCached(ENTRIES_KEY, next);
+  };
+
+  const clearEntries = () => writeCached(ENTRIES_KEY, EMPTY_ENTRIES);
+
+  return { entries, setEntries, upsertEntry, clearEntries };
 }
 
+// Backwards-compatible setters (if any code still calls them)
 export function setEntries(next: CheckInEntry[]) {
   writeCached(ENTRIES_KEY, next);
 }
 
-export function useChat(): ChatMessage[] {
-  return useSyncExternalStore(
+// ---- Chat ----
+// Components expect: const { messagesWithDate, addMessage } = useChat();
+export function useChat() {
+  const messages = useSyncExternalStore(
     (listener) => subscribeKey(CHAT_KEY, listener),
-    () => readCached<ChatMessage[]>(CHAT_KEY, EMPTY_CHAT),
+    () => readCached<ChatMessageStored[]>(CHAT_KEY, EMPTY_CHAT),
     () => EMPTY_CHAT
   );
+
+  const addMessage = (msg: ChatMessageStored) => {
+    const prev = readCached<ChatMessageStored[]>(CHAT_KEY, EMPTY_CHAT);
+    const next = [...prev, msg];
+    writeCached(CHAT_KEY, next);
+  };
+
+  const clearChat = () => writeCached(CHAT_KEY, EMPTY_CHAT);
+
+  const messagesWithDate: ChatMessageWithDate[] = messages.map((m) => ({
+    ...m,
+    timestamp: new Date(m.timestampISO),
+  }));
+
+  return { messages, messagesWithDate, addMessage, clearChat };
 }
 
-export function setChat(next: ChatMessage[]) {
+export function setChat(next: ChatMessageStored[]) {
   writeCached(CHAT_KEY, next);
 }

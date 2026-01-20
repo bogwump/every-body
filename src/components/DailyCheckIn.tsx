@@ -97,8 +97,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
   const showCycleNudge = userData.cycleTrackingMode === 'no-cycle' && userData.enabledModules.includes('flow');
 
   return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen py-10">
+      <div className="eb-container max-w-3xl">
         <div className="mb-8">
           <h1 className="mb-2">Daily Check-in</h1>
           <p>How are you feeling today?</p>
@@ -106,7 +106,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
 
         {/* Friendly note for no-cycle users */}
         {userData.cycleTrackingMode === 'no-cycle' && (
-          <div className="bg-white rounded-2xl p-5 mb-6 shadow-sm border border-neutral-200">
+          <div className="eb-card mb-6">
             <p className="text-sm text-[rgb(var(--color-text-secondary))]">
               You can track symptoms even without a cycle. If you ever want to use cycle-phase insights, you can switch it on in Profile.
             </p>
@@ -114,7 +114,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
         )}
 
         {/* Mood Selection */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="eb-card mb-6">
           <h3 className="mb-4">Overall Mood</h3>
           <div className="flex gap-4 justify-center">
             {moodIcons.map((mood) => {
@@ -143,7 +143,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
         </div>
 
         {/* Symptom Sliders */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="eb-card mb-6">
           <div className="flex items-start justify-between gap-4 mb-2">
             <div>
               <h3 className="mb-1">Your check-in</h3>
@@ -196,7 +196,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
         </div>
 
         {/* Notes */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="eb-card mb-6">
           <h3 className="mb-4">Notes (Optional)</h3>
           <textarea
             value={notes}

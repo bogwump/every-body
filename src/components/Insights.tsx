@@ -197,8 +197,8 @@ export function Insights({ userData }: InsightsProps) {
   };
 
   return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen py-10">
+      <div className="eb-container">
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2">Insights & Patterns</h1>
@@ -231,7 +231,7 @@ export function Insights({ userData }: InsightsProps) {
           {keyInsights.map((insight, index) => (
             <div
               key={index}
-              className="bg-white rounded-2xl p-6 shadow-sm border-l-4 border-[rgb(var(--color-primary))]"
+              className="eb-card border-l-4 border-[rgb(var(--color-primary))]"
             >
               <div className="flex items-start gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-primary))] bg-opacity-10 flex items-center justify-center flex-shrink-0">
@@ -250,7 +250,7 @@ export function Insights({ userData }: InsightsProps) {
         </div>
 
         {/* Cycle Phase Analysis (optional) */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="eb-card mb-6">
           <div className="flex items-center justify-between mb-6">
             <h3>Symptoms by cycle phase</h3>
             <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
@@ -307,7 +307,7 @@ export function Insights({ userData }: InsightsProps) {
         </div>
 
         {/* Correlation Chart */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="eb-card mb-6">
           <div className="flex items-center justify-between mb-2">
             <div>
               <h3>Sleep vs Energy</h3>
