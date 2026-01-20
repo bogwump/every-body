@@ -1291,6 +1291,19 @@
   --color-text-secondary: 100 110 105;
 }
 
+
+[data-theme="sage"] {
+  --color-primary: 132 155 130;
+  --color-primary-light: 169 189 167;
+  --color-primary-dark: 103 130 101;
+  --color-accent: 203 186 159;
+  --color-background: 248 250 248;
+  --color-surface: 255 255 255;
+  --color-text: 50 50 50;
+  --color-text-muted: 120 120 120;
+  --color-border: 220 220 220;
+}
+
 [data-theme="lavender"] {
   --color-primary: 156 136 177;
   --color-primary-light: 190 175 207;
