@@ -21,11 +21,12 @@ export function QuickStart({ selectedGoal, onStart }: QuickStartProps) {
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
       <div className="max-w-md w-full">
         <div className="text-center mb-10">
-          
-          <div className="text-sm font-medium tracking-wide text-[rgb(var(--color-text-secondary))] mb-2">EveryBody</div>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgba(var(--color-primary),0.1)] mb-6">
+            <Sparkles className="w-8 h-8 text-[rgb(var(--color-primary))]" />
+          </div>
           <h1 className="mb-3">What brought you here today?</h1>
           <p className="text-base text-[rgb(var(--color-text-secondary))]">
-            No set-up marathon. Start now, tweak anything later.
+            Start straight away. You can personalise everything later.
           </p>
         </div>
 

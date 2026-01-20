@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Send, Sparkles, Clock } from 'lucide-react';
 import type { CheckInEntry, UserData } from '../types';
-import { ENTRIES_KEY, loadFromStorage } from '../lib/storage';
 import { filterByDays, mean } from '../lib/analytics';
+import { COMPANION_NAME, useChat, useEntries } from '../lib/appStore';
 
 interface Message {
   id: string;
@@ -37,9 +37,9 @@ function summarise(entries: CheckInEntry[]) {
 function buildSuggestedQuestions(cycleEnabled: boolean): string[] {
   const base = [
     'What patterns do you notice in my last week?',
-    'Any ideas why I’ve felt tired lately?',
+    'Why might I feel tired lately?',
     'How can I support sleep and energy?',
-    'What might be pushing my stress up?',
+    'What could be increasing my stress?',
   ];
   if (cycleEnabled) {
     base.splice(1, 0, 'How do symptoms usually change across the month?');
@@ -50,15 +50,15 @@ function buildSuggestedQuestions(cycleEnabled: boolean): string[] {
 }
 
 export function AIChat({ userName, userData }: AIChatProps) {
-  const entries = useMemo(() => loadFromStorage<CheckInEntry[]>(ENTRIES_KEY, []), []);
+  const { entries } = useEntries();
   const summary = useMemo(() => summarise(entries), [entries]);
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
 
   const opening = useMemo(() => {
     const parts: string[] = [];
-    parts.push(`Hi ${userName}! I’m here with you.`);
+    parts.push(`Hi ${userName}! I’m ${COMPANION_NAME}, your companion.`);
     if (summary.daysTracked === 0) {
-      parts.push('If you do a quick check-in, I can help you spot patterns as you go.');
+      parts.push('Start with a quick check-in and I’ll help you spot patterns as you go.');
     } else {
       parts.push(`You’ve logged ${summary.daysTracked} day${summary.daysTracked === 1 ? '' : 's'} so far.`);
       if (summary.avgSleep !== null || summary.avgEnergy !== null) {
@@ -68,39 +68,26 @@ export function AIChat({ userName, userData }: AIChatProps) {
         parts.push(`In the last 7 days your average is ${bits.join(' and ')}.`);
       }
       if (!cycleEnabled) {
-        parts.push('Cycle features are off, but you can still track symptoms and spot useful links.');
+        parts.push('Cycle features are off, but you can still track symptoms and get useful correlations.');
       }
     }
-    parts.push('What would feel most helpful right now?');
+    parts.push('What would you like help with today?');
     return parts.join(' ');
   }, [userName, summary, cycleEnabled]);
 
   const suggestedQuestions = useMemo(() => buildSuggestedQuestions(cycleEnabled), [cycleEnabled]);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: opening,
-      sender: 'ai',
-      timestamp: new Date(),
-    },
-  ]);
+  const { messagesWithDate: messages, addMessage } = useChat();
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMessages([
-      {
-        id: '1',
-        text: opening,
-        sender: 'ai',
-        timestamp: new Date(),
-      },
-    ]);
-    // reset suggested questions on mode changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opening]);
+    // If there is no chat history, seed it with the current opening.
+    if (messages.length === 0) {
+      addMessage({ sender: 'ai', text: opening, timestampISO: new Date().toISOString() });
+    }
+  }, [messages.length, addMessage, opening]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -179,7 +166,7 @@ export function AIChat({ userName, userData }: AIChatProps) {
     }
 
     return (
-      "I’m here to help you make sense of what you’re logging and feel a bit more in control. What’s bothering you most right now? We’ll break it down together." +
+      "I’m here to help you make sense of what you’re logging and feel more in control. Tell me what’s bothering you most right now, and we’ll break it down together." +
       softSafety
     );
   };
@@ -195,18 +182,12 @@ export function AIChat({ userName, userData }: AIChatProps) {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    addMessage({ sender: 'user', text: messageText, timestampISO: new Date().toISOString(), id: userMessage.id });
     setInputText('');
     setIsTyping(true);
 
     setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: getAIResponse(messageText),
-        sender: 'ai',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+      addMessage({ sender: 'ai', text: getAIResponse(messageText), timestampISO: new Date().toISOString() });
       setIsTyping(false);
     }, 900);
   };
@@ -228,8 +209,8 @@ export function AIChat({ userName, userData }: AIChatProps) {
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3>Guide</h3>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">Supportive, not a diagnosis</p>
+              <h3>{COMPANION_NAME}</h3>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">Supportive, not medical</p>
             </div>
           </div>
         </div>
@@ -276,7 +257,7 @@ export function AIChat({ userName, userData }: AIChatProps) {
       {messages.length === 1 && (
         <div className="px-6 py-4 bg-white border-t border-neutral-200">
           <div className="max-w-4xl mx-auto">
-            <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">Try one of these:</p>
+            <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">Suggested questions:</p>
             <div className="flex flex-wrap gap-2">
               {suggestedQuestions.map((question, index) => (
                 <button
@@ -301,7 +282,7 @@ export function AIChat({ userName, userData }: AIChatProps) {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask about your patterns, symptoms, or next steps..."
+              placeholder="Ask me anything about your symptoms..."
               className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary))] focus:border-transparent"
             />
             <button

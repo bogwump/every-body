@@ -2,12 +2,13 @@ import React, { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Calendar, TrendingUp, Sparkles, ArrowRight } from 'lucide-react';
 import type { CheckInEntry, UserData, UserGoal } from '../types';
-import { ENTRIES_KEY, loadFromStorage } from '../lib/storage';
+import { useEntries } from '../lib/appStore';
 import { filterByDays, isoToday, estimatePhaseByFlow } from '../lib/analytics';
 
 interface DashboardProps {
   userName: string;
   userGoal: UserGoal | null;
+  userData: UserData;
   onNavigate: (screen: string) => void;
 }
 
@@ -36,14 +37,14 @@ function buildWeekSeries(entries: CheckInEntry[]) {
   return out;
 }
 
-export function Dashboard({ userName, userGoal, onNavigate }: DashboardProps) {
+export function Dashboard({ userName, userGoal, userData, onNavigate }: DashboardProps) {
   const todayLabel = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   });
 
-  const entries = useMemo(() => loadFromStorage<CheckInEntry[]>(ENTRIES_KEY, []), []);
+  const { entries } = useEntries();
   const weekEntries = useMemo(() => filterByDays(entries, 7), [entries]);
   const weekSeries = useMemo(() => buildWeekSeries(weekEntries), [weekEntries]);
 
@@ -53,18 +54,7 @@ export function Dashboard({ userName, userGoal, onNavigate }: DashboardProps) {
   }, [entries]);
 
   // Cycle card copy: only show cycle-phase messaging if user enabled cycle tracking AND we have any flow logs
-  const cycleMode: UserData['cycleTrackingMode'] = (() => {
-    // user data is stored elsewhere; Dashboard currently doesn't receive it.
-    // We derive mode from persisted user profile v2 if available.
-    try {
-      const raw = localStorage.getItem('everybody:user:v2');
-      if (!raw) return 'cycle';
-      const parsed = JSON.parse(raw) as Partial<UserData>;
-      return parsed.cycleTrackingMode ?? 'cycle';
-    } catch {
-      return 'cycle';
-    }
-  })();
+  const cycleMode: UserData['cycleTrackingMode'] = userData.cycleTrackingMode;
 
   const hasFlow = useMemo(
     () => entries.some((e) => typeof e.values.flow === 'number' && e.values.flow > 0),
@@ -79,9 +69,9 @@ export function Dashboard({ userName, userGoal, onNavigate }: DashboardProps) {
   const companion = useMemo(() => {
     if (!hasCheckedInToday) {
       return {
-        title:  'Shall we do a quick check-in?',
-        body: 'It looks like you haven’t checked in today. A tiny check-in now makes patterns easier to spot later.',
-        cta: 'Check in now',
+        title: 'Quick check-in?',
+        body: 'It looks like you haven’t checked in today. 30 seconds now can make patterns easier to spot later.',
+        cta: 'Do today’s check-in',
         action: 'check-in' as const,
       };
     }
@@ -96,16 +86,16 @@ export function Dashboard({ userName, userGoal, onNavigate }: DashboardProps) {
 
     if (isFinite(avgSleep) && avgSleep < 45 && isFinite(avgEnergy) && avgEnergy < 45) {
       return {
-        title: 'Want me to help you join the dots?',
-        body: 'Over the last week, low sleep and low energy are turning up together. Want to explore what might be driving it?',
-        cta: 'Open Insights',
+        title: 'Want help making sense of this?',
+        body: 'Your last week looks like low sleep and low energy are showing up together. Want to explore patterns?',
+        cta: 'See Insights',
         action: 'insights' as const,
       };
     }
     return {
-      title: 'Nice work showing up',
-      body: 'If you like, I can look for gentle links between symptoms and your week. No judgement.',
-      cta: 'Show me what you see',
+      title: 'Nice work keeping up the habit',
+      body: 'If you want, we can look for links between symptoms and lifestyle across the last few weeks.',
+      cta: 'Show me insights',
       action: 'insights' as const,
     };
   }, [entries, hasCheckedInToday]);

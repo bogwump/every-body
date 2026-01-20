@@ -23,14 +23,12 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
             <Sparkles className="w-8 h-8 text-[rgb(var(--color-primary))]" />
           </div>
           <h1 className="mb-4">Welcome to EveryBody</h1>
-          <p className="text-lg">
-            Your friendly companion for spotting patterns and feeling more in control
-          </p>
+          <p className="text-lg">A calm place to track symptoms and spot patterns, one day at a time</p>
         </div>
         <div className="space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm mb-2 text-[rgb(var(--color-text))]">
-              What should I call you?
+              What should we call you?
             </label>
             <input
               type="text"
@@ -42,7 +40,7 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
                   handleSubmit(e);
                 }
               }}
-              placeholder="Your name (optional)"
+              placeholder="Enter your name"
               className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary))] focus:border-transparent bg-white transition-all"
               autoFocus
             />

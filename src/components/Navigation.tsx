@@ -10,7 +10,7 @@ const navItems = [
   { id: 'dashboard', label: 'Home', icon: Home },
   { id: 'check-in', label: 'Check-in', icon: Calendar },
   { id: 'insights', label: 'Insights', icon: TrendingUp },
-  { id: 'chat', label: 'Guide', icon: MessageCircle },
+  { id: 'chat', label: 'Chat', icon: MessageCircle },
   { id: 'resources', label: 'Learn', icon: BookOpen },
   { id: 'profile', label: 'Profile', icon: User },
 ];

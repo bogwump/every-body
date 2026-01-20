@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { User, Palette, Bell, Lock, HelpCircle, LogOut, ChevronRight, Check, Download } from 'lucide-react';
 import type { CheckInEntry, ColorTheme, SymptomKey, UserData } from '../types';
-import { ENTRIES_KEY, loadFromStorage, downloadTextFile } from '../lib/storage';
+import { downloadTextFile } from '../lib/storage';
+import { useEntries } from '../lib/appStore';
 import { calculateStreak } from '../lib/analytics';
 
 interface ProfileSettingsProps {
@@ -55,7 +56,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData }: P
     periodPrediction: true,
   });
 
-  const entries = useMemo(() => loadFromStorage<CheckInEntry[]>(ENTRIES_KEY, []), []);
+  const { entries } = useEntries();
   const daysTracked = entries.length;
   const streak = calculateStreak(entries);
 

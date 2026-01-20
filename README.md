@@ -1,21 +1,11 @@
-# EveryBody
 
-EveryBody is a friendly, minimalist hormone and symptom tracking companion.
+  # EveryBody
 
-## Running the app
+  A lightweight, friendly hormone and symptom tracking app. Built for a "do first, personalise later" onboarding, optional cycle tracking (including a no-period mode), modular symptom modules, and data-driven insights.
 
-Install dependencies:
+  ## Running the code
 
-```bash
-npm i
-```
+  Run `npm i` to install the dependencies.
 
-Start the development server:
-
-```bash
-npm run dev
-```
-
-## Notes
-
-- Cycle tracking is optional. You can track symptoms with or without bleeding/periods.
+  Run `npm run dev` to start the development server.
+  

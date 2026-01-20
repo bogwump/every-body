@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Battery, Moon, Heart, Droplet, Zap, Brain, Wind, Check, Smile, Meh, Frown } from 'lucide-react';
 import type { CheckInEntry, SymptomKey, UserData } from '../types';
-import { ENTRIES_KEY, loadFromStorage, saveToStorage } from '../lib/storage';
 import { isoToday } from '../lib/analytics';
+import { useEntries } from '../lib/appStore';
 
 interface DailyCheckInProps {
   userData: UserData;
@@ -26,16 +26,6 @@ const sliderMeta: Record<Exclude<SymptomKey, never>, { label: string; icon: Reac
   bloating: { label: 'Bloating', icon: Wind, color: 'text-teal-500' },
 };
 
-function upsertEntry(entries: CheckInEntry[], entry: CheckInEntry): CheckInEntry[] {
-  const idx = entries.findIndex((e) => e.dateISO === entry.dateISO);
-  if (idx >= 0) {
-    const updated = [...entries];
-    updated[idx] = entry;
-    return updated;
-  }
-  return [...entries, entry];
-}
-
 export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckInProps) {
   const todayISO = isoToday();
   const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | null>(null);
@@ -43,7 +33,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
   const [values, setValues] = useState<Partial<Record<SymptomKey, number>>>({});
   const [submitted, setSubmitted] = useState(false);
 
-  const entries = useMemo(() => loadFromStorage<CheckInEntry[]>(ENTRIES_KEY, []), []);
+  const { entries, upsertEntry } = useEntries();
   const existingToday = useMemo(() => entries.find((e) => e.dateISO === todayISO), [entries, todayISO]);
 
   // Populate defaults / existing entry
@@ -95,9 +85,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
       updatedAt: now,
     };
 
-    const current = loadFromStorage<CheckInEntry[]>(ENTRIES_KEY, []);
-    const updated = upsertEntry(current, next);
-    saveToStorage(ENTRIES_KEY, updated);
+    upsertEntry(next);
 
     setSubmitted(true);
     setTimeout(() => {
@@ -112,15 +100,15 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
     <div className="min-h-screen px-6 py-8">
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
-          <h1 className="mb-2">Check-in</h1>
-          <p>How are you feeling, really?</p>
+          <h1 className="mb-2">Daily Check-in</h1>
+          <p>How are you feeling today?</p>
         </div>
 
         {/* Friendly note for no-cycle users */}
         {userData.cycleTrackingMode === 'no-cycle' && (
           <div className="bg-white rounded-2xl p-5 mb-6 shadow-sm border border-neutral-200">
             <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-              You can track symptoms without bleeding or a cycle. If you ever want cycle-phase insights, you can switch them on in Profile.
+              You can track symptoms even without a cycle. If you ever want to use cycle-phase insights, you can switch it on in Profile.
             </p>
           </div>
         )}

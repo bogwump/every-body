@@ -8,8 +8,8 @@ import { Resources } from './components/Resources';
 import { ProfileSettings } from './components/ProfileSettings';
 import { Navigation } from './components/Navigation';
 
-import type { ColorTheme, UserData, UserGoal } from './types';
-import { USER_KEY, loadFromStorage, saveToStorage } from './lib/storage';
+import type { UserData, UserGoal } from './types';
+import { APP_NAME, useUser } from './lib/appStore';
 
 const DEFAULT_USER: UserData = {
   name: '',
@@ -22,17 +22,17 @@ const DEFAULT_USER: UserData = {
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
-  const [userData, setUserData] = useState<UserData>(() => loadFromStorage<UserData>(USER_KEY, DEFAULT_USER));
+  const { user: userData, updateUser: setUserData } = useUser(DEFAULT_USER);
 
   // Apply theme to root
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', userData.colorTheme);
   }, [userData.colorTheme]);
 
-  // Persist user profile
+  // Page title (nice in iOS Safari PWA contexts)
   useEffect(() => {
-    saveToStorage(USER_KEY, userData);
-  }, [userData]);
+    document.title = APP_NAME;
+  }, []);
 
   const onboardingComplete = userData.onboardingComplete;
 
@@ -45,7 +45,7 @@ export default function App() {
   const main = useMemo(() => {
     switch (currentScreen) {
       case 'dashboard':
-        return <Dashboard userName={userData.name} userGoal={userData.goal} onNavigate={setCurrentScreen} />;
+        return <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} />;
       case 'check-in':
         return (
           <DailyCheckIn
@@ -64,12 +64,12 @@ export default function App() {
         return (
           <ProfileSettings
             userData={userData}
-            onUpdateTheme={(theme) => setUserData((prev) => ({ ...prev, colorTheme: theme as ColorTheme }))}
+            onUpdateTheme={(theme) => setUserData((prev) => ({ ...prev, colorTheme: theme }))}
             onUpdateUserData={setUserData}
           />
         );
       default:
-        return <Dashboard userName={userData.name} userGoal={userData.goal} onNavigate={setCurrentScreen} />;
+        return <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} />;
     }
   }, [currentScreen, userData]);
 

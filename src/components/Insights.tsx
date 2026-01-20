@@ -13,7 +13,8 @@ import {
 } from 'recharts';
 import { TrendingUp, Calendar, Lightbulb, ChevronDown } from 'lucide-react';
 import type { CheckInEntry, CyclePhase, SymptomKey, UserData } from '../types';
-import { ENTRIES_KEY, loadFromStorage, downloadTextFile } from '../lib/storage';
+import { downloadTextFile } from '../lib/storage';
+import { useEntries } from '../lib/appStore';
 import { calculateStreak, filterByDays, labelCorrelation, pearsonCorrelation, estimatePhaseByFlow, sortByDateAsc } from '../lib/analytics';
 
 interface InsightsProps {
@@ -50,8 +51,11 @@ function averageFor(entries: CheckInEntry[], key: SymptomKey): number {
 export function Insights({ userData }: InsightsProps) {
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('month');
 
-  const entriesAll = useMemo(() => loadFromStorage<CheckInEntry[]>(ENTRIES_KEY, []), []);
-  const entries = useMemo(() => filterByDays(entriesAll, timeframeDays(selectedTimeframe)), [entriesAll, selectedTimeframe]);
+  const { entries: entriesAll } = useEntries();
+  const entries = useMemo(
+    () => filterByDays(entriesAll, timeframeDays(selectedTimeframe)),
+    [entriesAll, selectedTimeframe]
+  );
   const entriesSorted = useMemo(() => sortByDateAsc(entries), [entries]);
 
   const sleep = useMemo(() => entriesSorted.map((e) => e.values.sleep).filter(hasNumeric), [entriesSorted]);

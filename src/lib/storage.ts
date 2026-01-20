@@ -29,7 +29,11 @@ export function loadFromStorage<T>(key: string, fallback: T): T {
 export function saveToStorage<T>(key: string, value: T): void {
   try {
     const raw = safeJsonStringify(value);
-    if (raw) localStorage.setItem(key, raw);
+    if (raw) {
+      localStorage.setItem(key, raw);
+      // Notify same-tab listeners. The native "storage" event only fires across documents.
+      window.dispatchEvent(new CustomEvent('everybody:storage', { detail: { key } }));
+    }
   } catch {
     // ignore
   }
