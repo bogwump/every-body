@@ -1,7 +1,10 @@
 node_modules/
 dist/
+build/
 .vite/
+.DS_Store
+
 .env
 .env.local
-.DS_Store
+.env.*.local
 
