@@ -200,10 +200,10 @@ export function AIChat({ userName, userData }: AIChatProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-white/85 backdrop-blur border-b border-neutral-200/70 px-6 py-4 flex-shrink-0">
-        <div className="eb-container max-w-4xl">
+      <div className="bg-white border-b border-neutral-200 px-6 py-4 flex-shrink-0">
+        <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[rgb(var(--color-primary))] to-[rgb(var(--color-primary-dark))] flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
@@ -217,15 +217,13 @@ export function AIChat({ userName, userData }: AIChatProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 bg-[rgb(var(--color-background))]">
-        <div className="eb-container max-w-4xl space-y-4">
+      <div className="flex-1 overflow-y-auto px-6 py-6 bg-neutral-50">
+        <div className="max-w-4xl mx-auto space-y-4">
           {messages.map((message) => (
             <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`max-w-[80%] md:max-w-[70%] rounded-2xl px-4 py-3 ${
-                  message.sender === 'user'
-                    ? 'bg-[rgb(var(--color-primary))] text-white shadow-sm'
-                    : 'bg-white border border-neutral-200/70 shadow-sm'
+                  message.sender === 'user' ? 'bg-[rgb(var(--color-primary))] text-white' : 'bg-white border border-neutral-200'
                 }`}
               >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>

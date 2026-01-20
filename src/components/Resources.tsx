@@ -76,8 +76,8 @@ export function Resources({ userGoal }: ResourcesProps) {
   };
 
   return (
-    <div className="min-h-screen py-10">
-      <div className="eb-container">
+    <div className="min-h-screen px-6 py-8">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2">Resources & Learning</h1>

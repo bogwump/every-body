@@ -114,8 +114,8 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
   }, [cycleMode, todayPhase]);
 
   return (
-    <div className="min-h-screen py-10">
-      <div className="eb-container">
+    <div className="min-h-screen px-6 py-8 md:pl-8">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2">Welcome back{userName ? `, ${userName}` : ''}</h1>
@@ -159,7 +159,7 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
         {/* Companion Card */}
         <button
           onClick={() => onNavigate(companion.action)}
-          className="eb-card eb-card-hover mb-6 text-left"
+          className="bg-white rounded-2xl p-6 mb-6 shadow-sm hover:shadow-md transition-all text-left border border-neutral-200"
         >
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-primary),0.1)] flex items-center justify-center flex-shrink-0">
@@ -177,7 +177,7 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <button
             onClick={() => onNavigate('check-in')}
-            className="eb-card eb-card-hover text-left group"
+            className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all text-left group"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-primary),0.1)] flex items-center justify-center">
@@ -191,7 +191,7 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
 
           <button
             onClick={() => onNavigate('insights')}
-            className="eb-card eb-card-hover text-left group"
+            className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all text-left group"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-accent),0.2)] flex items-center justify-center">
@@ -205,7 +205,7 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
 
           <button
             onClick={() => onNavigate('chat')}
-            className="eb-card eb-card-hover text-left group"
+            className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all text-left group"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-accent),0.2)] flex items-center justify-center">
@@ -219,7 +219,7 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
         </div>
 
         {/* Weekly Trends */}
-        <div className="eb-card mb-6">
+        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <h3>Your Week at a Glance</h3>
             <span className="text-xs text-[rgb(var(--color-text-secondary))]">Based on your check-ins</span>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { QuickStart } from './components/onboarding/QuickStart';
 import { DailyCheckIn } from './components/DailyCheckIn';
 import { Dashboard } from './components/Dashboard';
 import { Insights } from './components/Insights';
@@ -8,7 +8,7 @@ import { Resources } from './components/Resources';
 import { ProfileSettings } from './components/ProfileSettings';
 import { Navigation } from './components/Navigation';
 
-import type { UserData } from './types';
+import type { UserData, UserGoal } from './types';
 import { APP_NAME, useUser } from './lib/appStore';
 
 const DEFAULT_USER: UserData = {
@@ -35,6 +35,12 @@ export default function App() {
   }, []);
 
   const onboardingComplete = userData.onboardingComplete;
+
+  const handleQuickStart = (goal: UserGoal | null) => {
+    setUserData((prev) => ({ ...prev, goal, onboardingComplete: true }));
+    // Do-first: drop them straight into the check-in
+    setCurrentScreen('check-in');
+  };
 
   const main = useMemo(() => {
     switch (currentScreen) {
@@ -67,27 +73,10 @@ export default function App() {
     }
   }, [currentScreen, userData]);
 
-  const shouldShowOnboarding =
-    !onboardingComplete || !userData.name.trim() || userData.goal == null;
-
-  if (shouldShowOnboarding) {
+  if (!onboardingComplete) {
     return (
-      <div className="min-h-screen eb-surface">
-        <OnboardingFlow
-          initialName={userData.name}
-          initialGoal={userData.goal}
-          initialTheme={userData.colorTheme}
-          onComplete={({ name, goal, colorTheme }) => {
-            setUserData((prev) => ({
-              ...prev,
-              name,
-              goal,
-              colorTheme,
-              onboardingComplete: true,
-            }));
-            setCurrentScreen('check-in');
-          }}
-        />
+      <div className="min-h-screen bg-neutral-50">
+        <QuickStart selectedGoal={userData.goal} onStart={handleQuickStart} />
       </div>
     );
   }
@@ -95,9 +84,7 @@ export default function App() {
   return (
     <>
       <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
-      <div className="md:ml-64 min-h-screen eb-surface pb-20 md:pb-0 md:pl-8">
-        {main}
-      </div>
+      <div className="md:ml-64 min-h-screen bg-neutral-50 pb-20 md:pb-0 md:pl-8">{main}</div>
     </>
   );
 }

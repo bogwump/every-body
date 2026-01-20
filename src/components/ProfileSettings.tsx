@@ -123,8 +123,8 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData }: P
   };
 
   return (
-    <div className="min-h-screen py-10">
-      <div className="eb-container max-w-3xl">
+    <div className="min-h-screen px-6 py-8">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2">Profile & Settings</h1>
