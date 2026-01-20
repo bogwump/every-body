@@ -132,14 +132,14 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData }: P
         </div>
 
         {/* Profile Card */}
-        <div className="bg-gradient-to-br from-[rgb(var(--color-primary))] to-[rgb(var(--color-primary-dark))] rounded-2xl p-6 mb-6 text-white shadow-lg">
+        <div className="bg-gradient-to-br from-[rgb(var(--color-primary))] to-[rgb(var(--color-primary-dark))] rounded-2xl p-6 mb-6 text-[rgb(var(--color-text))] shadow-lg">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-white bg-opacity-20 flex items-center justify-center text-2xl font-medium">
+            <div className="w-16 h-16 rounded-full bg-[rgba(255,255,255,0.45)] border border-[rgba(0,0,0,0.12)] flex items-center justify-center text-2xl font-medium">
               {(userData.name?.trim()?.charAt(0) || '?').toUpperCase()}
             </div>
             <div>
-              <h2 className="text-white mb-1">{userData.name?.trim() || 'Friend'}</h2>
-              <p className="text-white text-opacity-90 text-sm">
+              <h2 className="mb-1">{userData.name?.trim() || 'Friend'}</h2>
+              <p className="text-sm text-[rgba(0,0,0,0.85)]">
                 {userData.goal === 'cycle-health' && 'Tracking cycle health'}
                 {userData.goal === 'perimenopause' && 'Perimenopause support'}
                 {userData.goal === 'post-contraception' && 'Post-contraception journey'}
@@ -148,18 +148,18 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData }: P
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-white border-opacity-20">
+          <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-[rgba(0,0,0,0.12)]">
             <div>
-              <p className="text-xs text-white text-opacity-80 mb-1">Days tracked</p>
-              <p className="text-xl font-medium text-white">{daysTracked}</p>
+              <p className="text-xs opacity-80 mb-1">Days tracked</p>
+              <p className="text-xl font-medium">{daysTracked}</p>
             </div>
             <div>
-              <p className="text-xs text-white text-opacity-80 mb-1">Current streak</p>
-              <p className="text-xl font-medium text-white">{streak}</p>
+              <p className="text-xs opacity-80 mb-1">Current streak</p>
+              <p className="text-xl font-medium">{streak}</p>
             </div>
             <div>
-              <p className="text-xs text-white text-opacity-80 mb-1">Insights</p>
-              <p className="text-xl font-medium text-white">{insightsUnlocked}</p>
+              <p className="text-xs opacity-80 mb-1">Insights</p>
+              <p className="text-xl font-medium">{insightsUnlocked}</p>
             </div>
           </div>
         </div>

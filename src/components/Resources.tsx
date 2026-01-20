@@ -118,14 +118,14 @@ export function Resources({ userGoal }: ResourcesProps) {
         </div>
 
         {/* Featured Resource */}
-        <div className="bg-gradient-to-br from-[rgb(var(--color-primary))] to-[rgb(var(--color-primary-dark))] rounded-2xl p-8 mb-8 text-white">
+        <div className="bg-gradient-to-br from-[rgb(var(--color-primary))] to-[rgb(var(--color-primary-dark))] rounded-2xl p-8 mb-8 text-[rgb(var(--color-text))]">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
-              <span className="text-xs px-3 py-1 rounded-full bg-white bg-opacity-20 text-white mb-3 inline-block">
+              <span className="text-xs px-3 py-1 rounded-full bg-[rgba(255,255,255,0.45)] border border-[rgba(0,0,0,0.12)] mb-3 inline-block">
                 Featured
               </span>
-              <h2 className="text-white mb-3">Cycle Syncing Masterclass</h2>
-              <p className="text-white text-opacity-90 mb-4">
+              <h2 className="mb-3">Cycle Syncing Masterclass</h2>
+              <p className="text-[rgba(0,0,0,0.85)] mb-4">
                 Learn how to align your lifestyle, nutrition, and activities with your natural hormonal rhythm
               </p>
               <button className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-[rgb(var(--color-primary))] hover:shadow-lg transition-all font-medium">
