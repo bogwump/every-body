@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+:root {
+  /* Sage theme (default) */
+  --color-primary: 132 155 130;
+  --color-primary-light: 169 189 167;
+  --color-primary-dark: 96 115 94;
+  --color-accent: 203 186 159;
+  --color-background: 249 248 246;
+  --color-surface: 255 255 255;
+  --color-text: 45 55 50;
+  --color-text-secondary: 100 110 105;
+}
+
+[data-theme="lavender"] {
+  --color-primary: 156 136 177;
+  --color-primary-light: 190 175 207;
+  --color-primary-dark: 122 102 147;
+  --color-accent: 217 186 203;
+  --color-background: 250 248 251;
+  --color-surface: 255 255 255;
+  --color-text: 50 45 60;
+  --color-text-secondary: 110 100 120;
+}
+
+[data-theme="ocean"] {
+  --color-primary: 115 155 175;
+  --color-primary-light: 158 191 207;
+  --color-primary-dark: 82 125 145;
+  --color-accent: 186 216 217;
+  --color-background: 247 250 251;
+  --color-surface: 255 255 255;
+  --color-text: 40 50 60;
+  --color-text-secondary: 95 110 120;
+}
+
+[data-theme="terracotta"] {
+  --color-primary: 190 130 110;
+  --color-primary-light: 215 170 155;
+  --color-primary-dark: 160 100 80;
+  --color-accent: 225 195 170;
+  --color-background: 251 248 246;
+  --color-surface: 255 255 255;
+  --color-text: 60 45 40;
+  --color-text-secondary: 120 100 90;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-text));
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgb(var(--color-text));
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: rgb(var(--color-text));
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: rgb(var(--color-text));
+}
+
+p {
+  line-height: 1.6;
+  color: rgb(var(--color-text-secondary));
+}
+
+@media (max-width: 768px) {
+  h1 {
+    font-size: 1.75rem;
+  }
+  
+  h2 {
+    font-size: 1.25rem;
+  }
+}
