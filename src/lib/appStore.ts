@@ -13,6 +13,21 @@ const CHAT_KEY = "everybody:chat";
 export type CheckInEntry = any;
 export type ChatMessage = any;
 
+// Chat message shapes
+type StoredChatMessage = {
+  id?: string;
+  sender: "user" | "ai";
+  text: string;
+  timestampISO?: string;
+};
+
+export type ChatMessageWithDate = {
+  id: string;
+  sender: "user" | "ai";
+  text: string;
+  timestamp: Date;
+};
+
 // ---- Stable fallbacks ----
 const EMPTY_ENTRIES: CheckInEntry[] = [];
 const EMPTY_CHAT: ChatMessage[] = [];
@@ -88,7 +103,14 @@ function normaliseEntries(value: unknown): CheckInEntry[] {
 }
 
 function normaliseChat(value: unknown): ChatMessage[] {
-  return Array.isArray(value) ? value : [];
+  if (Array.isArray(value)) return value;
+
+  // Legacy/alternate shape support
+  if (value && typeof value === "object" && Array.isArray((value as any).messages)) {
+    return (value as any).messages;
+  }
+
+  return [];
 }
 
 // ---- Cross-tab updates ----
@@ -157,15 +179,38 @@ export function useChat() {
     () => EMPTY_CHAT
   );
 
-  const messages = normaliseChat(raw);
+  const messages = normaliseChat(raw) as StoredChatMessage[];
 
-  const addMessage = (message: ChatMessage) => {
-    writeCached(CHAT_KEY, [...messages, message]);
+  // Convert stored messages to a stable in-memory shape (Date objects, ids)
+  const messagesWithDate: ChatMessageWithDate[] = messages.map((m, idx) => {
+    const iso = typeof m.timestampISO === "string" && m.timestampISO ? m.timestampISO : "";
+    const id =
+      typeof m.id === "string" && m.id.trim()
+        ? m.id
+        : `${m.sender || "msg"}-${iso || "no-ts"}-${idx}`;
+    const d = new Date(iso);
+    return {
+      id,
+      sender: m.sender === "user" || m.sender === "ai" ? m.sender : "ai",
+      text: typeof m.text === "string" ? m.text : "",
+      timestamp: !iso || Number.isNaN(d.getTime()) ? new Date() : d,
+    };
+  });
+
+  const addMessage = (message: StoredChatMessage) => {
+    const next: StoredChatMessage = {
+      id: message.id || Date.now().toString(),
+      sender: message.sender,
+      text: message.text,
+      timestampISO: message.timestampISO || new Date().toISOString(),
+    };
+
+    writeCached(CHAT_KEY, [...messages, next]);
   };
 
   const clearChat = () => {
     writeCached(CHAT_KEY, []);
   };
 
-  return { messages, addMessage, clearChat };
+  return { messages, messagesWithDate, addMessage, clearChat };
 }

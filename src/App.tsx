@@ -75,7 +75,7 @@ export default function App() {
 
   if (!onboardingComplete) {
     return (
-      <div className="min-h-screen bg-neutral-50">
+      <div className="min-h-screen eb-surface">
         <QuickStart selectedGoal={userData.goal} onStart={handleQuickStart} />
       </div>
     );
@@ -84,7 +84,7 @@ export default function App() {
   return (
     <>
       <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
-      <div className="md:ml-64 min-h-screen bg-neutral-50 pb-20 md:pb-0 md:pl-8">{main}</div>
+      <div className="md:ml-64 min-h-screen eb-surface pb-20 md:pb-0 md:pl-8">{main}</div>
     </>
   );
 }

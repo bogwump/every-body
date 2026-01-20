@@ -101,17 +101,21 @@ body {
   }
 
   /* Buttons (duplicate base styles so components can keep using eb-btn-primary/secondary only) */
-  .eb-btn-primary {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.99];
+    .eb-btn-primary {
+    /* Tailwind v4: avoid state variants inside @apply (e.g. active:, hover:, focus:) */
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition;
     color: white;
     background: rgb(var(--color-primary));
   }
   .eb-btn-primary:hover {
     background: rgb(var(--color-primary-dark));
   }
+  .eb-btn-primary:active {
+    transform: scale(0.99);
+  }
 
   .eb-btn-secondary {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.99];
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition;
     background: white;
     color: rgb(var(--color-text));
     border: 1px solid rgb(228 228 231 / 0.7);
@@ -119,8 +123,10 @@ body {
   .eb-btn-secondary:hover {
     background: rgb(250 250 250);
   }
-
-  .eb-input {
+  .eb-btn-secondary:active {
+    transform: scale(0.99);
+  }
+.eb-input {
     @apply w-full rounded-xl px-3 py-2 text-sm shadow-sm outline-none transition;
     background: white;
     border: 1px solid rgb(228 228 231 / 1);
