@@ -13,11 +13,19 @@ import {
   LineChart,
   Line,
 } from 'recharts';
-import { TrendingUp, Calendar, Lightbulb, ChevronDown } from 'lucide-react';
+import { TrendingUp, Calendar, Lightbulb, ChevronDown, MoonStar, Zap, Droplets, Sparkles, Activity, ArrowRight } from 'lucide-react';
 import type { CheckInEntry, CyclePhase, SymptomKey, UserData } from '../types';
 import { downloadTextFile } from '../lib/storage';
 import { useEntries } from '../lib/appStore';
-import { calculateStreak, filterByDays, labelCorrelation, pearsonCorrelation, estimatePhaseByFlow, sortByDateAsc } from '../lib/analytics';
+import {
+  calculateStreak,
+  computeCycleStats,
+  filterByDays,
+  labelCorrelation,
+  pearsonCorrelation,
+  estimatePhaseByFlow,
+  sortByDateAsc,
+} from '../lib/analytics';
 
 interface InsightsProps {
   userData: UserData;
@@ -50,16 +58,104 @@ function averageFor(entries: CheckInEntry[], key: SymptomKey): number {
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
+
+function insightIcon(title: string) {
+  const t = title.toLowerCase();
+  if (t.includes('sleep')) return MoonStar;
+  if (t.includes('energy')) return Zap;
+  if (t.includes('cycle') || t.includes('phase') || t.includes('flow')) return Droplets;
+  if (t.includes('stress') || t.includes('pain')) return Activity;
+  if (t.includes('start')) return Sparkles;
+  return Lightbulb;
+}
+
+function MiniIllustration({ kind }: { kind: 'spark' | 'droplet' | 'moon' | 'chart' }) {
+  // Simple inline SVGs so we don't need image assets.
+  // Uses currentColor so it stays on-brand with theme variables.
+  if (kind === 'droplet') {
+    return (
+      <svg viewBox="0 0 64 64" className="w-12 h-12" aria-hidden="true">
+        <path
+          d="M32 6c10 14 18 23 18 34a18 18 0 1 1-36 0C14 29 22 20 32 6Z"
+          fill="currentColor"
+          opacity="0.12"
+        />
+        <path
+          d="M24 41c2 5 7 8 13 8"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          opacity="0.45"
+        />
+      </svg>
+    );
+  }
+  if (kind === 'moon') {
+    return (
+      <svg viewBox="0 0 64 64" className="w-12 h-12" aria-hidden="true">
+        <path
+          d="M39 8c-8 3-14 11-14 21 0 12 10 22 22 22 3 0 6-.6 9-1.8C52 56 44 60 35 60 20 60 8 48 8 33 8 21 15 11 26 8c4-1 9-1 13 0Z"
+          fill="currentColor"
+          opacity="0.12"
+        />
+        <circle cx="44" cy="22" r="3" fill="currentColor" opacity="0.35" />
+      </svg>
+    );
+  }
+  if (kind === 'chart') {
+    return (
+      <svg viewBox="0 0 64 64" className="w-12 h-12" aria-hidden="true">
+        <rect x="10" y="12" width="44" height="40" rx="10" fill="currentColor" opacity="0.10" />
+        <path
+          d="M18 42l10-10 8 6 12-16"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.45"
+        />
+        <circle cx="18" cy="42" r="3" fill="currentColor" opacity="0.35" />
+        <circle cx="28" cy="32" r="3" fill="currentColor" opacity="0.35" />
+        <circle cx="36" cy="38" r="3" fill="currentColor" opacity="0.35" />
+        <circle cx="48" cy="22" r="3" fill="currentColor" opacity="0.35" />
+      </svg>
+    );
+  }
+  // spark
+  return (
+    <svg viewBox="0 0 64 64" className="w-12 h-12" aria-hidden="true">
+      <path
+        d="M32 10l3 10 10 3-10 3-3 10-3-10-10-3 10-3 3-10Z"
+        fill="currentColor"
+        opacity="0.16"
+      />
+      <path d="M49 36l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6Z" fill="currentColor" opacity="0.12" />
+    </svg>
+  );
+}
+
+function timeframeLabel(tf: Timeframe): string {
+  return tf === 'week' ? 'Week' : tf === 'month' ? 'Month' : '3 Months';
+}
+
 export function Insights({ userData }: InsightsProps) {
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('month');
   const [moodMonths, setMoodMonths] = useState<number>(1); // 1,3,6,12
 
   const { entries: entriesAll } = useEntries();
+  const entriesAllSorted = useMemo(() => sortByDateAsc(entriesAll), [entriesAll]);
   const entries = useMemo(
     () => filterByDays(entriesAll, timeframeDays(selectedTimeframe)),
     [entriesAll, selectedTimeframe]
   );
   const entriesSorted = useMemo(() => sortByDateAsc(entries), [entries]);
+
+  // Cycle phases: optional, only when user enables cycle mode AND they have any flow logs
+  const cycleEnabled = userData.cycleTrackingMode === 'cycle';
+
+  // Small summary stats used across the page
+  const streak = useMemo(() => calculateStreak(entriesAllSorted), [entriesAllSorted]);
+  const cycleStats = useMemo(() => (cycleEnabled ? computeCycleStats(entriesAllSorted) : null), [cycleEnabled, entriesAllSorted]);
 
   const sleep = useMemo(() => entriesSorted.map((e) => e.values.sleep).filter(hasNumeric), [entriesSorted]);
   const energy = useMemo(() => entriesSorted.map((e) => e.values.energy).filter(hasNumeric), [entriesSorted]);
@@ -82,9 +178,6 @@ export function Insights({ userData }: InsightsProps) {
     const ys = correlationData.map((p) => p.energy);
     return pearsonCorrelation(xs, ys);
   }, [correlationData]);
-
-  // Cycle phases: optional, only when user enables cycle mode AND they have any flow logs
-  const cycleEnabled = userData.cycleTrackingMode === 'cycle';
   const hasFlow = useMemo(() => entriesAll.some((e) => hasNumeric(e.values.flow) && e.values.flow > 0), [entriesAll]);
 
   const phaseBuckets = useMemo(() => {
@@ -124,7 +217,7 @@ export function Insights({ userData }: InsightsProps) {
   }, [phaseBuckets]);
 
   const keyInsights = useMemo(() => {
-    const list: Array<{ title: string; description: string; tag: string }> = [];
+    const list: Array<{ title: string; description: string; tag: string; illustration: 'spark' | 'droplet' | 'moon' | 'chart' }> = [];
     if (correlationData.length >= 5) {
       const tag = labelCorrelation(rSleepEnergy);
       const direction = isFinite(rSleepEnergy) ? (rSleepEnergy > 0.2 ? 'tend to rise together' : rSleepEnergy < -0.2 ? 'tend to move in opposite directions' : 'don’t show a clear link yet') : 'need more data';
@@ -132,12 +225,14 @@ export function Insights({ userData }: InsightsProps) {
         title: 'Sleep and energy',
         description: `In your data, sleep and energy ${direction}.`,
         tag,
+        illustration: 'chart',
       });
     } else {
       list.push({
         title: 'Start spotting patterns',
         description: 'Log a few more days and we’ll begin showing meaningful links between symptoms.',
         tag: 'Keep going',
+        illustration: 'spark',
       });
     }
 
@@ -147,12 +242,14 @@ export function Insights({ userData }: InsightsProps) {
           title: 'Cycle phase patterns',
           description: 'If you log bleeding or spotting (optional), we can estimate phases and show how symptoms change across the month.',
           tag: 'Optional',
+          illustration: 'droplet',
         });
       } else {
         list.push({
           title: 'Cycle insights are ready when you are',
           description: 'Turn on the flow module if you want phase-based charts. You can still track symptoms without it.',
           tag: 'Your choice',
+          illustration: 'droplet',
         });
       }
     } else {
@@ -160,6 +257,7 @@ export function Insights({ userData }: InsightsProps) {
         title: 'No-cycle mode',
         description: 'Cycle features are off. You’ll still get correlations and symptom trends based on your daily check-ins.',
         tag: 'Enabled',
+        illustration: 'chart',
       });
     }
 
@@ -172,12 +270,27 @@ export function Insights({ userData }: InsightsProps) {
           title: 'Stress and sleep',
           description: 'Your recent week shows higher stress alongside lower sleep. Want a few gentle options to try?',
           tag: 'Worth exploring',
+          illustration: 'moon',
         });
       }
     }
 
+    // Always keep the grid feeling balanced: if we still have fewer than 3 cards,
+    // add a small "snapshot" card that also makes timeframe switching feel responsive.
+    if (list.length < 3) {
+      const days = timeframeDays(selectedTimeframe);
+      const logged = entriesSorted.length;
+      const streak = calculateStreak(entriesAll);
+      list.push({
+        title: 'Your snapshot',
+        description: `Showing ${timeframeLabel(selectedTimeframe).toLowerCase()} view: ${logged} of last ${days} days logged. Current streak: ${streak} day${streak === 1 ? '' : 's'}.`,
+        tag: 'Export',
+        illustration: 'chart',
+      });
+    }
+
     return list.slice(0, 3);
-  }, [correlationData.length, rSleepEnergy, cycleEnabled, hasFlow, entriesSorted]);
+  }, [correlationData.length, rSleepEnergy, cycleEnabled, hasFlow, entriesSorted, selectedTimeframe, entriesAll]);
 
   const moodSummary = useMemo(() => {
     const days = Math.max(30, Math.round(moodMonths * 30));
@@ -268,8 +381,8 @@ export function Insights({ userData }: InsightsProps) {
   };
 
   return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="eb-page">
+      <div className="eb-page-inner">
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2">Insights & Patterns</h1>
@@ -295,6 +408,68 @@ export function Insights({ userData }: InsightsProps) {
               </button>
             ))}
           </div>
+
+          <p className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
+            Showing {entriesSorted.length} logs from the last {timeframeDays(selectedTimeframe)} days.
+            {entriesSorted.length === 0 ? ' Add a daily check-in to unlock insights.' : ''}
+          </p>
+        </div>
+
+        {/* Summary strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-[rgb(var(--color-text-secondary))]">Logs</div>
+                <div className="text-lg font-semibold">{entriesSorted.length}</div>
+              </div>
+              <div className="text-[rgb(var(--color-primary-dark))]">
+                <MiniIllustration kind="chart" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-[rgb(var(--color-text-secondary))]">Streak</div>
+                <div className="text-lg font-semibold">{streak} day{streak === 1 ? '' : 's'}</div>
+              </div>
+              <div className="text-[rgb(var(--color-primary-dark))]">
+                <MiniIllustration kind="spark" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-[rgb(var(--color-text-secondary))]">Mood</div>
+                <div className="text-lg font-semibold">{moodSummary.avgLabel}</div>
+              </div>
+              <div className="text-[rgb(var(--color-primary-dark))]">
+                <MiniIllustration kind="moon" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-[rgb(var(--color-text-secondary))]">Next cycle</div>
+                <div className="text-lg font-semibold">
+                  {!cycleEnabled
+                    ? 'Off'
+                    : cycleStats?.predictedNextStartISO
+                      ? new Date(cycleStats.predictedNextStartISO + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+                      : 'Not enough data'}
+                </div>
+              </div>
+              <div className="text-[rgb(var(--color-primary-dark))]">
+                <MiniIllustration kind="droplet" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Key Insights */}
@@ -305,24 +480,41 @@ export function Insights({ userData }: InsightsProps) {
               className="bg-white rounded-2xl p-6 shadow-sm border-l-4 border-[rgb(var(--color-primary))]"
             >
               <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-primary))] bg-opacity-10 flex items-center justify-center flex-shrink-0">
-                  <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+                <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center flex-shrink-0">
+                  {(() => {
+                    const Icon = insightIcon(insight.title);
+                    return <Icon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />;
+                  })()}
                 </div>
                 <div>
                   <h3 className="mb-1 text-base">{insight.title}</h3>
                   <p className="text-sm mb-2">{insight.description}</p>
-                  <span className="text-xs px-2 py-1 rounded-full bg-[rgb(var(--color-primary))] bg-opacity-10 text-[rgb(var(--color-primary))]">
+                  <span className="text-xs px-2 py-1 rounded-full bg-[rgb(var(--color-primary)/0.12)] text-[rgb(var(--color-primary-dark))]">
                     {insight.tag}
                   </span>
                 </div>
               </div>
+
+              <div className="mt-3 flex items-center justify-end text-[rgb(var(--color-primary-dark))]">
+                <MiniIllustration kind={insight.illustration} />
+              </div>
+
+              {insight.tag === 'Export' ? (
+                <button
+                  type="button"
+                  onClick={exportReport}
+                  className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[rgb(var(--color-primary)/0.12)] text-[rgb(var(--color-primary-dark))] text-sm hover:bg-[rgb(var(--color-primary)/0.16)]"
+                >
+                  Export report <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
 
         {/* Mood trend */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div className="eb-card mb-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="mb-1">Overall mood</h3>
               <p className="text-sm text-[rgb(var(--color-text-secondary))]">
@@ -330,43 +522,49 @@ export function Insights({ userData }: InsightsProps) {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 rounded-xl border border-[rgba(0,0,0,0.08)] p-1 bg-white">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-2xl p-1 bg-[rgb(var(--color-primary)/0.10)]">
                 {[1, 3, 6, 12].map((m) => (
                   <button
                     key={m}
                     type="button"
                     onClick={() => setMoodMonths(m)}
-                    className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
-                      moodMonths === m ? 'bg-[rgb(var(--color-primary))] text-white' : 'text-[rgb(var(--color-text-secondary))] hover:bg-neutral-50'
-                    }`}
+                    className="px-3 py-2 rounded-xl text-sm transition"
+                    style={{
+                      background: moodMonths === m ? 'rgb(var(--color-primary))' : 'transparent',
+                      color: moodMonths === m ? 'white' : 'rgb(var(--color-text-secondary))',
+                    }}
                   >
                     {m}m
                   </button>
                 ))}
               </div>
 
-              <span className="text-sm px-3 py-1 rounded-full bg-[rgb(var(--color-primary))] bg-opacity-10 text-[rgb(var(--color-primary))] whitespace-nowrap">
-                {moodSummary.avgLabel}
-              </span>
+              <span className="eb-chip whitespace-nowrap">{moodSummary.avgLabel}</span>
             </div>
           </div>
 
           {moodSummary.moodDays === 0 ? (
-            <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-              Start using the mood buttons in your daily check-in and you’ll see patterns appear here. You can also view mood on the Calendar overlay.
-            </p>
+            <div className="mt-4 text-sm text-[rgb(var(--color-text-secondary))]">
+              Start using the mood buttons in your daily check-in and you’ll see patterns appear here.
+              <span className="hidden sm:inline"> You can also view mood on the Calendar overlay.</span>
+            </div>
           ) : (
-            <div className="space-y-5">
-              {/* Line chart */}
+            <div className="mt-4 space-y-4">
               <div className="rounded-2xl border border-[rgba(0,0,0,0.06)] p-4">
-                <div className="text-sm font-medium mb-2">Trend</div>
-                <div style={{ width: '100%', height: 220 }}>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="text-sm font-medium">Trend</div>
+                  <div className="text-sm text-[rgb(var(--color-text-secondary))] whitespace-nowrap">
+                    Good {moodSummary.counts.good} · Okay {moodSummary.counts.okay} · Low {moodSummary.counts.low}
+                  </div>
+                </div>
+
+                <div style={{ width: '100%', height: 150 }}>
                   <ResponsiveContainer>
-                    <LineChart data={moodSummary.moodSeries} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
+                    <LineChart data={moodSummary.moodSeries} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" hide={moodSummary.moodSeries.length > 14} />
-                      <YAxis domain={[1, 3]} ticks={[1, 2, 3]} />
+                      <XAxis dataKey="label" hide={moodSummary.moodSeries.length > 10} />
+                      <YAxis domain={[1, 3]} ticks={[1, 2, 3]} width={28} />
                       <Tooltip formatter={(v: any) => (v === 1 ? 'Low' : v === 2 ? 'Okay' : 'Good')} />
                       <Line type="monotone" dataKey="mood" stroke="rgb(var(--color-primary))" strokeWidth={2.5} dot={false} />
                     </LineChart>
@@ -374,54 +572,40 @@ export function Insights({ userData }: InsightsProps) {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3 text-sm">
-                <div className="px-3 py-2 rounded-xl bg-neutral-50 border border-[rgba(0,0,0,0.06)]">
-                  <span className="font-medium">Good:</span> {moodSummary.counts.good}
-                </div>
-                <div className="px-3 py-2 rounded-xl bg-neutral-50 border border-[rgba(0,0,0,0.06)]">
-                  <span className="font-medium">Okay:</span> {moodSummary.counts.okay}
-                </div>
-                <div className="px-3 py-2 rounded-xl bg-neutral-50 border border-[rgba(0,0,0,0.06)]">
-                  <span className="font-medium">Low:</span> {moodSummary.counts.low}
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-medium">Week by week</div>
+                <div className="text-sm text-[rgb(var(--color-text-secondary))]">
+                  Scroll
                 </div>
               </div>
 
-              <div>
-                <div className="text-sm font-medium mb-2">Week by week</div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {moodSummary.weekBuckets.map((w) => {
-                    const label = !Number.isFinite(w.avg) ? '—' : w.avg < 1.75 ? 'Low' : w.avg < 2.5 ? 'Okay' : 'Good';
-                    // Theme-based dots (avoid red/amber/green)
-                    const dot = !Number.isFinite(w.avg)
-                      ? 'bg-neutral-300'
-                      : w.avg < 1.75
-                        ? 'bg-[rgb(var(--color-primary-dark))]'
-                        : w.avg < 2.5
-                          ? 'bg-[rgb(var(--color-accent))]'
-                          : 'bg-[rgb(var(--color-primary))]';
-                    return (
-                      <div key={w.label} className="rounded-2xl border border-[rgba(0,0,0,0.06)] p-4">
-                        <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">Week of {w.label}</div>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2.5 h-2.5 rounded-full ${dot}`} />
-                          <div className="text-sm font-medium">{label}</div>
-                          <div className="text-xs text-[rgb(var(--color-text-secondary))]">({w.n} days)</div>
-                        </div>
+              <div className="eb-scroll-row">
+                {moodSummary.weekBuckets.map((w) => {
+                  const label = !Number.isFinite(w.avg) ? '—' : w.avg < 1.75 ? 'Low' : w.avg < 2.5 ? 'Okay' : 'Good';
+                  const dot = !Number.isFinite(w.avg)
+                    ? 'bg-neutral-300'
+                    : w.avg < 1.75
+                      ? 'bg-[rgb(var(--color-primary-dark))]'
+                      : w.avg < 2.5
+                        ? 'bg-[rgb(var(--color-accent))]'
+                        : 'bg-[rgb(var(--color-primary))]';
+                  return (
+                    <div key={w.label} className="eb-scroll-item min-w-[150px] rounded-2xl border border-[rgba(0,0,0,0.06)] p-4 bg-white">
+                      <div className="text-sm font-medium mb-2">{w.label}</div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+                        <span className="text-[rgb(var(--color-text-secondary))]">{label}</span>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                If your mood has been consistently low, it might be worth exploring what else was happening that week (sleep, stress, pain). If this feels persistent or worrying, it’s a good idea to speak to a healthcare professional.
-              </p>
             </div>
           )}
         </div>
 
-{/* Cycle Phase Analysis (optional) */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+	        {/* Cycle Phase Analysis (optional) */}
+	        <div className="eb-card mb-6">
           <div className="flex items-center justify-between mb-6">
             <h3>Symptoms by cycle phase</h3>
             <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
@@ -478,7 +662,7 @@ export function Insights({ userData }: InsightsProps) {
         </div>
 
         {/* Correlation Chart */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+	        <div className="eb-card mb-6">
           <div className="flex items-center justify-between mb-2">
             <div>
               <h3>Sleep vs Energy</h3>
@@ -488,9 +672,17 @@ export function Insights({ userData }: InsightsProps) {
           </div>
 
           {correlationData.length < 3 ? (
-            <p className="text-sm text-[rgb(var(--color-text-secondary))] mt-4">
-              Log a few days with both sleep and energy to see this chart.
-            </p>
+            <div className="mt-4 rounded-2xl border border-[rgba(0,0,0,0.06)] p-5 flex items-center gap-4">
+              <div className="text-[rgb(var(--color-primary-dark))] flex-shrink-0">
+                <MiniIllustration kind="chart" />
+              </div>
+              <div>
+                <div className="font-medium mb-1">Not enough data yet</div>
+                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                  Log a few days with both sleep and energy and this chart will start revealing patterns.
+                </p>
+              </div>
+            </div>
           ) : (
             <>
               <ResponsiveContainer width="100%" height={300}>

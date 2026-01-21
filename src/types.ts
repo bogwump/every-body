@@ -29,6 +29,21 @@ export interface UserData {
   showCycleBubble: boolean;
   /** Which symptom modules are enabled for the daily check-in */
   enabledModules: SymptomKey[];
+
+  /** Dev/testing: use local mock Eve (no API calls) */
+  useMockEve: boolean;
+  /** Reduce context length and reply size for cheaper API usage */
+  eveLowCostMode: boolean;
+  /** Optional: cloud sync (local-first). Default off. */
+  cloudSyncEnabled?: boolean;
+  /** Which cloud provider to use when cloudSyncEnabled is on */
+  cloudProvider?: 'supabase';
+  /** Optional: profile photo stored locally as a Data URL */
+  avatarDataUrl?: string;
+  /** Optional: selected built-in avatar icon */
+  avatarStockId?: string;
+
+
 }
 
 export interface CheckInEntry {

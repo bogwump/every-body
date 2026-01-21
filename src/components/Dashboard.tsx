@@ -132,8 +132,8 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
   };
 
   return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="eb-page">
+      <div className="eb-page-inner">
         {/* Header */}
         <div>
           <h1 className="mb-2">Welcome back{userName ? `, ${userName}` : ''}</h1>
@@ -272,6 +272,91 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
             </div>
           </div>
         </button>
+        {/* Cycle length modal */}
+        {cycleModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setCycleModalOpen(false)}
+              aria-label="Close cycle modal"
+            />
+            <div className="relative w-full max-w-lg eb-card p-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold mb-1">Cycle length</h2>
+                  <p className="text-sm text-[rgba(0,0,0,0.65)]">
+                    {userData.cycleTrackingMode === 'cycle' ? 'Based on your logs and any overrides.' : 'Cycle tracking is off.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCycleModalOpen(false)}
+                  className="rounded-xl px-3 py-2 border border-[rgba(0,0,0,0.12)] hover:bg-neutral-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="eb-inset p-4">
+                  <div className="eb-inset-label">Average</div>
+                  <div className="eb-inset-value">{cycleStats.avgLength ? `${cycleStats.avgLength} days` : '–'}</div>
+                </div>
+                <div className="eb-inset p-4">
+                  <div className="eb-inset-label">Last cycle</div>
+                  <div className="eb-inset-value">{cycleStats.lastLength ? `${cycleStats.lastLength} days` : '–'}</div>
+                </div>
+              </div>
+
+              <div className="eb-card p-4 mb-5 bg-white border border-[rgba(0,0,0,0.06)]">
+                <div className="text-sm font-semibold mb-1">Predicted next start</div>
+                <div className="text-base">
+                  {cycleStats.predictedNextStartISO ? cycleStats.predictedNextStartISO : 'Not enough data yet'}
+                </div>
+                {cycleStats.predictionNote && (
+                  <p className="text-sm text-[rgba(0,0,0,0.65)] mt-2">{cycleStats.predictionNote}</p>
+                )}
+              </div>
+
+              <div className="flex items-start gap-3 mb-5">
+                <input
+                  id="eb-new-cycle-dashboard"
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-[rgba(0,0,0,0.25)]"
+                  checked={markNewCycle}
+                  onChange={(e) => setMarkNewCycle(e.target.checked)}
+                />
+                <div className="min-w-0">
+                  <label htmlFor="eb-new-cycle-dashboard" className="block font-semibold mb-1">
+                    New cycle started today
+                  </label>
+                  <p className="text-sm text-[rgba(0,0,0,0.65)]">
+                    Marks today as a fresh start even if you are not logging bleeding.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setCycleModalOpen(false)}
+                  className="rounded-xl px-4 py-2 border border-[rgba(0,0,0,0.12)] hover:bg-neutral-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveCycleOverride}
+                  className="rounded-xl px-4 py-2 bg-[rgb(var(--color-primary))] text-white hover:opacity-95"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

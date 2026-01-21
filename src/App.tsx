@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { QuickStart } from './components/onboarding/QuickStart';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { DailyCheckIn } from './components/DailyCheckIn';
 import { Dashboard } from './components/Dashboard';
 import { Insights } from './components/Insights';
@@ -42,6 +42,24 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const { user: userData, updateUser: setUserData } = useUser(DEFAULT_USER);
 
+  const FORCE_ONBOARDING_KEY = 'eb_force_onboarding_preview';
+  const [forceOnboarding, setForceOnboarding] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(FORCE_ONBOARDING_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const clearForceOnboarding = () => {
+    try {
+      sessionStorage.removeItem(FORCE_ONBOARDING_KEY);
+    } catch {
+      // ignore
+    }
+    setForceOnboarding(false);
+  };
+
   // Apply theme to root
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', userData.colorTheme);
@@ -52,18 +70,44 @@ export default function App() {
     document.title = `${APP_NAME}${currentScreen === 'dashboard' ? '' : ' • ' + currentScreen}`;
   }, [currentScreen]);
 
-  const startOnboarding = (goal: UserData['goal']) => {
+  const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; colorTheme: UserData['colorTheme'] }) => {
+    if (!data.goal) return;
     setUserData((prev) => ({
       ...prev,
-      goal,
+      name: data.name,
+      goal: data.goal,
+      colorTheme: data.colorTheme,
       onboardingComplete: true,
     }));
-    setCurrentScreen('dashboard');
+    clearForceOnboarding();
+    // Do-first: drop them straight into the check-in
+    setCurrentScreen('check-in');
   };
 
   const main = useMemo(() => {
-    if (!userData.onboardingComplete) {
-      return <QuickStart selectedGoal={userData.goal} onStart={startOnboarding} />;
+    if (!userData.onboardingComplete || forceOnboarding) {
+      const showBack = forceOnboarding && userData.onboardingComplete;
+      return (
+        <div className="min-h-screen bg-neutral-50">
+          {showBack && (
+            <div className="px-6 pt-6">
+              <button
+                type="button"
+                onClick={clearForceOnboarding}
+                className="text-sm text-[rgb(var(--color-text-secondary))] hover:text-[rgb(var(--color-text))]"
+              >
+                Back to app
+              </button>
+            </div>
+          )}
+          <OnboardingFlow
+            initialName={userData.name}
+            initialGoal={userData.goal}
+            initialTheme={userData.colorTheme}
+            onComplete={handleOnboardingComplete}
+          />
+        </div>
+      );
     }
 
     switch (currentScreen) {
@@ -102,6 +146,15 @@ export default function App() {
             userData={userData}
             onUpdateTheme={(theme) => setUserData((prev) => ({ ...prev, colorTheme: theme }))}
             onUpdateUserData={setUserData}
+            onPreviewOnboarding={() => {
+              try {
+                sessionStorage.setItem('eb_force_onboarding_preview', '1');
+              } catch {
+                // ignore
+              }
+              setForceOnboarding(true);
+              setCurrentScreen('dashboard');
+            }}
           />
         );
 
@@ -122,10 +175,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      {userData.onboardingComplete && (
+      {userData.onboardingComplete && !forceOnboarding && (
         <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
       )}
-      <main className={userData.onboardingComplete ? 'pb-20 md:pb-0 md:pl-64' : ''}>{main}</main>
+      <main className={userData.onboardingComplete && !forceOnboarding ? 'pb-20 md:pb-0 md:pl-64' : ''}>{main}</main>
     </div>
   );
 }

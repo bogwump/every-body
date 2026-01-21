@@ -19,8 +19,8 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
   return (
     <>
       {/* Mobile Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[rgb(var(--color-surface))] border-t border-[rgb(228_228_231_/_0.7)] md:hidden z-50">
-        <div className="flex items-center justify-around px-2 py-2">
+      <nav className="fixed bottom-0 left-0 right-0 bg-[rgb(var(--color-surface)/0.92)] backdrop-blur-xl border-t border-[rgb(228_228_231_/_0.7)] md:hidden z-50">
+        <div className="flex items-center justify-around px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
           {navItems.slice(0, 5).map((item) => {
             const Icon = item.icon;
             const isActive = currentScreen === item.id;

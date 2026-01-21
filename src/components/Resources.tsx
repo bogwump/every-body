@@ -75,9 +75,75 @@ export function Resources({ userGoal }: ResourcesProps) {
     }
   };
 
+  const FeaturedIllustration = () => (
+    <svg
+      width="96"
+      height="96"
+      viewBox="0 0 96 96"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      className="opacity-95"
+    >
+      <defs>
+        <linearGradient id="g1" x1="16" y1="10" x2="80" y2="86" gradientUnits="userSpaceOnUse">
+          <stop stopColor="rgba(255,255,255,0.95)" />
+          <stop offset="1" stopColor="rgba(255,255,255,0.55)" />
+        </linearGradient>
+      </defs>
+
+      {/* Soft ring */}
+      <circle cx="48" cy="48" r="30" stroke="rgba(255,255,255,0.45)" strokeWidth="2" />
+      <circle cx="48" cy="48" r="20" stroke="rgba(255,255,255,0.28)" strokeWidth="2" />
+
+      {/* Leaf + dot */}
+      <path
+        d="M60 30C52 30 44.5 36 42 46.5C40.2 54.1 44.2 61.2 51.2 64.8C59.5 69 68.5 63.8 70.5 54.7C72.8 43.8 67.2 34.8 60 30Z"
+        stroke="url(#g1)"
+        strokeWidth="2.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="34" cy="62" r="4" fill="rgba(255,255,255,0.7)" />
+      <path d="M28 36C33 39 36 44 36 50" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+
+  const MiniCardIllustration = ({ kind }: { kind: string }) => {
+    // Tiny inline SVG background for the resource icon tile (no assets).
+    // Uses current theme variables so it always matches your chosen colours.
+    const isHealth = kind === 'Health';
+    const isNutrition = kind === 'Nutrition';
+    const isWellness = kind === 'Wellness';
+    const isFitness = kind === 'Fitness';
+    const tone = isHealth ? 0.18 : isNutrition ? 0.16 : isWellness ? 0.14 : isFitness ? 0.15 : 0.12;
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 48 48"
+        className="absolute inset-0"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <linearGradient id="m1" x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+            <stop stopColor={`rgba(255,255,255,${0.55})`} />
+            <stop offset="1" stopColor={`rgba(255,255,255,${0.05})`} />
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="48" height="48" rx="12" fill={`rgb(var(--color-primary)/${tone})`} />
+        <path d="M8 30C13 24 18 22 24 22C30 22 35 24 40 30" stroke="url(#m1)" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M10 18C14 16 18 15 24 15C30 15 34 16 38 18" stroke="rgba(255,255,255,0.22)" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="16" cy="34" r="2" fill="rgba(255,255,255,0.35)" />
+        <circle cx="34" cy="16" r="2.2" fill="rgba(255,255,255,0.28)" />
+      </svg>
+    );
+  };
+
+
+
   return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="eb-page">
+      <div className="eb-page-inner">
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2">Resources & Learning</h1>
@@ -118,14 +184,14 @@ export function Resources({ userGoal }: ResourcesProps) {
         </div>
 
         {/* Featured Resource */}
-        <div className="bg-gradient-to-br from-[rgb(var(--color-primary))] to-[rgb(var(--color-primary-dark))] rounded-2xl p-8 mb-8 text-[rgb(var(--color-text))]">
+        <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-8 mb-8 overflow-hidden shadow-sm">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
               <span className="text-xs px-3 py-1 rounded-full bg-[rgba(255,255,255,0.45)] border border-[rgba(0,0,0,0.12)] mb-3 inline-block">
                 Featured
               </span>
-              <h2 className="mb-3">Cycle Syncing Masterclass</h2>
-              <p className="text-[rgba(0,0,0,0.85)] mb-4">
+              <h2 className="mb-3 text-white">Cycle Syncing Masterclass</h2>
+              <p className="eb-hero-on-dark-muted mb-4">
                 Learn how to align your lifestyle, nutrition, and activities with your natural hormonal rhythm
               </p>
               <button className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-[rgb(var(--color-primary))] hover:shadow-lg transition-all font-medium">
@@ -133,7 +199,9 @@ export function Resources({ userGoal }: ResourcesProps) {
                 <ExternalLink className="w-4 h-4" />
               </button>
             </div>
-            <div className="hidden md:block w-32 h-32 rounded-2xl bg-white bg-opacity-20" />
+            <div className="hidden md:block w-32 h-32 rounded-2xl bg-[rgba(255,255,255,0.18)] overflow-hidden flex items-center justify-center">
+              <FeaturedIllustration />
+            </div>
           </div>
         </div>
 
@@ -145,13 +213,14 @@ export function Resources({ userGoal }: ResourcesProps) {
             return (
               <div
                 key={index}
-                className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                className="eb-card p-6 hover:shadow-md transition-all cursor-pointer group"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-[rgb(var(--color-primary))] bg-opacity-10 flex items-center justify-center">
-                    <Icon className="w-6 h-6 text-[rgb(var(--color-primary))]" />
+                  <div className="w-12 h-12 rounded-xl relative overflow-hidden flex items-center justify-center">
+                    <MiniCardIllustration kind={article.category} />
+                    <Icon className="w-6 h-6 relative z-10 text-[rgb(var(--color-primary))]" />
                   </div>
-                  <span className="text-xs px-3 py-1 rounded-full bg-[rgb(var(--color-accent))] bg-opacity-20 text-[rgb(var(--color-text))]">
+                  <span className="text-xs px-3 py-1 rounded-full bg-[rgb(var(--color-accent)/0.18)] text-[rgb(var(--color-text))]">
                     {article.category}
                   </span>
                 </div>

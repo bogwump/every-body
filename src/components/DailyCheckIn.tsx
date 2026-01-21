@@ -126,6 +126,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
   const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | null>(null);
   const [notes, setNotes] = useState('');
   const [values, setValues] = useState<Partial<Record<SymptomKey, number>>>({});
+  const [markNewCycle, setMarkNewCycle] = useState<boolean>(false);
   const [submitted, setSubmitted] = useState(false);
 
   const { entries, upsertEntry } = useEntries();
@@ -134,6 +135,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
   // Populate defaults / existing entry
   useEffect(() => {
     if (existingToday) {
+      setMarkNewCycle(Boolean((existingToday as any)?.cycleStartOverride));
       setSelectedMood(existingToday.mood ?? null);
       setNotes(existingToday.notes ?? '');
       setValues(existingToday.values ?? {});
@@ -141,6 +143,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
     }
 
     // defaults if no existing entry
+    setMarkNewCycle(false);
     const defaults: Partial<Record<SymptomKey, number>> = {};
     for (const k of userData.enabledModules) {
       defaults[k] = k === 'pain' || k === 'flow' || k === 'bloating' ? 0 : 50;
@@ -176,7 +179,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
       mood: selectedMood ?? undefined,
       notes: notes.trim() ? notes.trim() : undefined,
       values: values ?? {},
-      cycleStartOverride: (existingToday as any)?.cycleStartOverride ? true : undefined,
+      cycleStartOverride: markNewCycle ? true : undefined,
       createdAt: existingToday?.createdAt ?? now,
       updatedAt: now,
     };
