@@ -127,9 +127,33 @@ window.addEventListener("storage", (e) => {
 // ---- Hooks ----
 
 export function useUser(defaultUser: UserData) {
+  // IMPORTANT:
+  // useSyncExternalStore requires getSnapshot to return a cached value.
+  // Creating a new object on every call (eg `{ ...defaultUser, ...stored }`)
+  // can cause an infinite render loop.
+  //
+  // So we cache the merged snapshot by the *raw* localStorage string.
   const user = useSyncExternalStore(
     (listener) => subscribeKey(USER_KEY, listener),
-    () => readCached<UserData>(USER_KEY, defaultUser),
+    () => {
+      const raw = localStorage.getItem(USER_KEY);
+
+      const fnAny = useUser as any;
+      const prevRaw: string | null | undefined = fnAny._mergedUserRaw;
+      const prevVal: UserData | undefined = fnAny._mergedUserVal;
+
+      if (prevRaw === raw && prevVal) return prevVal;
+
+      const stored = readCached<UserData>(USER_KEY, defaultUser);
+
+      // Merge defaults so newly added settings don't break older stored profiles
+      const merged = ({ ...defaultUser, ...(stored as any) } as UserData) || defaultUser;
+
+      fnAny._mergedUserRaw = raw;
+      fnAny._mergedUserVal = merged;
+
+      return merged;
+    },
     () => defaultUser
   );
 
@@ -161,7 +185,14 @@ export function useEntries() {
   };
 
   const upsertEntry = (entry: CheckInEntry) => {
-    const next = [...entries.filter((e) => e.date !== entry.date), entry];
+    const entryISO = (entry as any).dateISO || (entry as any).date;
+    const next = [
+      ...entries.filter((e) => {
+        const iso = (e as any).dateISO || (e as any).date;
+        return iso !== entryISO;
+      }),
+      entry,
+    ];
     writeCached(ENTRIES_KEY, next);
   };
 
@@ -197,6 +228,9 @@ export function useChat() {
     };
   });
 
+  // IMPORTANT: Don't append using the `messages` array from render.
+  // Rapid consecutive writes (user message then AI message) can otherwise
+  // race and overwrite each other, causing user bubbles to disappear.
   const addMessage = (message: StoredChatMessage) => {
     const next: StoredChatMessage = {
       id: message.id || Date.now().toString(),
@@ -205,7 +239,9 @@ export function useChat() {
       timestampISO: message.timestampISO || new Date().toISOString(),
     };
 
-    writeCached(CHAT_KEY, [...messages, next]);
+    const currentRaw = readCached<unknown>(CHAT_KEY, EMPTY_CHAT);
+    const current = normaliseChat(currentRaw) as StoredChatMessage[];
+    writeCached(CHAT_KEY, [...current, next]);
   };
 
   const clearChat = () => {

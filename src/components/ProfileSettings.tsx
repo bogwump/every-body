@@ -208,6 +208,38 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData }: P
           </div>
         </div>
 
+{/* Eve testing */}
+<div className="flex items-center justify-between py-4 border-t border-[rgb(var(--color-border))]">
+  <div>
+    <p className="font-medium mb-1">Mock Eve (testing)</p>
+    <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+      {userData.useMockEve ? 'On (no API calls, free to test)' : 'Off (uses OpenAI API)'}
+    </p>
+  </div>
+  <button
+    onClick={() => onUpdateUserData((prev) => ({ ...prev, useMockEve: !prev.useMockEve }))}
+    className="px-3 py-2 rounded-xl border border-[rgb(var(--color-border))] text-sm"
+  >
+    {userData.useMockEve ? 'Turn off' : 'Turn on'}
+  </button>
+</div>
+
+<div className="flex items-center justify-between py-4 border-t border-[rgb(var(--color-border))]">
+  <div>
+    <p className="font-medium mb-1">Low-cost mode</p>
+    <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+      {userData.eveLowCostMode ? 'On (shorter context, shorter replies)' : 'Off'}
+    </p>
+  </div>
+  <button
+    onClick={() => onUpdateUserData((prev) => ({ ...prev, eveLowCostMode: !prev.eveLowCostMode }))}
+    className="px-3 py-2 rounded-xl border border-[rgb(var(--color-border))] text-sm"
+  >
+    {userData.eveLowCostMode ? 'Turn off' : 'Turn on'}
+  </button>
+</div>
+
+
         {/* What to track */}
         <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
           <h3 className="mb-2">What you track</h3>

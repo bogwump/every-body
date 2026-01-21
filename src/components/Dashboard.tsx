@@ -51,7 +51,7 @@ function buildWeekSeries(dateISOs: string[], entriesByDate: Map<string, any>) {
 }
 
 export function Dashboard({ userName, userGoal, userData, onNavigate }: DashboardProps) {
-  const { entries: entriesAll } = useEntries();
+  const { entries: entriesAll, upsertEntry } = useEntries();
   const entriesSorted = useMemo(() => sortByDateAsc(entriesAll), [entriesAll]);
   const todayISO = isoToday();
   const todayEntry = useMemo(() => entriesSorted.find((e) => e.dateISO === todayISO) ?? null, [entriesSorted, todayISO]);
@@ -107,6 +107,30 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
   const avgCycleText =
     cycleStats.avgLength ? `${cycleStats.avgLength} days avg` : 'Not enough data yet';
 
+  const showCycleBubble = userData.cycleTrackingMode === 'cycle' && (userData.showCycleBubble ?? true);
+  const [cycleModalOpen, setCycleModalOpen] = React.useState(false);
+  const [markNewCycle, setMarkNewCycle] = React.useState<boolean>(Boolean((todayEntry as any)?.cycleStartOverride));
+
+  React.useEffect(() => {
+    setMarkNewCycle(Boolean((todayEntry as any)?.cycleStartOverride));
+  }, [todayEntry]);
+
+  const saveCycleOverride = () => {
+    const now = new Date().toISOString();
+    const next = {
+      id: (todayEntry as any)?.id ?? `${Date.now()}`,
+      dateISO: todayISO,
+      mood: (todayEntry as any)?.mood,
+      notes: (todayEntry as any)?.notes,
+      values: (todayEntry as any)?.values ?? {},
+      cycleStartOverride: markNewCycle ? true : undefined,
+      createdAt: (todayEntry as any)?.createdAt ?? now,
+      updatedAt: now,
+    };
+    upsertEntry(next as any);
+    setCycleModalOpen(false);
+  };
+
   return (
     <div className="min-h-screen px-6 py-8">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -116,30 +140,16 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
           <p>{todayLabel}</p>
         </div>
 
-        {/* Cycle length card (only if cycle tracking is on) */}
-        {userData.cycleTrackingMode === 'cycle' && (
-          <div className="eb-card">
-            <div className="text-sm text-[rgba(0,0,0,0.65)]">Cycle length</div>
-            <div className="text-lg font-semibold">{avgCycleText}</div>
-            {cycleStats.lastLength && (
-              <div className="text-sm text-[rgba(0,0,0,0.65)] mt-1">
-                Last cycle: {cycleStats.lastLength} days
-              </div>
-            )}
-            {cycleStats.predictedNextStartISO && (
-              <div className="text-sm text-[rgba(0,0,0,0.65)] mt-1">
-                Predicted next start: {new Date(cycleStats.predictedNextStartISO + 'T00:00:00').toLocaleDateString()}
-              </div>
-            )}
-            {cycleStats.predictionNote && (
-              <div className="text-sm text-[rgba(0,0,0,0.65)] mt-2">{cycleStats.predictionNote}</div>
-            )}
-          </div>
-        )}
-
         {/* HERO: Symptom tracking */}
         <div className="eb-card eb-hero eb-hero-surface rounded-2xl p-6 relative">
-          <Calendar className="absolute top-4 right-4 opacity-70" />
+          <button
+            type="button"
+            onClick={() => onNavigate('calendar')}
+            className="absolute top-4 right-4 opacity-80 hover:opacity-100 transition"
+            title="Calendar"
+          >
+            <Calendar className="w-5 h-5" />
+          </button>
 
           <h3 className="mb-1 text-lg font-semibold">Symptom tracking</h3>
 
@@ -148,6 +158,20 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
               ? 'Cycle features are off, but you can still track symptoms and patterns.'
               : 'Add bleeding or spotting (optional) to unlock cycle-phase insights.'}
           </p>
+
+          
+          {showCycleBubble && (
+            <button
+              type="button"
+              onClick={() => setCycleModalOpen(true)}
+              className="absolute top-4 right-14 rounded-full bg-[rgba(255,255,255,0.18)] border border-[rgba(255,255,255,0.25)] px-3 py-1 text-sm eb-hero-on-dark hover:bg-[rgba(255,255,255,0.24)] transition"
+              title="Cycle length"
+            >
+              <span className="font-medium">Cycle length</span>
+              <span className="mx-2 opacity-70">•</span>
+              <span className="font-semibold">{avgCycleText}</span>
+            </button>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="eb-inset rounded-xl p-4">

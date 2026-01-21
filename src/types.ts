@@ -25,6 +25,8 @@ export interface UserData {
   onboardingComplete: boolean;
   /** Whether to use cycle-phase features (period tracking). Users can still track symptoms in all modes. */
   cycleTrackingMode: CycleTrackingMode;
+  /** Show the small cycle-length bubble on the Dashboard hero (only relevant when cycle tracking is on) */
+  showCycleBubble: boolean;
   /** Which symptom modules are enabled for the daily check-in */
   enabledModules: SymptomKey[];
 }

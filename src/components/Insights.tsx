@@ -10,6 +10,8 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
+  LineChart,
+  Line,
 } from 'recharts';
 import { TrendingUp, Calendar, Lightbulb, ChevronDown } from 'lucide-react';
 import type { CheckInEntry, CyclePhase, SymptomKey, UserData } from '../types';
@@ -50,6 +52,7 @@ function averageFor(entries: CheckInEntry[], key: SymptomKey): number {
 
 export function Insights({ userData }: InsightsProps) {
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('month');
+  const [moodMonths, setMoodMonths] = useState<number>(1); // 1,3,6,12
 
   const { entries: entriesAll } = useEntries();
   const entries = useMemo(
@@ -176,6 +179,74 @@ export function Insights({ userData }: InsightsProps) {
     return list.slice(0, 3);
   }, [correlationData.length, rSleepEnergy, cycleEnabled, hasFlow, entriesSorted]);
 
+  const moodSummary = useMemo(() => {
+    const days = Math.max(30, Math.round(moodMonths * 30));
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - (days - 1));
+
+    const ranged = entriesSorted.filter((e) => {
+      const d = new Date(e.dateISO + 'T00:00:00');
+      return d >= cutoff;
+    });
+
+    const moods = ranged.map((e) => e.mood).filter((m): m is 1 | 2 | 3 => m === 1 || m === 2 || m === 3);
+    const counts = {
+      low: moods.filter((m) => m === 1).length,
+      okay: moods.filter((m) => m === 2).length,
+      good: moods.filter((m) => m === 3).length,
+    };
+
+    const avg = moods.length ? moods.reduce((a, b) => a + b, 0) / moods.length : NaN;
+    const avgLabel = !Number.isFinite(avg)
+      ? 'Not enough data yet'
+      : avg < 1.75
+        ? 'Mostly low'
+        : avg < 2.5
+          ? 'Mostly okay'
+          : 'Mostly good';
+
+    // Week-by-week rollup (up to last 12 weeks)
+    const weeks = Math.min(12, Math.ceil(days / 7));
+    const weekBuckets: Array<{ label: string; avg: number; n: number }> = [];
+    for (let w = weeks - 1; w >= 0; w--) {
+      const start = new Date();
+      start.setDate(start.getDate() - (w + 1) * 7 + 1);
+      const end = new Date();
+      end.setDate(end.getDate() - w * 7);
+      const inWeek = ranged.filter((e) => {
+        const d = new Date(e.dateISO + 'T00:00:00');
+        return d >= start && d <= end;
+      });
+      const ms = inWeek.map((e) => e.mood).filter((m): m is 1 | 2 | 3 => m === 1 || m === 2 || m === 3);
+      const a = ms.length ? ms.reduce((x, y) => x + y, 0) / ms.length : NaN;
+      weekBuckets.push({
+        label: start.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+        avg: a,
+        n: ms.length,
+      });
+    }
+
+    // Daily series for a simple line chart
+    const moodSeries = ranged
+      .map((e) => ({
+        dateISO: e.dateISO,
+        label: new Date(e.dateISO + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+        mood: e.mood,
+      }))
+      .filter((p) => p.mood === 1 || p.mood === 2 || p.mood === 3) as Array<{ dateISO: string; label: string; mood: 1 | 2 | 3 }>;
+
+    return {
+      days,
+      totalDays: ranged.length,
+      moodDays: moods.length,
+      counts,
+      avg,
+      avgLabel,
+      weekBuckets,
+      moodSeries,
+    };
+  }, [entriesSorted, moodMonths]);
+
   const exportReport = () => {
     const streak = calculateStreak(entriesAll);
     const report = {
@@ -249,7 +320,107 @@ export function Insights({ userData }: InsightsProps) {
           ))}
         </div>
 
-        {/* Cycle Phase Analysis (optional) */}
+        {/* Mood trend */}
+        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <h3 className="mb-1">Overall mood</h3>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                Last {moodSummary.days} days: {moodSummary.moodDays ? `${moodSummary.moodDays} mood logs` : 'no mood logs yet'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-xl border border-[rgba(0,0,0,0.08)] p-1 bg-white">
+                {[1, 3, 6, 12].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMoodMonths(m)}
+                    className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
+                      moodMonths === m ? 'bg-[rgb(var(--color-primary))] text-white' : 'text-[rgb(var(--color-text-secondary))] hover:bg-neutral-50'
+                    }`}
+                  >
+                    {m}m
+                  </button>
+                ))}
+              </div>
+
+              <span className="text-sm px-3 py-1 rounded-full bg-[rgb(var(--color-primary))] bg-opacity-10 text-[rgb(var(--color-primary))] whitespace-nowrap">
+                {moodSummary.avgLabel}
+              </span>
+            </div>
+          </div>
+
+          {moodSummary.moodDays === 0 ? (
+            <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+              Start using the mood buttons in your daily check-in and you’ll see patterns appear here. You can also view mood on the Calendar overlay.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              {/* Line chart */}
+              <div className="rounded-2xl border border-[rgba(0,0,0,0.06)] p-4">
+                <div className="text-sm font-medium mb-2">Trend</div>
+                <div style={{ width: '100%', height: 220 }}>
+                  <ResponsiveContainer>
+                    <LineChart data={moodSummary.moodSeries} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" hide={moodSummary.moodSeries.length > 14} />
+                      <YAxis domain={[1, 3]} ticks={[1, 2, 3]} />
+                      <Tooltip formatter={(v: any) => (v === 1 ? 'Low' : v === 2 ? 'Okay' : 'Good')} />
+                      <Line type="monotone" dataKey="mood" stroke="rgb(var(--color-primary))" strokeWidth={2.5} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3 text-sm">
+                <div className="px-3 py-2 rounded-xl bg-neutral-50 border border-[rgba(0,0,0,0.06)]">
+                  <span className="font-medium">Good:</span> {moodSummary.counts.good}
+                </div>
+                <div className="px-3 py-2 rounded-xl bg-neutral-50 border border-[rgba(0,0,0,0.06)]">
+                  <span className="font-medium">Okay:</span> {moodSummary.counts.okay}
+                </div>
+                <div className="px-3 py-2 rounded-xl bg-neutral-50 border border-[rgba(0,0,0,0.06)]">
+                  <span className="font-medium">Low:</span> {moodSummary.counts.low}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium mb-2">Week by week</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {moodSummary.weekBuckets.map((w) => {
+                    const label = !Number.isFinite(w.avg) ? '—' : w.avg < 1.75 ? 'Low' : w.avg < 2.5 ? 'Okay' : 'Good';
+                    // Theme-based dots (avoid red/amber/green)
+                    const dot = !Number.isFinite(w.avg)
+                      ? 'bg-neutral-300'
+                      : w.avg < 1.75
+                        ? 'bg-[rgb(var(--color-primary-dark))]'
+                        : w.avg < 2.5
+                          ? 'bg-[rgb(var(--color-accent))]'
+                          : 'bg-[rgb(var(--color-primary))]';
+                    return (
+                      <div key={w.label} className="rounded-2xl border border-[rgba(0,0,0,0.06)] p-4">
+                        <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">Week of {w.label}</div>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+                          <div className="text-sm font-medium">{label}</div>
+                          <div className="text-xs text-[rgb(var(--color-text-secondary))]">({w.n} days)</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                If your mood has been consistently low, it might be worth exploring what else was happening that week (sleep, stress, pain). If this feels persistent or worrying, it’s a good idea to speak to a healthcare professional.
+              </p>
+            </div>
+          )}
+        </div>
+
+{/* Cycle Phase Analysis (optional) */}
         <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h3>Symptoms by cycle phase</h3>

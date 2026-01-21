@@ -49,37 +49,56 @@ function buildSuggestedQuestions(cycleEnabled: boolean): string[] {
   return base;
 }
 
-export function AIChat({ userName, userData }: AIChatProps) {
+function buildFollowUpQuestions(userMessage: string, cycleEnabled: boolean, daysTracked7: number): string[] {
+  const lower = userMessage.toLowerCase();
+
+  // Keep it short and practical. 1–3 max.
+  if (lower.includes('pattern') || lower.includes('last week')) {
+    if (daysTracked7 < 3) {
+      return ['What’s the easiest check-in to do daily?', 'What should I track first for quick insights?'];
+    }
+    return [
+      cycleEnabled ? 'Is any of this linked to my cycle phase?' : 'How can I track patterns without a cycle?',
+      'What’s one small change I could try this week?',
+    ];
+  }
+
+  if (lower.includes('tired') || lower.includes('energy') || lower.includes('fatigue')) {
+    return ['Could sleep be driving this?', 'What 3-day experiment should I try?', cycleEnabled ? 'Does this change across the month?' : 'What patterns should I watch for?'];
+  }
+
+  if (lower.includes('stress') || lower.includes('anxiety')) {
+    return ['What’s the quickest way to lower stress today?', 'How can I protect my sleep this week?', 'What might be triggering this?'];
+  }
+
+  if (lower.includes('sleep')) {
+    return ['What should I change first for better sleep?', 'Is stress affecting my sleep?', 'What does my sleep trend look like?'];
+  }
+
+  if (lower.includes('pms') || lower.includes('luteal') || lower.includes('period')) {
+    return [cycleEnabled ? 'What symptoms tend to cluster before a period?' : 'Should I turn cycle tracking on?', 'What helps most people with these symptoms?', 'What can I try next cycle?'];
+  }
+
+  // Default gentle prompts.
+  return ['What patterns do you notice in my last week?', 'How do symptoms usually change over time?', 'What should I focus on first?'];
+}
+
+export function AIChat({ userName: _userName, userData }: AIChatProps) {
   const { entries } = useEntries();
   const summary = useMemo(() => summarise(entries), [entries]);
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
 
   const opening = useMemo(() => {
-    const parts: string[] = [];
-    parts.push(`Hi ${userName}! I’m ${COMPANION_NAME}, your companion.`);
-    if (summary.daysTracked === 0) {
-      parts.push('Start with a quick check-in and I’ll help you spot patterns as you go.');
-    } else {
-      parts.push(`You’ve logged ${summary.daysTracked} day${summary.daysTracked === 1 ? '' : 's'} so far.`);
-      if (summary.avgSleep !== null || summary.avgEnergy !== null) {
-        const bits: string[] = [];
-        if (summary.avgSleep !== null) bits.push(`sleep ${summary.avgSleep}%`);
-        if (summary.avgEnergy !== null) bits.push(`energy ${summary.avgEnergy}%`);
-        parts.push(`In the last 7 days your average is ${bits.join(' and ')}.`);
-      }
-      if (!cycleEnabled) {
-        parts.push('Cycle features are off, but you can still track symptoms and get useful correlations.');
-      }
-    }
-    parts.push('What would you like help with today?');
-    return parts.join(' ');
-  }, [userName, summary, cycleEnabled]);
+    // Requested: include the product name in the opening message.
+    return `Hi there! I’m ${COMPANION_NAME}, your EveryBody companion. Start with a quick check-in and I’ll help you spot patterns as you go. What would you like help with today?`;
+  }, []);
 
   const suggestedQuestions = useMemo(() => buildSuggestedQuestions(cycleEnabled), [cycleEnabled]);
 
   const { messagesWithDate: messages, addMessage } = useChat();
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [followUps, setFollowUps] = useState<{ aiId: string; questions: string[] } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,79 +116,58 @@ export function AIChat({ userName, userData }: AIChatProps) {
     scrollToBottom();
   }, [messages]);
 
-  const getAIResponse = (userMessage: string): string => {
-    const lower = userMessage.toLowerCase();
+  function buildSummaryText(): string {
+    const last7 = filterByDays(entries, 7);
+    const last30 = filterByDays(entries, 30);
 
-    const softSafety =
-      "\n\nI can help you spot patterns and try gentle ideas, but I can’t diagnose. If symptoms are severe, new, or worrying, it’s best to speak to a GP or pharmacist.";
+    const avgSleep7 = mean(last7.map((e) => e.values.sleep).filter(hasNumeric));
+    const avgEnergy7 = mean(last7.map((e) => e.values.energy).filter(hasNumeric));
+    const avgStress7 = mean(last7.map((e) => e.values.stress).filter(hasNumeric));
+    const avgMood7 = mean(last7.map((e) => e.values.mood).filter(hasNumeric));
 
-    if (lower.includes('without a cycle') || lower.includes('no period') || lower.includes('coil') || lower.includes('menopause')) {
-      return (
-        "You can absolutely track symptoms without bleeding or a cycle. Focus on daily patterns (sleep, energy, mood, stress, pain) and watch how they move together over time. If you ever want cycle-phase features, you can switch them on in Profile, but it’s totally optional." +
-        softSafety
-      );
+    const parts: string[] = [];
+    parts.push(`Entries total: ${entries.length}`);
+    parts.push(`Entries last 7 days: ${last7.length}`);
+    parts.push(`Entries last 30 days: ${last30.length}`);
+    parts.push(`Cycle tracking enabled: ${cycleEnabled ? 'yes' : 'no'}`);
+
+    const fmt = (v: number) => `${Math.round(v)}%`;
+    const avgs: string[] = [];
+    if (Number.isFinite(avgSleep7)) avgs.push(`sleep ${fmt(avgSleep7)}`);
+    if (Number.isFinite(avgEnergy7)) avgs.push(`energy ${fmt(avgEnergy7)}`);
+    if (Number.isFinite(avgStress7)) avgs.push(`stress ${fmt(avgStress7)}`);
+    if (Number.isFinite(avgMood7)) avgs.push(`mood ${fmt(avgMood7)}`);
+    if (avgs.length) parts.push(`Last 7 day averages: ${avgs.join(', ')}`);
+
+    return parts.join('\n');
+  }
+
+  async function askEve(userMessage: string) {
+    const history = messages
+      .slice(-12)
+      .map((m) => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
+
+    const res = await fetch('/api/eve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: userMessage,
+        history,
+        mock: Boolean(userData.useMockEve),
+        lowCost: Boolean(userData.eveLowCostMode),
+        context: {
+          summaryText: buildSummaryText(),
+          cycleEnabled,
+          useMockEve: Boolean(userData.useMockEve),
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Eve request failed');
     }
-
-    if (lower.includes('pattern') || lower.includes('last week')) {
-      if (summary.daysTracked7 < 3) {
-        return 'You don’t have many check-ins in the last week yet. If you log a few more days, I can give you a much clearer picture of what’s linked.' + softSafety;
-      }
-      const bits: string[] = [];
-      if (summary.avgSleep !== null) bits.push(`average sleep: ${summary.avgSleep}%`);
-      if (summary.avgEnergy !== null) bits.push(`average energy: ${summary.avgEnergy}%`);
-      if (summary.avgStress !== null) bits.push(`average stress: ${summary.avgStress}%`);
-      return (
-        `Here’s what I can see from your last week: ${bits.join(', ')}. ` +
-        'If you tell me what feels most annoying right now (sleep, fatigue, mood, pain), I’ll help you explore likely links.' +
-        softSafety
-      );
-    }
-
-    if (lower.includes('tired') || lower.includes('energy') || lower.includes('fatigue')) {
-      const extra = summary.avgSleep !== null ? ` Your recent sleep average is ${summary.avgSleep}%.` : '';
-      return (
-        'Tiredness can come from lots of places, but the quickest thing to check is whether low sleep and low energy are showing up together.' +
-        extra +
-        ' If you want, I can suggest a 3-day experiment (small changes you can actually stick to) and then we can see if your data shifts.' +
-        softSafety
-      );
-    }
-
-    if (lower.includes('stress') || lower.includes('anxiety')) {
-      const extra = summary.avgStress !== null ? ` Your recent stress average is ${summary.avgStress}%.` : '';
-      return (
-        'When stress is up, sleep and energy often take a hit. The goal is not “remove stress”, it’s “lower the load on your nervous system”.' +
-        extra +
-        ' Want ideas that fit your day (quick, medium, or longer)?' +
-        softSafety
-      );
-    }
-
-    if (lower.includes('eat') || lower.includes('food') || lower.includes('diet')) {
-      return (
-        'If you want something simple: aim for regular protein, fibre and hydration first. That supports energy and mood regardless of cycle. If you tell me whether you’re dealing with cravings, bloating, or low energy, I’ll suggest a few realistic options.' +
-        softSafety
-      );
-    }
-
-    if (lower.includes('pms') || lower.includes('luteal') || lower.includes('period')) {
-      if (!cycleEnabled) {
-        return (
-          'Even with cycle features off, you can still track PMS-style patterns by looking at clusters of symptoms over time. If you do want cycle-phase insights, you can enable cycle tracking and optionally log bleeding or spotting.' +
-          softSafety
-        );
-      }
-      return (
-        'PMS symptoms often show up in the later part of a cycle, but the best approach is to use your own data. If you keep logging, I can help you identify which symptoms tend to cluster together and what usually helps.' +
-        softSafety
-      );
-    }
-
-    return (
-      "I’m here to help you make sense of what you’re logging and feel more in control. Tell me what’s bothering you most right now, and we’ll break it down together." +
-      softSafety
-    );
-  };
+    return (await res.json()) as { answer: string; suggestions?: string[]; safety_note?: string };
+  }
 
   const handleSendMessage = (text?: string) => {
     const messageText = text || inputText.trim();
@@ -185,11 +183,34 @@ export function AIChat({ userName, userData }: AIChatProps) {
     addMessage({ sender: 'user', text: messageText, timestampISO: new Date().toISOString(), id: userMessage.id });
     setInputText('');
     setIsTyping(true);
+    setFollowUps(null);
 
-    setTimeout(() => {
-      addMessage({ sender: 'ai', text: getAIResponse(messageText), timestampISO: new Date().toISOString() });
-      setIsTyping(false);
-    }, 900);
+    (async () => {
+      try {
+        const data = await askEve(messageText);
+        const aiId = `${Date.now().toString()}-ai`;
+        const safety = (data.safety_note || '').trim();
+        const aiText = safety ? `${data.answer}\n\n${safety}` : data.answer;
+        addMessage({ sender: 'ai', text: aiText, timestampISO: new Date().toISOString(), id: aiId });
+
+        const qs = Array.isArray(data.suggestions) && data.suggestions.length
+          ? data.suggestions.slice(0, 3)
+          : buildFollowUpQuestions(messageText, cycleEnabled, summary.daysTracked7).slice(0, 3);
+        setFollowUps({ aiId, questions: qs });
+      } catch {
+        const aiId = `${Date.now().toString()}-ai`;
+        addMessage({
+          sender: 'ai',
+          text:
+            "I’m having trouble connecting right now. If you’re running locally, make sure you started the Eve server with: npm run dev:all.\n\nYou can still use the app as normal, and we can try again in a moment.",
+          timestampISO: new Date().toISOString(),
+          id: aiId,
+        });
+        setFollowUps({ aiId, questions: buildFollowUpQuestions(messageText, cycleEnabled, summary.daysTracked7).slice(0, 3) });
+      } finally {
+        setIsTyping(false);
+      }
+    })();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -223,16 +244,46 @@ export function AIChat({ userName, userData }: AIChatProps) {
             <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`max-w-[80%] md:max-w-[70%] rounded-2xl px-4 py-3 ${
-                  message.sender === 'user' ? 'bg-[rgb(var(--color-primary))] text-white' : 'bg-white border border-neutral-200'
+                  // Use a calm, readable user bubble that works across light theme palettes.
+                  message.sender === 'user'
+                    ? 'bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-text-primary))] border border-[rgb(var(--color-primary))]'
+                    : 'bg-white border border-neutral-200'
                 }`}
               >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
                 <div className="flex items-center gap-1 mt-2">
-                  <Clock className={`w-3 h-3 ${message.sender === 'user' ? 'text-white opacity-70' : 'text-neutral-400'}`} />
-                  <span className={`text-xs ${message.sender === 'user' ? 'text-white opacity-70' : 'text-neutral-400'}`}>
+                  <Clock
+                    className={`w-3 h-3 ${
+                      message.sender === 'user' ? 'text-[rgb(var(--color-text-secondary))]' : 'text-neutral-400'
+                    }`}
+                  />
+                  <span
+                    className={`text-xs ${
+                      message.sender === 'user' ? 'text-[rgb(var(--color-text-secondary))]' : 'text-neutral-400'
+                    }`}
+                  >
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
+
+                {/* Follow-up suggestion pills (shown only under the latest AI message) */}
+                {message.sender === 'ai' && followUps?.aiId === message.id && followUps.questions.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-neutral-100">
+                    <p className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">You could ask me:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {followUps.questions.map((q, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSendMessage(q)}
+                          className="text-xs px-3 py-1.5 rounded-full border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))] hover:text-white transition-all"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}

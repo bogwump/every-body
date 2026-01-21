@@ -6,6 +6,7 @@ import { Insights } from './components/Insights';
 import { AIChat } from './components/AIChat';
 import { Resources } from './components/Resources';
 import { ProfileSettings } from './components/ProfileSettings';
+import { CalendarView } from './components/CalendarView';
 import { Navigation } from './components/Navigation';
 
 import type { UserData } from './types';
@@ -17,7 +18,10 @@ const DEFAULT_USER: UserData = {
   colorTheme: 'sage',
   onboardingComplete: false,
   cycleTrackingMode: 'cycle',
-  enabledModules: [
+    showCycleBubble: true,
+  useMockEve: true,
+  eveLowCostMode: true,
+enabledModules: [
     'energy',
     'sleep',
     'stress',
@@ -79,6 +83,7 @@ export default function App() {
             userData={userData}
             onUpdateUserData={setUserData}
             onDone={() => setCurrentScreen('dashboard')}
+            onNavigate={setCurrentScreen}
           />
         );
 
@@ -100,6 +105,9 @@ export default function App() {
           />
         );
 
+
+      case 'calendar':
+        return <CalendarView userData={userData} onNavigate={setCurrentScreen} />;
       default:
         return (
           <Dashboard

@@ -7,5 +7,15 @@
 
   Run `npm i` to install the dependencies.
 
-  Run `npm run dev` to start the development server.
+  ### Eve chat (AI)
+
+  Eve now runs through a tiny local server so your OpenAI API key is never exposed in the browser.
+
+  1) Copy `.env.example` to `.env` and add your OpenAI API key.
+
+  2) Run `npm run dev:all` to start both:
+  - the Vite app on http://localhost:3000
+  - the Eve server on http://localhost:5174
+
+  (If you don’t want Eve running, you can still run `npm run dev`, but the chat will show a “can’t connect” message.)
   

@@ -56,5 +56,12 @@
     server: {
       port: 3000,
       open: true,
+      proxy: {
+        // Keep API keys off the frontend. The Eve server runs locally on 5174.
+        '/api': {
+          target: 'http://localhost:5174',
+          changeOrigin: true,
+        },
+      },
     },
   });

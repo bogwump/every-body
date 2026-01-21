@@ -8,7 +8,6 @@ interface DailyCheckInProps {
   userData: UserData;
   onUpdateUserData: (updater: ((prev: UserData) => UserData) | UserData) => void;
   onDone: () => void;
-  onNavigate?: (screen: string) => void;
 }
 
 const moodIcons: Array<{ value: 1 | 2 | 3; icon: React.ElementType; label: string }> = [
@@ -34,94 +33,7 @@ const sliderMeta: Record<Exclude<SymptomKey, never>, { label: string; icon: Reac
   nightSweats: { label: 'Night sweats', icon: Moon, color: 'text-sky-600' },
 };
 
-function moodFill(v: 1 | 2 | 3): string {
-  // Match the same calm scale as the 0–10 buttons.
-  if (v === 1) return 'bg-[rgb(var(--color-primary-light)_/_0.25)]';
-  if (v === 2) return 'bg-[rgb(var(--color-accent)_/_0.22)]';
-  return 'bg-[rgb(var(--color-primary-dark)_/_0.20)]';
-}
-
-function moodBorder(v: 1 | 2 | 3): string {
-  if (v === 1) return 'border-[rgb(var(--color-primary-light)_/_0.70)]';
-  if (v === 2) return 'border-[rgb(var(--color-accent)_/_0.70)]';
-  return 'border-[rgb(var(--color-primary-dark)_/_0.70)]';
-}
-
-function moodInk(v: 1 | 2 | 3): string {
-  if (v === 1) return 'text-[rgb(var(--color-primary))]';
-  if (v === 2) return 'text-[rgb(var(--color-accent-ink,0,0,0))]';
-  return 'text-[rgb(var(--color-primary-dark))]';
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function toScale10(percent: number): number {
-  // Stored values are 0-100. UI shows a simpler 0-10 scale.
-  return clamp(Math.round((percent ?? 0) / 10), 0, 10);
-}
-
-function fromScale10(scale: number): number {
-  return clamp(Math.round(scale), 0, 10) * 10;
-}
-
-function scaleFill(n: number): string {
-  // Theme-based gentle shift (no traffic-light colours).
-  // Low: primary-light (soft)
-  // Mid: accent (warm)
-  // High: primary / primary-dark (deeper)
-  if (n <= 2) return 'bg-[rgb(var(--color-primary-light)_/_0.22)]';
-  if (n <= 4) return 'bg-[rgb(var(--color-primary-light)_/_0.30)]';
-  if (n <= 6) return 'bg-[rgb(var(--color-accent)_/_0.26)]';
-  if (n <= 8) return 'bg-[rgb(var(--color-primary)_/_0.22)]';
-  return 'bg-[rgb(var(--color-primary-dark)_/_0.20)]';
-}
-
-function scaleBorder(n: number): string {
-  if (n <= 4) return 'border-[rgb(var(--color-primary-light)_/_0.65)]';
-  if (n <= 6) return 'border-[rgb(var(--color-accent)_/_0.65)]';
-  if (n <= 8) return 'border-[rgb(var(--color-primary)_/_0.65)]';
-  return 'border-[rgb(var(--color-primary-dark)_/_0.65)]';
-}
-
-function scaleInk(n: number): string {
-  if (n <= 4) return 'text-[rgb(var(--color-primary))]';
-  if (n <= 6) return 'text-[rgb(var(--color-accent-ink,0,0,0))]';
-  if (n <= 8) return 'text-[rgb(var(--color-primary))]';
-  return 'text-[rgb(var(--color-primary-dark))]';
-}
-
-function Scale10({ value, onChange, showZeroLabel }: { value: number; onChange: (n: number) => void; showZeroLabel?: boolean }) {
-  const current = clamp(value, 0, 10);
-  return (
-    <div className="flex items-center gap-1 overflow-x-auto py-1">
-      {Array.from({ length: 11 }).map((_, idx) => {
-        const n = idx;
-        const selected = n === current;
-        return (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(n)}
-            className={
-              'shrink-0 w-8 h-9 rounded-lg border transition-all text-sm font-medium ' +
-              (selected
-                ? `${scaleFill(n)} ${scaleBorder(n)} ${scaleInk(n)} shadow-sm`
-                : 'bg-white border-[rgba(0,0,0,0.10)] text-[rgb(var(--color-text))] hover:bg-neutral-50')
-            }
-            aria-pressed={selected}
-            title={n === 0 && showZeroLabel ? 'None' : String(n)}
-          >
-            {n === 0 && showZeroLabel ? '0' : n}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }: DailyCheckInProps) {
+export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckInProps) {
   const todayISO = isoToday();
   const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | null>(null);
   const [notes, setNotes] = useState('');
@@ -141,6 +53,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
     }
 
     // defaults if no existing entry
+    setCycleStartOverride(false);
     const defaults: Partial<Record<SymptomKey, number>> = {};
     for (const k of userData.enabledModules) {
       defaults[k] = k === 'pain' || k === 'flow' || k === 'bloating' ? 0 : 50;
@@ -220,17 +133,18 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
                 <button
                   key={mood.value}
                   onClick={() => setSelectedMood(mood.value)}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all border ${
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all ${
                     isSelected
-                      ? `${moodFill(mood.value)} ${moodBorder(mood.value)} scale-110 shadow-sm`
-                      : 'bg-white hover:bg-neutral-50 border-[rgba(0,0,0,0.08)]'
+                      ? 'bg-[rgb(var(--color-primary))] bg-opacity-10 scale-110'
+                      : 'bg-neutral-50 hover:bg-neutral-100'
                   }`}
                 >
                   <Icon
-                    className={`w-8 h-8 ${isSelected ? moodInk(mood.value) : 'text-neutral-500'}`}
-                    strokeWidth={2.25}
+                    className={`w-8 h-8 ${
+                      isSelected ? 'text-[rgb(var(--color-primary))]' : 'text-neutral-400'
+                    }`}
                   />
-                  <span className={`text-sm ${isSelected ? moodInk(mood.value) : ''}`}>{mood.label}</span>
+                  <span className="text-sm">{mood.label}</span>
                 </button>
               );
             })}
@@ -242,10 +156,10 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
           <div className="flex items-start justify-between gap-4 mb-2">
             <div>
               <h3 className="mb-1">Your check-in</h3>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">Showing your chosen symptoms</p>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">Only what you chose to track</p>
             </div>
             <button
-              onClick={() => (onNavigate ? onNavigate('profile') : onUpdateUserData((prev) => ({ ...prev })))}
+              onClick={() => onUpdateUserData((prev) => ({ ...prev }))}
               className="text-sm text-[rgb(var(--color-primary))] hover:underline"
               title="You can customise what you track in Profile"
               type="button"
@@ -256,8 +170,18 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
 
           {showCycleNudge && (
             <p className="text-xs text-[rgb(var(--color-text-secondary))] mb-4">
-              Tip: If you don't bleed because of a coil or menopause, you can keep tracking symptoms and turn off cycle tracking in Profile.
+              Tip: If you don’t bleed because of a coil or menopause, you can keep tracking symptoms and turn off cycle tracking in Profile.
             </p>
+          )}                  className="mt-1"
+                />
+                <div>
+                  <div className="text-sm font-medium">New cycle started today</div>
+                  <div className="text-sm text-[rgba(0,0,0,0.65)]">
+                    Use this if bleeding is unclear, or you just want to mark Day 1 manually.
+                  </div>
+                </div>
+              </label>
+            </div>
           )}
 
           <div className="space-y-6">
@@ -271,12 +195,18 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
                       <Icon className={`w-5 h-5 ${slider.color}`} />
                       <span className="text-sm">{slider.label}</span>
                     </div>
-                    <span className="text-sm font-medium text-[rgb(var(--color-primary))]">{toScale10(v)}/10</span>
+                    <span className="text-sm font-medium text-[rgb(var(--color-primary))]">{v}%</span>
                   </div>
-                  <Scale10
-                    value={toScale10(v)}
-                    onChange={(n) => handleSliderChange(slider.key, fromScale10(n))}
-                    showZeroLabel={slider.key === 'flow' || slider.key === 'pain'}
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={v}
+                    onChange={(e) => handleSliderChange(slider.key, parseInt(e.target.value, 10))}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer slider"
+                    style={{
+                      background: `linear-gradient(to right, rgb(var(--color-primary)) 0%, rgb(var(--color-primary)) ${v}%, rgb(229, 231, 235) ${v}%, rgb(229, 231, 235) 100%)`,
+                    }}
                   />
                 </div>
               );
