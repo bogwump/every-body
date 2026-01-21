@@ -140,3 +140,120 @@ export function estimatePhaseByFlow(
   if (daySince <= 15) return "Ovulation";
   return "Luteal";
 }
+
+
+export interface CycleStats {
+  cycleStarts: string[]; // YYYY-MM-DD sorted asc
+  lengths: number[]; // days between consecutive starts
+  lastLength: number | null;
+  avgLength: number | null;
+  predictedNextStartISO: string | null;
+  predictionNote: string | null;
+}
+
+/**
+ * Detect cycle starts using either a manual override, or a flow "start" signal.
+ * Rules:
+ * - Manual override always counts as a start
+ * - Otherwise flow >= 20 counts as bleeding, and the first bleeding day after a non-bleeding day is a start
+ */
+export function getCycleStarts(entries: CheckInEntry[] | unknown): string[] {
+  const sorted = sortByDateAsc(entries);
+  const starts: string[] = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const e: any = sorted[i];
+    const dateISO = String(e?.dateISO ?? "");
+    if (!dateISO) continue;
+
+    if (e?.cycleStartOverride === true) {
+      starts.push(dateISO);
+      continue;
+    }
+
+    const flow = e?.values?.flow;
+    const prevFlow = i > 0 ? (sorted[i - 1] as any)?.values?.flow : undefined;
+
+    const isBleeding = typeof flow === "number" && flow >= 20;
+    const wasBleeding = typeof prevFlow === "number" && prevFlow >= 20;
+
+    if (isBleeding && !wasBleeding) {
+      starts.push(dateISO);
+    }
+  }
+
+  // de-dupe (in case override + flow same day)
+  return Array.from(new Set(starts)).sort();
+}
+
+function daysBetweenISO(aISO: string, bISO: string): number {
+  const a = new Date(aISO + "T00:00:00");
+  const b = new Date(bISO + "T00:00:00");
+  const ms = b.getTime() - a.getTime();
+  return Math.round(ms / (1000 * 60 * 60 * 24));
+}
+
+function addDaysISO(dateISO: string, days: number): string {
+  const d = new Date(dateISO + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Compute cycle length stats. This is intentionally "explainable":
+ * - starts come from override or flow
+ * - prediction defaults to lastStart + avgLength
+ * - optional symptom-based hint (fatigue/brain fog/night sweats/skin/hair) nudges the note, not the date
+ */
+export function computeCycleStats(entries: CheckInEntry[] | unknown): CycleStats {
+  const starts = getCycleStarts(entries);
+  const lengths: number[] = [];
+
+  for (let i = 0; i < starts.length - 1; i++) {
+    const len = daysBetweenISO(starts[i], starts[i + 1]);
+    if (Number.isFinite(len) && len >= 10 && len <= 60) {
+      lengths.push(len);
+    }
+  }
+
+  const lastLength = lengths.length ? lengths[lengths.length - 1] : null;
+
+  const recent = lengths.slice(-6);
+  const avgLength =
+    recent.length > 0 ? Math.round(recent.reduce((a, b) => a + b, 0) / recent.length) : null;
+
+  const lastStart = starts.length ? starts[starts.length - 1] : null;
+  const predictedNextStartISO =
+    lastStart && avgLength ? addDaysISO(lastStart, avgLength) : null;
+
+  // Symptom-based hint (lightweight "AI-ish" signal)
+  // We look at last 5 days average for selected symptoms, and if high, we mention it.
+  const sorted = sortByDateAsc(entries);
+  const last5 = sorted.slice(-5) as any[];
+
+  const keys: SymptomKey[] = ["fatigue", "brainFog", "nightSweats", "hairShedding", "facialSpots", "cysts"];
+  let signalCount = 0;
+
+  for (const k of keys) {
+    const vals = last5.map((e) => e?.values?.[k]).filter((v: any) => typeof v === "number") as number[];
+    if (!vals.length) continue;
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    if (avg >= 65) signalCount++;
+  }
+
+  const predictionNote =
+    predictedNextStartISO && signalCount >= 2
+      ? "Some recent symptoms often seen pre-period are running higher than usual. Consider using the 'New cycle started today' switch if bleeding is unclear."
+      : predictedNextStartISO
+      ? "Prediction is based on your recent average cycle length. You can override it anytime."
+      : null;
+
+  return {
+    cycleStarts: starts,
+    lengths,
+    lastLength,
+    avgLength,
+    predictedNextStartISO,
+    predictionNote,
+  };
+}

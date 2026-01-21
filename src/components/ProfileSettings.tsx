@@ -41,6 +41,12 @@ const moduleMeta: Array<{ key: SymptomKey; label: string; description: string }>
   { key: 'focus', label: 'Clarity', description: 'Brain fog vs clear thinking' },
   { key: 'bloating', label: 'Bloating', description: 'Digestive discomfort and swelling' },
   { key: 'pain', label: 'Pain', description: 'Cramps, aches, headaches, etc' },
+  { key: 'hairShedding', label: 'Hair shedding', description: 'Shedding or thinning today' },
+  { key: 'facialSpots', label: 'Facial spots', description: 'Breakouts or skin changes' },
+  { key: 'cysts', label: 'Cysts', description: 'Cystic spots or tenderness' },
+  { key: 'brainFog', label: 'Brain fog', description: 'Foggy thinking, forgetfulness' },
+  { key: 'fatigue', label: 'Fatigue', description: 'Heavy tiredness or drained feeling' },
+  { key: 'nightSweats', label: 'Night sweats', description: 'Sweats or overheating at night' },
   { key: 'flow', label: 'Bleeding / spotting', description: 'Optional, only if it’s relevant to you' },
 ];
 

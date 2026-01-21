@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Battery, Moon, Heart, Droplet, Zap, Brain, Wind, Check, Smile, Meh, Frown } from 'lucide-react';
+import { Battery, Moon, Heart, Droplet, Zap, Brain, Wind, Check, Smile, Meh, Frown, Sparkles } from 'lucide-react';
 import type { CheckInEntry, SymptomKey, UserData } from '../types';
 import { isoToday } from '../lib/analytics';
 import { useEntries } from '../lib/appStore';
@@ -24,6 +24,13 @@ const sliderMeta: Record<Exclude<SymptomKey, never>, { label: string; icon: Reac
   stress: { label: 'Stress', icon: Zap, color: 'text-orange-500' },
   focus: { label: 'Mental Clarity', icon: Brain, color: 'text-purple-500' },
   bloating: { label: 'Bloating', icon: Wind, color: 'text-teal-500' },
+
+  hairShedding: { label: 'Hair shedding', icon: Sparkles, color: 'text-emerald-600' },
+  facialSpots: { label: 'Facial spots', icon: Sparkles, color: 'text-amber-600' },
+  cysts: { label: 'Cysts', icon: Heart, color: 'text-rose-600' },
+  brainFog: { label: 'Brain fog', icon: Brain, color: 'text-purple-600' },
+  fatigue: { label: 'Fatigue', icon: Battery, color: 'text-amber-500' },
+  nightSweats: { label: 'Night sweats', icon: Moon, color: 'text-sky-600' },
 };
 
 export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckInProps) {
@@ -31,6 +38,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
   const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | null>(null);
   const [notes, setNotes] = useState('');
   const [values, setValues] = useState<Partial<Record<SymptomKey, number>>>({});
+  const [cycleStartOverride, setCycleStartOverride] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   const { entries, upsertEntry } = useEntries();
@@ -42,10 +50,12 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
       setSelectedMood(existingToday.mood ?? null);
       setNotes(existingToday.notes ?? '');
       setValues(existingToday.values ?? {});
+      setCycleStartOverride(Boolean((existingToday as any).cycleStartOverride));
       return;
     }
 
     // defaults if no existing entry
+    setCycleStartOverride(false);
     const defaults: Partial<Record<SymptomKey, number>> = {};
     for (const k of userData.enabledModules) {
       defaults[k] = k === 'pain' || k === 'flow' || k === 'bloating' ? 0 : 50;
@@ -81,6 +91,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
       mood: selectedMood ?? undefined,
       notes: notes.trim() ? notes.trim() : undefined,
       values: values ?? {},
+      cycleStartOverride: cycleStartOverride ? true : undefined,
       createdAt: existingToday?.createdAt ?? now,
       updatedAt: now,
     };
@@ -163,6 +174,27 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone }: DailyCheckI
             <p className="text-xs text-[rgb(var(--color-text-secondary))] mb-4">
               Tip: If you don’t bleed because of a coil or menopause, you can keep tracking symptoms and turn off cycle tracking in Profile.
             </p>
+          )}
+
+
+          {/* Cycle start override (optional) */}
+          {userData.cycleTrackingMode === 'cycle' && (
+            <div className="mb-4 p-4 rounded-xl border border-[rgba(0,0,0,0.08)] bg-[rgba(255,255,255,0.5)]">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={cycleStartOverride}
+                  onChange={(e) => setCycleStartOverride(e.target.checked)}
+                  className="mt-1"
+                />
+                <div>
+                  <div className="text-sm font-medium">New cycle started today</div>
+                  <div className="text-sm text-[rgba(0,0,0,0.65)]">
+                    Use this if bleeding is unclear, or you just want to mark Day 1 manually.
+                  </div>
+                </div>
+              </label>
+            </div>
           )}
 
           <div className="space-y-6">

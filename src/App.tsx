@@ -8,7 +8,7 @@ import { Resources } from './components/Resources';
 import { ProfileSettings } from './components/ProfileSettings';
 import { Navigation } from './components/Navigation';
 
-import type { UserData, UserGoal } from './types';
+import type { UserData } from './types';
 import { APP_NAME, useUser } from './lib/appStore';
 
 const DEFAULT_USER: UserData = {
@@ -17,7 +17,21 @@ const DEFAULT_USER: UserData = {
   colorTheme: 'sage',
   onboardingComplete: false,
   cycleTrackingMode: 'cycle',
-  enabledModules: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'pain', 'flow'],
+  enabledModules: [
+    'energy',
+    'sleep',
+    'stress',
+    'focus',
+    'bloating',
+    'pain',
+    'fatigue',
+    'brainFog',
+    'nightSweats',
+    'hairShedding',
+    'facialSpots',
+    'cysts',
+    'flow',
+  ],
 };
 
 export default function App() {
@@ -29,23 +43,36 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', userData.colorTheme);
   }, [userData.colorTheme]);
 
-  // Page title (nice in iOS Safari PWA contexts)
+  // Page title (nice on iOS Safari)
   useEffect(() => {
-    document.title = APP_NAME;
-  }, []);
+    document.title = `${APP_NAME}${currentScreen === 'dashboard' ? '' : ' • ' + currentScreen}`;
+  }, [currentScreen]);
 
-  const onboardingComplete = userData.onboardingComplete;
-
-  const handleQuickStart = (goal: UserGoal | null) => {
-    setUserData((prev) => ({ ...prev, goal, onboardingComplete: true }));
-    // Do-first: drop them straight into the check-in
-    setCurrentScreen('check-in');
+  const startOnboarding = (goal: UserData['goal']) => {
+    setUserData((prev) => ({
+      ...prev,
+      goal,
+      onboardingComplete: true,
+    }));
+    setCurrentScreen('dashboard');
   };
 
   const main = useMemo(() => {
+    if (!userData.onboardingComplete) {
+      return <QuickStart selectedGoal={userData.goal} onStart={startOnboarding} />;
+    }
+
     switch (currentScreen) {
       case 'dashboard':
-        return <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} />;
+        return (
+          <Dashboard
+            userName={userData.name}
+            userGoal={userData.goal}
+            userData={userData}
+            onNavigate={setCurrentScreen}
+          />
+        );
+
       case 'check-in':
         return (
           <DailyCheckIn
@@ -54,12 +81,16 @@ export default function App() {
             onDone={() => setCurrentScreen('dashboard')}
           />
         );
+
       case 'insights':
         return <Insights userData={userData} />;
+
       case 'chat':
         return <AIChat userName={userData.name || 'there'} userData={userData} />;
+
       case 'resources':
-        return <Resources userGoal={userData.goal} />;
+        return <Resources />;
+
       case 'profile':
         return (
           <ProfileSettings
@@ -68,23 +99,25 @@ export default function App() {
             onUpdateUserData={setUserData}
           />
         );
-      default:
-        return <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} />;
-    }
-  }, [currentScreen, userData]);
 
-  if (!onboardingComplete) {
-    return (
-      <div className="min-h-screen eb-surface">
-        <QuickStart selectedGoal={userData.goal} onStart={handleQuickStart} />
-      </div>
-    );
-  }
+      default:
+        return (
+          <Dashboard
+            userName={userData.name}
+            userGoal={userData.goal}
+            userData={userData}
+            onNavigate={setCurrentScreen}
+          />
+        );
+    }
+  }, [currentScreen, userData, setUserData]);
 
   return (
-    <>
-      <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
-      <div className="md:ml-64 min-h-screen eb-surface pb-20 md:pb-0 md:pl-8">{main}</div>
-    </>
+    <div className="min-h-screen">
+      {userData.onboardingComplete && (
+        <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
+      )}
+      <main className={userData.onboardingComplete ? 'pb-20 md:pb-0 md:pl-64' : ''}>{main}</main>
+    </div>
   );
 }

@@ -214,11 +214,10 @@ p {
 .eb-hero-surface {
   background: linear-gradient(
     135deg,
-    rgba(var(--color-primary), 0.55),
-    rgba(var(--color-primary-dark), 0.75)
+    rgb(var(--color-primary-dark)),
+    rgb(var(--color-primary))
   );
 }
-
 /* Default hero text is black (eg "Symptom tracking") */
 .eb-hero {
   color: rgba(0, 0, 0, 0.9);

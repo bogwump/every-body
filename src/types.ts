@@ -10,7 +10,13 @@ export type SymptomKey =
   | 'flow'
   | 'stress'
   | 'focus'
-  | 'bloating';
+  | 'bloating'
+  | 'hairShedding'
+  | 'facialSpots'
+  | 'cysts'
+  | 'brainFog'
+  | 'fatigue'
+  | 'nightSweats';
 
 export interface UserData {
   name: string;
@@ -26,6 +32,8 @@ export interface UserData {
 export interface CheckInEntry {
   id: string;
   dateISO: string; // YYYY-MM-DD
+  /** Manually mark this day as a new cycle start (day 1) */
+  cycleStartOverride?: boolean;
   /** Mood chosen on the 3-point picker */
   mood?: 1 | 2 | 3;
   notes?: string;
