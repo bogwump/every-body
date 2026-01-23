@@ -43,6 +43,9 @@ export interface UserData {
   /** Optional: selected built-in avatar icon */
   avatarStockId?: string;
 
+  /** Optional: trying to conceive mode (enables fertility features like sex log + fertile window shading) */
+  fertilityMode?: boolean;
+
 
 }
 
@@ -56,6 +59,12 @@ export interface CheckInEntry {
   notes?: string;
   /** Per-module values 0-100 */
   values: Partial<Record<SymptomKey, number>>;
+
+  /** Optional non-symptom events (kept separate from symptom modules) */
+  events?: {
+    /** Sex logged for the day (only shown when Fertility mode is enabled) */
+    sex?: boolean;
+  };
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }

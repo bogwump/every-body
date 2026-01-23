@@ -21,6 +21,7 @@ const DEFAULT_USER: UserData = {
     showCycleBubble: true,
   useMockEve: true,
   eveLowCostMode: true,
+  fertilityMode: false,
 enabledModules: [
     'energy',
     'sleep',
@@ -40,6 +41,7 @@ enabledModules: [
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
+  const [checkInDateISO, setCheckInDateISO] = useState<string | undefined>(undefined);
   const { user: userData, updateUser: setUserData } = useUser(DEFAULT_USER);
 
   const FORCE_ONBOARDING_KEY = 'eb_force_onboarding_preview';
@@ -70,7 +72,20 @@ export default function App() {
     document.title = `${APP_NAME}${currentScreen === 'dashboard' ? '' : ' • ' + currentScreen}`;
   }, [currentScreen]);
 
-  const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; colorTheme: UserData['colorTheme'] }) => {
+  // Ensure each screen loads from the top (SPA nav otherwise keeps prior scroll position)
+  useEffect(() => {
+    try {
+      window.scrollTo(0, 0);
+    } catch {
+      // ignore
+    }
+  }, [currentScreen]);
+
+    const navigateToCheckIn = (dateISO?: string) => {
+    setCheckInDateISO(dateISO);
+    setCurrentScreen('check-in');
+  };
+const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; colorTheme: UserData['colorTheme'] }) => {
     if (!data.goal) return;
     setUserData((prev) => ({
       ...prev,
@@ -113,12 +128,7 @@ export default function App() {
     switch (currentScreen) {
       case 'dashboard':
         return (
-          <Dashboard
-            userName={userData.name}
-            userGoal={userData.goal}
-            userData={userData}
-            onNavigate={setCurrentScreen}
-          />
+          <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} onUpdateUserData={setUserData} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />
         );
 
       case 'check-in':
@@ -126,6 +136,7 @@ export default function App() {
           <DailyCheckIn
             userData={userData}
             onUpdateUserData={setUserData}
+            initialDateISO={checkInDateISO}
             onDone={() => setCurrentScreen('dashboard')}
             onNavigate={setCurrentScreen}
           />
@@ -160,15 +171,10 @@ export default function App() {
 
 
       case 'calendar':
-        return <CalendarView userData={userData} onNavigate={setCurrentScreen} />;
+        return <CalendarView userData={userData} onNavigate={setCurrentScreen} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />;
       default:
         return (
-          <Dashboard
-            userName={userData.name}
-            userGoal={userData.goal}
-            userData={userData}
-            onNavigate={setCurrentScreen}
-          />
+          <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} onUpdateUserData={setUserData} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />
         );
     }
   }, [currentScreen, userData, setUserData]);

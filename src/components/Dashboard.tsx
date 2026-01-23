@@ -13,13 +13,15 @@ import {
 
 import type { UserData, UserGoal } from '../types';
 import { useEntries } from '../lib/appStore';
-import { computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
+import { computeCycleStats, estimatePhaseByFlow, isoToday, sortByDateAsc } from '../lib/analytics';
 
 interface DashboardProps {
   userName: string;
   userGoal: UserGoal | null;
   userData: UserData;
   onNavigate: (screen: string) => void;
+  onUpdateUserData: (updater: ((prev: UserData) => UserData) | UserData) => void;
+  onOpenCheckIn: (dateISO?: string) => void;
 }
 
 function prettyGoal(goal: UserGoal | null) {
@@ -50,11 +52,22 @@ function buildWeekSeries(dateISOs: string[], entriesByDate: Map<string, any>) {
   });
 }
 
-export function Dashboard({ userName, userGoal, userData, onNavigate }: DashboardProps) {
+export function Dashboard({
+  userName,
+  userGoal,
+  userData,
+  onNavigate,
+  onUpdateUserData,
+  onOpenCheckIn,
+}: DashboardProps) {
   const { entries: entriesAll, upsertEntry } = useEntries();
   const entriesSorted = useMemo(() => sortByDateAsc(entriesAll), [entriesAll]);
+
   const todayISO = isoToday();
-  const todayEntry = useMemo(() => entriesSorted.find((e) => e.dateISO === todayISO) ?? null, [entriesSorted, todayISO]);
+  const todayEntry = useMemo(
+    () => entriesSorted.find((e) => e.dateISO === todayISO) ?? null,
+    [entriesSorted, todayISO]
+  );
 
   const todayLabel = useMemo(() => {
     const d = new Date();
@@ -64,12 +77,19 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
   const checkedInToday = Boolean(todayEntry);
   const goalLabel = prettyGoal(userGoal);
 
+  const [showGoalPicker, setShowGoalPicker] = React.useState(false);
+
   const cycleStats = useMemo(() => computeCycleStats(entriesSorted), [entriesSorted]);
 
   const todayPhase = useMemo(() => {
     if (userData.cycleTrackingMode !== 'cycle') return null;
     return estimatePhaseByFlow(todayISO, entriesSorted);
   }, [userData.cycleTrackingMode, todayISO, entriesSorted]);
+
+  function dayPhaseKey(p: any) {
+    if (p === 'Ovulatory') return 'Ovulation';
+    return p;
+  }
 
   const tipText = useMemo(() => {
     if (userData.cycleTrackingMode !== 'cycle') {
@@ -85,13 +105,7 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
     return byPhase[dayPhaseKey(todayPhase)] ?? 'Small daily check-ins can help you spot patterns over time.';
   }, [userData.cycleTrackingMode, todayPhase]);
 
-  function dayPhaseKey(p: any) {
-    // analytics uses "Ovulation" not "Ovulatory" in some places
-    if (p === 'Ovulatory') return 'Ovulation';
-    return p;
-  }
-
-  // week series
+  // Week chart
   const weekSeries = useMemo(() => {
     const today = new Date();
     const dateISOs: string[] = [];
@@ -104,32 +118,15 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
     return buildWeekSeries(dateISOs, map);
   }, [entriesSorted]);
 
-  const avgCycleText =
-    cycleStats.avgLength ? `${cycleStats.avgLength} days avg` : 'Not enough data yet';
-
   const showCycleBubble = userData.cycleTrackingMode === 'cycle' && (userData.showCycleBubble ?? true);
   const [cycleModalOpen, setCycleModalOpen] = React.useState(false);
-  const [markNewCycle, setMarkNewCycle] = React.useState<boolean>(Boolean((todayEntry as any)?.cycleStartOverride));
 
-  React.useEffect(() => {
-    setMarkNewCycle(Boolean((todayEntry as any)?.cycleStartOverride));
-  }, [todayEntry]);
+  const avgCycleText = cycleStats.avgLength ? `${cycleStats.avgLength} days avg` : 'Not enough data yet';
 
-  const saveCycleOverride = () => {
-    const now = new Date().toISOString();
-    const next = {
-      id: (todayEntry as any)?.id ?? `${Date.now()}`,
-      dateISO: todayISO,
-      mood: (todayEntry as any)?.mood,
-      notes: (todayEntry as any)?.notes,
-      values: (todayEntry as any)?.values ?? {},
-      cycleStartOverride: markNewCycle ? true : undefined,
-      createdAt: (todayEntry as any)?.createdAt ?? now,
-      updatedAt: now,
-    };
-    upsertEntry(next as any);
-    setCycleModalOpen(false);
-  };
+  // NOTE: You asked to move quick log items to Check-in.
+  // This modal remains informational only (stats + prediction).
+  // If you still want overrides here too, we can add them back cleanly later.
+  const closeGoalPicker = () => setShowGoalPicker(false);
 
   return (
     <div className="eb-page">
@@ -142,6 +139,7 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
 
         {/* HERO: Symptom tracking */}
         <div className="eb-card eb-hero eb-hero-surface rounded-2xl p-6 relative">
+          {/* Calendar icon */}
           <button
             type="button"
             onClick={() => onNavigate('calendar')}
@@ -151,15 +149,7 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
             <Calendar className="w-5 h-5" />
           </button>
 
-          <h3 className="mb-1 text-lg font-semibold">Symptom tracking</h3>
-
-          <p className="text-sm eb-hero-on-dark-muted mb-5">
-            {userData.cycleTrackingMode === 'no-cycle'
-              ? 'Cycle features are off, but you can still track symptoms and patterns.'
-              : 'Add bleeding or spotting (optional) to unlock cycle-phase insights.'}
-          </p>
-
-          
+          {/* Cycle length bubble */}
           {showCycleBubble && (
             <button
               type="button"
@@ -173,22 +163,80 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
             </button>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="eb-inset rounded-xl p-4">
-              <div className="eb-inset-label">Today</div>
-              <div className="eb-inset-value">{checkedInToday ? 'Checked in' : 'Not checked in yet'}</div>
-            </div>
+          <h3 className="mb-1 text-lg font-semibold">Symptom tracking</h3>
 
-            <div className="eb-inset rounded-xl p-4">
-              <div className="eb-inset-label">Goal</div>
-              <div className="eb-inset-value">{goalLabel}</div>
+          <p className="text-sm eb-hero-on-dark-muted mb-5">
+            {userData.cycleTrackingMode === 'no-cycle'
+              ? 'Cycle features are off, but you can still track symptoms and patterns.'
+              : 'Add bleeding or spotting (optional) to unlock cycle-phase insights.'}
+          </p>
+
+          {/* Today + Goal */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => onOpenCheckIn(todayISO)}
+              className="eb-inset rounded-xl p-4 text-left w-full hover:opacity-95 transition"
+            >
+              <div className="eb-inset-label">Today</div>
+              <div className="eb-inset-value">
+                {checkedInToday ? 'Checked in' : 'Not checked in yet'}
+              </div>
+            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowGoalPicker((v) => !v)}
+                className="eb-inset rounded-xl p-4 text-left w-full hover:opacity-95 transition"
+              >
+                <div className="eb-inset-label">Goal</div>
+                <div className="eb-inset-value">{goalLabel}</div>
+              </button>
+
+              {showGoalPicker && (
+                <div
+                  className="absolute left-0 right-0 mt-2 z-20 bg-white rounded-2xl shadow-lg border border-[rgba(0,0,0,0.08)] p-3"
+                  role="menu"
+                >
+                  <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">Change goal</div>
+                  <div className="grid gap-2">
+                    {([
+                      { id: 'cycle-health', label: 'Cycle Health' },
+                      { id: 'perimenopause', label: 'Perimenopause' },
+                      { id: 'post-contraception', label: 'Post contraception' },
+                      { id: 'wellbeing', label: 'Wellbeing' },
+                    ] as const).map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        className={`w-full text-left px-3 py-2 rounded-xl transition ${
+                          userData.goal === g.id
+                            ? 'bg-[rgb(var(--color-primary)/0.12)]'
+                            : 'hover:bg-[rgba(0,0,0,0.04)]'
+                        }`}
+                        onClick={() => {
+                          onUpdateUserData((prev) => ({ ...prev, goal: g.id }));
+                          closeGoalPicker();
+                        }}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Action cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <button onClick={() => onNavigate('check-in')} className="eb-card hover:shadow-md transition-all text-left group">
+          <button
+            onClick={() => onOpenCheckIn(todayISO)}
+            className="eb-card hover:shadow-md transition-all text-left group"
+            type="button"
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-accent),0.2)] flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
@@ -199,7 +247,11 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
             <p className="text-sm">Log today’s symptoms</p>
           </button>
 
-          <button onClick={() => onNavigate('insights')} className="eb-card hover:shadow-md transition-all text-left group">
+          <button
+            onClick={() => onNavigate('insights')}
+            className="eb-card hover:shadow-md transition-all text-left group"
+            type="button"
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-accent),0.2)] flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
@@ -223,7 +275,11 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
             <p className="text-sm mb-4">
               Start with a daily check-in. After a week or two, insights start to become more useful.
             </p>
-            <button onClick={() => onNavigate('chat')} className="text-sm text-[rgb(var(--color-primary))] hover:underline">
+            <button
+              onClick={() => onNavigate('chat')}
+              className="text-sm text-[rgb(var(--color-primary))] hover:underline"
+              type="button"
+            >
               Ask a question in chat →
             </button>
           </div>
@@ -257,7 +313,11 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
         </div>
 
         {/* Nice work */}
-        <button onClick={() => onNavigate('insights')} className="eb-card w-full text-left hover:shadow-md transition">
+        <button
+          onClick={() => onNavigate('insights')}
+          className="eb-card w-full text-left hover:shadow-md transition"
+          type="button"
+        >
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl bg-[rgba(0,0,0,0.06)] flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-[rgba(0,0,0,0.65)]" />
@@ -268,11 +328,14 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
               <p className="text-sm text-[rgba(0,0,0,0.65)]">
                 If you want, we can look for links between symptoms and lifestyle across the last few weeks.
               </p>
-              <span className="mt-3 inline-block text-sm text-[rgb(var(--color-primary))]">Show me insights →</span>
+              <span className="mt-3 inline-block text-sm text-[rgb(var(--color-primary))]">
+                Show me insights →
+              </span>
             </div>
           </div>
         </button>
-        {/* Cycle length modal */}
+
+        {/* Cycle length modal (stats only) */}
         {cycleModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <button
@@ -286,7 +349,9 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
                 <div className="min-w-0">
                   <h2 className="text-xl font-semibold mb-1">Cycle length</h2>
                   <p className="text-sm text-[rgba(0,0,0,0.65)]">
-                    {userData.cycleTrackingMode === 'cycle' ? 'Based on your logs and any overrides.' : 'Cycle tracking is off.'}
+                    {userData.cycleTrackingMode === 'cycle'
+                      ? 'Based on your logs and any overrides.'
+                      : 'Cycle tracking is off.'}
                   </p>
                 </div>
                 <button
@@ -301,11 +366,15 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
               <div className="grid grid-cols-2 gap-3 mb-5">
                 <div className="eb-inset p-4">
                   <div className="eb-inset-label">Average</div>
-                  <div className="eb-inset-value">{cycleStats.avgLength ? `${cycleStats.avgLength} days` : '–'}</div>
+                  <div className="eb-inset-value">
+                    {cycleStats.avgLength ? `${cycleStats.avgLength} days` : '–'}
+                  </div>
                 </div>
                 <div className="eb-inset p-4">
                   <div className="eb-inset-label">Last cycle</div>
-                  <div className="eb-inset-value">{cycleStats.lastLength ? `${cycleStats.lastLength} days` : '–'}</div>
+                  <div className="eb-inset-value">
+                    {cycleStats.lastLength ? `${cycleStats.lastLength} days` : '–'}
+                  </div>
                 </div>
               </div>
 
@@ -319,38 +388,13 @@ export function Dashboard({ userName, userGoal, userData, onNavigate }: Dashboar
                 )}
               </div>
 
-              <div className="flex items-start gap-3 mb-5">
-                <input
-                  id="eb-new-cycle-dashboard"
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-[rgba(0,0,0,0.25)]"
-                  checked={markNewCycle}
-                  onChange={(e) => setMarkNewCycle(e.target.checked)}
-                />
-                <div className="min-w-0">
-                  <label htmlFor="eb-new-cycle-dashboard" className="block font-semibold mb-1">
-                    New cycle started today
-                  </label>
-                  <p className="text-sm text-[rgba(0,0,0,0.65)]">
-                    Marks today as a fresh start even if you are not logging bleeding.
-                  </p>
-                </div>
-              </div>
-
               <div className="flex gap-3 justify-end">
                 <button
                   type="button"
                   onClick={() => setCycleModalOpen(false)}
                   className="rounded-xl px-4 py-2 border border-[rgba(0,0,0,0.12)] hover:bg-neutral-50"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={saveCycleOverride}
-                  className="rounded-xl px-4 py-2 bg-[rgb(var(--color-primary))] text-white hover:opacity-95"
-                >
-                  Save
+                  Close
                 </button>
               </div>
             </div>

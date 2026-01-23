@@ -178,7 +178,22 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
       dateISO: todayISO,
       mood: selectedMood ?? undefined,
       notes: notes.trim() ? notes.trim() : undefined,
-      values: values ?? {},
+      values: (() => {
+        const nextValues = { ...(values ?? {}) } as any;
+        // If user toggles "Bleeding/spotting started" but didn't touch the slider, log a minimal flow value.
+        if (userData.cycleTrackingMode === 'cycle' && userData.enabledModules.includes('flow')) {
+          if (markBleedingStarted && (!nextValues.flow || nextValues.flow <= 0)) nextValues.flow = 1;
+        }
+        return nextValues;
+      })(),
+      events: (() => {
+        const ev: any = { ...((existingEntry as any)?.events ?? {}) };
+        if (userData.cycleTrackingMode === 'cycle' && userData.fertilityMode) {
+          if (markSex) ev.sex = true;
+          else delete ev.sex;
+        }
+        return Object.keys(ev).length ? ev : undefined;
+      })(),
       cycleStartOverride: markNewCycle ? true : undefined,
       createdAt: existingToday?.createdAt ?? now,
       updatedAt: now,
@@ -200,7 +215,10 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
       <div className="eb-container py-8 max-w-3xl">
         <div className="mb-8">
           <h1 className="mb-2">Daily Check-in</h1>
-          <p>How are you feeling today?</p>
+          <p className="text-[rgb(var(--color-text-secondary))]">
+            {new Date(activeDateISO + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {activeDateISO !== todayISO ? ' (edit)' : ''}
+          </p>
         </div>
 
         {/* Friendly note for no-cycle users */}
@@ -239,6 +257,50 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
             })}
           </div>
         </div>
+
+        
+        {/* Quick log (cycle & fertility) */}
+        {(userData.cycleTrackingMode === 'cycle' || userData.fertilityMode) && (
+          <div className="eb-card mb-6">
+            <h3 className="mb-1">Quick log</h3>
+            <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
+              Optional extras. These sit alongside your check-in (not in your symptom sliders).
+            </p>
+
+            {userData.cycleTrackingMode === 'cycle' && (
+              <button
+                type="button"
+                onClick={() => setMarkNewCycle((v) => !v)}
+                className="w-full flex items-center justify-between gap-3 py-2"
+              >
+                <span className="text-sm">New cycle started</span>
+                <TogglePill checked={markNewCycle} />
+              </button>
+            )}
+
+            {userData.cycleTrackingMode === 'cycle' && userData.enabledModules.includes('flow') && (
+              <button
+                type="button"
+                onClick={() => setMarkBleedingStarted((v) => !v)}
+                className="w-full flex items-center justify-between gap-3 py-2"
+              >
+                <span className="text-sm">Bleeding/spotting started</span>
+                <TogglePill checked={markBleedingStarted} />
+              </button>
+            )}
+
+            {userData.cycleTrackingMode === 'cycle' && userData.fertilityMode && (
+              <button
+                type="button"
+                onClick={() => setMarkSex((v) => !v)}
+                className="w-full flex items-center justify-between gap-3 py-2"
+              >
+                <span className="text-sm">Sex</span>
+                <TogglePill checked={markSex} />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Symptom Sliders */}
         <div className="eb-card mb-6">
@@ -320,4 +382,22 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
       </div>
     </div>
   );
+
+function TogglePill({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={`w-12 h-6 rounded-full transition-all inline-flex items-center ${
+        checked ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+      }`}
+      aria-hidden="true"
+    >
+      <span
+        className={`w-5 h-5 bg-white rounded-full transition-transform ${
+          checked ? 'translate-x-6' : 'translate-x-0.5'
+        }`}
+      />
+    </span>
+  );
+}
+
 }
