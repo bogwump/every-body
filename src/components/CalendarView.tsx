@@ -38,16 +38,22 @@ function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
 
-function HeartMark() {
+function SexMark({ size = 10 }: { size?: number }) {
   return (
-    <span className="inline-flex items-center justify-center" aria-label="Sex logged" title="Sex logged">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M12 21s-7.2-4.6-9.7-9.1C.8 8.8 2.6 6 5.6 6c1.7 0 3.1 1 3.9 2 0.8-1 2.2-2 3.9-2 3 0 4.8 2.8 3.3 5.9C19.2 16.4 12 21 12 21Z"
-          fill="rgb(var(--color-primary))"
-          opacity="0.95"
-        />
-      </svg>
+    <span
+      className="inline-flex items-center justify-center"
+      aria-label="Sex logged"
+      title="Sex logged"
+    >
+      <span
+        className="rounded-full"
+        style={{
+          width: size,
+          height: size,
+          background: 'rgb(var(--color-primary-dark) / 0.55)',
+          boxShadow: '0 0 0 2px rgb(255 255 255 / 0.85)',
+        }}
+      />
     </span>
   );
 }
@@ -85,7 +91,13 @@ function getOverlayValue(entry: any, key: SymptomKey | 'mood'): number | null {
   }
   const v = entry?.values?.[key];
   if (typeof v !== 'number') return null;
-  return clamp(v, 0, 10);
+
+  // We have had a couple of different storage scales over time:
+  // - older builds stored symptoms as 0–100
+  // - newer UI sometimes treats them as 0–10
+  // For the calendar overlay we normalise to 0–10.
+  const scaled = v > 10 ? Math.round(v / 10) : v;
+  return clamp(scaled, 0, 10);
 }
 
 function overlayLabel(key: SymptomKey | 'mood'): string {
@@ -181,10 +193,19 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
 
   return (
     <div className="eb-page">
-      <div className="max-w-4xl mx-auto">
+      {/* Keep a more phone-like density on wide screens */}
+      <div className="max-w-2xl mx-auto px-2 sm:px-0">
+        <div className="mb-6">
+          <h1 className="mb-2">Calendar</h1>
+          <p className="text-[rgb(var(--color-text-secondary))]">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
+        </div>
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
-            <button type="button" className="eb-btn-secondary" onClick={() => setMonthCursor(addDaysISO(toISO(monthStart), -1) ? startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1)) : monthStart)}>
+            <button
+              type="button"
+              className="eb-btn-secondary"
+              onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1)))}
+            >
               Prev
             </button>
             <div className="font-semibold">{monthLabel}</div>
@@ -214,7 +235,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-3">
+        <div className="grid grid-cols-7 gap-2">
           {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d) => (
             <div key={d} className="text-xs text-[rgb(var(--color-text-secondary))] px-1">{d}</div>
           ))}
@@ -242,27 +263,29 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
                 key={iso}
                 type="button"
                 onClick={() => onOpenCheckIn(iso)}
-                className={`relative rounded-2xl border text-left p-3 min-h-[72px] transition shadow-sm ${
+                className={`relative rounded-2xl border text-left p-2 min-h-[54px] transition shadow-sm ${
                   inMonth ? 'bg-white border-[rgba(0,0,0,0.08)]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.04)]'
                 }`}
                 style={{
+                  // IMPORTANT: our CSS vars store space-separated RGB values (e.g. "132 155 130").
+                  // Use the modern `rgb(R G B / a)` syntax (NOT rgba(var(--color-*), a)).
                   background: isPeriod
-                    ? `rgba(var(--color-primary-dark), 0.16)`
+                    ? `rgb(var(--color-primary-dark) / 0.16)`
                     : isFertile
-                      ? `rgba(var(--color-primary), 0.12)`
+                      ? `rgb(var(--color-primary) / 0.12)`
                       : undefined,
                 }}
               >
                 <div className="flex items-start justify-between">
                   <div className={`text-sm font-medium ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
-                  {hasSex && fertilityEnabled && <HeartMark />}
+                  {hasSex && fertilityEnabled && <SexMark size={9} />}
                 </div>
 
-                {/* Small overlay bar */}
-                {barOpacity > 0 && (
+                {/* Symptom overlay bar (only when data exists for this day) */}
+                {raw != null && (
                   <div
-                    className="absolute left-3 right-3 bottom-2 h-2 rounded-full"
-                    style={{ background: `rgba(var(--color-primary), ${barOpacity})` }}
+                    className="absolute left-2 right-2 bottom-2 h-1 rounded-full"
+                    style={{ background: `rgb(var(--color-primary) / ${barOpacity})` }}
                     aria-label={`${overlayLabel(overlayKey)} overlay`}
                     title={`${overlayLabel(overlayKey)} overlay`}
                   />
@@ -281,18 +304,18 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
           <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-[rgb(var(--color-text-secondary))]">
             {cycleEnabled && (
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(var(--color-primary-dark),0.22)' }} />
+                <span className="w-3 h-3 rounded-full" style={{ background: 'rgb(var(--color-primary-dark) / 0.22)' }} />
                 <span>Period window</span>
               </div>
             )}
             {fertilityEnabled && (
               <>
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(var(--color-primary),0.18)' }} />
+                  <span className="w-3 h-3 rounded-full" style={{ background: 'rgb(var(--color-primary) / 0.18)' }} />
                   <span>Fertile window</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <HeartMark />
+                  <SexMark size={10} />
                   <span>Sex logged</span>
                 </div>
               </>

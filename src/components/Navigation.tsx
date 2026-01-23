@@ -30,7 +30,7 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
                 onClick={() => onNavigate(item.id)}
                 className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all  ${
                   isActive
-                    ? 'text-[rgb(var(--color-primary))] bg-[rgba(var(--color-primary),0.1)]'
+                    ? 'text-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.10)]'
                     : 'text-[rgb(var(--color-text-secondary))] hover:text-[rgb(var(--color-text))]'
                 }`}
               >
@@ -55,7 +55,7 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
                   onClick={() => onNavigate(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                     isActive
-                      ? 'text-[rgb(var(--color-primary))] bg-[rgba(var(--color-primary),0.1)]'
+                      ? 'text-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.10)]'
                       : 'text-[rgb(var(--color-text-secondary))] hover:text-[rgb(var(--color-text))] hover:bg-[rgba(0,0,0,0.03)]'
                   }`}
                 >

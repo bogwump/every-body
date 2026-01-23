@@ -63,7 +63,7 @@ export function GoalSelection({ selectedGoal, onSelectGoal, onBack }: GoalSelect
                 onClick={() => onSelectGoal(goal.id)}
                 className={`p-6 rounded-2xl border-2 text-left transition-all duration-200 hover:scale-[1.02] ${
                   isSelected
-                    ? 'border-[rgb(var(--color-primary))] bg-[rgba(var(--color-primary),0.05)]'
+                    ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.05)]'
                     : 'border-neutral-200 bg-white hover:border-[rgb(var(--color-primary-light))]'
                 }`}
               >
@@ -71,7 +71,7 @@ export function GoalSelection({ selectedGoal, onSelectGoal, onBack }: GoalSelect
                   className={`inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4 ${
                     isSelected
                       ? 'bg-[rgb(var(--color-primary))]'
-                      : 'bg-[rgba(var(--color-primary),0.1)]'
+                      : 'bg-[rgb(var(--color-primary)/0.10)]'
                   }`}
                 >
                   <Icon

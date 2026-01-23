@@ -21,7 +21,7 @@ export function QuickStart({ selectedGoal, onStart }: QuickStartProps) {
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
       <div className="max-w-md w-full">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgba(var(--color-primary),0.1)] mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgb(var(--color-primary)/0.10)] mb-6">
             <Sparkles className="w-8 h-8 text-[rgb(var(--color-primary))]" />
           </div>
           <h1 className="mb-3">What brought you here today?</h1>
@@ -39,7 +39,7 @@ export function QuickStart({ selectedGoal, onStart }: QuickStartProps) {
                 onClick={() => setGoal(opt.id)}
                 className={`w-full text-left rounded-2xl border p-4 transition-all ${
                   active
-                    ? 'border-[rgb(var(--color-primary))] bg-[rgba(var(--color-primary),0.06)]'
+                    ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.06)]'
                     : 'border-neutral-200 bg-white hover:border-neutral-300'
                 }`}
               >

@@ -19,7 +19,7 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
       <div className="max-w-md w-full">
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgba(var(--color-primary),0.1)] mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgb(var(--color-primary)/0.10)] mb-6">
             <Sparkles className="w-8 h-8 text-[rgb(var(--color-primary))]" />
           </div>
           <h1 className="mb-4">Welcome to EveryBody</h1>

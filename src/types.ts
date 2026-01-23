@@ -18,6 +18,9 @@ export type SymptomKey =
   | 'fatigue'
   | 'nightSweats';
 
+/** Metrics that can be shown on the dashboard chart */
+export type DashboardMetric = SymptomKey | 'mood';
+
 export interface UserData {
   name: string;
   goal: UserGoal | null;
@@ -46,6 +49,9 @@ export interface UserData {
   /** Optional: trying to conceive mode (enables fertility features like sex log + fertile window shading) */
   fertilityMode?: boolean;
 
+  /** Optional: which 3 metrics to show on the dashboard "week at a glance" chart */
+  dashboardChartMetrics?: [DashboardMetric, DashboardMetric, DashboardMetric];
+
 
 }
 
@@ -57,7 +63,7 @@ export interface CheckInEntry {
   /** Mood chosen on the 3-point picker */
   mood?: 1 | 2 | 3;
   notes?: string;
-  /** Per-module values 0-100 */
+  /** Per-module values 0-10 */
   values: Partial<Record<SymptomKey, number>>;
 
   /** Optional non-symptom events (kept separate from symptom modules) */

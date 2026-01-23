@@ -1,5 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Battery, Moon, Heart, Droplet, Zap, Brain, Wind, Check, Smile, Meh, Frown, Sparkles } from 'lucide-react';
+import {
+  Battery,
+  Moon,
+  Heart,
+  Droplet,
+  Zap,
+  Brain,
+  Wind,
+  Smile,
+  Meh,
+  Frown,
+  Sparkles,
+  Calendar,
+  ChevronRight,
+} from 'lucide-react';
+
 import type { CheckInEntry, SymptomKey, UserData } from '../types';
 import { isoToday } from '../lib/analytics';
 import { useEntries } from '../lib/appStore';
@@ -8,6 +23,9 @@ interface DailyCheckInProps {
   userData: UserData;
   onUpdateUserData: (updater: ((prev: UserData) => UserData) | UserData) => void;
   onDone: () => void;
+  /** If provided, the check-in opens for this date (used by calendar + edit). */
+  initialDateISO?: string;
+  /** Optional navigation helper (e.g. open calendar / profile). */
   onNavigate?: (screen: string) => void;
 }
 
@@ -17,331 +35,347 @@ const moodIcons: Array<{ value: 1 | 2 | 3; icon: React.ElementType; label: strin
   { value: 3, icon: Smile, label: 'Good' },
 ];
 
-const sliderMeta: Record<Exclude<SymptomKey, never>, { label: string; icon: React.ElementType; color: string }> = {
-  energy: { label: 'Energy', icon: Battery, color: 'text-amber-500' },
-  sleep: { label: 'Sleep Quality', icon: Moon, color: 'text-indigo-500' },
-  pain: { label: 'Pain Level', icon: Heart, color: 'text-rose-500' },
-  flow: { label: 'Bleeding / Spotting', icon: Droplet, color: 'text-red-400' },
-  stress: { label: 'Stress', icon: Zap, color: 'text-orange-500' },
-  focus: { label: 'Mental Clarity', icon: Brain, color: 'text-purple-500' },
-  bloating: { label: 'Bloating', icon: Wind, color: 'text-teal-500' },
-
-  hairShedding: { label: 'Hair shedding', icon: Sparkles, color: 'text-emerald-600' },
-  facialSpots: { label: 'Facial spots', icon: Sparkles, color: 'text-amber-600' },
-  cysts: { label: 'Cysts', icon: Heart, color: 'text-rose-600' },
-  brainFog: { label: 'Brain fog', icon: Brain, color: 'text-purple-600' },
-  fatigue: { label: 'Fatigue', icon: Battery, color: 'text-amber-500' },
-  nightSweats: { label: 'Night sweats', icon: Moon, color: 'text-sky-600' },
+// Stored symptom values are now treated as 0–10.
+// (Calendar + analytics already normalise if older entries used 0–100.)
+const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType }> = {
+  energy: { label: 'Energy', icon: Battery },
+  sleep: { label: 'Sleep quality', icon: Moon },
+  stress: { label: 'Stress', icon: Zap },
+  focus: { label: 'Clarity', icon: Brain },
+  bloating: { label: 'Bloating', icon: Wind },
+  pain: { label: 'Pain', icon: Heart },
+  flow: { label: 'Bleeding / spotting (optional)', icon: Droplet },
+  hairShedding: { label: 'Hair shedding', icon: Sparkles },
+  facialSpots: { label: 'Facial spots', icon: Sparkles },
+  cysts: { label: 'Cysts', icon: Heart },
+  brainFog: { label: 'Brain fog', icon: Brain },
+  fatigue: { label: 'Fatigue', icon: Battery },
+  nightSweats: { label: 'Night sweats', icon: Moon },
 };
-
-function moodFill(v: 1 | 2 | 3): string {
-  // Match the same calm scale as the 0–10 buttons.
-  if (v === 1) return 'bg-[rgb(var(--color-primary-light)_/_0.25)]';
-  if (v === 2) return 'bg-[rgb(var(--color-accent)_/_0.22)]';
-  return 'bg-[rgb(var(--color-primary-dark)_/_0.20)]';
-}
-
-function moodBorder(v: 1 | 2 | 3): string {
-  if (v === 1) return 'border-[rgb(var(--color-primary-light)_/_0.70)]';
-  if (v === 2) return 'border-[rgb(var(--color-accent)_/_0.70)]';
-  return 'border-[rgb(var(--color-primary-dark)_/_0.70)]';
-}
-
-function moodInk(v: 1 | 2 | 3): string {
-  if (v === 1) return 'text-[rgb(var(--color-primary))]';
-  if (v === 2) return 'text-[rgb(var(--color-accent-ink,0,0,0))]';
-  return 'text-[rgb(var(--color-primary-dark))]';
-}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function toScale10(percent: number): number {
-  // Stored values are 0-100. UI shows a simpler 0-10 scale.
-  return clamp(Math.round((percent ?? 0) / 10), 0, 10);
+function normalise10(v: any): number {
+  if (typeof v !== 'number') return 0;
+  // Support older 0–100 values
+  const scaled = v > 10 ? Math.round(v / 10) : v;
+  return clamp(scaled, 0, 10);
 }
 
-function fromScale10(scale: number): number {
-  return clamp(Math.round(scale), 0, 10) * 10;
-}
-
-function scaleFill(n: number): string {
-  // Theme-based gentle shift (no traffic-light colours).
-  // Low: primary-light (soft)
-  // Mid: accent (warm)
-  // High: primary / primary-dark (deeper)
-  if (n <= 2) return 'bg-[rgb(var(--color-primary-light)_/_0.22)]';
-  if (n <= 4) return 'bg-[rgb(var(--color-primary-light)_/_0.30)]';
-  if (n <= 6) return 'bg-[rgb(var(--color-accent)_/_0.26)]';
-  if (n <= 8) return 'bg-[rgb(var(--color-primary)_/_0.22)]';
-  return 'bg-[rgb(var(--color-primary-dark)_/_0.20)]';
-}
-
-function scaleBorder(n: number): string {
-  if (n <= 4) return 'border-[rgb(var(--color-primary-light)_/_0.65)]';
-  if (n <= 6) return 'border-[rgb(var(--color-accent)_/_0.65)]';
-  if (n <= 8) return 'border-[rgb(var(--color-primary)_/_0.65)]';
-  return 'border-[rgb(var(--color-primary-dark)_/_0.65)]';
-}
-
-function scaleInk(n: number): string {
-  if (n <= 4) return 'text-[rgb(var(--color-primary))]';
-  if (n <= 6) return 'text-[rgb(var(--color-accent-ink,0,0,0))]';
-  if (n <= 8) return 'text-[rgb(var(--color-primary))]';
-  return 'text-[rgb(var(--color-primary-dark))]';
-}
-
-function Scale10({ value, onChange, showZeroLabel }: { value: number; onChange: (n: number) => void; showZeroLabel?: boolean }) {
-  const current = clamp(value, 0, 10);
+function SwitchRow({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  hint?: string;
+}) {
   return (
-    <div className="flex items-center gap-1 overflow-x-auto py-1">
-      {Array.from({ length: 11 }).map((_, idx) => {
-        const n = idx;
-        const selected = n === current;
-        return (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(n)}
-            className={
-              'shrink-0 w-8 h-9 rounded-lg border transition-all text-sm font-medium ' +
-              (selected
-                ? `${scaleFill(n)} ${scaleBorder(n)} ${scaleInk(n)} shadow-sm`
-                : 'bg-white border-[rgba(0,0,0,0.10)] text-[rgb(var(--color-text))] hover:bg-neutral-50')
-            }
-            aria-pressed={selected}
-            title={n === 0 && showZeroLabel ? 'None' : String(n)}
-          >
-            {n === 0 && showZeroLabel ? '0' : n}
-          </button>
-        );
-      })}
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white p-4">
+      <div className="min-w-0">
+        <div className="font-medium">{label}</div>
+        {hint && <div className="text-sm text-[rgb(var(--color-text-secondary))]">{hint}</div>}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`w-12 h-6 rounded-full transition-all ${
+          checked ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+        }`}
+        aria-pressed={checked}
+      >
+        <div className={`w-5 h-5 bg-white rounded-full transition-transform ${checked ? 'translate-x-6' : 'translate-x-0.5'}`} />
+      </button>
     </div>
   );
 }
 
-export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }: DailyCheckInProps) {
+function Slider10({
+  value,
+  onChange,
+  leftLabel,
+  rightLabel,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  leftLabel?: string;
+  rightLabel?: string;
+}) {
+  const v = clamp(value, 0, 10);
+  return (
+    <div>
+      <input
+        type="range"
+        min={0}
+        max={10}
+        step={1}
+        value={v}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        className="w-full accent-[rgb(var(--color-primary))]"
+        aria-label="slider"
+      />
+      <div className="flex items-center justify-between text-xs text-[rgb(var(--color-text-secondary))] -mt-1">
+        <span>{leftLabel ?? '0'}</span>
+        <span>{rightLabel ?? '10'}</span>
+      </div>
+    </div>
+  );
+}
+
+export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateISO, onNavigate }: DailyCheckInProps) {
   const todayISO = isoToday();
+  const activeDateISO = initialDateISO ?? todayISO;
+
+  const { entries, upsertEntry } = useEntries();
+  const existingEntry = useMemo(
+    () => entries.find((e) => e.dateISO === activeDateISO) ?? null,
+    [entries, activeDateISO]
+  );
+
   const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | null>(null);
   const [notes, setNotes] = useState('');
   const [values, setValues] = useState<Partial<Record<SymptomKey, number>>>({});
-  const [markNewCycle, setMarkNewCycle] = useState<boolean>(false);
-  const [submitted, setSubmitted] = useState(false);
 
-  const { entries, upsertEntry } = useEntries();
-  const existingToday = useMemo(() => entries.find((e) => e.dateISO === todayISO), [entries, todayISO]);
+  // Quick log (under mood)
+  const [markNewCycle, setMarkNewCycle] = useState(false);
+  const [markBleedingStarted, setMarkBleedingStarted] = useState(false);
+  const [markSex, setMarkSex] = useState(false);
 
-  // Populate defaults / existing entry
+  const isCycleEnabled = userData.cycleTrackingMode === 'cycle';
+  const isFertilityEnabled = Boolean(userData.fertilityMode) && isCycleEnabled;
+
+  // Initialise when date changes or entry loaded
   useEffect(() => {
-    if (existingToday) {
-      setMarkNewCycle(Boolean((existingToday as any)?.cycleStartOverride));
-      setSelectedMood(existingToday.mood ?? null);
-      setNotes(existingToday.notes ?? '');
-      setValues(existingToday.values ?? {});
+    if (existingEntry) {
+      setSelectedMood((existingEntry.mood as any) ?? null);
+      setNotes(existingEntry.notes ?? '');
+
+      const nextVals: any = {};
+      for (const k of userData.enabledModules) {
+        if (!sliderMeta[k]) continue;
+        nextVals[k] = normalise10((existingEntry as any)?.values?.[k]);
+      }
+      // Keep any other stored values too (even if module got turned off later)
+      setValues({ ...((existingEntry.values as any) ?? {}), ...nextVals });
+
+      setMarkNewCycle(Boolean((existingEntry as any).cycleStartOverride));
+      setMarkBleedingStarted(Boolean((existingEntry as any)?.values?.flow && normalise10((existingEntry as any).values.flow) > 0));
+      setMarkSex(Boolean((existingEntry as any)?.events?.sex));
       return;
     }
 
-    // defaults if no existing entry
-    setMarkNewCycle(false);
-    const defaults: Partial<Record<SymptomKey, number>> = {};
-    for (const k of userData.enabledModules) {
-      defaults[k] = k === 'pain' || k === 'flow' || k === 'bloating' ? 0 : 50;
-    }
-    setValues(defaults);
+    // Defaults for a fresh day
     setSelectedMood(null);
     setNotes('');
-  }, [existingToday, userData.enabledModules]);
-
-  const enabledModulesEffective = useMemo(() => {
-    // symptoms are never blocked by cycle tracking mode
-    // but if user says they have no cycle, we gently hide flow by default unless they explicitly enabled it
-    if (userData.cycleTrackingMode === 'no-cycle') {
-      return userData.enabledModules;
+    const defaults: Partial<Record<SymptomKey, number>> = {};
+    for (const k of userData.enabledModules) {
+      if (!sliderMeta[k]) continue;
+      // default 5/10 for most symptoms, 0 for flow
+      defaults[k] = k === 'flow' ? 0 : 5;
     }
-    return userData.enabledModules;
-  }, [userData.cycleTrackingMode, userData.enabledModules]);
+    setValues(defaults);
+    setMarkNewCycle(false);
+    setMarkBleedingStarted(false);
+    setMarkSex(false);
+  }, [existingEntry, userData.enabledModules, activeDateISO]);
 
-  const sliders = enabledModulesEffective
-    .map((key) => ({ key, ...sliderMeta[key] }))
-    // keep flow optional and never required
-    .filter(Boolean);
+  const enabledSliders = useMemo(() => {
+    return userData.enabledModules.filter((k) => Boolean(sliderMeta[k]));
+  }, [userData.enabledModules]);
 
-  const handleSliderChange = (key: SymptomKey, value: number) => {
-    setValues((prev) => ({ ...prev, [key]: value }));
-  };
+  const dateLabel = useMemo(() => {
+    const d = new Date(activeDateISO + 'T00:00:00');
+    return d.toLocaleDateString(undefined, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }, [activeDateISO]);
 
   const handleSubmit = () => {
     const now = new Date().toISOString();
+
+    const nextValues: any = { ...((existingEntry as any)?.values ?? {}), ...(values ?? {}) };
+
+    // Normalise all tracked sliders to 0–10
+    for (const k of enabledSliders) {
+      const v = normalise10((values as any)?.[k]);
+      nextValues[k] = v;
+    }
+
+    if (isCycleEnabled) {
+      // If user marks bleeding started, ensure a non-zero flow exists.
+      if (markBleedingStarted && (!nextValues.flow || normalise10(nextValues.flow) <= 0)) nextValues.flow = 6;
+      // If user unchecks bleeding started, do NOT wipe their flow slider value.
+    } else {
+      // If cycle features off, still allow flow if they enabled it. Otherwise keep whatever is there.
+    }
+
+    const nextEvents: any = { ...((existingEntry as any)?.events ?? {}) };
+    if (isFertilityEnabled) {
+      if (markSex) nextEvents.sex = true;
+      else delete nextEvents.sex;
+    } else {
+      delete nextEvents.sex;
+    }
+
     const next: CheckInEntry = {
-      id: existingToday?.id ?? `${Date.now()}`,
-      dateISO: todayISO,
+      id: existingEntry?.id ?? `${Date.now()}`,
+      dateISO: activeDateISO,
       mood: selectedMood ?? undefined,
       notes: notes.trim() ? notes.trim() : undefined,
-      values: (() => {
-        const nextValues = { ...(values ?? {}) } as any;
-        // If user toggles "Bleeding/spotting started" but didn't touch the slider, log a minimal flow value.
-        if (userData.cycleTrackingMode === 'cycle' && userData.enabledModules.includes('flow')) {
-          if (markBleedingStarted && (!nextValues.flow || nextValues.flow <= 0)) nextValues.flow = 1;
-        }
-        return nextValues;
-      })(),
-      events: (() => {
-        const ev: any = { ...((existingEntry as any)?.events ?? {}) };
-        if (userData.cycleTrackingMode === 'cycle' && userData.fertilityMode) {
-          if (markSex) ev.sex = true;
-          else delete ev.sex;
-        }
-        return Object.keys(ev).length ? ev : undefined;
-      })(),
-      cycleStartOverride: markNewCycle ? true : undefined,
-      createdAt: existingToday?.createdAt ?? now,
+      values: nextValues,
+      events: Object.keys(nextEvents).length ? nextEvents : undefined,
+      cycleStartOverride: isCycleEnabled && markNewCycle ? true : undefined,
+      createdAt: existingEntry?.createdAt ?? now,
       updatedAt: now,
     };
 
-    upsertEntry(next);
-
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      onDone();
-    }, 450);
+    upsertEntry(next as any);
+    onDone();
   };
 
-  const showCycleNudge = userData.cycleTrackingMode === 'no-cycle' && userData.enabledModules.includes('flow');
-
   return (
-    <div className="min-h-screen">
-      <div className="eb-container py-8 max-w-3xl">
-        <div className="mb-8">
-          <h1 className="mb-2">Daily Check-in</h1>
-          <p className="text-[rgb(var(--color-text-secondary))]">
-            {new Date(activeDateISO + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            {activeDateISO !== todayISO ? ' (edit)' : ''}
-          </p>
+    <div className="eb-page">
+      <div className="eb-page-inner max-w-3xl">
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h1 className="mb-1">Daily check-in</h1>
+            <p className="text-[rgb(var(--color-text-secondary))]">
+              {dateLabel}
+              {activeDateISO !== todayISO ? ' (edit)' : ''}
+            </p>
+          </div>
+
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('calendar')}
+              className="eb-btn-secondary"
+              title="Open calendar"
+            >
+              <Calendar className="w-4 h-4" />
+              Calendar
+            </button>
+          )}
         </div>
 
-        {/* Friendly note for no-cycle users */}
         {userData.cycleTrackingMode === 'no-cycle' && (
-          <div className="eb-card mb-6 p-5">
+          <div className="eb-card p-5 mb-6">
             <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-              You can track symptoms even without a cycle. If you ever want to use cycle-phase insights, you can switch it on in Profile.
+              You can track symptoms even without a cycle. If you ever want cycle-phase insights, you can switch it on in Profile.
             </p>
           </div>
         )}
 
-        {/* Mood Selection */}
+        {/* Mood */}
         <div className="eb-card mb-6">
-          <h3 className="mb-4">Overall Mood</h3>
+          <h3 className="mb-4">Overall mood</h3>
           <div className="flex gap-4 justify-center">
-            {moodIcons.map((mood) => {
-              const Icon = mood.icon;
-              const isSelected = selectedMood === mood.value;
+            {moodIcons.map((m) => {
+              const Icon = m.icon;
+              const selected = selectedMood === m.value;
               return (
                 <button
-                  key={mood.value}
-                  onClick={() => setSelectedMood(mood.value)}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all border ${
-                    isSelected
-                      ? `${moodFill(mood.value)} ${moodBorder(mood.value)} scale-110 shadow-sm`
-                      : 'bg-white hover:bg-neutral-50 border-[rgba(0,0,0,0.08)]'
-                  }`}
+                  key={m.value}
+                  type="button"
+                  onClick={() => setSelectedMood(m.value)}
+                  className={
+                    'flex flex-col items-center gap-2 p-4 rounded-xl transition-all border ' +
+                    (selected
+                      ? 'bg-[rgb(var(--color-primary)/0.14)] border-[rgb(var(--color-primary)/0.45)] shadow-sm'
+                      : 'bg-white hover:bg-neutral-50 border-[rgba(0,0,0,0.08)]')
+                  }
+                  aria-pressed={selected}
                 >
                   <Icon
-                    className={`w-8 h-8 ${isSelected ? moodInk(mood.value) : 'text-neutral-500'}`}
+                    className={'w-8 h-8 ' + (selected ? 'text-[rgb(var(--color-primary-dark))]' : 'text-neutral-500')}
                     strokeWidth={2.25}
                   />
-                  <span className={`text-sm ${isSelected ? moodInk(mood.value) : ''}`}>{mood.label}</span>
+                  <span className={'text-sm ' + (selected ? 'text-[rgb(var(--color-primary-dark))]' : '')}>{m.label}</span>
                 </button>
               );
             })}
           </div>
+
+          {/* Quick log under mood */}
+          {isCycleEnabled && (
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold mb-3">Quick log</h4>
+              <div className="grid grid-cols-1 gap-3">
+                <SwitchRow
+                  checked={markNewCycle}
+                  onChange={setMarkNewCycle}
+                  label="New cycle started"
+                  hint="Use this if bleeding is unclear, or you just want to mark Day 1 manually."
+                />
+                <SwitchRow
+                  checked={markBleedingStarted}
+                  onChange={setMarkBleedingStarted}
+                  label="Bleeding / spotting started"
+                  hint="Helps the calendar show a 7-day window."
+                />
+                {isFertilityEnabled && (
+                  <SwitchRow
+                    checked={markSex}
+                    onChange={setMarkSex}
+                    label="Sex"
+                    hint="Logged privately. Used for fertility insights if you want them."
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        
-        {/* Quick log (cycle & fertility) */}
-        {(userData.cycleTrackingMode === 'cycle' || userData.fertilityMode) && (
-          <div className="eb-card mb-6">
-            <h3 className="mb-1">Quick log</h3>
-            <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
-              Optional extras. These sit alongside your check-in (not in your symptom sliders).
-            </p>
-
-            {userData.cycleTrackingMode === 'cycle' && (
-              <button
-                type="button"
-                onClick={() => setMarkNewCycle((v) => !v)}
-                className="w-full flex items-center justify-between gap-3 py-2"
-              >
-                <span className="text-sm">New cycle started</span>
-                <TogglePill checked={markNewCycle} />
-              </button>
-            )}
-
-            {userData.cycleTrackingMode === 'cycle' && userData.enabledModules.includes('flow') && (
-              <button
-                type="button"
-                onClick={() => setMarkBleedingStarted((v) => !v)}
-                className="w-full flex items-center justify-between gap-3 py-2"
-              >
-                <span className="text-sm">Bleeding/spotting started</span>
-                <TogglePill checked={markBleedingStarted} />
-              </button>
-            )}
-
-            {userData.cycleTrackingMode === 'cycle' && userData.fertilityMode && (
-              <button
-                type="button"
-                onClick={() => setMarkSex((v) => !v)}
-                className="w-full flex items-center justify-between gap-3 py-2"
-              >
-                <span className="text-sm">Sex</span>
-                <TogglePill checked={markSex} />
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Symptom Sliders */}
+        {/* Sliders */}
         <div className="eb-card mb-6">
-          <div className="flex items-start justify-between gap-4 mb-2">
-            <div>
-              <h3 className="mb-1">Your check-in</h3>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">Showing your chosen symptoms</p>
-            </div>
-            <button
-              onClick={() => (onNavigate ? onNavigate('profile') : onUpdateUserData((prev) => ({ ...prev })))}
-              className="text-sm text-[rgb(var(--color-primary))] hover:underline"
-              title="You can customise what you track in Profile"
-              type="button"
-            >
-              Customise
-            </button>
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <h3 className="mb-0">Your check-in</h3>
+            {onNavigate && (
+              <button
+                type="button"
+                className="text-sm text-[rgb(var(--color-primary))] hover:underline inline-flex items-center gap-1"
+                onClick={() => onNavigate('profile')}
+              >
+                Customise <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
+          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-5">Only what you choose to track.</p>
 
-          {showCycleNudge && (
-            <p className="text-xs text-[rgb(var(--color-text-secondary))] mb-4">
-              Tip: If you don't bleed because of a coil or menopause, you can keep tracking symptoms and turn off cycle tracking in Profile.
-            </p>
-          )}
+          <div className="space-y-5">
+            {enabledSliders.map((key) => {
+              const meta = sliderMeta[key];
+              const Icon = meta.icon;
+              const current = normalise10((values as any)?.[key]);
 
-          <div className="space-y-6">
-            {sliders.map((slider) => {
-              const Icon = slider.icon;
-              const v = typeof values[slider.key] === 'number' ? (values[slider.key] as number) : 0;
               return (
-                <div key={slider.key}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Icon className={`w-5 h-5 ${slider.color}`} />
-                      <span className="text-sm">{slider.label}</span>
+                <div key={key} className="rounded-2xl border border-[rgba(0,0,0,0.06)] p-4 bg-white">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center">
+                        <Icon className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium">{meta.label}</div>
+                        <div className="text-xs text-[rgb(var(--color-text-secondary))]">{current}/10</div>
+                      </div>
                     </div>
-                    <span className="text-sm font-medium text-[rgb(var(--color-primary))]">{toScale10(v)}/10</span>
+                    <div className="text-sm font-medium text-[rgb(var(--color-text-secondary))]">{current}</div>
                   </div>
-                  <Scale10
-                    value={toScale10(v)}
-                    onChange={(n) => handleSliderChange(slider.key, fromScale10(n))}
-                    showZeroLabel={slider.key === 'flow' || slider.key === 'pain'}
+
+                  <Slider10
+                    value={current}
+                    onChange={(n) => setValues((prev) => ({ ...prev, [key]: n }))}
+                    leftLabel={key === 'flow' ? '0' : '0'}
+                    rightLabel={key === 'flow' ? '10' : '10'}
                   />
                 </div>
               );
@@ -351,53 +385,24 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, onNavigate }:
 
         {/* Notes */}
         <div className="eb-card mb-6">
-          <h3 className="mb-4">Notes (Optional)</h3>
+          <h3 className="mb-3">Notes (optional)</h3>
           <textarea
+            className="eb-input min-h-[120px]"
+            placeholder="Anything worth remembering today?"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anything you noticed today?"
-            rows={4}
-            className="w-full px-4 py-3 rounded-xl border border-[rgb(228_228_231_/_0.7)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary))] focus:border-transparent resize-none"
           />
         </div>
 
-        {/* Submit Button */}
-        <button
-          onClick={handleSubmit}
-          className={`w-full py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
-            submitted
-              ? 'bg-green-500 text-white'
-              : 'bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))]'
-          }`}
-        >
-          {submitted ? (
-            <>
-              <Check className="w-5 h-5" />
-              Saved
-            </>
-          ) : (
-            'Save check-in'
-          )}
-        </button>
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" className="eb-btn-secondary" onClick={onDone}>
+            Cancel
+          </button>
+          <button type="button" className="eb-btn-primary" onClick={handleSubmit}>
+            Save
+          </button>
+        </div>
       </div>
     </div>
   );
-
-function TogglePill({ checked }: { checked: boolean }) {
-  return (
-    <span
-      className={`w-12 h-6 rounded-full transition-all inline-flex items-center ${
-        checked ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-      }`}
-      aria-hidden="true"
-    >
-      <span
-        className={`w-5 h-5 bg-white rounded-full transition-transform ${
-          checked ? 'translate-x-6' : 'translate-x-0.5'
-        }`}
-      />
-    </span>
-  );
-}
-
 }

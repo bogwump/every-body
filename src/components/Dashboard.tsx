@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Calendar, TrendingUp, Sparkles, ArrowRight } from 'lucide-react';
+import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -11,9 +11,9 @@ import {
   YAxis,
 } from 'recharts';
 
-import type { UserData, UserGoal } from '../types';
+import type { DashboardMetric, SymptomKey, UserData, UserGoal } from '../types';
 import { useEntries } from '../lib/appStore';
-import { computeCycleStats, estimatePhaseByFlow, isoToday, sortByDateAsc } from '../lib/analytics';
+import { computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
 
 interface DashboardProps {
   userName: string;
@@ -40,16 +40,81 @@ function labelDayShort(iso: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'short' });
 }
 
-function buildWeekSeries(dateISOs: string[], entriesByDate: Map<string, any>) {
+const METRIC_LABELS: Record<DashboardMetric, string> = {
+  mood: 'Mood',
+  energy: 'Energy',
+  sleep: 'Sleep',
+  stress: 'Stress',
+  focus: 'Clarity',
+  bloating: 'Bloating',
+  pain: 'Pain',
+  flow: 'Flow',
+  hairShedding: 'Hair shedding',
+  facialSpots: 'Facial spots',
+  cysts: 'Cysts',
+  brainFog: 'Brain fog',
+  fatigue: 'Fatigue',
+  nightSweats: 'Night sweats',
+};
+
+function metricValue(entry: any | undefined, metric: DashboardMetric): number | undefined {
+  if (!entry) return undefined;
+  if (metric === 'mood') {
+    const m = entry?.mood as 1 | 2 | 3 | undefined;
+    // Keep everything on a 0-10 feel for the chart.
+    if (m === 1) return 3;
+    if (m === 2) return 6;
+    if (m === 3) return 9;
+    return undefined;
+  }
+  const v = entry?.values?.[metric as SymptomKey];
+  return typeof v === 'number' ? v : undefined;
+}
+
+function buildWeekSeries(dateISOs: string[], entriesByDate: Map<string, any>, metrics: DashboardMetric[]) {
   return dateISOs.map((iso) => {
     const e = entriesByDate.get(iso);
-    return {
-      day: labelDayShort(iso),
-      energy: e?.values?.energy,
-      sleep: e?.values?.sleep,
-      mood: e?.mood ? e.mood * 33 : undefined,
-    };
+    const row: any = { day: labelDayShort(iso), dateISO: iso };
+    for (const m of metrics) row[m] = metricValue(e, m);
+    return row;
   });
+}
+
+
+type DashboardTileProps = {
+  title: string;
+  subtitle: string;
+  cta?: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+};
+
+function DashboardTile({ title, subtitle, cta, icon, onClick }: DashboardTileProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="eb-card hover:shadow-md transition-all text-left group"
+    >
+      <div className="flex items-start gap-4">
+        <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
+          <div className="text-[rgb(var(--color-primary))]">{icon}</div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold mb-1">{title}</h3>
+          <p className="text-sm text-[rgba(0,0,0,0.65)]">{subtitle}</p>
+          {cta ? (
+            <span className="mt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))]">
+              {cta} <ArrowRight className="w-4 h-4" />
+            </span>
+          ) : null}
+        </div>
+
+        <ChevronRight className="w-5 h-5 text-[rgba(0,0,0,0.45)] group-hover:text-[rgba(0,0,0,0.65)] mt-1" />
+      </div>
+    </button>
+  );
 }
 
 export function Dashboard({
@@ -75,6 +140,12 @@ export function Dashboard({
   }, []);
 
   const checkedInToday = Boolean(todayEntry);
+  const daysTracked = entriesSorted.length;
+  // We want Insights to hook users early. Three days is enough to show a meaningful nudge.
+  const insightsMinDays = 3;
+  const insightsRemaining = Math.max(0, insightsMinDays - daysTracked);
+  const insightsReady = daysTracked >= insightsMinDays;
+
   const goalLabel = prettyGoal(userGoal);
 
   const [showGoalPicker, setShowGoalPicker] = React.useState(false);
@@ -105,6 +176,38 @@ export function Dashboard({
     return byPhase[dayPhaseKey(todayPhase)] ?? 'Small daily check-ins can help you spot patterns over time.';
   }, [userData.cycleTrackingMode, todayPhase]);
 
+  // Dashboard chart metrics (user chooses 3)
+  const availableMetrics = useMemo(() => {
+    const set = new Set<DashboardMetric>();
+    set.add('mood');
+    (userData.enabledModules || []).forEach((k) => set.add(k));
+    return Array.from(set);
+  }, [userData.enabledModules]);
+
+  const chartMetrics: [DashboardMetric, DashboardMetric, DashboardMetric] = useMemo(() => {
+    const saved = userData.dashboardChartMetrics;
+    if (
+      saved &&
+      saved.length === 3 &&
+      saved.every((m) => availableMetrics.includes(m))
+    ) {
+      return saved;
+    }
+
+    const preferred: DashboardMetric[] = ['mood', 'energy', 'sleep'];
+    const picked: DashboardMetric[] = [];
+    for (const p of preferred) {
+      if (availableMetrics.includes(p) && !picked.includes(p)) picked.push(p);
+    }
+    for (const m of availableMetrics) {
+      if (picked.length >= 3) break;
+      if (!picked.includes(m)) picked.push(m);
+    }
+    // Fallback safety
+    while (picked.length < 3) picked.push('mood');
+    return [picked[0], picked[1], picked[2]] as [DashboardMetric, DashboardMetric, DashboardMetric];
+  }, [userData.dashboardChartMetrics, availableMetrics]);
+
   // Week chart
   const weekSeries = useMemo(() => {
     const today = new Date();
@@ -115,8 +218,53 @@ export function Dashboard({
       dateISOs.push(d.toISOString().slice(0, 10));
     }
     const map = new Map(entriesSorted.map((e: any) => [e.dateISO, e]));
-    return buildWeekSeries(dateISOs, map);
-  }, [entriesSorted]);
+    return buildWeekSeries(dateISOs, map, chartMetrics);
+  }, [entriesSorted, chartMetrics]);
+
+  const quickHookLines = useMemo(() => {
+    // Generate 2-3 lines that feel useful even from day 1.
+    if (entriesSorted.length === 0) return [] as string[];
+    const last7 = filterByDays(entriesSorted, 7);
+    const lines: string[] = [];
+
+    // 1) Encourage progress toward insights
+    if (!insightsReady) {
+      lines.push(
+        insightsRemaining === 1
+          ? 'Log 1 more day to unlock your first insights.'
+          : `Log ${insightsRemaining} more days to unlock your first insights.`
+      );
+    } else {
+      lines.push('Insights are ready. Tap View insights to spot patterns.' );
+    }
+
+    // 2) Pick a “best so far” from the first non-mood metric available
+    const bestMetric = chartMetrics.find((m) => m !== 'mood') ?? chartMetrics[0];
+    let best: { iso: string; v: number } | null = null;
+    for (const e of last7) {
+      const v = metricValue(e as any, bestMetric);
+      if (typeof v !== 'number') continue;
+      if (!best || v > best.v) best = { iso: (e as any).dateISO, v };
+    }
+    if (best) {
+      const day = labelDayShort(best.iso);
+      lines.push(`${METRIC_LABELS[bestMetric]} peak (last 7 days): ${best.v}/10 on ${day}.`);
+    }
+
+    // 3) Mood line if available
+    let bestMood: { iso: string; v: number } | null = null;
+    for (const e of last7) {
+      const v = metricValue(e as any, 'mood');
+      if (typeof v !== 'number') continue;
+      if (!bestMood || v > bestMood.v) bestMood = { iso: (e as any).dateISO, v };
+    }
+    if (bestMood) {
+      const day = labelDayShort(bestMood.iso);
+      lines.push(`Best mood (last 7 days): ${bestMood.v}/10 on ${day}.`);
+    }
+
+    return lines.slice(0, 3);
+  }, [entriesSorted, chartMetrics, insightsReady, insightsRemaining]);
 
   const showCycleBubble = userData.cycleTrackingMode === 'cycle' && (userData.showCycleBubble ?? true);
   const [cycleModalOpen, setCycleModalOpen] = React.useState(false);
@@ -127,6 +275,25 @@ export function Dashboard({
   // This modal remains informational only (stats + prediction).
   // If you still want overrides here too, we can add them back cleanly later.
   const closeGoalPicker = () => setShowGoalPicker(false);
+
+  const setChartMetric = (index: 0 | 1 | 2, next: DashboardMetric) => {
+    onUpdateUserData((prev) => {
+      const current = (prev.dashboardChartMetrics && prev.dashboardChartMetrics.length === 3
+        ? [...prev.dashboardChartMetrics]
+        : [...chartMetrics]) as DashboardMetric[];
+
+      // If the user picks a metric already used elsewhere, swap them so we always keep 3 unique choices.
+      const otherIndex = current.findIndex((m, i) => m === next && i !== index);
+      const copy = [...current];
+      if (otherIndex >= 0) {
+        const tmp = copy[index];
+        copy[index] = copy[otherIndex];
+        copy[otherIndex] = tmp;
+      }
+      copy[index] = next;
+      return { ...prev, dashboardChartMetrics: [copy[0], copy[1], copy[2]] as any };
+    });
+  };
 
   return (
     <div className="eb-page">
@@ -176,11 +343,16 @@ export function Dashboard({
             <button
               type="button"
               onClick={() => onOpenCheckIn(todayISO)}
-              className="eb-inset rounded-xl p-4 text-left w-full hover:opacity-95 transition"
+              className="eb-inset rounded-xl p-4 text-left w-full hover:opacity-95 transition group cursor-pointer shadow-sm hover:shadow-md"
             >
-              <div className="eb-inset-label">Today</div>
-              <div className="eb-inset-value">
-                {checkedInToday ? 'Checked in' : 'Not checked in yet'}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="eb-inset-label">Today</div>
+                  <div className="eb-inset-value">
+                    {checkedInToday ? 'Checked in' : 'Not checked in yet'}
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 opacity-70 group-hover:opacity-100 transition" />
               </div>
             </button>
 
@@ -188,10 +360,15 @@ export function Dashboard({
               <button
                 type="button"
                 onClick={() => setShowGoalPicker((v) => !v)}
-                className="eb-inset rounded-xl p-4 text-left w-full hover:opacity-95 transition"
+                className="eb-inset rounded-xl p-4 text-left w-full hover:opacity-95 transition group cursor-pointer shadow-sm hover:shadow-md"
               >
-                <div className="eb-inset-label">Goal</div>
-                <div className="eb-inset-value">{goalLabel}</div>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="eb-inset-label">Goal</div>
+                    <div className="eb-inset-value">{goalLabel}</div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 opacity-70 group-hover:opacity-100 transition" />
+                </div>
               </button>
 
               {showGoalPicker && (
@@ -232,48 +409,56 @@ export function Dashboard({
 
         {/* Action cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <button
-            onClick={() => onOpenCheckIn(todayISO)}
-            className="eb-card hover:shadow-md transition-all text-left group"
-            type="button"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-accent),0.2)] flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-              </div>
-              <ArrowRight className="w-5 h-5 text-[rgba(0,0,0,0.45)] group-hover:text-[rgba(0,0,0,0.65)]" />
-            </div>
-            <h3 className="mb-1">Daily check-in</h3>
-            <p className="text-sm">Log today’s symptoms</p>
-          </button>
+  <DashboardTile
+    title="Nice work keeping up the habit"
+    subtitle="Little check-ins add up."
+    cta="Open calendar"
+    icon={<Sparkles className="w-5 h-5" />}
+    onClick={() => onNavigate('calendar')}
+  />
 
-          <button
-            onClick={() => onNavigate('insights')}
-            className="eb-card hover:shadow-md transition-all text-left group"
-            type="button"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-accent),0.2)] flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+  <DashboardTile
+    title="Insights"
+    subtitle={
+      insightsReady
+        ? 'See what’s starting to show up in your last few days.'
+        : `Log ${insightsRemaining} more day${insightsRemaining === 1 ? '' : 's'} to unlock early patterns.`
+    }
+    cta={insightsReady ? 'View insights' : 'Do today’s check-in'}
+    icon={<TrendingUp className="w-5 h-5" />}
+    onClick={() => (insightsReady ? onNavigate('insights') : onOpenCheckIn(todayISO))}
+  />
+</div>
+
+        {quickHookLines.length > 0 && (
+          <div className="eb-card">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
-              <ArrowRight className="w-5 h-5 text-[rgba(0,0,0,0.45)] group-hover:text-[rgba(0,0,0,0.65)]" />
+              <div className="min-w-0">
+                <h3 className="mb-2">Your early insights</h3>
+                <ul className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
+                  {quickHookLines.map((l, idx) => (
+                    <li key={idx}>{l}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <h3 className="mb-1">View insights</h3>
-            <p className="text-sm">Spot patterns over time</p>
-          </button>
-        </div>
+          </div>
+        )}
 
         {/* Guide + week at a glance */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="eb-card">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-[rgba(var(--color-accent),0.18)] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
               <h3 className="mb-0">Guide</h3>
             </div>
             <p className="text-sm mb-4">
-              Start with a daily check-in. After a week or two, insights start to become more useful.
+              Start with a daily check-in. After a few days you can spot early patterns, and after a week it gets even clearer.
             </p>
             <button
               onClick={() => onNavigate('chat')}
@@ -285,55 +470,82 @@ export function Dashboard({
           </div>
 
           <div className="eb-card">
-            <h3 className="mb-3">Your week at a glance</h3>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="mb-1">Your week at a glance</h3>
+                <p className="text-xs text-[rgb(var(--color-text-secondary))]">Pick 3 metrics to show</p>
+              </div>
+            </div>
             <div style={{ width: '100%', height: 220 }}>
               <ResponsiveContainer>
                 <LineChart data={weekSeries}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
-                  <YAxis domain={[0, 100]} />
+                  <YAxis domain={[0, 10]} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="energy" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="sleep" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="mood" strokeWidth={2} dot={false} />
+                  {chartMetrics.map((m, idx) => (
+                    <Line
+                      key={m}
+                      type="monotone"
+                      dataKey={m}
+                      name={METRIC_LABELS[m]}
+                      stroke={
+                        idx === 0
+                          ? 'rgb(var(--color-primary))'
+                          : idx === 1
+                          ? 'rgb(var(--color-accent))'
+                          : 'rgb(var(--color-primary-dark))'
+                      }
+                      strokeWidth={2}
+                      connectNulls
+                      dot={{ r: 3 }}
+                      isAnimationActive={false}
+                    />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             </div>
+
+            {/* Metric pickers (bottom row) */}
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              {[0, 1, 2].map((idx) => (
+                <select
+                  key={idx}
+                  className="eb-input !py-2 !px-3 !text-sm flex-1"
+                  value={chartMetrics[idx as 0 | 1 | 2]}
+                  onChange={(e) => setChartMetric(idx as 0 | 1 | 2, e.target.value as DashboardMetric)}
+                >
+                  {availableMetrics.map((m) => (
+                    <option key={m} value={m}>
+                      {METRIC_LABELS[m]}
+                    </option>
+                  ))}
+                </select>
+              ))}
+            </div>
             <p className="text-sm mt-3">
-              Quick view of the last 7 days. Missing points mean you did not check in that day.
+              You will see dots from day 1. Lines connect across missed days so you can still spot the overall trend.
             </p>
           </div>
         </div>
 
         {/* Tip for today */}
         <div className="eb-card">
-          <h3 className="mb-2">Tip for today</h3>
-          <p className="text-sm">{tipText}</p>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+              <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="mb-1">Tip for today</h3>
+              <p className="text-sm text-[rgba(0,0,0,0.75)]">{tipText}</p>
+            </div>
+          </div>
         </div>
 
         {/* Nice work */}
-        <button
-          onClick={() => onNavigate('insights')}
-          className="eb-card w-full text-left hover:shadow-md transition"
-          type="button"
-        >
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-[rgba(0,0,0,0.06)] flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-[rgba(0,0,0,0.65)]" />
-            </div>
+        
 
-            <div className="min-w-0">
-              <h3 className="font-semibold mb-1">Nice work keeping up the habit</h3>
-              <p className="text-sm text-[rgba(0,0,0,0.65)]">
-                If you want, we can look for links between symptoms and lifestyle across the last few weeks.
-              </p>
-              <span className="mt-3 inline-block text-sm text-[rgb(var(--color-primary))]">
-                Show me insights →
-              </span>
-            </div>
-          </div>
-        </button>
 
         {/* Cycle length modal (stats only) */}
         {cycleModalOpen && (
