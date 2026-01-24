@@ -244,7 +244,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   return (
     <div className="eb-page">
       <div className="eb-page-inner max-w-3xl">
-        <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="mb-1">Daily check-in</h1>
             <p className="text-[rgb(var(--color-text-secondary))]">
@@ -257,7 +257,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
             <button
               type="button"
               onClick={() => onNavigate('calendar')}
-              className="eb-btn-secondary"
+              className="eb-btn-secondary inline-flex items-center gap-2"
               title="Open calendar"
             >
               <Calendar className="w-4 h-4" />

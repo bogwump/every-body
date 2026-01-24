@@ -316,20 +316,6 @@ export function Dashboard({
             <Calendar className="w-5 h-5" />
           </button>
 
-          {/* Cycle length bubble */}
-          {showCycleBubble && (
-            <button
-              type="button"
-              onClick={() => setCycleModalOpen(true)}
-              className="absolute top-4 right-14 rounded-full bg-[rgba(255,255,255,0.18)] border border-[rgba(255,255,255,0.25)] px-3 py-1 text-sm eb-hero-on-dark hover:bg-[rgba(255,255,255,0.24)] transition"
-              title="Cycle length"
-            >
-              <span className="font-medium">Cycle length</span>
-              <span className="mx-2 opacity-70">•</span>
-              <span className="font-semibold">{avgCycleText}</span>
-            </button>
-          )}
-
           <h3 className="mb-1 text-lg font-semibold">Symptom tracking</h3>
 
           <p className="text-sm eb-hero-on-dark-muted mb-5">
@@ -337,6 +323,22 @@ export function Dashboard({
               ? 'Cycle features are off, but you can still track symptoms and patterns.'
               : 'Add bleeding or spotting (optional) to unlock cycle-phase insights.'}
           </p>
+
+          {/* Cycle length bubble */}
+          {showCycleBubble && (
+            <button
+              type="button"
+              onClick={() => setCycleModalOpen(true)}
+              // On mobile, keep this in the normal flow so it never overlaps the hero text.
+              // On sm+ screens, we float it up near the calendar icon.
+              className="w-full sm:w-auto sm:absolute sm:left-auto sm:right-14 sm:top-4 rounded-full bg-[rgba(255,255,255,0.18)] border border-[rgba(255,255,255,0.25)] px-3 py-1 text-sm eb-hero-on-dark hover:bg-[rgba(255,255,255,0.24)] transition flex items-center justify-center mb-4 sm:mb-0"
+              title="Cycle length"
+            >
+              <span className="font-medium">Cycle length</span>
+              <span className="mx-2 opacity-70">•</span>
+              <span className="font-semibold">{avgCycleText}</span>
+            </button>
+          )}
 
           {/* Today + Goal */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -418,19 +420,16 @@ export function Dashboard({
   />
 
   <DashboardTile
-    title="Insights"
-    subtitle={
-      insightsReady
-        ? 'See what’s starting to show up in your last few days.'
-        : `Log ${insightsRemaining} more day${insightsRemaining === 1 ? '' : 's'} to unlock early patterns.`
-    }
-    cta={insightsReady ? 'View insights' : 'Do today’s check-in'}
-    icon={<TrendingUp className="w-5 h-5" />}
-    onClick={() => (insightsReady ? onNavigate('insights') : onOpenCheckIn(todayISO))}
+    title="Guide"
+    subtitle="Start with a daily check-in. After a few days you can spot early patterns, and after a week it gets even clearer."
+    cta="Ask a question in chat"
+    icon={<Lightbulb className="w-5 h-5" />}
+    onClick={() => onNavigate('chat')}
   />
 </div>
 
-        {quickHookLines.length > 0 && (
+{/* Insights + week at a glance */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="eb-card">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
@@ -438,35 +437,27 @@ export function Dashboard({
               </div>
               <div className="min-w-0">
                 <h3 className="mb-2">Your early insights</h3>
-                <ul className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
-                  {quickHookLines.map((l, idx) => (
-                    <li key={idx}>{l}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
+                {quickHookLines.length > 0 ? (
+                  <ul className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
+                    {quickHookLines.map((l, idx) => (
+                      <li key={idx}>{l}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-[rgba(0,0,0,0.75)]">
+                    Log a few days and your first patterns will show up here.
+                  </p>
+                )}
 
-        {/* Guide + week at a glance */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="eb-card">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+                <button
+                  type="button"
+                  onClick={() => (insightsReady ? onNavigate('insights') : onOpenCheckIn(todayISO))}
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+                >
+                  {insightsReady ? 'View insights' : 'Do today’s check-in'} <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
-              <h3 className="mb-0">Guide</h3>
             </div>
-            <p className="text-sm mb-4">
-              Start with a daily check-in. After a few days you can spot early patterns, and after a week it gets even clearer.
-            </p>
-            <button
-              onClick={() => onNavigate('chat')}
-              className="text-sm text-[rgb(var(--color-primary))] hover:underline"
-              type="button"
-            >
-              Ask a question in chat →
-            </button>
           </div>
 
           <div className="eb-card">

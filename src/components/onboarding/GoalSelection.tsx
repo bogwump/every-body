@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Sunrise, Leaf, Sparkles, ChevronLeft } from 'lucide-react';
+import { Heart, Leaf, Sparkles, Sun, ChevronLeft } from 'lucide-react';
 import type { UserGoal } from '../../types';
 
 interface GoalSelectionProps {
@@ -19,7 +19,8 @@ const goals = [
     id: 'perimenopause' as UserGoal,
     title: 'Perimenopause Support',
     description: 'Navigate hormonal changes with confidence',
-    icon: Sunrise,
+    // Sun icon (matches the rest of the onboarding set).
+    icon: Sun,
   },
   {
     id: 'post-contraception' as UserGoal,

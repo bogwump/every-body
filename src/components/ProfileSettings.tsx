@@ -11,6 +11,11 @@ import {
   Download,
   ArrowLeft,
   Camera,
+  Heart as HeartIcon,
+  Leaf as LeafIcon,
+  Sparkles as SparklesIcon,
+  Moon as MoonIcon,
+  Sun as SunIcon,
 } from 'lucide-react';
 import type { ColorTheme, SymptomKey, UserData } from '../types';
 import { downloadTextFile } from '../lib/storage';
@@ -33,10 +38,10 @@ interface ProfileSettingsProps {
 }
 
 const themes = [
-  { id: 'sage' as ColorTheme, name: 'Sage', colors: ['rgb(132, 155, 130)', 'rgb(169, 189, 167)', 'rgb(203, 186, 159)'] },
-  { id: 'lavender' as ColorTheme, name: 'Lavender', colors: ['rgb(156, 136, 177)', 'rgb(190, 175, 207)', 'rgb(217, 186, 203)'] },
-  { id: 'ocean' as ColorTheme, name: 'Ocean', colors: ['rgb(115, 155, 175)', 'rgb(158, 191, 207)', 'rgb(186, 216, 217)'] },
-  { id: 'terracotta' as ColorTheme, name: 'Terracotta', colors: ['rgb(190, 130, 110)', 'rgb(215, 170, 155)', 'rgb(225, 195, 170)'] },
+  { id: 'sage' as ColorTheme, name: 'Sage', description: 'Calm and grounding', colors: ['rgb(132, 155, 130)', 'rgb(169, 189, 167)', 'rgb(203, 186, 159)'] },
+  { id: 'lavender' as ColorTheme, name: 'Lavender', description: 'Gentle and soothing', colors: ['rgb(156, 136, 177)', 'rgb(190, 175, 207)', 'rgb(217, 186, 203)'] },
+  { id: 'ocean' as ColorTheme, name: 'Ocean', description: 'Clear and refreshing', colors: ['rgb(115, 155, 175)', 'rgb(158, 191, 207)', 'rgb(186, 216, 217)'] },
+  { id: 'terracotta' as ColorTheme, name: 'Terracotta', description: 'Warm and nurturing', colors: ['rgb(190, 130, 110)', 'rgb(215, 170, 155)', 'rgb(225, 195, 170)'] },
 ];
 
 const moduleMeta: Array<{ key: SymptomKey; label: string; description: string }> = [
@@ -55,67 +60,65 @@ const moduleMeta: Array<{ key: SymptomKey; label: string; description: string }>
   { key: 'flow', label: 'Bleeding / spotting', description: 'Optional, only if it’s relevant to you' },
 ];
 
+
+const moduleGroups: Array<{ id: string; title: string; keys: SymptomKey[] }> = [
+  { id: 'core', title: 'Core', keys: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'pain', 'fatigue', 'brainFog'] },
+  { id: 'skinHair', title: 'Skin & hair', keys: ['hairShedding', 'facialSpots', 'cysts'] },
+  { id: 'temperature', title: 'Temperature', keys: ['nightSweats'] },
+  { id: 'cycle', title: 'Cycle', keys: ['flow'] },
+];
+
+
 const STOCK_AVATARS: Array<{ id: string; label: string }> = [
   { id: 'moon', label: 'Moon' },
+  { id: 'spark', label: 'Star' },
+  { id: 'sun', label: 'Sun' },
   { id: 'leaf', label: 'Leaf' },
-  { id: 'spark', label: 'Spark' },
-  { id: 'drop', label: 'Drop' },
+  { id: 'flower', label: 'Flower' },
+  { id: 'heart', label: 'Heart' },
 ];
+
+
+function FivePetalFlowerIcon({ className }: { className?: string }) {
+  // Clean 5-petal outline flower. No shading, matches the onboarding icon vibe.
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <g>
+        <ellipse cx="12" cy="6.4" rx="3" ry="4" />
+        <ellipse cx="17" cy="9" rx="3" ry="4" transform="rotate(72 17 9)" />
+        <ellipse cx="16" cy="15.6" rx="3" ry="4" transform="rotate(144 16 15.6)" />
+        <ellipse cx="8" cy="15.6" rx="3" ry="4" transform="rotate(216 8 15.6)" />
+        <ellipse cx="7" cy="9" rx="3" ry="4" transform="rotate(288 7 9)" />
+      </g>
+      <circle cx="12" cy="12" r="2.2" />
+    </svg>
+  );
+}
 
 function StockAvatar({ id, className }: { id: string; className?: string }) {
   const cls = className ?? 'w-10 h-10';
   switch (id) {
     case 'moon':
-      return (
-        <svg viewBox="0 0 48 48" className={cls} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="24" cy="24" r="16" stroke="currentColor" strokeWidth="2" opacity="0.9" />
-          <circle cx="30" cy="18" r="14" fill="currentColor" opacity="0.22" />
-        </svg>
-      );
-    case 'leaf':
-      return (
-        <svg viewBox="0 0 48 48" className={cls} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M12 30c12-18 26-18 24-18-2 0-6 1-10 5-6 6-7 15-14 20"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.9"
-          />
-          <path d="M20 24c4 0 8 2 12 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
-        </svg>
-      );
+      return <MoonIcon className={cls} />;
     case 'spark':
-      return (
-        <svg viewBox="0 0 48 48" className={cls} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M24 10l2.6 8.3L35 21l-8.4 2.7L24 32l-2.6-8.3L13 21l8.4-2.7L24 10z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinejoin="round"
-            opacity="0.9"
-          />
-          <path
-            d="M14 34l1.4 4.2L20 40l-4.6 1.5L14 46l-1.4-4.5L8 40l4.6-1.8L14 34z"
-            fill="currentColor"
-            opacity="0.18"
-          />
-        </svg>
-      );
-    case 'drop':
-      return (
-        <svg viewBox="0 0 48 48" className={cls} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M24 10c6 8 10 13 10 19a10 10 0 1 1-20 0c0-6 4-11 10-19z"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinejoin="round"
-            opacity="0.9"
-          />
-          <path d="M18.5 30.5c1.5 3 4 4.5 7.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.55" />
-        </svg>
-      );
+      return <SparklesIcon className={cls} />;
+    case 'sun':
+      return <SunIcon className={cls} />;
+    case 'leaf':
+      return <LeafIcon className={cls} />;
+    case 'flower':
+      return <FivePetalFlowerIcon className={cls} />;
+    case 'heart':
+      return <HeartIcon className={cls} />;
     default:
       return null;
   }
@@ -135,6 +138,12 @@ function toggleInList<T>(list: T[], item: T): T[] {
 export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onPreviewOnboarding }: ProfileSettingsProps) {
   const [view, setView] = useState<'main' | 'personal'>('main');
   const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [showPrivacyPanel, setShowPrivacyPanel] = useState(false);
+  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
+  const [showHelpPanel, setShowHelpPanel] = useState(false);
+  const [showLogoutPanel, setShowLogoutPanel] = useState(false);
+
+  const [moduleSearch, setModuleSearch] = useState<string>('');
 
   // Personal info editing
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -218,26 +227,29 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
       title: 'Account',
       items: [
         { icon: User, label: 'Personal Information', onClick: () => openPersonal() },
-        { icon: Lock, label: 'Privacy & Security', onClick: () => {} },
+        { icon: Lock, label: 'Privacy & Security', onClick: () => setShowPrivacyPanel(!showPrivacyPanel) },
       ],
     },
     {
       title: 'Preferences',
       items: [
         { icon: Palette, label: 'Theme', onClick: () => setShowThemeSelector(!showThemeSelector) },
-        { icon: Bell, label: 'Notifications', onClick: () => {} },
+        { icon: Bell, label: 'Notifications', onClick: () => setShowNotificationsPanel(!showNotificationsPanel) },
       ],
     },
     {
       title: 'Support',
-      items: [{ icon: HelpCircle, label: 'Help Centre', onClick: () => {} }],
+      items: [
+        { icon: HelpCircle, label: 'Help Centre', onClick: () => setShowHelpPanel(!showHelpPanel) },
+        { icon: LogOut, label: 'Log out', onClick: () => setShowLogoutPanel(!showLogoutPanel) },
+      ],
     },
   ];
 
   if (view === 'personal') {
     return (
       <div className="eb-page">
-        <div className="max-w-3xl mx-auto">
+        <div className="eb-page-inner">
           <div className="mb-6 flex items-center gap-3">
             <button
               type="button"
@@ -336,7 +348,13 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                         aria-label={a.label}
                         title={a.label}
                       >
-                        <div className={selected ? 'text-[rgb(var(--color-primary))]' : 'text-[rgb(var(--color-text-secondary))]'}>
+                        <div
+                          className={
+                            selected
+                              ? 'text-[rgb(var(--color-primary))]'
+                              : 'text-[rgb(var(--color-primary))] opacity-60'
+                          }
+                        >
                           <StockAvatar id={a.id} className="w-8 h-8" />
                         </div>
                       </button>
@@ -362,7 +380,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
 
   return (
     <div className="eb-page">
-      <div className="max-w-3xl mx-auto">
+      <div className="eb-page-inner">
         <div className="mb-8">
           <h1 className="mb-2">Profile & Settings</h1>
           <p className="text-[rgb(var(--color-text-secondary))]">Make it personal</p>
@@ -412,7 +430,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
         </div>
 
         {/* Cycle tracking */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="eb-card mb-6">
           <h3 className="mb-2">Cycle tracking</h3>
           <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
             Symptoms and cycle are not mutually exclusive. You can track symptoms with no periods (coil, menopause, hysterectomy, etc).
@@ -479,7 +497,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
         </div>
 
         {/* Cloud sync (optional) */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="eb-card mb-6">
           <h3 className="mb-2">Cloud sync (optional)</h3>
           <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
             Local-first by default. Turn this on only if you want backup and cross-device syncing. (Beta)
@@ -629,7 +647,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
         </div>
 
         {/* Eve testing */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="eb-card mb-6">
           <h3 className="mb-2">Eve</h3>
           <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">Settings for testing and cost control.</p>
 
@@ -667,65 +685,129 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
         </div>
 
         {/* What to track */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
-          <h3 className="mb-2">What you track</h3>
-          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">Turn modules on or off. Nothing is required, including bleeding.</p>
-          <div className="space-y-4">
-            {moduleMeta.map((m) => {
-              const enabled = userData.enabledModules.includes(m.key);
-              return (
-                <div key={m.key} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium mb-1">{m.label}</p>
-                    <p className="text-sm text-[rgb(var(--color-text-secondary))]">{m.description}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onUpdateUserData((prev) => ({ ...prev, enabledModules: toggleInList(prev.enabledModules, m.key) }))}
-                    className={`w-12 h-6 rounded-full transition-all ${enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
-                  >
-                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${enabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Theme selector */}
-        {showThemeSelector && (
-          <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm border-2 border-[rgb(var(--color-primary))]">
-            <h3 className="mb-4">Choose your theme</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {themes.map((theme) => {
-                const isSelected = userData.colorTheme === theme.id;
-                return (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => onUpdateTheme(theme.id)}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      isSelected ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.06)]' : 'border-neutral-200 hover:border-neutral-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex gap-2">
-                        {theme.colors.map((color, i) => (
-                          <div key={i} className="w-6 h-6 rounded-full" style={{ backgroundColor: color }} />
-                        ))}
-                      </div>
-                      {isSelected && <Check className="w-5 h-5 text-[rgb(var(--color-primary))]" />}
-                    </div>
-                    <p className="text-sm font-medium text-left">{theme.name}</p>
-                  </button>
-                );
-              })}
+                <div className="eb-card mb-6">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="min-w-0">
+              <h3 className="mb-1">What you track</h3>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                Choose what shows up in your daily check-in. Nothing is required, including bleeding.
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-xs text-[rgb(var(--color-text-secondary))]">Enabled</p>
+              <p className="font-semibold">{userData.enabledModules.length}/{moduleMeta.length}</p>
             </div>
           </div>
-        )}
 
-        {/* Notifications */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+          <details className="mt-4 rounded-2xl border border-neutral-200 overflow-hidden group">
+            <summary className="list-none cursor-pointer select-none p-4 flex items-center justify-between hover:bg-neutral-50">
+              <span className="font-medium">Customise symptoms</span>
+              <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+            </summary>
+
+            <div className="p-4 pt-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                <input
+                  value={moduleSearch}
+                  onChange={(e) => setModuleSearch(e.target.value)}
+                  placeholder="Search symptoms..."
+                  className="w-full sm:flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)/0.35)]"
+                />
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateUserData((prev) => ({ ...prev, enabledModules: moduleMeta.map((m) => m.key) }))}
+                    className="text-sm px-3 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                  >
+                    Enable all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateUserData((prev) => ({ ...prev, enabledModules: [] }))}
+                    className="text-sm px-3 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {moduleGroups.map((group) => {
+                  const query = moduleSearch.trim().toLowerCase();
+                  const items = group.keys
+                    .map((k) => moduleMeta.find((m) => m.key === k))
+                    .filter(Boolean)
+                    .filter((m) => {
+                      if (!query) return true;
+                      const hay = `${m!.label} ${m!.description}`.toLowerCase();
+                      return hay.includes(query);
+                    }) as Array<(typeof moduleMeta)[number]>;
+
+                  if (items.length === 0) return null;
+
+                  return (
+                    <details key={group.id} className="rounded-2xl border border-neutral-200 overflow-hidden group">
+                      <summary className="list-none cursor-pointer select-none px-4 py-3 flex items-center justify-between hover:bg-neutral-50">
+                        <span className="font-medium">{group.title}</span>
+                        <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                      </summary>
+
+                      <div className="px-4 pb-3">
+                        <div className="space-y-3 pt-1">
+                          {items.map((m) => {
+                            const enabled = userData.enabledModules.includes(m.key);
+                            return (
+                              <div key={m.key} className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100 last:border-b-0">
+                                <div className="min-w-0">
+                                  <p className="font-medium mb-1">{m.label}</p>
+                                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">{m.description}</p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onUpdateUserData((prev) => ({
+                                      ...prev,
+                                      enabledModules: toggleInList(prev.enabledModules, m.key),
+                                    }))
+                                  }
+                                  className={`w-12 h-6 rounded-full transition-all ${enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
+                                  aria-label={enabled ? `Disable ${m.label}` : `Enable ${m.label}`}
+                                >
+                                  <div
+                                    className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                      enabled ? 'translate-x-6' : 'translate-x-0.5'
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </details>
+                  );
+                })}
+
+                {moduleSearch.trim() && (
+                  (() => {
+                    const query = moduleSearch.trim().toLowerCase();
+                    const anyMatch = moduleMeta.some((m) => (`${m.label} ${m.description}`.toLowerCase().includes(query)));
+                    if (anyMatch) return null;
+                    return (
+                      <p className="text-sm text-[rgb(var(--color-text-secondary))] px-1">
+                        No matches. Try a different search.
+                      </p>
+                    );
+                  })()
+                )}
+              </div>
+            </div>
+          </details>
+        </div>
+
+<div className="eb-card mb-6">
           <h3 className="mb-4">Notifications</h3>
           <div className="space-y-4">
             {(
@@ -772,9 +854,312 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
         {settingsSections.map((section) => (
           <div key={section.title} className="mb-6">
             <h3 className="mb-3 px-2">{section.title}</h3>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[rgb(var(--color-primary)/0.22)]">
               {section.items.map((item, index) => {
                 const Icon = item.icon;
+
+                if (item.label === 'Theme') {
+                  return (
+                    <details
+                      key="theme"
+                      className="border-b border-neutral-100 last:border-b-0 group"
+                      open={showThemeSelector}
+                      onToggle={(e) => setShowThemeSelector((e.currentTarget as HTMLDetailsElement).open)}
+                    >
+                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
+                          <span>Theme</span>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                      </summary>
+
+                      <div className="px-4 pb-4 pt-0">
+                        <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
+                          Select colours that feel right for you. You can change this anytime.
+                        </p>
+
+                        {/*
+                          Responsive bounding for desktop resizing:
+                          keep 2 columns until medium screens so the cards don't get squeezed and misalign.
+                        */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {themes.map((t) => {
+                            const selected = userData.colorTheme === t.id;
+                            return (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => {
+                                  onUpdateTheme(t.id);
+                                  // keep the panel open so it feels like a picker, not a navigation
+                                  setShowThemeSelector(true);
+                                }}
+                                className={[
+                                  'w-full rounded-xl border px-3 py-3 text-left transition-colors',
+                                  selected
+                                    ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.06)]'
+                                    : 'border-neutral-200 hover:bg-neutral-50',
+                                ].join(' ')}
+                                aria-pressed={selected}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <span className="text-sm font-medium block leading-tight">{t.name}</span>
+                                    <span className="text-xs text-[rgb(var(--color-text-secondary))] block mt-0.5">
+                                      {t.description}
+                                    </span>
+                                  </div>
+                                  <span className="flex items-center gap-1.5">
+                                    {t.colors.map((c) => (
+                                      <span
+                                        key={c}
+                                        className="w-3.5 h-3.5 rounded-full border border-neutral-200"
+                                        style={{ background: c }}
+                                      />
+                                    ))}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </details>
+                  );
+                }
+                if (item.label === 'Privacy & Security') {
+                  return (
+                    <details
+                      key="privacy"
+                      className="border-b border-neutral-100 last:border-b-0 group"
+                      open={showPrivacyPanel}
+                      onToggle={(e) => setShowPrivacyPanel((e.currentTarget as HTMLDetailsElement).open)}
+                    >
+                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
+                          <span>Privacy &amp; security</span>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                      </summary>
+
+                      <div className="p-4 pt-0">
+                        <div className="eb-card eb-inset p-4">
+                          <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                            Your check-ins are stored on this device. Cloud sync and account features can be added later,
+                            but you can already export your data anytime.
+                          </p>
+
+                          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                            <button
+                              type="button"
+                              onClick={exportJson}
+                              className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                            >
+                              <Download className="w-4 h-4" />
+                              Export JSON
+                            </button>
+                            <button
+                              type="button"
+                              onClick={exportCsv}
+                              className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                            >
+                              <Download className="w-4 h-4" />
+                              Export CSV
+                            </button>
+                          </div>
+
+                          <div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
+                            <p className="text-sm font-medium mb-1">Coming soon</p>
+                            <ul className="text-sm text-[rgb(var(--color-text-secondary))] list-disc pl-5 space-y-1">
+                              <li>Passcode / Face ID lock</li>
+                              <li>Cloud account sign-in and sync</li>
+                              <li>Delete my data (with confirmation)</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  );
+                }
+
+                if (item.label === 'Notifications') {
+                  return (
+                    <details
+                      key="notifications"
+                      className="border-b border-neutral-100 last:border-b-0 group"
+                      open={showNotificationsPanel}
+                      onToggle={(e) => setShowNotificationsPanel((e.currentTarget as HTMLDetailsElement).open)}
+                    >
+                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
+                          <span>Notifications</span>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                      </summary>
+
+                      <div className="p-4 pt-0">
+                        <div className="eb-card eb-inset p-4">
+                          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
+                            These switches are ready now. Actual phone notifications can be wired up later when we add push
+                            support.
+                          </p>
+
+                          <div className="space-y-3">
+                            <label className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium">Daily reminder</span>
+                              <button
+                                type="button"
+                                onClick={() => setNotifications((p) => ({ ...p, dailyReminder: !p.dailyReminder }))}
+                                className={`w-12 h-6 rounded-full transition-all ${
+                                  notifications.dailyReminder ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                                }`}
+                                aria-pressed={notifications.dailyReminder}
+                              >
+                                <div
+                                  className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                    notifications.dailyReminder ? 'translate-x-6' : 'translate-x-0.5'
+                                  }`}
+                                />
+                              </button>
+                            </label>
+
+                            <label className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium">Insights nudges</span>
+                              <button
+                                type="button"
+                                onClick={() => setNotifications((p) => ({ ...p, insights: !p.insights }))}
+                                className={`w-12 h-6 rounded-full transition-all ${
+                                  notifications.insights ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                                }`}
+                                aria-pressed={notifications.insights}
+                              >
+                                <div
+                                  className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                    notifications.insights ? 'translate-x-6' : 'translate-x-0.5'
+                                  }`}
+                                />
+                              </button>
+                            </label>
+
+                            <label className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium">Cycle predictions</span>
+                              <button
+                                type="button"
+                                onClick={() => setNotifications((p) => ({ ...p, periodPrediction: !p.periodPrediction }))}
+                                className={`w-12 h-6 rounded-full transition-all ${
+                                  notifications.periodPrediction ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                                }`}
+                                aria-pressed={notifications.periodPrediction}
+                              >
+                                <div
+                                  className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                    notifications.periodPrediction ? 'translate-x-6' : 'translate-x-0.5'
+                                  }`}
+                                />
+                              </button>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  );
+                }
+
+                if (item.label === 'Help Centre') {
+                  return (
+                    <details
+                      key="help"
+                      className="border-b border-neutral-100 last:border-b-0 group"
+                      open={showHelpPanel}
+                      onToggle={(e) => setShowHelpPanel((e.currentTarget as HTMLDetailsElement).open)}
+                    >
+                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
+                          <span>Help centre</span>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                      </summary>
+
+                      <div className="p-4 pt-0">
+                        <div className="eb-card eb-inset p-4">
+                          <div className="space-y-2 text-sm text-[rgb(var(--color-text-secondary))]">
+                            <p><span className="font-medium text-[rgb(var(--color-text-primary))]">What is this?</span> A simple daily symptom tracker with optional cycle predictions.</p>
+                            <p><span className="font-medium text-[rgb(var(--color-text-primary))]">How do insights work?</span> You need a few days of check-ins before patterns appear. More data = better signals.</p>
+                            <p><span className="font-medium text-[rgb(var(--color-text-primary))]">Something broken?</span> This is a work-in-progress build. We can add a “Report a bug” flow once hosted.</p>
+                          </div>
+
+                          <div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
+                            <p className="text-sm font-medium mb-1">Coming soon</p>
+                            <ul className="text-sm text-[rgb(var(--color-text-secondary))] list-disc pl-5 space-y-1">
+                              <li>Searchable FAQ</li>
+                              <li>Contact / feedback form</li>
+                              <li>Troubleshooting for sync and notifications</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  );
+                }
+
+                if (item.label === 'Log out') {
+                  return (
+                    <details
+                      key="logout"
+                      className="border-b border-neutral-100 last:border-b-0 group"
+                      open={showLogoutPanel}
+                      onToggle={(e) => setShowLogoutPanel((e.currentTarget as HTMLDetailsElement).open)}
+                    >
+                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
+                          <span>Log out</span>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                      </summary>
+
+                      <div className="p-4 pt-0">
+                        <div className="eb-card eb-inset p-4">
+                          <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                            Log out is only relevant once you are signed in to cloud sync. For now, this will just sign out of the cloud session if one exists.
+                          </p>
+
+                          <div className="mt-4 flex gap-2">
+                            <button
+                              type="button"
+                              className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                              onClick={async () => {
+                                setCloudBusy(true);
+                                setCloudMessage('');
+                                try {
+                                  await cloudSignOut();
+                                  setCloudMessage('Signed out.');
+                                } catch (e: any) {
+                                  setCloudMessage(e?.message ?? 'Could not sign out.');
+                                } finally {
+                                  setCloudBusy(false);
+                                }
+                              }}
+                              disabled={cloudBusy}
+                            >
+                              <LogOut className="w-4 h-4" />
+                              Sign out
+                            </button>
+                          </div>
+
+                          {cloudMessage ? (
+                            <p className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">{cloudMessage}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </details>
+                  );
+                }
+
                 return (
                   <button
                     key={index}
@@ -794,33 +1179,9 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
           </div>
         ))}
 
-        {/* Export */}
-        <div className="bg-[rgb(var(--color-accent)/0.16)] rounded-2xl p-6 mb-6 border border-[rgb(var(--color-accent)/0.22)]">
-          <h3 className="mb-2">Export your data</h3>
-          <p className="text-sm mb-4 text-[rgb(var(--color-text-secondary))]">Download your check-ins (CSV or JSON)</p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={exportCsv}
-              className="px-4 py-3 rounded-xl bg-white border border-neutral-200 hover:bg-neutral-50 transition-all font-medium flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              CSV
-            </button>
-            <button
-              type="button"
-              onClick={exportJson}
-              className="px-4 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              JSON
-            </button>
-          </div>
-        </div>
-
         {/* Testing */}
         {onPreviewOnboarding && (
-          <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-neutral-100">
+          <div className="eb-card mb-6">
             <h3 className="mb-2">Testing</h3>
             <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">Want to re-run onboarding without losing your saved data?</p>
             <button type="button" onClick={onPreviewOnboarding} className="w-full eb-btn-primary">
@@ -828,12 +1189,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
             </button>
           </div>
         )}
-
-        <button className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl text-red-600 hover:bg-red-50 transition-all" type="button">
-          <LogOut className="w-5 h-5" />
-          <span className="font-medium">Log Out</span>
-        </button>
-      </div>
+</div>
     </div>
   );
 }

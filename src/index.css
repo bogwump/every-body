@@ -82,7 +82,7 @@ body {
 
   .eb-page-inner {
     /* Extra bottom padding keeps content comfortably above the bottom nav on iPhone */
-    @apply mx-auto w-full max-w-6xl px-4 space-y-6 pb-28;
+    @apply mx-auto w-full max-w-5xl px-4 space-y-6 pb-28;
   }
 
   .eb-card-header {
@@ -139,7 +139,7 @@ body {
   }
 
   .eb-container {
-    @apply mx-auto w-full max-w-6xl px-4;
+    @apply mx-auto w-full max-w-5xl px-4;
   }
 
   .eb-surface {
@@ -150,8 +150,8 @@ body {
   .eb-card {
     @apply rounded-2xl p-6 shadow-sm;
     background: rgb(var(--color-surface));
-    border: 1px solid rgb(228 228 231 / 0.7);
-  }
+    border: 1px solid rgb(var(--color-primary) / 0.22);
+}
 
   .eb-muted {
     color: rgb(var(--color-text-secondary));
@@ -184,8 +184,8 @@ body {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition;
     background: white;
     color: rgb(var(--color-text));
-    border: 1px solid rgb(228 228 231 / 0.7);
-  }
+    border: 1px solid rgb(var(--color-primary) / 0.22);
+}
   .eb-btn-secondary:hover {
     background: rgb(250 250 250);
   }
@@ -302,8 +302,8 @@ p {
 
 .eb-inset {
   background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgb(var(--color-primary) / 0.18);
+box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .eb-inset-label {
