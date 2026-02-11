@@ -14,6 +14,7 @@ import {
 import type { DashboardMetric, SymptomKey, UserData, UserGoal } from '../types';
 import { useEntries } from '../lib/appStore';
 import { computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
+import { getDailyTip } from '../lib/tips';
 
 interface DashboardProps {
   userName: string;
@@ -45,17 +46,43 @@ const METRIC_LABELS: Record<DashboardMetric, string> = {
   energy: 'Energy',
   sleep: 'Sleep',
   stress: 'Stress',
+  anxiety: 'Anxiety',
+  irritability: 'Irritability',
   focus: 'Clarity',
   bloating: 'Bloating',
+  digestion: 'Digestion',
+  nausea: 'Nausea',
   pain: 'Pain',
+  headache: 'Headache',
+  cramps: 'Cramps',
+  jointPain: 'Joint pain',
   flow: 'Flow',
   hairShedding: 'Hair shedding',
   facialSpots: 'Facial spots',
   cysts: 'Cysts',
   brainFog: 'Brain fog',
   fatigue: 'Fatigue',
+  dizziness: 'Dizziness',
+  appetite: 'Appetite',
+  libido: 'Libido',
+  breastTenderness: 'Breast tenderness',
+  hotFlushes: 'Hot flushes',
   nightSweats: 'Night sweats',
 };
+
+// A mixed palette pulled from all theme families so multi-line charts stay readable
+// even when the current theme uses similar tones.
+const MIXED_CHART_PALETTE = [
+  'rgb(96, 115, 94)',    // sage dark
+  'rgb(156, 136, 177)',  // lavender primary
+  'rgb(82, 125, 145)',   // ocean dark
+  'rgb(190, 130, 110)',  // terracotta primary
+  'rgb(203, 186, 159)',  // sage accent
+  'rgb(217, 186, 203)',  // lavender accent
+  'rgb(186, 216, 217)',  // ocean accent
+  'rgb(160, 100, 80)',   // terracotta dark
+];
+
 
 function metricValue(entry: any | undefined, metric: DashboardMetric): number | undefined {
   if (!entry) return undefined;
@@ -94,18 +121,18 @@ function DashboardTile({ title, subtitle, cta, icon, onClick }: DashboardTilePro
     <button
       type="button"
       onClick={onClick}
-      className="eb-card hover:shadow-md transition-all text-left group"
+      className="eb-card hover:shadow-md transition-all text-left group h-full flex flex-col justify-start"
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-4 w-full h-full">
         <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
           <div className="text-[rgb(var(--color-primary))]">{icon}</div>
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 flex flex-col items-start h-full">
           <h3 className="font-semibold mb-1">{title}</h3>
           <p className="text-sm text-[rgba(0,0,0,0.65)]">{subtitle}</p>
           {cta ? (
-            <span className="mt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))]">
+            <span className="mt-auto pt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))]">
               {cta} <ArrowRight className="w-4 h-4" />
             </span>
           ) : null}
@@ -162,19 +189,30 @@ export function Dashboard({
     return p;
   }
 
-  const tipText = useMemo(() => {
-    if (userData.cycleTrackingMode !== 'cycle') {
-      return 'Small daily check-ins can help you spot patterns over time. You can track symptoms with or without a cycle.';
-    }
-    if (!todayPhase) return 'Small daily check-ins can help you spot patterns over time.';
-    const byPhase: Record<string, string> = {
-      Menstrual: 'Go gentle if you need. Warmth, hydration, and extra rest can really help.',
-      Follicular: 'Energy often rises here. It can be a nice time to plan, start fresh, or try something new.',
-      Ovulation: 'Often a higher-energy window. It can be a nice time for social plans or creative work.',
-      Luteal: 'If symptoms ramp up here, try reducing friction: earlier nights, simpler meals, lighter plans.',
-    };
-    return byPhase[dayPhaseKey(todayPhase)] ?? 'Small daily check-ins can help you spot patterns over time.';
-  }, [userData.cycleTrackingMode, todayPhase]);
+  const [tipOffset, setTipOffset] = React.useState(0);
+
+  const tip = useMemo(() => {
+    const phase = userData.cycleTrackingMode === 'cycle' ? (dayPhaseKey(todayPhase) as any) : null;
+    return getDailyTip({
+      dateISO: todayISO,
+      phase,
+      goal: userData.goal ?? null,
+      daysTracked,
+      offset: tipOffset,
+    });
+  }, [todayISO, todayPhase, userData.cycleTrackingMode, userData.goal, daysTracked, tipOffset]);
+
+  const addDaysISO = (dateISO: string, days: number) => {
+    const d = new Date(dateISO + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const yesterdayISO = useMemo(() => addDaysISO(todayISO, -1), [todayISO]);
+  const yesterdayEntry = useMemo(
+    () => entriesSorted.find((e: any) => (e as any).dateISO === yesterdayISO) ?? null,
+    [entriesSorted, yesterdayISO]
+  );
 
   // Dashboard chart metrics (user chooses 3)
   const availableMetrics = useMemo(() => {
@@ -263,8 +301,78 @@ export function Dashboard({
       lines.push(`Best mood (last 7 days): ${bestMood.v}/10 on ${day}.`);
     }
 
-    return lines.slice(0, 3);
-  }, [entriesSorted, chartMetrics, insightsReady, insightsRemaining]);
+    // 4) Add a tiny "stability" hint if we have a few points
+    if (last7.length >= 3 && lines.length < 4) {
+      const candidates = (chartMetrics.length ? chartMetrics : (['mood', 'energy', 'sleep', 'stress'] as any))
+        .slice(0, 6);
+
+      const stats = candidates
+        .map((k: any) => {
+          const vals = last7
+            .map((e) => metricValue(e as any, k))
+            .filter((v) => typeof v === 'number') as number[];
+          if (vals.length < 3) return null;
+          const min = Math.min(...vals);
+          const max = Math.max(...vals);
+          return { k, range: max - min };
+        })
+        .filter(Boolean) as Array<{ k: any; range: number }>;
+
+      if (stats.length) {
+        stats.sort((a, b) => a.range - b.range);
+        const mostConsistent = stats[0];
+        const biggestSwing = stats[stats.length - 1];
+        lines.push(`Most consistent (last 7 days): ${METRIC_LABELS[mostConsistent.k]}.`);
+        if (lines.length < 4) {
+          lines.push(`Biggest swing (last 7 days): ${METRIC_LABELS[biggestSwing.k]}.`);
+        }
+      }
+    }
+
+
+    // 3b) A lightweight "micro-insight" if we have enough sleep+energy points
+    if (lines.length < 3) {
+      const pts = last7
+        .map((e) => ({
+          sleep: metricValue(e as any, 'sleep'),
+          energy: metricValue(e as any, 'energy'),
+        }))
+        .filter((p) => typeof p.sleep === 'number' && typeof p.energy === 'number') as Array<{ sleep: number; energy: number }>;
+
+      if (pts.length >= 4) {
+        const low = pts.filter((p) => p.sleep <= 5).map((p) => p.energy);
+        const high = pts.filter((p) => p.sleep >= 7).map((p) => p.energy);
+        const mean = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+        const a = mean(low);
+        const b = mean(high);
+        if (a != null && b != null && Math.abs(b - a) >= 1) {
+          lines.push(`Early pattern: on lower-sleep days, energy averaged ${Math.round(a)}/10 (vs ${Math.round(b)}/10 on better-sleep days).`);
+        }
+      }
+    }
+
+    // 4) A simple “since yesterday” comparison (if we have both days)
+    if (todayEntry && yesterdayEntry) {
+      const candidates: DashboardMetric[] = ['mood', ...chartMetrics.filter((m) => m !== 'mood')];
+      for (const m of candidates) {
+        const a = metricValue(todayEntry as any, m);
+        const b = metricValue(yesterdayEntry as any, m);
+        if (typeof a === 'number' && typeof b === 'number') {
+          const arrow = a > b ? '↑' : a < b ? '↓' : '→';
+          lines.push(`Since yesterday: ${METRIC_LABELS[m]} ${b}→${a} ${arrow}`);
+          break;
+        }
+      }
+    }
+
+    // 5) Gentle nudge to customise without making day 1 feel heavy
+    const coreDefaultCount = 8;
+    if (lines.length < 3 && (userData.enabledModules?.length ?? 0) <= coreDefaultCount) {
+      lines.push('Want more personalised insights? Add 1–2 symptoms in Profile (it stays lightweight).');
+    }
+
+    return lines.slice(0, 4);
+  }, [entriesSorted, chartMetrics, insightsReady, insightsRemaining, todayEntry, yesterdayEntry, userData.enabledModules]);
 
   const showCycleBubble = userData.cycleTrackingMode === 'cycle' && (userData.showCycleBubble ?? true);
   const [cycleModalOpen, setCycleModalOpen] = React.useState(false);
@@ -316,9 +424,9 @@ export function Dashboard({
             <Calendar className="w-5 h-5" />
           </button>
 
-          <h3 className="mb-1 text-lg font-semibold">Symptom tracking</h3>
+          <h3 className="mb-1 text-lg font-semibold eb-hero-on-dark text-white">Symptom tracking</h3>
 
-          <p className="text-sm eb-hero-on-dark-muted mb-5">
+          <p className="text-sm eb-hero-on-dark-muted mb-5 text-white">
             {userData.cycleTrackingMode === 'no-cycle'
               ? 'Cycle features are off, but you can still track symptoms and patterns.'
               : 'Add bleeding or spotting (optional) to unlock cycle-phase insights.'}
@@ -431,7 +539,7 @@ export function Dashboard({
 {/* Insights + week at a glance */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="eb-card">
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-4 w-full h-full">
               <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
                 <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
@@ -448,6 +556,21 @@ export function Dashboard({
                     Log a few days and your first patterns will show up here.
                   </p>
                 )}
+
+                {daysTracked > 0 ? (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="eb-inset rounded-2xl p-3">
+                      <div className="text-xs text-[rgb(var(--color-text-secondary))]">Days logged</div>
+                      <div className="mt-1 font-semibold">{daysTracked}</div>
+                    </div>
+                    <div className="eb-inset rounded-2xl p-3">
+                      <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
+                      <div className="mt-1 font-semibold">
+                        {insightsReady ? 'Unlocked' : `${insightsRemaining} to unlock`}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <button
                   type="button"
@@ -481,13 +604,7 @@ export function Dashboard({
                       type="monotone"
                       dataKey={m}
                       name={METRIC_LABELS[m]}
-                      stroke={
-                        idx === 0
-                          ? 'rgb(var(--color-primary))'
-                          : idx === 1
-                          ? 'rgb(var(--color-accent))'
-                          : 'rgb(var(--color-primary-dark))'
-                      }
+                      stroke={MIXED_CHART_PALETTE[idx % MIXED_CHART_PALETTE.length]}
                       strokeWidth={2}
                       connectNulls
                       dot={{ r: 3 }}
@@ -522,14 +639,40 @@ export function Dashboard({
         </div>
 
         {/* Tip for today */}
-        <div className="eb-card">
-          <div className="flex items-start gap-4">
+        <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
+          <div className="flex items-start gap-4 w-full h-full">
             <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
               <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
             <div className="min-w-0">
-              <h3 className="mb-1">Tip for today</h3>
-              <p className="text-sm text-[rgba(0,0,0,0.75)]">{tipText}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="mb-1">Tip for today</h3>
+                  <p className="text-sm font-semibold">{tip.title}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTipOffset((v) => v + 1)}
+                  className="text-sm text-[rgb(var(--color-primary))] hover:underline shrink-0"
+                >
+                  Another tip
+                </button>
+              </div>
+
+              <p className="text-sm text-[rgba(0,0,0,0.75)] mt-2">{tip.body}</p>
+
+              {tip.cta ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tip.cta?.screen === 'check-in') onOpenCheckIn(todayISO);
+                    else onNavigate(tip.cta.screen);
+                  }}
+                  className="mt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+                >
+                  {tip.cta.label} <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

@@ -22,19 +22,15 @@ const DEFAULT_USER: UserData = {
   useMockEve: true,
   eveLowCostMode: true,
   fertilityMode: false,
-enabledModules: [
+  customSymptoms: [],
+  enabledModules: [
+    // Keep the app light on day 1. Users can turn on more in Profile.
     'energy',
     'sleep',
     'stress',
     'focus',
     'bloating',
-    'pain',
-    'fatigue',
-    'brainFog',
-    'nightSweats',
-    'hairShedding',
-    'facialSpots',
-    'cysts',
+        'fatigue',
     'flow',
   ],
 };
@@ -142,8 +138,8 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
           />
         );
 
-      case 'insights':
-        return <Insights userData={userData} />;
+        case 'insights':
+          return <Insights userData={userData} onOpenCheckIn={navigateToCheckIn} />;
 
       case 'chat':
         return <AIChat userName={userData.name || 'there'} userData={userData} />;

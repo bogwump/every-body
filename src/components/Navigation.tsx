@@ -1,6 +1,8 @@
 import React from 'react';
 import { Home, Calendar, TrendingUp, MessageCircle, BookOpen, User } from 'lucide-react';
 
+import appLogo from '../assets/everybody-logo-256.png';
+
 interface NavigationProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
@@ -44,7 +46,14 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
       {/* Desktop Navigation */}
       <nav className="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-[rgb(var(--color-surface))] border-r border-[rgb(228_228_231_/_0.7)] z-50">
         <div className="p-6">
-          <h2 className="eb-title mb-8">EveryBody</h2>
+          <div className="flex items-center gap-3 mb-8">
+            <img
+              src={appLogo}
+              alt="EveryBody"
+              className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-surface))]"
+            />
+            <h2 className="eb-title">EveryBody</h2>
+          </div>
           <div className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;

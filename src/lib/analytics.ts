@@ -109,7 +109,8 @@ export type CyclePhase = "Menstrual" | "Follicular" | "Ovulation" | "Luteal";
 
 /**
  * Lightweight heuristic cycle-phase estimator.
- * - Uses logged flow (>= 20) as period day marker.
+ * - Uses logged flow (> 0) as period day marker.
+ *   (Flow is treated as 0–10; older builds sometimes stored 0–100.)
  * - Estimates phase by counting days since last bleeding.
  * - This is only used when the user explicitly enables cycle tracking.
  */
@@ -121,11 +122,25 @@ export function estimatePhaseByFlow(
   const idx = sorted.findIndex((e) => String(e?.dateISO ?? "") === dateISO);
   if (idx < 0) return null;
 
-  // find most recent day with flow >= 20 up to idx
+  const flowTo10 = (v: any): number | null => {
+    if (typeof v !== "number") return null;
+    // Support older 0–100 values
+    const scaled = v > 10 ? Math.round(v / 10) : v;
+    return Math.max(0, Math.min(10, scaled));
+  };
+
+  // If you are bleeding/spotting *today*, that's Menstrual regardless of day count.
+  const todayFlow = flowTo10((sorted[idx] as any)?.values?.flow);
+  if (todayFlow != null && todayFlow > 0) return "Menstrual";
+
+  // (Duplicate block removed) bleeding/spotting today already handled above.
+
+  // Find most recent day with flow > 0 up to idx.
+  // NOTE: flow is now treated as a 0–10 scale (older builds stored 0–100).
   let lastBleedIndex = -1;
   for (let i = idx; i >= 0; i--) {
-    const flow = (sorted[i] as any)?.values?.flow;
-    if (typeof flow === "number" && flow >= 20) {
+    const flow = flowTo10((sorted[i] as any)?.values?.flow);
+    if (flow != null && flow > 0) {
       lastBleedIndex = i;
       break;
     }
@@ -155,11 +170,18 @@ export interface CycleStats {
  * Detect cycle starts using either a manual override, or a flow "start" signal.
  * Rules:
  * - Manual override always counts as a start
- * - Otherwise flow >= 20 counts as bleeding, and the first bleeding day after a non-bleeding day is a start
+ * - Otherwise flow > 0 counts as bleeding, and the first bleeding day after a non-bleeding day is a start
  */
 export function getCycleStarts(entries: CheckInEntry[] | unknown): string[] {
   const sorted = sortByDateAsc(entries);
   const starts: string[] = [];
+
+  const flowTo10 = (v: any): number | null => {
+    if (typeof v !== "number") return null;
+    // Support older 0–100 values
+    const scaled = v > 10 ? Math.round(v / 10) : v;
+    return Math.max(0, Math.min(10, scaled));
+  };
 
   for (let i = 0; i < sorted.length; i++) {
     const e: any = sorted[i];
@@ -171,11 +193,11 @@ export function getCycleStarts(entries: CheckInEntry[] | unknown): string[] {
       continue;
     }
 
-    const flow = e?.values?.flow;
-    const prevFlow = i > 0 ? (sorted[i - 1] as any)?.values?.flow : undefined;
+    const flow = flowTo10(e?.values?.flow);
+    const prevFlow = i > 0 ? flowTo10((sorted[i - 1] as any)?.values?.flow) : null;
 
-    const isBleeding = typeof flow === "number" && flow >= 20;
-    const wasBleeding = typeof prevFlow === "number" && prevFlow >= 20;
+    const isBleeding = typeof flow === "number" && flow > 0;
+    const wasBleeding = typeof prevFlow === "number" && prevFlow > 0;
 
     if (isBleeding && !wasBleeding) {
       starts.push(dateISO);
@@ -234,11 +256,20 @@ export function computeCycleStats(entries: CheckInEntry[] | unknown): CycleStats
   const keys: SymptomKey[] = ["fatigue", "brainFog", "nightSweats", "hairShedding", "facialSpots", "cysts"];
   let signalCount = 0;
 
+  const normalise10 = (v: any): number | null => {
+    if (typeof v !== 'number') return null;
+    const scaled = v > 10 ? Math.round(v / 10) : v;
+    return Math.max(0, Math.min(10, scaled));
+  };
+
   for (const k of keys) {
-    const vals = last5.map((e) => e?.values?.[k]).filter((v: any) => typeof v === "number") as number[];
+    const vals = last5
+      .map((e) => normalise10(e?.values?.[k]))
+      .filter((v: any) => typeof v === 'number') as number[];
     if (!vals.length) continue;
     const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    if (avg >= 65) signalCount++;
+    // values are 0–10 (older builds may have 0–100, normalised above)
+    if (avg >= 7) signalCount++;
   }
 
   const predictionNote =

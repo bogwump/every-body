@@ -7,19 +7,39 @@ export type SymptomKey =
   | 'energy'
   | 'sleep'
   | 'pain'
+  | 'headache'
+  | 'cramps'
+  | 'jointPain'
   | 'flow'
   | 'stress'
+  | 'anxiety'
+  | 'irritability'
   | 'focus'
   | 'bloating'
+  | 'digestion'
+  | 'nausea'
+  | 'acidReflux'
   | 'hairShedding'
   | 'facialSpots'
   | 'cysts'
   | 'brainFog'
   | 'fatigue'
+  | 'dizziness'
+  | 'appetite'
+  | 'libido'
+  | 'breastTenderness'
+  | 'hotFlushes'
   | 'nightSweats';
 
 /** Metrics that can be shown on the dashboard chart */
 export type DashboardMetric = SymptomKey | 'mood';
+
+export interface CustomSymptom {
+  id: string;
+  label: string;
+  enabled: boolean;
+}
+
 
 export interface UserData {
   name: string;
@@ -32,6 +52,9 @@ export interface UserData {
   showCycleBubble: boolean;
   /** Which symptom modules are enabled for the daily check-in */
   enabledModules: SymptomKey[];
+
+  /** Optional: user-defined custom symptoms (freeform). Stored as ids + labels. */
+  customSymptoms?: CustomSymptom[];
 
   /** Dev/testing: use local mock Eve (no API calls) */
   useMockEve: boolean;
@@ -66,6 +89,9 @@ export interface CheckInEntry {
   /** Per-module values 0-10 */
   values: Partial<Record<SymptomKey, number>>;
 
+  /** Optional custom symptom values keyed by CustomSymptom.id (0-10) */
+  customValues?: Record<string, number>;
+
   /** Optional non-symptom events (kept separate from symptom modules) */
   events?: {
     /** Sex logged for the day (only shown when Fertility mode is enabled) */
@@ -73,4 +99,33 @@ export interface CheckInEntry {
   };
   createdAt: string; // ISO
   updatedAt: string; // ISO
+}
+
+/**
+ * A lightweight in-app “experiment” the user can run for a few days.
+ * Stored locally only.
+ */
+export type InsightMetricKey = SymptomKey | 'mood' | `custom:${string}`;
+
+export interface ExperimentPlan {
+  id: string;
+  title: string;
+  startDateISO: string; // YYYY-MM-DD
+  durationDays: number;
+  /** Which metrics to focus on logging during the experiment */
+  metrics: InsightMetricKey[];
+  /** Small, realistic steps */
+  steps: string[];
+  /** A short coaching note */
+  note: string;
+
+  /** Optional outcome captured at the end of the experiment */
+  outcome?: {
+    /** 1–5 quick rating */
+    rating?: 1 | 2 | 3 | 4 | 5;
+    /** Freeform note */
+    note?: string;
+    /** When the user completed the experiment */
+    completedAtISO?: string;
+  };
 }

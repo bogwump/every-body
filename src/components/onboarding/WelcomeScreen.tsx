@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+
+import appLogo from '../../assets/everybody-logo-512.png';
 
 interface WelcomeScreenProps {
   onContinue: (name: string) => void;
@@ -19,8 +20,8 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
       <div className="max-w-md w-full">
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgb(var(--color-primary)/0.10)] mb-6">
-            <Sparkles className="w-8 h-8 text-[rgb(var(--color-primary))]" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-[rgb(var(--color-primary)/0.08)] mb-6 shadow-sm">
+            <img src={appLogo} alt="EveryBody" className="w-14 h-14" />
           </div>
           <h1 className="mb-4">Welcome to EveryBody</h1>
           <p className="text-lg">A calm place to track symptoms and spot patterns, one day at a time</p>

@@ -48,23 +48,51 @@ const moduleMeta: Array<{ key: SymptomKey; label: string; description: string }>
   { key: 'energy', label: 'Energy', description: 'How much fuel you have in the tank' },
   { key: 'sleep', label: 'Sleep', description: 'Quality of sleep, not just hours' },
   { key: 'stress', label: 'Stress', description: 'Mental load and tension' },
+  { key: 'anxiety', label: 'Anxiety', description: 'Worry, unease, or a tight chest feeling' },
+  { key: 'irritability', label: 'Irritability', description: 'Short fuse, snappy, easily overwhelmed' },
   { key: 'focus', label: 'Clarity', description: 'Brain fog vs clear thinking' },
   { key: 'bloating', label: 'Bloating', description: 'Digestive discomfort and swelling' },
+  { key: 'digestion', label: 'Digestion', description: 'How your tummy feels overall today' },
+  { key: 'nausea', label: 'Nausea', description: 'Queasy, unsettled stomach' },
   { key: 'pain', label: 'Pain', description: 'Cramps, aches, headaches, etc' },
+  { key: 'headache', label: 'Headache', description: 'Head pain or pressure today' },
+  { key: 'cramps', label: 'Cramps', description: 'Pelvic cramps or period-type pain' },
+  { key: 'jointPain', label: 'Joint pain', description: 'Aches or stiffness in joints' },
   { key: 'hairShedding', label: 'Hair shedding', description: 'Shedding or thinning today' },
   { key: 'facialSpots', label: 'Facial spots', description: 'Breakouts or skin changes' },
   { key: 'cysts', label: 'Cysts', description: 'Cystic spots or tenderness' },
   { key: 'brainFog', label: 'Brain fog', description: 'Foggy thinking, forgetfulness' },
   { key: 'fatigue', label: 'Fatigue', description: 'Heavy tiredness or drained feeling' },
+  { key: 'dizziness', label: 'Dizziness', description: 'Light-headed, off balance, spaced out' },
+  { key: 'appetite', label: 'Appetite', description: 'Hunger, cravings, or low appetite' },
+  { key: 'libido', label: 'Libido', description: 'Sex drive or interest' },
+  { key: 'breastTenderness', label: 'Breast tenderness', description: 'Soreness or sensitivity' },
+  { key: 'hotFlushes', label: 'Hot flushes', description: 'Sudden heat, flushing, or sweating' },
   { key: 'nightSweats', label: 'Night sweats', description: 'Sweats or overheating at night' },
   { key: 'flow', label: 'Bleeding / spotting', description: 'Optional, only if it’s relevant to you' },
 ];
 
 
 const moduleGroups: Array<{ id: string; title: string; keys: SymptomKey[] }> = [
-  { id: 'core', title: 'Core', keys: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'pain', 'fatigue', 'brainFog'] },
+  { id: 'basics', title: 'Daily basics', keys: ['energy', 'sleep', 'fatigue'] },
+
+  // Mind + cognition
+  { id: 'mind', title: 'Mind', keys: ['stress', 'anxiety', 'irritability', 'focus', 'brainFog'] },
+
+  // Pain + body
+  { id: 'body', title: 'Body & pain', keys: ['headache', 'cramps', 'jointPain', 'pain', 'dizziness', 'breastTenderness'] },
+
+  // Digestion
+  { id: 'digestion', title: 'Digestion', keys: ['bloating', 'digestion', 'acidReflux', 'nausea', 'appetite'] },
+
+  // Skin & hair
   { id: 'skinHair', title: 'Skin & hair', keys: ['hairShedding', 'facialSpots', 'cysts'] },
-  { id: 'temperature', title: 'Temperature', keys: ['nightSweats'] },
+
+  // Temperature + hormones
+  { id: 'temperature', title: 'Temperature', keys: ['hotFlushes', 'nightSweats'] },
+  { id: 'hormones', title: 'Hormones & sex', keys: ['libido'] },
+
+  // Cycle
   { id: 'cycle', title: 'Cycle', keys: ['flow'] },
 ];
 
@@ -144,6 +172,9 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [showLogoutPanel, setShowLogoutPanel] = useState(false);
 
   const [moduleSearch, setModuleSearch] = useState<string>('');
+  const [customSymptomText, setCustomSymptomText] = useState<string>('');
+  const [customSymptomError, setCustomSymptomError] = useState<string>('');
+
 
   // Personal info editing
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -706,6 +737,10 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
             </summary>
 
             <div className="p-4 pt-0">
+              <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
+                Turning a symptom off hides it from your check-in. Your past data stays saved, so Insights can still use it when you turn it back on.
+              </p>
+
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
                 <input
                   value={moduleSearch}
@@ -730,6 +765,113 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                     Clear
                   </button>
                 </div>
+              </div>
+
+
+              {/* Custom symptoms */}
+              <div className="mt-4 mb-5 rounded-2xl border border-neutral-200 bg-white/60 p-4">
+                <p className="font-medium mb-1">Add your own symptom</p>
+                <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
+                  Freeform labels like “Jaw pain”, “Sugar cravings”, “Tinnitus”. You can turn them on and off any time.
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                  <input
+                    value={customSymptomText}
+                    onChange={(e) => {
+                      setCustomSymptomText(e.target.value);
+                      setCustomSymptomError('');
+                    }}
+                    placeholder="Type a symptom name..."
+                    className="w-full sm:flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)/0.35)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const label = customSymptomText.trim();
+                      if (!label) {
+                        setCustomSymptomError('Type a symptom name first.');
+                        return;
+                      }
+                      if (label.length > 28) {
+                        setCustomSymptomError('Keep it short (28 characters max).');
+                        return;
+                      }
+                      onUpdateUserData((prev) => {
+                        const existing = (prev.customSymptoms ?? []);
+                        const exists = existing.some((s) => s.label.toLowerCase() === label.toLowerCase());
+                        if (exists) return prev;
+                        const id = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+                        return {
+                          ...prev,
+                          customSymptoms: [
+                            ...existing,
+                            { id, label, enabled: true },
+                          ],
+                        };
+                      });
+                      setCustomSymptomText('');
+                      setCustomSymptomError('');
+                    }}
+                    className="text-sm px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:opacity-95 transition-colors whitespace-nowrap"
+                  >
+                    Add symptom
+                  </button>
+                </div>
+
+                {customSymptomError && (
+                  <div className="mt-2 text-sm text-[rgb(170,60,60)]">{customSymptomError}</div>
+                )}
+
+                {!!(userData.customSymptoms?.length) && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs uppercase tracking-wide text-[rgb(var(--color-text-secondary))]">Your custom symptoms</p>
+                    <div className="space-y-2">
+                      {(userData.customSymptoms ?? []).map((s) => (
+                        <div key={s.id} className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-3 py-2">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{s.label}</div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateUserData((prev) => ({
+                                  ...prev,
+                                  customSymptoms: (prev.customSymptoms ?? []).map((x) =>
+                                    x.id === s.id ? { ...x, enabled: !x.enabled } : x
+                                  ),
+                                }))
+                              }
+                              className={`w-12 h-6 rounded-full transition-all ${s.enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
+                              aria-label={s.enabled ? `Disable ${s.label}` : `Enable ${s.label}`}
+                            >
+                              <div
+                                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                  s.enabled ? 'translate-x-6' : 'translate-x-0.5'
+                                }`}
+                              />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateUserData((prev) => ({
+                                  ...prev,
+                                  customSymptoms: (prev.customSymptoms ?? []).filter((x) => x.id !== s.id),
+                                }))
+                              }
+                              className="text-sm px-3 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">

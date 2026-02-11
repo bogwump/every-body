@@ -5,9 +5,28 @@ export const APP_NAME = "EveryBody";
 export const COMPANION_NAME = "Eve";
 
 // Storage keys
-const USER_KEY = "everybody:user";
-const ENTRIES_KEY = "everybody:entries";
-const CHAT_KEY = "everybody:chat";
+const USER_KEY = "everybody:v2:user";
+const ENTRIES_KEY = "everybody:v2:entries";
+const CHAT_KEY = "everybody:v2:chat";
+const EXPERIMENT_KEY = "everybody:v2:experiment";
+
+// One-time migration: if a user previously ran a legacy build that stored values on
+// different scales (eg 0–100) we prefer a clean slate over guessing.
+// This keeps behaviour predictable, and you can always re-log with the new 0–10 UI.
+(function migrateV2() {
+  try {
+    const flag = 'everybody:migrated-v2';
+    if (localStorage.getItem(flag) === '1') return;
+    // Remove legacy keys (do NOT touch other sites).
+    localStorage.removeItem('everybody:user');
+    localStorage.removeItem('everybody:entries');
+    localStorage.removeItem('everybody:chat');
+    localStorage.setItem(flag, '1');
+  } catch {
+    // ignore
+  }
+})();
+
 
 // ---- Types ----
 export type CheckInEntry = any;
@@ -117,7 +136,7 @@ function normaliseChat(value: unknown): ChatMessage[] {
 window.addEventListener("storage", (e) => {
   if (!e.key) return;
 
-  if (e.key === USER_KEY || e.key === ENTRIES_KEY || e.key === CHAT_KEY) {
+  if (e.key === USER_KEY || e.key === ENTRIES_KEY || e.key === CHAT_KEY || e.key === EXPERIMENT_KEY) {
     rawCache.delete(e.key);
     parsedCache.delete(e.key);
     emitKey(e.key);
@@ -201,6 +220,27 @@ export function useEntries() {
   };
 
   return { entries, setEntries, upsertEntry, clearEntries };
+}
+
+// ---- Experiment (lightweight coaching plan) ----
+export function useExperiment() {
+  const raw = useSyncExternalStore(
+    (listener) => subscribeKey(EXPERIMENT_KEY, listener),
+    () => readCached<unknown>(EXPERIMENT_KEY, null),
+    () => null
+  );
+
+  const experiment = (raw && typeof raw === 'object') ? (raw as any) : null;
+
+  const setExperiment = (next: any) => {
+    writeCached(EXPERIMENT_KEY, next);
+  };
+
+  const clearExperiment = () => {
+    writeCached(EXPERIMENT_KEY, null);
+  };
+
+  return { experiment, setExperiment, clearExperiment };
 }
 
 export function useChat() {

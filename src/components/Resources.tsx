@@ -150,6 +150,28 @@ export function Resources({ userGoal }: ResourcesProps) {
           <p>Evidence-based content to support your wellness journey</p>
         </div>
 
+        {/* Featured Resource */}
+        <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-8 mb-8 overflow-hidden shadow-sm">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <span className="text-xs px-3 py-1 rounded-full bg-[rgba(255,255,255,0.45)] border border-[rgba(0,0,0,0.12)] mb-3 inline-block">
+                Featured
+              </span>
+              <h2 className="mb-3 text-white">Cycle Syncing Masterclass</h2>
+              <p className="eb-hero-on-dark-muted mb-4">
+                Learn how to align your lifestyle, nutrition, and activities with your natural hormonal rhythm
+              </p>
+              <button className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-[rgb(var(--color-primary))] hover:shadow-lg transition-all font-medium">
+                Start Learning
+                <ExternalLink className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="hidden md:block w-32 h-32 rounded-2xl bg-[rgba(255,255,255,0.18)] overflow-hidden flex items-center justify-center">
+              <FeaturedIllustration />
+            </div>
+          </div>
+        </div>
+
         {/* Search */}
         <div className="mb-6">
           <div className="relative">
@@ -180,28 +202,6 @@ export function Resources({ userGoal }: ResourcesProps) {
                 {category}
               </button>
             ))}
-          </div>
-        </div>
-
-        {/* Featured Resource */}
-        <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-8 mb-8 overflow-hidden shadow-sm">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <span className="text-xs px-3 py-1 rounded-full bg-[rgba(255,255,255,0.45)] border border-[rgba(0,0,0,0.12)] mb-3 inline-block">
-                Featured
-              </span>
-              <h2 className="mb-3 text-white">Cycle Syncing Masterclass</h2>
-              <p className="eb-hero-on-dark-muted mb-4">
-                Learn how to align your lifestyle, nutrition, and activities with your natural hormonal rhythm
-              </p>
-              <button className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-[rgb(var(--color-primary))] hover:shadow-lg transition-all font-medium">
-                Start Learning
-                <ExternalLink className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="hidden md:block w-32 h-32 rounded-2xl bg-[rgba(255,255,255,0.18)] overflow-hidden flex items-center justify-center">
-              <FeaturedIllustration />
-            </div>
           </div>
         </div>
 

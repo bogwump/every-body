@@ -1,291 +1,302 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Send, Bot, Clock } from 'lucide-react';
+import { Bot, Clock, Send } from 'lucide-react';
 import type { CheckInEntry, UserData } from '../types';
 import { filterByDays, mean } from '../lib/analytics';
 import { COMPANION_NAME, useChat, useEntries } from '../lib/appStore';
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'ai';
-  timestamp: Date;
-}
 
 interface AIChatProps {
   userName: string;
   userData: UserData;
 }
 
-function stripLegacyDisclaimer(text: string): string {
-  // Earlier builds appended a long disclaimer into every AI message.
-  // We keep the single footer disclaimer in the UI instead.
+type EveReply = {
+  answer: string;
+  suggestions?: string[];
+};
+
+type EveContext = {
+  daysWithData: number;
+  last7Count: number;
+  last14Count: number;
+  averages: {
+    sleep10: number | null;
+    energy10: number | null;
+    pain10: number | null;
+    flow10: number | null;
+    mood3: number | null;
+  };
+};
+
+function hasNumeric(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+function stripLegacyJunk(text: string): string {
+  // Keep the single footer disclaimer in the UI, and keep the chat feeling human.
   const lines = text.split('\n');
   const cleaned = lines.filter((l) => {
     const s = l.trim();
     if (!s) return true;
+
+    // Legacy repeated disclaimers / warnings
     if (s.startsWith('Supportive, not medical.')) return false;
+    if (s.includes('Guidance is informational only')) return false;
+    if (s.includes('For medical advice') && (s.includes('healthcare') || s.includes('professional'))) return false;
     if (s.includes('If something feels severe') && (s.includes('GP') || s.includes('pharmacist'))) return false;
+
+    // Legacy technical error copy
+    if (s.startsWith("I'm having trouble connecting")) return false;
+    if (s.includes('make sure you started the Eve server')) return false;
+    if (s.includes('npm run dev:all')) return false;
+
     return true;
   });
+
   return cleaned.join('\n').trimEnd();
 }
 
-function hasNumeric(v: unknown): v is number {
-  return typeof v === 'number' && !Number.isNaN(v);
+function uniqueDays(entries: CheckInEntry[]): number {
+  return new Set(entries.map((e) => e.dateISO)).size;
 }
 
-function summarise(entries: CheckInEntry[]) {
+function buildEveContext(entries: CheckInEntry[]): EveContext {
+  const daysWithData = uniqueDays(entries);
+
   const last7 = filterByDays(entries, 7);
-  const avgSleep = mean(last7.map((e) => e.values.sleep).filter(hasNumeric));
-  const avgEnergy = mean(last7.map((e) => e.values.energy).filter(hasNumeric));
-  const avgStress = mean(last7.map((e) => e.values.stress).filter(hasNumeric));
+  const last14 = filterByDays(entries, 14);
+
+  const sleepVals = last14.map((e) => e.values.sleep).filter(hasNumeric);
+  const energyVals = last14.map((e) => e.values.energy).filter(hasNumeric);
+  const painVals = last14.map((e) => e.values.pain).filter(hasNumeric);
+  const flowVals = last14.map((e) => e.values.flow).filter(hasNumeric);
+  const moodVals = last14.map((e) => e.mood).filter((m): m is 1 | 2 | 3 => m === 1 || m === 2 || m === 3);
+
+  const avg = (nums: number[]) => {
+    const m = mean(nums);
+    return Number.isFinite(m) ? Math.round(m * 10) / 10 : null;
+  };
+
   return {
-    daysTracked: entries.length,
-    daysTracked7: last7.length,
-    avgSleep: Number.isFinite(avgSleep) ? Math.round(avgSleep) : null,
-    avgEnergy: Number.isFinite(avgEnergy) ? Math.round(avgEnergy) : null,
-    avgStress: Number.isFinite(avgStress) ? Math.round(avgStress) : null,
+    daysWithData,
+    last7Count: last7.length,
+    last14Count: last14.length,
+    averages: {
+      sleep10: avg(sleepVals),
+      energy10: avg(energyVals),
+      pain10: avg(painVals),
+      flow10: avg(flowVals),
+      mood3: avg(moodVals),
+    },
   };
 }
 
 function buildSuggestedQuestions(cycleEnabled: boolean): string[] {
   const base = [
     'What patterns do you notice in my last week?',
-    'Why might I feel tired lately?',
+    'What should I focus on first?',
     'How can I support sleep and energy?',
-    'What could be increasing my stress?',
+    'What could be affecting my mood?',
   ];
   if (cycleEnabled) {
-    base.splice(1, 0, 'How do symptoms usually change across the month?');
+    base.splice(1, 0, 'Could any of this be linked to my cycle?');
   } else {
-    base.splice(1, 0, 'How can I track symptoms without a cycle?');
+    base.splice(1, 0, 'How can I track patterns without a cycle?');
   }
   return base;
 }
 
-function buildFollowUpQuestions(userMessage: string, cycleEnabled: boolean, daysTracked7: number): string[] {
+function buildFollowUpQuestions(userMessage: string, cycleEnabled: boolean, daysInLast7: number): string[] {
   const lower = userMessage.toLowerCase();
 
-  // Keep it short and practical. 1–3 max.
   if (lower.includes('pattern') || lower.includes('last week')) {
-    if (daysTracked7 < 3) {
-      return ['What’s the easiest check-in to do daily?', 'What should I track first for quick insights?'];
-    }
+    if (daysInLast7 < 3) return ['What’s the easiest check-in to do daily?', 'What should I track first for quick insights?'];
     return [
-      cycleEnabled ? 'Is any of this linked to my cycle phase?' : 'How can I track patterns without a cycle?',
+      cycleEnabled ? 'Could this be linked to cycle phase?' : 'How can I track patterns without a cycle?',
       'What’s one small change I could try this week?',
     ];
   }
 
-  if (lower.includes('tired') || lower.includes('energy') || lower.includes('fatigue')) {
-    return ['Could sleep be driving this?', 'What 3-day experiment should I try?', cycleEnabled ? 'Does this change across the month?' : 'What patterns should I watch for?'];
-  }
+  if (lower.includes('sleep')) return ['What should I change first for better sleep?', 'Is stress affecting my sleep?'];
+  if (lower.includes('mood') || lower.includes('irritable') || lower.includes('anxiety')) return ['Could sleep be driving this?', 'What’s one small thing I can try today?'];
+  if (lower.includes('pain') || lower.includes('cramp')) return ['What usually helps cramps?', 'Is this worse at a certain time of month?'];
+  if (lower.includes('bleed') || lower.includes('spot')) return ['What should I track about bleeding?', 'Could this be linked to stress or contraception?'];
 
-  if (lower.includes('stress') || lower.includes('anxiety')) {
-    return ['What’s the quickest way to lower stress today?', 'How can I protect my sleep this week?', 'What might be triggering this?'];
-  }
-
-  if (lower.includes('sleep')) {
-    return ['What should I change first for better sleep?', 'Is stress affecting my sleep?', 'What does my sleep trend look like?'];
-  }
-
-  if (lower.includes('pms') || lower.includes('luteal') || lower.includes('period')) {
-    return [cycleEnabled ? 'What symptoms tend to cluster before a period?' : 'Should I turn cycle tracking on?', 'What helps most people with these symptoms?', 'What can I try next cycle?'];
-  }
-
-  // Default gentle prompts.
-  return ['What patterns do you notice in my last week?', 'How do symptoms usually change over time?', 'What should I focus on first?'];
+  return ['Want help joining the dots from your last 7 days?', 'What’s one symptom you want to feel better first?'];
 }
 
-type EveReply = { answer: string; suggestions?: string[]; safety_note?: string };
+const STARTER_QUESTIONS_FRIENDLY = [
+  'Want help joining the dots?',
+  'Why might my mood be low lately?',
+  'What could be driving tiredness?',
+  'What should I track for quick insights?',
+];
 
-function clamp01(v: number) {
-  if (v < 0) return 0;
-  if (v > 1) return 1;
-  return v;
-}
+const OFFLINE_KEYWORD_RESPONSES: Array<{ test: (s: string) => boolean; replies: string[] }> = [
+  {
+    test: (s) => /bleeding|spotting|breakthrough|flow|brown discharge/i.test(s),
+    replies: [
+      `Spotting can happen for lots of reasons (cycle shifts, stress, contraception changes, or just “one of those weeks”).\n\nIf you want a simple way to track it for a few days:\n• colour (pink/red/brown)\n• amount (wipe-only vs pad)\n• any pain\n\nIf you tell me what it looks like today, I’ll help you decide what’s worth watching.`,
+      `Thanks for telling me. A quick sanity check:\n• light and short-lived (often OK to monitor)\n• new pain, dizziness, or very heavy bleeding (worth getting checked)\n\nWant to tell me if it’s just when you wipe, or enough to need a pad?`,
+    ],
+  },
+  {
+    test: (s) => /pain|cramp|cramps|period pain/i.test(s),
+    replies: [
+      `I’m sorry you’re dealing with pain. A few gentle things that often help:\n• heat (10–20 mins)\n• light movement or stretching\n• a warm drink + hydration\n\nIf you tell me if it’s one-sided or general cramps, I’ll suggest the simplest next step.`,
+    ],
+  },
+  {
+    test: (s) => /night sweats|hot flush|hot flash|overheating/i.test(s),
+    replies: [
+      `Night sweats are miserable. A few practical things people often try:\n• cooler room (fan, lighter duvet)\n• breathable layers\n• avoid alcohol/spicy food close to bed if you’ve noticed triggers\n\nDo they wake you drenched, or is it more “running hot” and restless sleep?`,
+    ],
+  },
+  {
+    test: (s) => /anxiety|anxious|panic|irritable|irritability|snappy|rage|mood swing/i.test(s),
+    replies: [
+      `That anxious/snappy wave can feel intense. A gentle “steadying” combo some people try:\n• protein early in the day\n• a 5–10 minute walk or fresh air\n• reduce caffeine for a day if it’s making you buzzy\n• slow exhale breathing (4 in, 6–8 out)\n\nIf you tell me when it hits (morning vs evening), I’ll suggest the easiest lever first.`,
+    ],
+  },
+  {
+    test: (s) => /brain fog|foggy|forgetful|can’t think|cant think|focus/i.test(s),
+    replies: [
+      `Brain fog is so annoying. A few “have you tried” options people often experiment with:\n• hydration + a salty snack (if you feel lightheaded)\n• protein + fibre snack to steady blood sugar\n• a 10-minute walk (surprisingly good for focus)\n• magnesium glycinate in the evening (some people find it calming and sleep-supportive)\n\nWhen is the fog worst for you (morning, afternoon, after meals)?`,
+    ],
+  },
+  {
+    test: (s) => /tired|fatigue|exhausted|no energy|drained/i.test(s),
+    replies: [
+      `That “battery suddenly dropped” feeling is horrible. Two quick checks that sometimes help:\n• have you eaten protein in the last 3–4 hours?\n• have you had water today (not just tea/coffee)?\n\nIf you tell me what time it hits, I’ll suggest a simple routine for that window.`,
+    ],
+  },
+];
 
-function score01(v: number, max = 10): number {
-  if (!Number.isFinite(v)) return 0;
-  return clamp01(v / max);
-}
-
-function formatDay(iso: string): string {
-  try {
-    const d = new Date(`${iso}T12:00:00`);
-    return d.toLocaleDateString([], { weekday: 'short' });
-  } catch {
-    return iso;
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i);
+    h |= 0;
   }
+  return h;
 }
 
-function pickTopBy<T>(items: T[], score: (t: T) => number): T | null {
-  let best: T | null = null;
-  let bestScore = -Infinity;
-  for (const it of items) {
-    const s = score(it);
-    if (s > bestScore) {
-      best = it;
-      bestScore = s;
-    }
-  }
-  return best;
+function pickVariant(replies: string[], seed: string): string {
+  const idx = Math.abs(hashString(seed)) % replies.length;
+  return replies[idx];
 }
 
-function localCompanionReply(userMessage: string, entries: CheckInEntry[], cycleEnabled: boolean): EveReply {
+function localCompanionReply(userMessage: string, ctx: EveContext, cycleEnabled: boolean): EveReply {
   const lower = userMessage.toLowerCase();
-  const last7 = filterByDays(entries, 7);
-  const last14 = filterByDays(entries, 14);
 
-  const hasEnough = last7.length >= 4;
-  const hasSome = last7.length >= 2;
-
-  const moodVals = last14.map((e) => e.mood).filter((m): m is 1 | 2 | 3 => m === 1 || m === 2 || m === 3);
-  const sleepVals = last14.map((e) => e.values.sleep).filter(hasNumeric);
-  const energyVals = last14.map((e) => e.values.energy).filter(hasNumeric);
-  const stressVals = last14.map((e) => e.values.stress).filter(hasNumeric);
-  const brainFogVals = last14.map((e) => e.values.brainFog).filter(hasNumeric);
-  const fatigueVals = last14.map((e) => e.values.fatigue).filter(hasNumeric);
-
-  const avgSleep = mean(sleepVals);
-  const avgEnergy = mean(energyVals);
-  const avgStress = mean(stressVals);
-  const avgMood = mean(moodVals);
-
-  const keyFocus = (() => {
-    if (lower.includes('sleep')) return 'sleep';
-    if (lower.includes('energy') || lower.includes('tired') || lower.includes('fatigue')) return 'energy';
-    if (lower.includes('stress') || lower.includes('anxiety')) return 'stress';
-    if (lower.includes('brain fog') || lower.includes('fog')) return 'brainFog';
-    if (lower.includes('night') || lower.includes('sweat')) return 'nightSweats';
-    if (lower.includes('cycle') || lower.includes('period') || lower.includes('pms') || lower.includes('luteal')) return 'cycle';
-    return 'patterns';
-  })();
-
-  // Lightweight "joining the dots" patterns.
-  const patterns: string[] = [];
-  if (hasSome) {
-    const lowSleepDays = last14.filter((e) => hasNumeric(e.values.sleep) && (e.values.sleep as number) <= 4);
-    const highStressDays = last14.filter((e) => hasNumeric(e.values.stress) && (e.values.stress as number) >= 7);
-    const highBrainFogDays = last14.filter((e) => hasNumeric(e.values.brainFog) && (e.values.brainFog as number) >= 7);
-
-    if (lowSleepDays.length >= 2 && (fatigueVals.length || energyVals.length)) {
-      patterns.push(
-        `On days where sleep looks lower, fatigue/energy tends to swing more. If you want, we can watch whether better sleep lines up with steadier energy.`
-      );
-    }
-    if (highStressDays.length >= 2) {
-      patterns.push(`I’m seeing a couple of higher-stress days in your recent check-ins. Often stress shows up next in sleep or focus.`);
-    }
-    if (highBrainFogDays.length >= 2) {
-      patterns.push(`Brain fog has spiked on a couple of days. We can test if it clusters with low sleep, high stress, or certain cycle phases.`);
+  // Friendly keyword-based help (offline mode / API failures)
+  for (const item of OFFLINE_KEYWORD_RESPONSES) {
+    if (item.test(lower)) {
+      return {
+        answer: pickVariant(item.replies, userMessage),
+        suggestions: buildSuggestedQuestions(cycleEnabled).slice(0, 3),
+      };
     }
   }
 
-  const strongest = pickTopBy(last14, (e) => {
-    const s = score01(e.values.stress ?? 0);
-    const f = score01(e.values.fatigue ?? 0);
-    const b = score01(e.values.brainFog ?? 0);
-    return s + f + b;
-  });
+  // Trust gate: do not analyse before 5 days.
+  if (ctx.daysWithData < 5) {
+    const daysLeft = 5 - ctx.daysWithData;
+    const nudge = ctx.daysWithData === 0
+      ? `If you log a few check-ins, I can start spotting patterns that are specific to you.`
+      : `You’ve logged ${ctx.daysWithData} day${ctx.daysWithData === 1 ? '' : 's'} so far. If you log ${daysLeft} more day${daysLeft === 1 ? '' : 's'}, I can start looking for patterns with more confidence.`;
 
-  const joinDotsLead = hasEnough
-    ? 'Want help joining the dots?'
-    : 'Want help getting the first few dots on the page?';
+    const focus =
+      lower.includes('sleep') ? 'sleep' :
+      (lower.includes('mood') || lower.includes('irritable') || lower.includes('anxiety')) ? 'mood' :
+      lower.includes('energy') || lower.includes('tired') ? 'energy' :
+      lower.includes('pain') || lower.includes('cramp') ? 'pain' :
+      (lower.includes('bleed') || lower.includes('spot') || lower.includes('flow')) ? 'bleeding' :
+      'one symptom';
 
-  const lowDataNudge =
-    last7.length < 3
-      ? `You don’t have many check-ins in the last week yet. If you log a couple more days, I can be much more confident about patterns.`
-      : '';
+    return {
+      answer: [
+        `Want help joining the dots?`,
+        nudge,
+        `For now, we can keep it simple: focus on ${focus} and do a quick daily check-in.`,
+        cycleEnabled
+          ? `If you’re tracking cycle days, we’ll be able to see if things shift around bleeding once you’ve got a bit more data.`
+          : `If you’re not tracking cycle days, that’s totally fine. We can still find patterns from sleep, mood, energy, pain, and bleeding.`,
+        `What’s the one thing you most want to feel better first?`,
+      ].filter(Boolean).join('\n\n'),
+      suggestions: [
+        'What should I track first?',
+        'How do I build a simple daily habit?',
+        cycleEnabled ? 'Could this be linked to my cycle?' : 'How can I track without a cycle?',
+      ].slice(0, 3),
+    };
+  }
 
-  const oneLineSnapshot = (() => {
-    const bits: string[] = [];
-    if (Number.isFinite(avgSleep)) bits.push(`sleep feels about ${Math.round(avgSleep)}/10 lately`);
-    if (Number.isFinite(avgEnergy)) bits.push(`energy about ${Math.round(avgEnergy)}/10`);
-    if (Number.isFinite(avgStress)) bits.push(`stress about ${Math.round(avgStress)}/10`);
-    if (Number.isFinite(avgMood)) bits.push(`mood about ${Math.round(avgMood)}/3`);
-    if (!bits.length) return '';
-    return `Quick snapshot (last ~2 weeks): ${bits.join(', ')}.`;
-  })();
+  // From day 5+: gentle, cautious pattern language based on core metrics.
+  const parts: string[] = [];
+  parts.push('Want help joining the dots?');
 
-  const cycleLine = cycleEnabled
-    ? `If you’re tracking cycle days, we can also look for phase patterns (for example, whether sleep or mood shifts before a bleed).`
-    : `If you don’t want cycle tracking, that’s fine. We can still find patterns just from sleep, mood, energy, and stress.`;
+  const snapBits: string[] = [];
+  if (ctx.averages.sleep10 != null) snapBits.push(`sleep ~${ctx.averages.sleep10}/10`);
+  if (ctx.averages.energy10 != null) snapBits.push(`energy ~${ctx.averages.energy10}/10`);
+  if (ctx.averages.pain10 != null) snapBits.push(`pain ~${ctx.averages.pain10}/10`);
+  if (ctx.averages.flow10 != null) snapBits.push(`bleeding ~${ctx.averages.flow10}/10`);
+  if (ctx.averages.mood3 != null) snapBits.push(`mood ~${ctx.averages.mood3}/3`);
 
-  const actionIdeas = (() => {
-    // Keep these gentle and "some people try".
-    if (keyFocus === 'sleep') {
-      return `Some people try a simple 3-night experiment: same bedtime window, dim screens 45 minutes before, and a short wind-down (shower, stretch, or audio). Want to pick one to test?`;
-    }
-    if (keyFocus === 'energy') {
-      return `Some people find it helps to pick one lever for 3 days: morning daylight, a protein-first breakfast, or a 10-minute walk. Want to try one and see if energy shifts?`;
-    }
-    if (keyFocus === 'stress') {
-      return `If stress is the main thing, some people start with a “tiny reset”: 60 seconds of slow breathing, then one small next step. Want a few options that fit your day?`;
-    }
-    if (keyFocus === 'cycle') {
-      return `If you tell me roughly where you are in your cycle (or whether you’ve had any spotting/bleeding), I can look for the most likely links and what tends to help people in that phase.`;
-    }
-    return `Some people start by choosing 1–2 symptoms to prioritise for a week (sleep + one other), then we review what moved. Want me to suggest a simple focus based on your recent check-ins?`;
-  })();
+  if (snapBits.length) parts.push(`Quick snapshot (last ~2 weeks): ${snapBits.join(', ')}.`);
 
-  const patternLine = (() => {
-    if (!patterns.length && strongest) {
-      return `A day that stands out is ${formatDay(strongest.dateISO)}. If you remember anything different about that day (sleep, food, workload, cycle), that context can really help.`;
-    }
-    if (!patterns.length) return '';
-    return patterns.slice(0, 2).join(' ');
-  })();
+  // Light pattern hints (no heavy stats)
+  // If the user asks about something, prioritise that
+  const wantsSleep = lower.includes('sleep') || lower.includes('insomnia') || lower.includes('wake');
+  const wantsMood = lower.includes('mood') || lower.includes('irritable') || lower.includes('anxiety') || lower.includes('snappy');
+  const wantsEnergy = lower.includes('energy') || lower.includes('tired') || lower.includes('fatigue');
+  const wantsPain = lower.includes('pain') || lower.includes('cramp');
+  const wantsBleed = lower.includes('bleed') || lower.includes('spot') || lower.includes('flow');
 
-  const answerParts = [
-    `${joinDotsLead}`,
-    lowDataNudge,
-    oneLineSnapshot,
-    patternLine,
-    cycleLine,
-    actionIdeas,
-  ].filter(Boolean);
+  const suggestions: string[] = [];
 
-  const suggestions = (() => {
-    const s: string[] = [];
-    s.push('Want help joining the dots from your last 7 days?');
-    s.push('What’s one symptom you want to feel better first?');
-    if (cycleEnabled) s.push('Could this be linked to cycle phase?');
-    s.push('Give me one small thing to try for 3 days.');
-    return s.slice(0, 3);
-  })();
+  const action = () => {
+    if (wantsSleep) return `Some people try a tiny 3-night experiment: same bedtime window, dim screens 45 mins before bed, and a 10-minute wind-down (stretch, shower, or audio). Want to pick one?`;
+    if (wantsMood) return `If mood feels wobbly, some people start with one lever for 3 days: protein early, less caffeine, or a short walk. Want the easiest one for your routine?`;
+    if (wantsEnergy) return `For energy dips, some people focus on steadier blood sugar: protein + fibre snack mid-morning and mid-afternoon for 3 days. Want to try it?`;
+    if (wantsPain) return `For pain, heat + gentle movement is often the quickest relief. If you tell me if it’s one-sided or general cramps, I’ll tailor a simple plan.`;
+    if (wantsBleed) return `If bleeding/spotting is the focus, tracking colour + amount + pain for a few days helps us see if it’s a short blip or a pattern. Want a simple tracking checklist?`;
+    return `Some people start by choosing 1–2 symptoms to prioritise for a week (sleep + one other), then we review what moved. Want me to suggest a simple focus?`;
+  };
+
+  parts.push(cycleEnabled
+    ? `If you’re tracking cycle days, we can also watch whether symptoms shift around bleeding.`
+    : `If you’re not tracking cycle days, that’s fine. We can still find patterns from sleep, mood, energy, pain, and bleeding.`);
+
+  parts.push(action());
+
+  suggestions.push('What’s one symptom you want to feel better first?');
+  if (cycleEnabled) suggestions.push('Could this be linked to cycle phase?');
+  suggestions.push('Give me one small thing to try for 3 days.');
 
   return {
-    answer: answerParts.join('\n\n'),
-    suggestions
+    answer: parts.join('\n\n'),
+    suggestions: suggestions.slice(0, 3),
   };
 }
 
 export function AIChat({ userName: _userName, userData }: AIChatProps) {
   const { entries } = useEntries();
-  const summary = useMemo(() => summarise(entries), [entries]);
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
 
-  const opening = useMemo(() => {
-    // Requested: include the product name in the opening message.
-    return `Hi, I’m ${COMPANION_NAME}. Want help joining the dots today?`;
-  }, []);
-
+  const eveContext = useMemo(() => buildEveContext(entries), [entries]);
   const suggestedQuestions = useMemo(() => buildSuggestedQuestions(cycleEnabled), [cycleEnabled]);
 
   const { messagesWithDate: messages, addMessage } = useChat();
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [followUps, setFollowUps] = useState<{ aiId: string; questions: string[] } | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Scroll behaviour requirements:
-  // - When opening Chat with existing history, show the most recent messages (bottom).
-  // - If the user scrolls up, remember their place when navigating away and back.
-  // - If they type a new message, jump back to the bottom (latest bubble).
   const SCROLL_TOP_KEY = 'everybody_eve_scrollTop_v1';
   const SCROLL_MANUAL_KEY = 'everybody_eve_manualScroll_v1';
+
   const [manualScroll, setManualScroll] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem(SCROLL_MANUAL_KEY) === '1';
@@ -294,16 +305,15 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
     }
   });
 
+  const opening = useMemo(() => `Hi, I’m ${COMPANION_NAME}. Want help joining the dots today?`, []);
+
   useEffect(() => {
-    // If there is no chat history, seed it with the current opening.
     if (messages.length === 0) {
       addMessage({ sender: 'ai', text: opening, timestampISO: new Date().toISOString() });
     }
   }, [messages.length, addMessage, opening]);
 
   const scrollToBottom = (behavior: ScrollBehavior = 'auto') => {
-    // Using scrollIntoView keeps this working whether the scroll container is the chat list
-    // or the page (depending on viewport height).
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
   };
 
@@ -321,22 +331,18 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
     } catch {
       // ignore
     }
-    // Default: open at the latest message.
     scrollToBottom('auto');
   };
 
-  // Restore on first paint, after the DOM has measured.
   useLayoutEffect(() => {
     restoreScrollPosition();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-scroll only when the user hasn't manually scrolled away.
   useEffect(() => {
     if (!manualScroll) scrollToBottom('auto');
   }, [messages, manualScroll]);
 
-  // Persist scroll position when the user navigates away.
   useEffect(() => {
     return () => {
       const el = scrollAreaRef.current;
@@ -354,7 +360,6 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
     const el = scrollAreaRef.current;
     if (!el) return;
 
-    // If the user is close to the bottom, allow auto-scroll again.
     const thresholdPx = 120;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     const atBottom = distanceFromBottom <= thresholdPx;
@@ -383,36 +388,25 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   };
 
   function buildSummaryText(): string {
-    const last7 = filterByDays(entries, 7);
-    const last30 = filterByDays(entries, 30);
-
-    const avgSleep7 = mean(last7.map((e) => e.values.sleep).filter(hasNumeric));
-    const avgEnergy7 = mean(last7.map((e) => e.values.energy).filter(hasNumeric));
-    const avgStress7 = mean(last7.map((e) => e.values.stress).filter(hasNumeric));
-    const avgMood7 = mean(last7.map((e) => e.values.mood).filter(hasNumeric));
-
     const parts: string[] = [];
-    parts.push(`Entries total: ${entries.length}`);
-    parts.push(`Entries last 7 days: ${last7.length}`);
-    parts.push(`Entries last 30 days: ${last30.length}`);
+    parts.push(`Days with data: ${eveContext.daysWithData}`);
+    parts.push(`Entries last 7 days: ${eveContext.last7Count}`);
+    parts.push(`Entries last 14 days: ${eveContext.last14Count}`);
     parts.push(`Cycle tracking enabled: ${cycleEnabled ? 'yes' : 'no'}`);
-
-    const fmt = (v: number) => `${Math.round(v)}%`;
-    const avgs: string[] = [];
-    if (Number.isFinite(avgSleep7)) avgs.push(`sleep ${fmt(avgSleep7)}`);
-    if (Number.isFinite(avgEnergy7)) avgs.push(`energy ${fmt(avgEnergy7)}`);
-    if (Number.isFinite(avgStress7)) avgs.push(`stress ${fmt(avgStress7)}`);
-    if (Number.isFinite(avgMood7)) avgs.push(`mood ${fmt(avgMood7)}`);
-    if (avgs.length) parts.push(`Last 7 day averages: ${avgs.join(', ')}`);
-
+    if (eveContext.averages.sleep10 != null) parts.push(`Avg sleep (0-10): ${eveContext.averages.sleep10}`);
+    if (eveContext.averages.mood3 != null) parts.push(`Avg mood (1-3): ${eveContext.averages.mood3}`);
+    if (eveContext.averages.energy10 != null) parts.push(`Avg energy (0-10): ${eveContext.averages.energy10}`);
+    if (eveContext.averages.pain10 != null) parts.push(`Avg pain (0-10): ${eveContext.averages.pain10}`);
+    if (eveContext.averages.flow10 != null) parts.push(`Avg bleeding/flow (0-10): ${eveContext.averages.flow10}`);
+    parts.push(`Analysis gate: ${eveContext.daysWithData < 5 ? 'LOW_DATA (no pattern claims)' : 'OK_TO_ANALYSE'}`);
     return parts.join('\n');
   }
 
-  async function askEve(userMessage: string) {
+  async function askEve(userMessage: string): Promise<EveReply> {
     // Local companion mode: when Mock Eve is enabled, or when the API isn't available,
-    // we still want Eve to feel useful and warm rather than "broken".
+    // keep Eve warm and useful rather than “broken”.
     if (Boolean(userData.useMockEve)) {
-      return localCompanionReply(userMessage, entries, cycleEnabled);
+      return localCompanionReply(userMessage, eveContext, cycleEnabled);
     }
 
     const history = messages
@@ -432,28 +426,30 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
             summaryText: buildSummaryText(),
             cycleEnabled,
             useMockEve: Boolean(userData.useMockEve),
+            eveContext,
           },
         }),
       });
 
       if (!res.ok) throw new Error('Eve request failed');
-      return (await res.json()) as EveReply;
+      const data = (await res.json()) as EveReply;
+
+      // Safety/trust guard: if we're under the 5-day gate, soften any overly-confident language.
+      if (eveContext.daysWithData < 5) {
+        const softened = `${stripLegacyJunk(data.answer)}\n\n(Still early days in your tracking. If you log a few more check-ins, I can start spotting patterns that are specific to you.)`;
+        return { ...data, answer: softened };
+      }
+
+      return { ...data, answer: stripLegacyJunk(data.answer) };
     } catch {
       // Graceful fallback: keep the companion usable even without the server.
-      return localCompanionReply(userMessage, entries, cycleEnabled);
+      return localCompanionReply(userMessage, eveContext, cycleEnabled);
     }
   }
 
   const handleSendMessage = (text?: string) => {
-    const messageText = text || inputText.trim();
+    const messageText = (text || inputText).trim();
     if (!messageText) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: messageText,
-      sender: 'user',
-      timestamp: new Date(),
-    };
 
     // When the user sends a new message, always jump back to the latest bubble.
     setManualScroll(false);
@@ -463,12 +459,12 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
       // ignore
     }
 
-    addMessage({ sender: 'user', text: messageText, timestampISO: new Date().toISOString(), id: userMessage.id });
+    const userId = `${Date.now().toString()}-user`;
+    addMessage({ sender: 'user', text: messageText, timestampISO: new Date().toISOString(), id: userId });
     setInputText('');
     setIsTyping(true);
     setFollowUps(null);
 
-    // Ensure the input stays visible and we land at the end of the thread.
     requestAnimationFrame(() => scrollToBottom('auto'));
 
     (async () => {
@@ -479,15 +475,16 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
 
         const qs = Array.isArray(data.suggestions) && data.suggestions.length
           ? data.suggestions.slice(0, 3)
-          : buildFollowUpQuestions(messageText, cycleEnabled, summary.daysTracked7).slice(0, 3);
+          : buildFollowUpQuestions(messageText, cycleEnabled, eveContext.last7Count).slice(0, 3);
         setFollowUps({ aiId, questions: qs });
       } catch {
         const aiId = `${Date.now().toString()}-ai`;
-        const fallback = localCompanionReply(messageText, entries, cycleEnabled);
+        const fallback = localCompanionReply(messageText, eveContext, cycleEnabled);
         addMessage({ sender: 'ai', text: fallback.answer, timestampISO: new Date().toISOString(), id: aiId });
+
         const qs = Array.isArray(fallback.suggestions) && fallback.suggestions.length
           ? fallback.suggestions.slice(0, 3)
-          : buildFollowUpQuestions(messageText, cycleEnabled, summary.daysTracked7).slice(0, 3);
+          : buildFollowUpQuestions(messageText, cycleEnabled, eveContext.last7Count).slice(0, 3);
         setFollowUps({ aiId, questions: qs });
       } finally {
         setIsTyping(false);
@@ -514,7 +511,8 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
               </div>
               <div>
                 <h3>{COMPANION_NAME}</h3>
-</div>
+                <p className="text-xs text-[rgb(var(--color-text-secondary))]">Here to support you with care and understanding</p>
+              </div>
             </div>
           </div>
 
@@ -534,7 +532,7 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
                         : 'bg-white border border-neutral-200'
                     }`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{stripLegacyDisclaimer(message.text)}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{stripLegacyJunk(message.text)}</p>
                     <div className="flex items-center gap-1 mt-2">
                       <Clock
                         className={`w-3 h-3 ${

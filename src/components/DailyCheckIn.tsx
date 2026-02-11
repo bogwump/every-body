@@ -13,11 +13,13 @@ import {
   Sparkles,
   Calendar,
   ChevronRight,
+  Pencil,
+  FlaskConical,
 } from 'lucide-react';
 
-import type { CheckInEntry, SymptomKey, UserData } from '../types';
+import type { CheckInEntry, SymptomKey, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { isoToday } from '../lib/analytics';
-import { useEntries } from '../lib/appStore';
+import { useEntries, useExperiment } from '../lib/appStore';
 
 interface DailyCheckInProps {
   userData: UserData;
@@ -41,15 +43,27 @@ const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType }>
   energy: { label: 'Energy', icon: Battery },
   sleep: { label: 'Sleep quality', icon: Moon },
   stress: { label: 'Stress', icon: Zap },
+  anxiety: { label: 'Anxiety', icon: Zap },
+  irritability: { label: 'Irritability', icon: Zap },
   focus: { label: 'Clarity', icon: Brain },
   bloating: { label: 'Bloating', icon: Wind },
+  digestion: { label: 'Digestion', icon: Wind },
+  nausea: { label: 'Nausea', icon: Wind },
   pain: { label: 'Pain', icon: Heart },
+  headache: { label: 'Headache', icon: Brain },
+  cramps: { label: 'Cramps', icon: Heart },
+  jointPain: { label: 'Joint pain', icon: Heart },
   flow: { label: 'Bleeding / spotting (optional)', icon: Droplet },
   hairShedding: { label: 'Hair shedding', icon: Sparkles },
   facialSpots: { label: 'Facial spots', icon: Sparkles },
   cysts: { label: 'Cysts', icon: Heart },
   brainFog: { label: 'Brain fog', icon: Brain },
   fatigue: { label: 'Fatigue', icon: Battery },
+  dizziness: { label: 'Dizziness', icon: Brain },
+  appetite: { label: 'Appetite', icon: Battery },
+  libido: { label: 'Libido', icon: Heart },
+  breastTenderness: { label: 'Breast tenderness', icon: Heart },
+  hotFlushes: { label: 'Hot flushes', icon: Sparkles },
   nightSweats: { label: 'Night sweats', icon: Moon },
 };
 
@@ -63,6 +77,29 @@ function normalise10(v: any): number {
   const scaled = v > 10 ? Math.round(v / 10) : v;
   return clamp(scaled, 0, 10);
 }
+
+
+function band3From10(v: number): 0 | 1 | 2 {
+  const n = clamp(v, 0, 10);
+  if (n <= 3) return 0;
+  if (n <= 6) return 1;
+  return 2;
+}
+
+function bandColorNoAlpha(band: 0 | 1 | 2): string {
+  // For controls (buttons/sliders) we use opaque colours for clarity.
+  if (band === 0) return 'rgb(var(--color-primary-light))';
+  if (band === 1) return 'rgb(var(--color-primary))';
+  return 'rgb(var(--color-primary-dark))';
+}
+
+function bandBgAlpha(band: 0 | 1 | 2): string {
+  // For button backgrounds on the hero card.
+  if (band === 0) return 'rgb(var(--color-primary-light) / 0.35)';
+  if (band === 1) return 'rgb(var(--color-primary) / 0.40)';
+  return 'rgb(var(--color-primary-dark) / 0.45)';
+}
+
 
 function SwitchRow({
   checked,
@@ -116,7 +153,8 @@ function Slider10({
         step={1}
         value={v}
         onChange={(e) => onChange(parseInt(e.target.value, 10))}
-        className="w-full accent-[rgb(var(--color-primary))]"
+        className="w-full"
+        style={{ accentColor: bandColorNoAlpha(band3From10(v)) }}
         aria-label="slider"
       />
       <div className="flex items-center justify-between text-xs text-[rgb(var(--color-text-secondary))] -mt-1">
@@ -131,15 +169,64 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   const todayISO = isoToday();
   const activeDateISO = initialDateISO ?? todayISO;
 
+  const addDaysISO = (dateISO: string, days: number) => {
+    const d = new Date(dateISO + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const prevDateISO = useMemo(() => addDaysISO(activeDateISO, -1), [activeDateISO]);
+
   const { entries, upsertEntry } = useEntries();
+  const { experiment } = useExperiment();
   const existingEntry = useMemo(
     () => entries.find((e) => e.dateISO === activeDateISO) ?? null,
     [entries, activeDateISO]
   );
 
+  const prevEntry = useMemo(
+    () => entries.find((e) => e.dateISO === prevDateISO) ?? null,
+    [entries, prevDateISO]
+  );
+
+  const experimentStatus = useMemo(() => {
+    if (!experiment) return null;
+    const ex = experiment as ExperimentPlan;
+    if (!ex.startDateISO) return null;
+    const todayISO2 = new Date().toISOString().slice(0, 10);
+    const start = new Date(ex.startDateISO + 'T00:00:00');
+    const today = new Date(todayISO2 + 'T00:00:00');
+    const dayIndex = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    const day = dayIndex + 1;
+    const done = dayIndex >= (ex.durationDays ?? 3);
+    // Only show while active or just-finished
+    return { ex, day: Math.max(1, day), done };
+  }, [experiment]);
+
+  const labelForMetric = (k: InsightMetricKey): string => {
+    if (k === 'mood') return 'Overall mood';
+    if (typeof k === 'string' && k.startsWith('custom:')) {
+      const id = k.slice('custom:'.length);
+      const s = (userData.customSymptoms ?? []).find((x) => x.id === id);
+      return s?.label ?? 'Custom';
+    }
+    // built-in symptom
+    return sliderMeta[k as SymptomKey]?.label ?? String(k);
+  };
+
+  const prevMoodLabel = useMemo(() => {
+    const m = (prevEntry as any)?.mood as 1 | 2 | 3 | undefined;
+    if (!m) return null;
+    return m === 1 ? 'Low' : m === 2 ? 'Okay' : 'Good';
+  }, [prevEntry]);
+
   const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | null>(null);
   const [notes, setNotes] = useState('');
+  const [showAllNotes, setShowAllNotes] = useState(false);
+
   const [values, setValues] = useState<Partial<Record<SymptomKey, number>>>({});
+  const [customValues, setCustomValues] = useState<Record<string, number>>({});
+
 
   // Quick log (under mood)
   const [markNewCycle, setMarkNewCycle] = useState(false);
@@ -163,6 +250,15 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       // Keep any other stored values too (even if module got turned off later)
       setValues({ ...((existingEntry.values as any) ?? {}), ...nextVals });
 
+      // Custom symptoms
+      const nextCustom: Record<string, number> = {};
+      for (const s of (userData.customSymptoms ?? [])) {
+        if (!s?.enabled) continue;
+        const raw = (existingEntry as any)?.customValues?.[s.id];
+        nextCustom[s.id] = normalise10(raw) ?? 5;
+      }
+      setCustomValues({ ...((existingEntry as any)?.customValues ?? {}), ...nextCustom });
+
       setMarkNewCycle(Boolean((existingEntry as any).cycleStartOverride));
       setMarkBleedingStarted(Boolean((existingEntry as any)?.values?.flow && normalise10((existingEntry as any).values.flow) > 0));
       setMarkSex(Boolean((existingEntry as any)?.events?.sex));
@@ -179,14 +275,69 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       defaults[k] = k === 'flow' ? 0 : 5;
     }
     setValues(defaults);
+
+    const customDefaults: Record<string, number> = {};
+    for (const s of (userData.customSymptoms ?? [])) {
+      if (!s?.enabled) continue;
+      customDefaults[s.id] = 5;
+    }
+    setCustomValues(customDefaults);
+
     setMarkNewCycle(false);
     setMarkBleedingStarted(false);
     setMarkSex(false);
-  }, [existingEntry, userData.enabledModules, activeDateISO]);
+  }, [existingEntry, userData.enabledModules, userData.customSymptoms, activeDateISO]);
 
   const enabledSliders = useMemo(() => {
     return userData.enabledModules.filter((k) => Boolean(sliderMeta[k]));
   }, [userData.enabledModules]);
+
+  const enabledCustom = useMemo(() => {
+    return (userData.customSymptoms ?? []).filter((s) => s && s.enabled && typeof s.label === 'string' && s.label.trim());
+  }, [userData.customSymptoms]);
+
+  // If an experiment is active, pin the experiment metrics to the top for the 3 days.
+  const orderedSliders = useMemo(() => {
+    if (!experimentStatus || experimentStatus.done) return enabledSliders;
+    const focus = (experimentStatus.ex.metrics ?? []) as any[];
+    const focusKeys = focus.filter((k) => typeof k === 'string' && k !== 'mood' && !String(k).startsWith('custom:')) as SymptomKey[];
+    if (!focusKeys.length) return enabledSliders;
+
+    const set = new Set(focusKeys);
+    const pinned = enabledSliders.filter((k) => set.has(k));
+    const rest = enabledSliders.filter((k) => !set.has(k));
+    return [...pinned, ...rest];
+  }, [enabledSliders, experimentStatus]);
+
+  const orderedCustom = useMemo(() => {
+    if (!experimentStatus || experimentStatus.done) return enabledCustom;
+    const focus = (experimentStatus.ex.metrics ?? []) as any[];
+    const focusIds = focus
+      .filter((k) => typeof k === 'string' && String(k).startsWith('custom:'))
+      .map((k) => String(k).replace('custom:', ''));
+    if (!focusIds.length) return enabledCustom;
+    const set = new Set(focusIds);
+    const pinned = enabledCustom.filter((s) => set.has(s.id));
+    const rest = enabledCustom.filter((s) => !set.has(s.id));
+    return [...pinned, ...rest];
+  }, [enabledCustom, experimentStatus]);
+
+
+  const allNotes = useMemo(() => {
+    return [...entries]
+      .filter((e) => typeof (e as any).notes === 'string' && ((e as any).notes as string).trim().length > 0)
+      .sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+      .map((e) => ({
+        dateISO: e.dateISO,
+        note: (e as any).notes as string,
+      }));
+  }, [entries]);
+
+  const formatNoteDate = (dateISO: string) => {
+    const d = new Date(dateISO + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
 
   const dateLabel = useMemo(() => {
     const d = new Date(activeDateISO + 'T00:00:00');
@@ -218,6 +369,15 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     }
 
     const nextEvents: any = { ...((existingEntry as any)?.events ?? {}) };
+
+    // Custom symptom values (0–10)
+    const nextCustomValues: Record<string, number> = { ...((existingEntry as any)?.customValues ?? {}), ...(customValues ?? {}) };
+    for (const s of enabledCustom) {
+      const v = normalise10((customValues as any)?.[s.id]);
+      if (v == null) continue;
+      nextCustomValues[s.id] = v;
+    }
+
     if (isFertilityEnabled) {
       if (markSex) nextEvents.sex = true;
       else delete nextEvents.sex;
@@ -231,6 +391,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       mood: selectedMood ?? undefined,
       notes: notes.trim() ? notes.trim() : undefined,
       values: nextValues,
+      customValues: Object.keys(nextCustomValues).length ? nextCustomValues : undefined,
       events: Object.keys(nextEvents).length ? nextEvents : undefined,
       cycleStartOverride: isCycleEnabled && markNewCycle ? true : undefined,
       createdAt: existingEntry?.createdAt ?? now,
@@ -274,41 +435,98 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           </div>
         )}
 
+        {experimentStatus && !experimentStatus.done && (
+          <div className="eb-inset rounded-2xl p-5 mb-6">
+            <div className="text-sm font-semibold flex items-center gap-2">
+              <FlaskConical className="w-4 h-4" />
+              Experiment in progress (Day {experimentStatus.day}/{experimentStatus.ex.durationDays})
+            </div>
+            <div className="mt-1 text-sm eb-muted">{experimentStatus.ex.title}</div>
+            {experimentStatus.ex.metrics?.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {experimentStatus.ex.metrics.slice(0, 6).map((k) => (
+                  <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                    {labelForMetric(k)}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-2 text-sm eb-muted">
+              Tip: use yesterday as your anchor so today’s score is easier to judge.
+            </div>
+          </div>
+        )}
+
         {/* Mood */}
-        <div className="eb-card mb-6">
-          <h3 className="mb-4">Overall mood</h3>
-          <div className="flex gap-4 justify-center">
-            {moodIcons.map((m) => {
-              const Icon = m.icon;
-              const selected = selectedMood === m.value;
-              return (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setSelectedMood(m.value)}
-                  className={
-                    'flex flex-col items-center gap-2 p-4 rounded-xl transition-all border ' +
-                    (selected
-                      ? 'bg-[rgb(var(--color-primary)/0.14)] border-[rgb(var(--color-primary)/0.45)] shadow-sm'
-                      : 'bg-white hover:bg-neutral-50 border-[rgba(0,0,0,0.08)]')
-                  }
-                  aria-pressed={selected}
-                >
-                  <Icon
-                    className={'w-8 h-8 ' + (selected ? 'text-[rgb(var(--color-primary-dark))]' : 'text-neutral-500')}
-                    strokeWidth={2.25}
-                  />
-                  <span className={'text-sm ' + (selected ? 'text-[rgb(var(--color-primary-dark))]' : '')}>{m.label}</span>
-                </button>
-              );
-            })}
+        <div className="eb-card eb-hero-surface mb-6 p-6">
+          <h3 className="mb-1 eb-hero-on-dark">Overall mood</h3>
+
+          <p className="mb-4 text-sm eb-hero-on-dark" style={{ color: 'rgb(255 255 255)' }}>
+            How are you feeling today?
+          </p>
+
+          {prevMoodLabel && (
+            <p className="text-xs eb-hero-on-dark-muted" style={{ color: 'rgba(255,255,255,0.85)' }}>
+              Yesterday: <span className="font-semibold">{prevMoodLabel}</span>
+            </p>
+          )}
+
+          {/* Mood buttons (high contrast, theme-driven) */}
+          <div className="mt-2 flex justify-center">
+            <div className="inline-flex gap-3 rounded-2xl bg-white/90 p-3 shadow-sm border border-black/5">
+              {moodIcons.map((m) => {
+                const Icon = m.icon;
+                const selected = selectedMood === m.value;
+                const band = (m.value - 1) as 0 | 1 | 2;
+
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setSelectedMood(m.value)}
+                    aria-pressed={selected}
+                    className={[
+                      "group relative w-[86px] h-[92px] rounded-2xl border text-center",
+                      "transition shadow-sm active:scale-[0.99]",
+                      "hover:-translate-y-[1px] hover:shadow-md",
+                      selected
+                        ? "border-[rgb(var(--color-primary-dark)/0.35)]"
+                        : "border-black/10 bg-white",
+                    ].join(" ")}
+                    style={selected ? { background: bandColorNoAlpha(band) } : undefined}
+                  >
+                    <div className="flex flex-col items-center justify-center h-full gap-2">
+                      <Icon
+                        className="w-8 h-8"
+                        strokeWidth={2.25}
+                        style={{ color: selected ? "white" : "rgb(var(--color-primary-dark))" }}
+                      />
+                      <span
+                        className={
+                          "text-sm font-medium " +
+                          (selected ? "text-white" : "text-[rgb(var(--color-text))]")
+                        }
+                      >
+                        {m.label}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Quick log under mood */}
+
           {isCycleEnabled && (
-            <div className="mt-6">
-              <h4 className="text-sm font-semibold mb-3">Quick log</h4>
-              <div className="grid grid-cols-1 gap-3">
+            <details className="mt-6 group">
+              <summary className="cursor-pointer list-none select-none">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-[rgba(255,255,255,0.25)] bg-white/10 px-4 py-3">
+                  <div className="text-sm font-semibold text-white">Quick log</div>
+                  <ChevronRight className="w-5 h-5 text-white/80 transition-transform group-open:rotate-90" />
+                </div>
+              </summary>
+              <div className="grid grid-cols-1 gap-3 mt-3">
                 <SwitchRow
                   checked={markNewCycle}
                   onChange={setMarkNewCycle}
@@ -330,7 +548,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                   />
                 )}
               </div>
-            </div>
+            </details>
           )}
         </div>
 
@@ -351,10 +569,12 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-5">Only what you choose to track.</p>
 
           <div className="space-y-5">
-            {enabledSliders.map((key) => {
+            {orderedSliders.map((key) => {
               const meta = sliderMeta[key];
               const Icon = meta.icon;
               const current = normalise10((values as any)?.[key]);
+              const prevRaw = (prevEntry as any)?.values?.[key];
+              const prevVal = typeof prevRaw === 'number' ? normalise10(prevRaw) : null;
 
               return (
                 <div key={key} className="rounded-2xl border border-[rgba(0,0,0,0.06)] p-4 bg-white">
@@ -365,7 +585,12 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                       </div>
                       <div className="min-w-0">
                         <div className="font-medium">{meta.label}</div>
-                        <div className="text-xs text-[rgb(var(--color-text-secondary))]">{current}/10</div>
+                        <div className="text-xs text-[rgb(var(--color-text-secondary))]">
+                          {current}/10
+                          {prevVal != null ? (
+                            <span className="ml-2">• Yesterday: {prevVal}/10</span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                     <div className="text-sm font-medium text-[rgb(var(--color-text-secondary))]">{current}</div>
@@ -383,16 +608,137 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           </div>
         </div>
 
+          {orderedCustom.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <h3 className="mb-1">Your custom symptoms</h3>
+                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">What you chose in Profile.</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {orderedCustom.map((s) => {
+                  const current = typeof (customValues as any)?.[s.id] === 'number' ? (customValues as any)[s.id] : 5;
+                  const prevVal = normalise10((prevEntry as any)?.customValues?.[s.id]);
+                  return (
+                    <div key={s.id} className="eb-card p-5">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold">{s.label}</div>
+                          {prevVal != null ? (
+                            <div className="text-xs text-[rgb(var(--color-text-secondary))] mt-1">Yesterday: {prevVal}/10</div>
+                          ) : (
+                            <div className="text-xs text-[rgb(var(--color-text-secondary))] mt-1">Yesterday: not logged</div>
+                          )}
+                        </div>
+                        <div className="text-sm font-medium text-[rgb(var(--color-text-secondary))]">{current}</div>
+                      </div>
+
+                      <Slider10
+                        value={current}
+                        onChange={(n) => setCustomValues((prev) => ({ ...prev, [s.id]: n }))}
+                        leftLabel="0"
+                        rightLabel="10"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+
         {/* Notes */}
-        <div className="eb-card mb-6">
-          <h3 className="mb-3">Notes (optional)</h3>
-          <textarea
-            className="eb-input min-h-[120px]"
-            placeholder="Anything worth remembering today?"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
+        <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0 mt-0.5">
+              <Pencil className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="mb-1">Notes (optional)</h3>
+                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">Anything worth remembering today?</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="text-sm text-[rgb(var(--color-primary))] hover:underline shrink-0"
+                  onClick={() => setShowAllNotes(true)}
+                >
+                  View all notes
+                </button>
+              </div>
+
+              <div className="mt-3">
+                <textarea
+                  className="eb-input resize-none overflow-auto transition-[height]"
+                  placeholder="Add a quick note..."
+                  value={notes}
+                  rows={3}
+                  style={{ minHeight: '64px', maxHeight: '200px' }}
+                  onChange={(e) => {
+                    setNotes(e.target.value);
+                    // auto-grow (caps at 200px, then becomes scrollable)
+                    e.currentTarget.style.height = 'auto';
+                    e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 200) + 'px';
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* All notes modal */}
+          {showAllNotes && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-label="All notes"
+            >
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/40"
+                onClick={() => setShowAllNotes(false)}
+                aria-label="Close"
+              />
+
+              <div className="relative w-full max-w-2xl eb-card p-5">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <div className="font-semibold">All notes</div>
+                    <div className="text-sm text-[rgb(var(--color-text-secondary))]">Only visible to you. Tap outside to close.</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="eb-btn-secondary"
+                    onClick={() => setShowAllNotes(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="max-h-[60vh] overflow-auto pr-1">
+                  {allNotes.length === 0 ? (
+                    <div className="text-sm text-[rgb(var(--color-text-secondary))]">No notes yet.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {allNotes.map((n) => (
+                        <div key={n.dateISO} className="rounded-2xl border border-[rgba(0,0,0,0.06)] bg-white p-4">
+                          <div className="text-sm font-medium">{formatNoteDate(n.dateISO)}</div>
+                          <div className="mt-2 text-sm whitespace-pre-wrap">{n.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
 
         <div className="flex items-center justify-end gap-2">
           <button type="button" className="eb-btn-secondary" onClick={onDone}>

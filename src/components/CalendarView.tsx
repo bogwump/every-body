@@ -19,13 +19,16 @@ function endOfMonth(d: Date) {
 }
 
 function toISO(d: Date) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function addDaysISO(dateISO: string, days: number): string {
   const d = new Date(dateISO + 'T00:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toISO(d);
 }
 
 function daysBetweenISO(aISO: string, bISO: string): number {
@@ -37,6 +40,30 @@ function daysBetweenISO(aISO: string, bISO: string): number {
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
+
+
+function toBand3(raw: number | null, key: SymptomKey | 'mood'): 0 | 1 | 2 | null {
+  if (raw == null) return null;
+  if (key === 'mood') {
+    // mood stored as 1..3
+    if (raw <= 1) return 0;
+    if (raw === 2) return 1;
+    return 2;
+  }
+  // symptoms normalised to 0..10
+  if (raw <= 3) return 0;
+  if (raw <= 6) return 1;
+  return 2;
+}
+
+function bandColorCSS(band: 0 | 1 | 2): string {
+  // Derived from theme, but optimised for calendar readability.
+  // Low = primary-light, Mid = primary, High = primary-dark.
+  if (band === 0) return 'rgb(var(--color-primary-light) / 0.40)';
+  if (band === 1) return 'rgb(var(--color-primary) / 0.52)';
+  return 'rgb(var(--color-primary-dark) / 0.68)';
+}
+
 
 function SexMark({ size = 10 }: { size?: number }) {
   return (
@@ -153,6 +180,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
   }, [entriesSorted]);
 
   const monthLabel = monthStart.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const todayISO = toISO(new Date());
 
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
   const fertilityEnabled = Boolean(userData.fertilityMode) && cycleEnabled;
@@ -242,6 +270,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
 
           {days.map((d) => {
             const iso = toISO(d);
+            const isToday = iso === todayISO;
             const inMonth = d >= monthStart && d <= monthEnd;
             const entry = byISO.get(iso);
 
@@ -257,28 +286,47 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
             }
 
             const hasSex = Boolean(entry?.events?.sex);
+            const hasNote = typeof entry?.notes === 'string' && entry.notes.trim().length > 0;
 
             return (
               <button
                 key={iso}
                 type="button"
                 onClick={() => onOpenCheckIn(iso)}
-                className={`relative rounded-2xl border text-left p-2 min-h-[54px] transition shadow-sm ${
-                  inMonth ? 'bg-white border-[rgba(0,0,0,0.08)]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.04)]'
-                }`}
+                className={`relative rounded-2xl border text-left p-2 min-h-[54px] transition shadow-sm active:scale-[0.99] ${
+                  inMonth ? 'bg-white border-[rgba(0,0,0,0.08)] hover:shadow-md hover:-translate-y-[1px]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.04)]'
+                } ${isToday ? 'ring-2 ring-[rgb(var(--color-primary)/0.45)] border-[rgb(var(--color-primary)/0.35)]' : ''} ${isFertile ? 'eb-fertile' : ''}`}
                 style={{
                   // IMPORTANT: our CSS vars store space-separated RGB values (e.g. "132 155 130").
                   // Use the modern `rgb(R G B / a)` syntax (NOT rgba(var(--color-*), a)).
-                  background: isPeriod
-                    ? `rgb(var(--color-primary-dark) / 0.16)`
-                    : isFertile
-                      ? `rgb(var(--color-primary) / 0.12)`
-                      : undefined,
+                  background: isPeriod ? `rgb(var(--color-primary-dark) / 0.16)` : undefined,
                 }}
               >
                 <div className="flex items-start justify-between">
                   <div className={`text-sm font-medium ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
-                  {hasSex && fertilityEnabled && <SexMark size={9} />}
+
+                                    <div className="relative w-[22px] h-[14px] flex items-center justify-end">
+                    {hasSex && fertilityEnabled && (
+                      <span className="absolute top-0 right-0">
+                        <SexMark size={9} />
+                      </span>
+                    )}
+                    {hasNote && (
+                      <span
+                        className="absolute top-[1px] right-[12px] inline-block w-[6px] h-[6px] rounded-full"
+                        style={{
+                          background: 'rgb(255 255 255 / 0.95)',
+                          boxShadow: '0 0 0 1px rgba(0,0,0,0.38), 0 1px 2px rgba(0,0,0,0.12)',
+                        }}
+                        aria-label="Note added"
+                        title="Note added"
+                      />
+                    )}
+                  </div>
+
+                  {isToday && (
+                    <div className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full border border-[rgb(var(--color-primary)/0.25)] bg-[rgb(var(--color-primary)/0.10)] text-[rgb(var(--color-primary-dark))]">Today</div>
+                  )}
                 </div>
 
                 {/* Symptom overlay bar (only when data exists for this day) */}
@@ -300,32 +348,72 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
           })}
         </div>
 
+        
         {showLegend && (
-          <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-[rgb(var(--color-text-secondary))]">
-            {cycleEnabled && (
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full" style={{ background: 'rgb(var(--color-primary-dark) / 0.22)' }} />
-                <span>Period window</span>
-              </div>
-            )}
-            {fertilityEnabled && (
-              <>
+          <>
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[rgb(var(--color-text-secondary))]">
+              {cycleEnabled && (
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full" style={{ background: 'rgb(var(--color-primary) / 0.18)' }} />
+                  <span
+                    className="w-4 h-3 rounded-md"
+                    style={{ background: 'rgb(var(--color-primary-dark) / 0.16)' }}
+                  />
+                  <span>Period window</span>
+                </div>
+              )}
+
+              {fertilityEnabled && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-4 h-3 rounded-md"
+                    style={{
+                      background: 'rgb(255 255 255 / 0.85)',
+                      boxShadow: 'inset 0 0 0 2px rgb(var(--color-primary) / 0.18)',
+                      border: '1px solid rgba(0,0,0,0.05)',
+                    }}
+                  />
                   <span>Fertile window</span>
                 </div>
+              )}
+
+              {fertilityEnabled && (
                 <div className="flex items-center gap-2">
                   <SexMark size={10} />
                   <span>Sex logged</span>
                 </div>
-              </>
-            )}
-          </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-block w-[6px] h-[6px] rounded-full"
+                  style={{
+                    background: 'rgb(255 255 255 / 0.95)',
+                    boxShadow: '0 0 0 1px rgba(0,0,0,0.38), 0 1px 2px rgba(0,0,0,0.12)',
+                  }}
+                  aria-hidden
+                />
+                <span>Note added</span>
+              </div>
+
+
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-3 h-2 rounded-full" style={{ background: bandColorCSS(0) }} />
+                  <span className="w-3 h-2 rounded-full" style={{ background: bandColorCSS(1) }} />
+                  <span className="w-3 h-2 rounded-full" style={{ background: bandColorCSS(2) }} />
+                </span>
+                <span>Overlay intensity</span>
+              </div>
+            </div>
+
+            <div className="mt-4 text-sm text-[rgb(var(--color-text-secondary))]">
+              Tip: switch overlay to{' '}
+              <span className="font-medium">Overall mood</span>{' '}
+              to spot good and difficult patches across the month.
+            </div>
+          </>
         )}
 
-        <div className="mt-4 text-sm text-[rgb(var(--color-text-secondary))]">
-          Tip: switch the overlay to <span className="font-medium">Overall mood</span> to see how your month felt at a glance.
-        </div>
       </div>
     </div>
   );
