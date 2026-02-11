@@ -22,6 +22,7 @@ const DEFAULT_USER: UserData = {
   useMockEve: true,
   eveLowCostMode: true,
   fertilityMode: false,
+  ovulationOverrideISOs: [],
   customSymptoms: [],
   enabledModules: [
     // Keep the app light on day 1. Users can turn on more in Profile.
@@ -167,7 +168,7 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
 
 
       case 'calendar':
-        return <CalendarView userData={userData} onNavigate={setCurrentScreen} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />;
+        return <CalendarView userData={userData} onNavigate={setCurrentScreen} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} onUpdateUser={setUserData} />;
       default:
         return (
           <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} onUpdateUserData={setUserData} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />

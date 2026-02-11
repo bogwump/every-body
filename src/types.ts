@@ -75,8 +75,11 @@ export interface UserData {
   /** Optional: which 3 metrics to show on the dashboard "week at a glance" chart */
   dashboardChartMetrics?: [DashboardMetric, DashboardMetric, DashboardMetric];
 
+  /** Optional: user-confirmed ovulation dates (YYYY-MM-DD) to override predicted fertile windows */
+  ovulationOverrideISOs?: string[];
 
 }
+
 
 export interface CheckInEntry {
   id: string;

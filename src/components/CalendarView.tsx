@@ -1,5 +1,8 @@
 
 import React, { useMemo, useState } from 'react';
+import { PencilLine, Droplet, Droplets, Egg, X } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
+import { cn } from './ui/utils';
 import type { UserData, SymptomKey } from '../types';
 import { useEntries } from '../lib/appStore';
 import { computeCycleStats, sortByDateAsc } from '../lib/analytics';
@@ -8,6 +11,7 @@ type Props = {
   userData: UserData;
   onNavigate: (screen: string) => void;
   onOpenCheckIn: (dateISO: string) => void;
+  onUpdateUser: (updater: UserData | ((prev: UserData) => UserData)) => void;
 };
 
 function startOfMonth(d: Date) {
@@ -87,27 +91,58 @@ function SexMark({ size = 10 }: { size?: number }) {
 
 function getCycleStarts(entriesSorted: any[]): string[] {
   const starts: string[] = [];
-  let prevHadFlow = false;
+
+  // We want to avoid treating a single day of very light / breakthrough spotting as a new cycle.
+  // Heuristic:
+  // - A clear bleed (flow >= 3 on a 0–10 scale) after no flow counts as a new cycle start
+  // - Spotting (flow 1–2) only counts if there are 2 consecutive spotting days
+  // - Manual override (cycleStartOverride) always counts as a new cycle start
+  let prevFlow = 0;
+  let spottingStreak = 0;
+  let spottingStreakStartISO: string | null = null;
 
   for (const e of entriesSorted) {
     const flowVal = e?.values?.flow;
-    const hasFlow = typeof flowVal === 'number' && flowVal > 0;
+    const flow = typeof flowVal === 'number' ? flowVal : 0;
     const override = Boolean((e as any)?.cycleStartOverride);
 
     if (override) {
       starts.push(e.dateISO);
-      prevHadFlow = hasFlow;
+      // Keep state moving in case the user also logged flow the same day.
+      prevFlow = flow;
+      spottingStreak = 0;
+      spottingStreakStartISO = null;
       continue;
     }
 
-    if (hasFlow && !prevHadFlow) {
+    const isBleed = flow >= 3;
+    const isSpotting = flow > 0 && flow < 3;
+
+    if (isBleed && prevFlow === 0) {
       starts.push(e.dateISO);
+      spottingStreak = 0;
+      spottingStreakStartISO = null;
+    } else if (isSpotting) {
+      if (spottingStreak === 0) spottingStreakStartISO = e.dateISO;
+      spottingStreak += 1;
+
+      // Only promote spotting to a cycle start if we see two consecutive spotting days and we were previously at zero.
+      if (prevFlow === 0 && spottingStreak >= 2 && spottingStreakStartISO) {
+        starts.push(spottingStreakStartISO);
+        // prevent repeated pushes on longer streaks
+        spottingStreak = 2;
+      }
+    } else {
+      spottingStreak = 0;
+      spottingStreakStartISO = null;
     }
-    prevHadFlow = hasFlow;
+
+    prevFlow = flow;
   }
 
   return Array.from(new Set(starts)).sort((a, b) => a.localeCompare(b));
 }
+
 
 function getOverlayValue(entry: any, key: SymptomKey | 'mood'): number | null {
   if (!entry) return null;
@@ -147,8 +182,8 @@ function overlayLabel(key: SymptomKey | 'mood'): string {
   return map[key] ?? String(key);
 }
 
-export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
-  const { entries } = useEntries();
+export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser }: Props) {
+  const { entries, upsertEntry } = useEntries();
   const entriesSorted = useMemo(() => sortByDateAsc(entries as any[]), [entries]);
 
   const cycleStats = useMemo(() => computeCycleStats(entriesSorted as any), [entriesSorted]);
@@ -157,6 +192,10 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
   const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
   type OverlayKey = SymptomKey | 'mood';
   const [overlayKey, setOverlayKey] = useState<OverlayKey>('stress');
+
+  const [editMode, setEditMode] = useState(false);
+  const [editISO, setEditISO] = useState<string | null>(null);
+
 
   const monthStart = startOfMonth(monthCursor);
   const monthEnd = endOfMonth(monthCursor);
@@ -185,37 +224,82 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
   const fertilityEnabled = Boolean(userData.fertilityMode) && cycleEnabled;
 
+  const ovulationSet = useMemo(() => {
+    const list = Array.isArray((userData as any).ovulationOverrideISOs)
+      ? ((userData as any).ovulationOverrideISOs as string[])
+      : [];
+    return new Set(list);
+  }, [userData]);
+
   const cycleStarts = useMemo(() => (cycleEnabled ? getCycleStarts(entriesSorted as any[]) : []), [cycleEnabled, entriesSorted]);
 
   // Build period + fertile windows
   const periodSet = useMemo(() => {
     const s = new Set<string>();
     if (!cycleEnabled) return s;
-    for (const startISO of cycleStarts) {
-      for (let i = 0; i < 7; i++) s.add(addDaysISO(startISO, i));
+
+    // Period shading should reflect *actual* logged bleeding/spotting days (flow > 0).
+    // This avoids a fixed "7-day window" that can feel wrong when users have shorter/longer bleeds,
+    // or when they only log spotting.
+    for (const e of entriesSorted as any[]) {
+      const flowVal = (e as any)?.values?.flow;
+      const flow = typeof flowVal === 'number' ? flowVal : 0;
+      if (flow > 0) s.add(e.dateISO);
     }
+
     return s;
-  }, [cycleEnabled, cycleStarts]);
+  }, [cycleEnabled, entriesSorted]);
 
   const fertileSet = useMemo(() => {
     const s = new Set<string>();
     if (!fertilityEnabled) return s;
 
+    // If the user has marked ovulation days manually, derive the fertile window from those.
+    // This takes precedence over predictions.
+    if (ovulationSet.size > 0) {
+      for (const ovISO of Array.from(ovulationSet)) {
+        // Fertile window: ovulation -5 through ovulation +1
+        for (let d = -5; d <= 1; d++) {
+          const dayISO = addDaysISO(ovISO, d);
+          if (periodSet.has(dayISO)) continue;
+          s.add(dayISO);
+        }
+      }
+      return s;
+    }
+
+    // If we don't yet have enough data to calculate an average cycle length,
+    // fall back to a sensible default so Fertility mode still shows *something*.
+    const DEFAULT_CYCLE_LEN = 28;
+
     for (let i = 0; i < cycleStarts.length; i++) {
       const startISO = cycleStarts[i];
-      const nextStartISO = cycleStarts[i + 1] ?? (avgLen ? addDaysISO(startISO, avgLen) : null);
-      if (!nextStartISO) continue;
 
-      // Ovulation ~ 14 days before next cycle start
-      const ovulationISO = addDaysISO(nextStartISO, -14);
+      const nextStartISO =
+        cycleStarts[i + 1] ?? addDaysISO(startISO, avgLen ?? DEFAULT_CYCLE_LEN);
+
+      const cycleLen = daysBetweenISO(startISO, nextStartISO);
+
+      // Ovulation estimate:
+      // Use the "nextStart - 14 days" idea, but guard against very short cycles where that
+      // would land during the period window and confuse the UI.
+      // We clamp to at least day 10, and at least 10 days before next start.
+      const latestAllowed = Math.max(10, cycleLen - 10);
+      const ovulationDay = clamp(cycleLen - 14, 10, latestAllowed);
+      const ovulationISO = addDaysISO(startISO, ovulationDay);
 
       // Fertile window: ovulation -5 through ovulation +1
       for (let d = -5; d <= 1; d++) {
-        s.add(addDaysISO(ovulationISO, d));
+        const dayISO = addDaysISO(ovulationISO, d);
+
+        // Never mark fertile days that are within the period window (keeps colours unambiguous).
+        if (periodSet.has(dayISO)) continue;
+
+        s.add(dayISO);
       }
     }
     return s;
-  }, [fertilityEnabled, cycleStarts, avgLen]);
+  }, [fertilityEnabled, cycleStarts, avgLen, periodSet, ovulationSet]);
 
   const showLegend = cycleEnabled || fertilityEnabled;
 
@@ -292,7 +376,13 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
               <button
                 key={iso}
                 type="button"
-                onClick={() => onOpenCheckIn(iso)}
+                onClick={() => {
+                  if (editMode) {
+                    setEditISO(iso);
+                    return;
+                  }
+                  onOpenCheckIn(iso);
+                }}
                 className={`relative rounded-2xl border text-left p-2 min-h-[54px] transition shadow-sm active:scale-[0.99] ${
                   inMonth ? 'bg-white border-[rgba(0,0,0,0.08)] hover:shadow-md hover:-translate-y-[1px]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.04)]'
                 } ${isToday ? 'ring-2 ring-[rgb(var(--color-primary)/0.45)] border-[rgb(var(--color-primary)/0.35)]' : ''} ${isFertile ? 'eb-fertile' : ''}`}
@@ -339,9 +429,11 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
                   />
                 )}
 
-                {/* tiny hint label if cycle start override */}
-                {entry?.cycleStartOverride && (
-                  <div className="absolute left-3 bottom-6 text-[10px] text-[rgb(var(--color-text-secondary))]">Start</div>
+                {/* Cycle start is editable, but we intentionally do not show a "Start" pill on tiles.
+                   It caused visual collisions and lowered trust when heuristics shifted. */}
+
+                {fertilityEnabled && ovulationSet.has(iso) && (
+                  <div className="absolute right-2 bottom-6 text-[10px] px-1.5 py-0.5 rounded-md bg-[rgb(var(--color-accent)/0.14)] border border-[rgb(var(--color-accent)/0.55)] text-[rgb(var(--color-primary-dark))]">Ov</div>
                 )}
               </button>
             );
@@ -349,7 +441,125 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
         </div>
 
         
-        {showLegend && (
+        <Sheet open={Boolean(editISO)} onOpenChange={(open) => { if (!open) setEditISO(null); }}>
+  <SheetContent side="bottom" className="bg-transparent border-0 p-0 shadow-none">
+    {editISO && (() => {
+      const e = byISO.get(editISO);
+      const flowVal = e?.values?.flow;
+      const flow = typeof flowVal === 'number' ? flowVal : 0;
+      const isBleeding = flow > 0;
+      const isStart = Boolean(e?.cycleStartOverride);
+      const isOv = fertilityEnabled && ovulationSet.has(editISO);
+
+      const ensureEntry = () => {
+        if (e) return e;
+        const now = new Date().toISOString();
+        return {
+          id: (globalThis.crypto && 'randomUUID' in globalThis.crypto) ? (globalThis.crypto as any).randomUUID() : String(Math.random()),
+          dateISO: editISO,
+          values: {},
+          createdAt: now,
+          updatedAt: now,
+        };
+      };
+
+      const saveEntry = (next: any) => {
+        const now = new Date().toISOString();
+        upsertEntry({ ...next, updatedAt: now });
+      };
+
+      const setFlow = (v: number) => {
+        const base = ensureEntry();
+        const next = { ...base, values: { ...(base.values ?? {}), flow: v } };
+        saveEntry(next);
+      };
+
+      const toggleStart = (v: boolean) => {
+        const base = ensureEntry();
+        const now = new Date().toISOString();
+
+        // Cycle start should be an explicit, single marker.
+        // If we set a start on this day, clear any other manual starts to avoid duplicates.
+        if (v) {
+          for (const existing of entriesSorted as any[]) {
+            if (existing?.cycleStartOverride && existing.dateISO !== editISO) {
+              upsertEntry({ ...existing, cycleStartOverride: false, updatedAt: now });
+            }
+          }
+        }
+
+        const next = { ...base, cycleStartOverride: v, updatedAt: now };
+        upsertEntry(next);
+      };
+
+      const toggleOvulation = (v: boolean) => {
+        onUpdateUser((prev) => {
+          const list = Array.isArray((prev as any).ovulationOverrideISOs) ? ([...(prev as any).ovulationOverrideISOs] as string[]) : [];
+          const set = new Set(list);
+          if (v) set.add(editISO);
+          else set.delete(editISO);
+          return { ...(prev as any), ovulationOverrideISOs: Array.from(set).sort((a, b) => a.localeCompare(b)) };
+        });
+      };
+
+      return (
+        <div className="px-4 pb-6">
+          <div className="mx-auto w-full max-w-lg eb-card p-4">
+<div className="mb-3 flex items-start justify-between gap-4">
+  <div>
+    <div className="text-base font-semibold">Edit this day</div>
+    <div className="text-sm text-[rgb(var(--color-text-secondary))]">{editISO ?? ''}</div>
+  </div>
+  <button
+    type="button"
+    className="eb-icon-btn"
+    onClick={() => setEditISO(null)}
+    aria-label="Close"
+    title="Close"
+  >
+    <X className="w-5 h-5" />
+  </button>
+</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              className="eb-btn-secondary flex items-center gap-2 justify-center"
+              onClick={() => { setFlow(isBleeding ? 0 : 5); setEditISO(null); }}
+            >
+              {isBleeding ? <Droplets className="w-4 h-4" /> : <Droplet className="w-4 h-4" />}
+              <span>{isBleeding ? 'Remove bleeding' : 'Mark as bleeding'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="eb-btn-secondary flex items-center gap-2 justify-center"
+              onClick={() => { toggleStart(!isStart); setEditISO(null); }}
+            >
+              <span className="font-semibold">1</span>
+              <span>{isStart ? 'Remove cycle start' : 'Set as cycle start'}</span>
+            </button>
+
+            {fertilityEnabled && (
+              <button
+                type="button"
+                className="eb-btn-secondary flex items-center gap-2 justify-center sm:col-span-2"
+                onClick={() => { toggleOvulation(!isOv); setEditISO(null); }}
+              >
+                <Egg className="w-4 h-4" />
+                <span>{isOv ? 'Remove ovulation' : 'Mark as ovulation'}</span>
+              </button>
+            )}
+          </div>
+
+          <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
+            These edits update your cycle overlay. Your symptom logging stays the source of truth.
+          </div>
+          </div>
+        </div>
+      );
+    })()}
+  </SheetContent>
+</Sheet>{showLegend && (
           <>
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[rgb(var(--color-text-secondary))]">
               {cycleEnabled && (
@@ -367,9 +577,9 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
                   <span
                     className="w-4 h-3 rounded-md"
                     style={{
-                      background: 'rgb(255 255 255 / 0.85)',
-                      boxShadow: 'inset 0 0 0 2px rgb(var(--color-primary) / 0.18)',
-                      border: '1px solid rgba(0,0,0,0.05)',
+                      background: 'rgb(var(--color-accent) / 0.14)',
+                      border: '2px solid rgb(var(--color-accent) / 0.45)',
+                      boxShadow: 'inset 0 0 0 1px rgb(var(--color-accent) / 0.08)',
                     }}
                   />
                   <span>Fertile window</span>
@@ -404,7 +614,22 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
                 </span>
                 <span>Overlay intensity</span>
               </div>
-            </div>
+            
+{editMode && (
+  <div className="mt-3 eb-callout">
+    <div className="flex items-start gap-2">
+      <PencilLine className="w-4 h-4 mt-0.5 text-[rgb(var(--color-primary-dark))]" />
+      <div className="text-sm">
+        <div className="font-medium">Cycle edit mode</div>
+        <div className="text-[rgb(var(--color-text-secondary))]">
+          Tap a day to adjust bleeding, cycle start, or ovulation. Tap Edit cycle again to return to normal.
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+</div>
 
             <div className="mt-4 text-sm text-[rgb(var(--color-text-secondary))]">
               Tip: switch overlay to{' '}
@@ -413,6 +638,24 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn }: Props) {
             </div>
           </>
         )}
+
+{/* Cycle edit toggle (sticky within page-inner so it aligns with the calendar grid, not the viewport edge) */}
+<div className="sticky bottom-6 mt-6 flex justify-end pointer-events-none">
+  <button
+    type="button"
+    className={cn(
+      "pointer-events-auto eb-btn-secondary !h-12 !px-4 !py-0 flex items-center gap-2 shadow-lg",
+      editMode && "border-[rgb(var(--color-primary)/0.55)] bg-[rgb(var(--color-primary)/0.10)]"
+    )}
+    onClick={() => setEditMode((v) => !v)}
+    aria-pressed={editMode}
+    title={editMode ? "Exit cycle edit mode" : "Edit cycle on calendar"}
+  >
+    <PencilLine className="w-4 h-4" />
+    <span className="text-sm">{editMode ? "Editing" : "Edit cycle"}</span>
+  </button>
+</div>
+
 
       </div>
     </div>
