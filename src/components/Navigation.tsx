@@ -47,11 +47,9 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
       <nav className="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-[rgb(var(--color-surface))] border-r border-[rgb(228_228_231_/_0.7)] z-50">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-8">
-            <img
-              src={appLogo}
-              alt="EveryBody"
-              className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-surface))]"
-            />
+            <div className="eb-appicon w-10 h-10 p-1">
+              <img src={appLogo} alt="EveryBody" className="w-full h-full" />
+            </div>
             <h2 className="eb-title">EveryBody</h2>
           </div>
           <div className="space-y-2">

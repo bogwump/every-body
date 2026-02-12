@@ -98,3 +98,23 @@ p {
     font-size: 1.25rem;
   }
 }
+
+
+/* App icon background (used behind the transparent logo mark) */
+.eb-appicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.5rem; /* 24px */
+  background:
+    radial-gradient(circle at 25% 20%, rgba(var(--color-accent) / 0.35), transparent 55%),
+    radial-gradient(circle at 70% 80%, rgba(var(--color-primary-light) / 0.35), transparent 55%),
+    linear-gradient(135deg, rgba(255 255 255 / 0.9), rgba(var(--color-background) / 1));
+  box-shadow:
+    0 10px 24px rgba(0 0 0 / 0.10),
+    0 2px 6px rgba(0 0 0 / 0.06);
+}
+
+.eb-appicon img {
+  display: block;
+}

@@ -146,8 +146,18 @@ function Slider10({
   rightLabel?: string;
 }) {
   const v = clamp(value, 0, 10);
+  const pct = (v / 10) * 100;
+  // Nudge keeps the value pill visually centred near the ends (0/10)
+  const nudgePx = (50 - pct) * 0.12;
   return (
-    <div>
+    <div className="relative pt-5">
+      <div
+        className="absolute -top-0.5 text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--color-surface))] shadow-sm border border-[rgb(228_228_231_/_0.6)] text-[rgb(var(--color-text))]"
+        style={{ left: `calc(${pct}% + ${nudgePx}px)`, transform: 'translateX(-50%)' }}
+        aria-hidden="true"
+      >
+        {v}
+      </div>
       <input
         type="range"
         min={0}
@@ -229,19 +239,14 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   const [values, setValues] = useState<Partial<Record<SymptomKey, number>>>({});
   const [customValues, setCustomValues] = useState<Record<string, number>>({});
 
-
-  // Quick log (under mood)
-  const [markNewCycle, setMarkNewCycle] = useState(false);
-
-
   // When bleeding starts, ask whether this is a new period or just spotting/breakthrough.
   const [periodPromptOpen, setPeriodPromptOpen] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<CheckInEntry | null>(null);
-  const [markBleedingStarted, setMarkBleedingStarted] = useState(false);
-  const [markSex, setMarkSex] = useState(false);
+  // Behavioural influences (kept discreet, but not hidden)
+  const [influencesOpen, setInfluencesOpen] = useState(false);
+  const [eventsState, setEventsState] = useState<Record<string, boolean>>({});
 
   const isCycleEnabled = userData.cycleTrackingMode === 'cycle';
-  const isFertilityEnabled = Boolean(userData.fertilityMode) && isCycleEnabled;
 
   // Initialise when date changes or entry loaded
   useEffect(() => {
@@ -266,9 +271,9 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       }
       setCustomValues({ ...((existingEntry as any)?.customValues ?? {}), ...nextCustom });
 
-      setMarkNewCycle(Boolean((existingEntry as any).cycleStartOverride));
-      setMarkBleedingStarted(Boolean((existingEntry as any)?.values?.flow && normalise10((existingEntry as any).values.flow) > 0));
-      setMarkSex(Boolean((existingEntry as any)?.events?.sex));
+      const ev = { ...((existingEntry as any)?.events ?? {}) } as Record<string, boolean>;
+      setEventsState(ev);
+      setInfluencesOpen(Object.values(ev).some(Boolean));
       return;
     }
 
@@ -290,9 +295,9 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     }
     setCustomValues(customDefaults);
 
-    setMarkNewCycle(false);
-    setMarkBleedingStarted(false);
-    setMarkSex(false);
+
+    setEventsState({});
+    setInfluencesOpen(false);
   }, [existingEntry, userData.enabledModules, userData.customSymptoms, activeDateISO]);
 
   const enabledSliders = useMemo(() => {
@@ -367,15 +372,12 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       nextValues[k] = v;
     }
 
-    if (isCycleEnabled) {
-      // If user marks bleeding started, ensure a non-zero flow exists.
-      if (markBleedingStarted && (!nextValues.flow || normalise10(nextValues.flow) <= 0)) nextValues.flow = 6;
-      // If user unchecks bleeding started, do NOT wipe their flow slider value.
-    } else {
-      // If cycle features off, still allow flow if they enabled it. Otherwise keep whatever is there.
-    }
+    const nextEvents: any = {};
 
-    const nextEvents: any = { ...((existingEntry as any)?.events ?? {}) };
+    // Behavioural influences (events)
+    for (const [k, v] of Object.entries(eventsState)) {
+      if (v) nextEvents[k] = true;
+    }
 
     // Custom symptom values (0–10)
     const nextCustomValues: Record<string, number> = { ...((existingEntry as any)?.customValues ?? {}), ...(customValues ?? {}) };
@@ -385,12 +387,6 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       nextCustomValues[s.id] = v;
     }
 
-    if (isFertilityEnabled) {
-      if (markSex) nextEvents.sex = true;
-      else delete nextEvents.sex;
-    } else {
-      delete nextEvents.sex;
-    }
 
     const next: CheckInEntry = {
       id: existingEntry?.id ?? `${Date.now()}`,
@@ -400,7 +396,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       values: nextValues,
       customValues: Object.keys(nextCustomValues).length ? nextCustomValues : undefined,
       events: Object.keys(nextEvents).length ? nextEvents : undefined,
-      cycleStartOverride: isCycleEnabled && markNewCycle ? true : undefined,
+      cycleStartOverride: (existingEntry as any)?.cycleStartOverride ?? undefined,
       createdAt: existingEntry?.createdAt ?? now,
       updatedAt: now,
     };
@@ -444,10 +440,13 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
   return (
     <div className="eb-page">
-      <Dialog open={periodPromptOpen} onOpenChange={(open) => {
-        setPeriodPromptOpen(open);
-        if (!open) setPendingEntry(null);
-      }}>
+      <Dialog
+        open={periodPromptOpen}
+        onOpenChange={(open) => {
+          setPeriodPromptOpen(open);
+          if (!open) setPendingEntry(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Is this the start of a new period?</DialogTitle>
@@ -614,42 +613,6 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
             </div>
           </div>
 
-          {/* Quick log under mood */}
-
-          {isCycleEnabled && (
-            <details className="mt-6 group">
-              <summary className="cursor-pointer list-none select-none">
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-[rgba(255,255,255,0.25)] bg-white/10 px-4 py-3">
-                  <div className="text-sm font-semibold text-white">Quick log</div>
-                  <ChevronRight className="w-5 h-5 text-white/80 transition-transform group-open:rotate-90" />
-                </div>
-              </summary>
-              <div className="grid grid-cols-1 gap-3 mt-3">
-                <SwitchRow
-                  checked={markNewCycle}
-                  onChange={setMarkNewCycle}
-                  label="New cycle started"
-                  hint="Use this if bleeding is unclear, or you just want to mark Day 1 manually."
-                />
-                <SwitchRow
-                  checked={markBleedingStarted}
-                  onChange={setMarkBleedingStarted}
-                  label="Bleeding / spotting started"
-                  hint="Helps the calendar show a 7-day window."
-                />
-                {isFertilityEnabled && (
-                  <SwitchRow
-                    checked={markSex}
-                    onChange={setMarkSex}
-                    label="Sex"
-                    hint="Logged privately. Used for fertility insights if you want them."
-                  />
-                )}
-              </div>
-            </details>
-          )}
-        </div>
-
         {/* Sliders */}
         <div className="eb-card mb-6">
           <div className="flex items-center justify-between gap-3 mb-1">
@@ -748,6 +711,54 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
               </div>
             </div>
           )}
+
+
+
+        {/* Other influences */}
+        <div className="eb-card mb-6">
+          <button
+            type="button"
+            onClick={() => setInfluencesOpen((v) => !v)}
+            className="w-full flex items-center justify-between gap-3 rounded-2xl border border-[rgba(0,0,0,0.06)] bg-white px-4 py-3"
+          >
+            <div className="text-sm font-semibold text-[rgb(var(--color-text))]">Other influences</div>
+            <ChevronRight
+              className={`w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform ${influencesOpen ? 'rotate-90' : ''}`}
+            />
+          </button>
+
+          {influencesOpen && (
+            <div className="grid grid-cols-1 gap-3 mt-3">
+              {[
+                {
+                  key: 'sex',
+                  label: 'Intimacy',
+                  hint: 'Logged privately. Helps spot patterns with mood, confidence, bleeding and more.',
+                },
+                { key: 'exercise', label: 'Workout', hint: 'Any workout or brisk activity.' },
+                { key: 'travel', label: 'Travel', hint: 'Travel, long drives, or time zone changes.' },
+                { key: 'illness', label: 'Illness', hint: 'Cold, flu, infection, or feeling unwell.' },
+                { key: 'alcohol', label: 'Alcohol', hint: 'More than your usual.' },
+                { key: 'lateNight', label: 'Late night', hint: 'Later bedtime or disrupted routine.' },
+                { key: 'stressfulDay', label: 'Stressful day', hint: 'High stress or emotional strain.' },
+                { key: 'medication', label: 'Medication', hint: 'Any medication today (yes/no). Useful for pattern spotting.' },
+              ].map((item) => (
+                <SwitchRow
+                  key={item.key}
+                  checked={Boolean(eventsState[item.key])}
+                  onChange={(checked) =>
+                    setEventsState((prev) => ({
+                      ...prev,
+                      [item.key]: checked,
+                    }))
+                  }
+                  label={item.label}
+                  hint={item.hint}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
 
         {/* Notes */}
@@ -850,6 +861,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 }

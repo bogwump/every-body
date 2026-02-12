@@ -69,20 +69,50 @@ function bandColorCSS(band: 0 | 1 | 2): string {
 }
 
 
-function SexMark({ size = 10 }: { size?: number }) {
+function influenceLabel(key: string): string | null {
+  switch (key) {
+    case 'sex':
+      return 'Intimacy';
+    case 'exercise':
+      return 'Workout';
+    case 'travel':
+      return 'Travel';
+    case 'illness':
+      return 'Illness';
+    case 'alcohol':
+      return 'Alcohol';
+    case 'lateNight':
+      return 'Late night';
+    case 'stressfulDay':
+      return 'Stressful day';
+    case 'medication':
+      return 'Medication';
+    default:
+      return null;
+  }
+}
+
+function influencesFromEntry(entry: any): string[] {
+  const ev = (entry?.events ?? {}) as Record<string, any>;
+  const labels: string[] = [];
+  for (const [k, v] of Object.entries(ev)) {
+    if (!v) continue;
+    const lab = influenceLabel(k);
+    if (lab) labels.push(lab);
+  }
+  return labels;
+}
+
+function InfluenceMark({ size = 10, title }: { size?: number; title: string }) {
   return (
-    <span
-      className="inline-flex items-center justify-center"
-      aria-label="Sex logged"
-      title="Sex logged"
-    >
+    <span className="inline-flex items-center justify-center" aria-label={title} title={title}>
       <span
         className="rounded-full"
         style={{
           width: size,
           height: size,
           background: 'rgb(var(--color-primary-dark) / 0.55)',
-          boxShadow: '0 0 0 2px rgb(255 255 255 / 0.85)',
+          boxShadow: '0 0 0 2px rgb(var(--color-surface))',
         }}
       />
     </span>
@@ -205,6 +235,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
 
   const [editMode, setEditMode] = useState(false);
   const [editISO, setEditISO] = useState<string | null>(null);
+  const [influenceTipISO, setInfluenceTipISO] = useState<string | null>(null);
 
 
   const monthStart = startOfMonth(monthCursor);
@@ -421,7 +452,8 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
               barOpacity = clamp(barOpacity, 0.12, 0.55);
             }
 
-            const hasSex = Boolean(entry?.events?.sex);
+            const influences = influencesFromEntry(entry);
+            const hasInfluences = influences.length > 0;
             const hasNote = typeof entry?.notes === 'string' && entry.notes.trim().length > 0;
 
             return (
@@ -448,9 +480,26 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
                   <div className={`text-sm font-medium ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
 
                                     <div className="relative w-[22px] h-[14px] flex items-center justify-end">
-                    {hasSex && fertilityEnabled && (
+                    {hasInfluences && (
+
                       <span className="absolute top-0 right-0">
-                        <SexMark size={9} />
+                        <span
+                          onMouseEnter={() => setInfluenceTipISO(iso)}
+                          onMouseLeave={() => setInfluenceTipISO((cur) => (cur === iso ? null : cur))}
+                          onTouchStart={() => {
+                            setInfluenceTipISO(iso);
+                            window.setTimeout(() => {
+                              setInfluenceTipISO((cur) => (cur === iso ? null : cur));
+                            }, 1600);
+                          }}
+                        >
+                          <InfluenceMark size={9} title={influences.join(', ')} />
+                        </span>
+                        {influenceTipISO === iso && (
+                          <div className="absolute z-30 top-0 right-4 -translate-y-full mt-[-6px] px-2 py-1 rounded-md text-[11px] bg-white text-black shadow border border-[rgba(0,0,0,0.08)]">
+                            {influences.join(', ')}
+                          </div>
+                        )}
                       </span>
                     )}
                     {hasNote && (
@@ -640,14 +689,6 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
                   <span>Fertile window</span>
                 </div>
               )}
-
-              {fertilityEnabled && (
-                <div className="flex items-center gap-2">
-                  <SexMark size={10} />
-                  <span>Sex logged</span>
-                </div>
-              )}
-
               <div className="flex items-center gap-2">
                 <span
                   className="inline-block w-[6px] h-[6px] rounded-full"

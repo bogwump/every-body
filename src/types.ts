@@ -101,8 +101,22 @@ export interface CheckInEntry {
 
   /** Optional non-symptom events (kept separate from symptom modules) */
   events?: {
-    /** Sex logged for the day (only shown when Fertility mode is enabled) */
+    /** Intimacy logged for the day (kept private) */
     sex?: boolean;
+    /** Exercise (any workout or brisk activity) */
+    exercise?: boolean;
+    /** Travel or major routine change */
+    travel?: boolean;
+    /** Illness (cold/flu/infection/feeling unwell) */
+    illness?: boolean;
+    /** Alcohol (more than usual) */
+    alcohol?: boolean;
+    /** Late night or disrupted sleep routine */
+    lateNight?: boolean;
+    /** Stressful day */
+    stressfulDay?: boolean;
+    /** Medication taken (yes/no influence) */
+    medication?: boolean;
   };
   createdAt: string; // ISO
   updatedAt: string; // ISO
