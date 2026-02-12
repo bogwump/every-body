@@ -265,13 +265,13 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
       items: [
         { icon: User, label: 'Personal Information', onClick: () => openPersonal() },
         { icon: Lock, label: 'Privacy & Security', onClick: () => setShowPrivacyPanel(!showPrivacyPanel) },
+        { icon: Bell, label: 'Notifications', onClick: () => setShowNotificationsPanel(!showNotificationsPanel) },
       ],
     },
     {
       title: 'Preferences',
       items: [
         { icon: Palette, label: 'Theme', onClick: () => setShowThemeSelector(!showThemeSelector) },
-        { icon: Bell, label: 'Notifications', onClick: () => setShowNotificationsPanel(!showNotificationsPanel) },
       ],
     },
     {
@@ -561,223 +561,8 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
           </div>
         </div>
 
-        {/* Cloud sync (optional) */}
-        <div className="eb-card mb-6">
-          <h3 className="mb-2">Cloud sync (optional)</h3>
-          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
-            Local-first by default. Turn this on only if you want backup and cross-device syncing. (Beta)
-          </p>
-
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium mb-1">Enable cloud sync</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {(() => {
-                  const st = cloudStatus(userData);
-                  if (st.kind === 'off') return 'Off';
-                  if (st.kind === 'not_configured') return 'Needs Supabase keys in your .env';
-                  return 'Ready (sign in to link your data)';
-                })()}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onUpdateUserData((prev) => ({
-                  ...prev,
-                  cloudSyncEnabled: !prev.cloudSyncEnabled,
-                  cloudProvider: 'supabase',
-                }))
-              }
-              className={`w-12 h-6 rounded-full transition-all ${
-                userData.cloudSyncEnabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-              }`}
-            >
-              <div
-                className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                  userData.cloudSyncEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-
-          {userData.cloudSyncEnabled && (
-            <div className="mt-4 space-y-3">
-              {cloudStatus(userData).kind === 'not_configured' ? (
-                <div className="rounded-xl border border-[rgba(0,0,0,0.08)] p-4 bg-neutral-50 text-sm text-[rgb(var(--color-text-secondary))]">
-                  Add <span className="font-medium">VITE_SUPABASE_URL</span> and <span className="font-medium">VITE_SUPABASE_ANON_KEY</span> to your{' '}
-                  <span className="font-medium">.env</span>, then restart the dev server.
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      className="eb-input"
-                      placeholder="Email for magic link sign-in"
-                      value={cloudEmail}
-                      onChange={(e) => setCloudEmail(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="eb-btn-secondary"
-                      disabled={cloudBusy}
-                      onClick={async () => {
-                        try {
-                          setCloudBusy(true);
-                          setCloudMessage('');
-                          await cloudSignInEmail(cloudEmail);
-                          setCloudMessage('Magic link sent. Open your email on this device and click the link, then come back here.');
-                        } catch (err: any) {
-                          setCloudMessage(err?.message || 'Could not start sign-in');
-                        } finally {
-                          setCloudBusy(false);
-                        }
-                      }}
-                    >
-                      Send magic link
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="eb-btn-secondary"
-                      disabled={cloudBusy}
-                      onClick={async () => {
-                        try {
-                          setCloudBusy(true);
-                          setCloudMessage('');
-                          await cloudPush(userData);
-                          setCloudMessage('Uploaded your current data to cloud.');
-                        } catch (err: any) {
-                          setCloudMessage(err?.message || 'Sync failed');
-                        } finally {
-                          setCloudBusy(false);
-                        }
-                      }}
-                    >
-                      Upload now
-                    </button>
-
-                    <button
-                      type="button"
-                      className="eb-btn-secondary"
-                      disabled={cloudBusy}
-                      onClick={async () => {
-                        try {
-                          setCloudBusy(true);
-                          setCloudMessage('');
-                          const changed = await cloudPullAndApply(userData);
-                          setCloudMessage(
-                            changed ? 'Downloaded cloud data to this device. Refreshing now...' : 'No cloud snapshot found yet.'
-                          );
-                          if (changed) window.location.reload();
-                        } catch (err: any) {
-                          setCloudMessage(err?.message || 'Sync failed');
-                        } finally {
-                          setCloudBusy(false);
-                        }
-                      }}
-                    >
-                      Download now
-                    </button>
-
-                    <button
-                      type="button"
-                      className="eb-btn-secondary"
-                      disabled={cloudBusy}
-                      onClick={async () => {
-                        try {
-                          setCloudBusy(true);
-                          setCloudMessage('');
-                          await cloudSignOut();
-                          setCloudMessage('Signed out.');
-                        } catch (err: any) {
-                          setCloudMessage(err?.message || 'Sign out failed');
-                        } finally {
-                          setCloudBusy(false);
-                        }
-                      }}
-                    >
-                      Sign out
-                    </button>
-                  </div>
-
-                  {cloudMessage && <div className="text-sm text-[rgb(var(--color-text-secondary))]">{cloudMessage}</div>}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Eve testing */}
-        <div className="eb-card mb-6">
-          <h3 className="mb-2">Eve</h3>
-          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">Settings for testing and cost control.</p>
-
-          <div className="flex items-center justify-between py-3 border-t border-[rgb(var(--color-border))]">
-            <div>
-              <p className="font-medium mb-1">Mock Eve (testing)</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {userData.useMockEve ? 'On (no API calls, free to test)' : 'Off (uses OpenAI API)'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onUpdateUserData((prev) => ({ ...prev, useMockEve: !prev.useMockEve }))}
-              className="px-3 py-2 rounded-xl border border-[rgb(var(--color-border))] text-sm"
-            >
-              {userData.useMockEve ? 'Turn off' : 'Turn on'}
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between py-3 border-t border-[rgb(var(--color-border))]">
-            <div>
-              <p className="font-medium mb-1">Low-cost mode</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {userData.eveLowCostMode ? 'On (shorter context, shorter replies)' : 'Off'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onUpdateUserData((prev) => ({ ...prev, eveLowCostMode: !prev.eveLowCostMode }))}
-              className="px-3 py-2 rounded-xl border border-[rgb(var(--color-border))] text-sm"
-            >
-              {userData.eveLowCostMode ? 'Turn off' : 'Turn on'}
-            </button>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between">
-            <div>
-              <p className="font-medium mb-1">Auto-start periods from bleeding</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {autoStartPeriodFromBleedingLabel}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onUpdateUserData((prev) => ({
-                  ...prev,
-                  autoStartPeriodFromBleeding: !prev.autoStartPeriodFromBleeding,
-                }))
-              }
-              className={`w-12 h-6 rounded-full transition-all ${
-                autoStartPeriodFromBleeding ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-              }`}
-            >
-              <div
-                className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                  autoStartPeriodFromBleeding ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* What to track */}
+        
+{/* What to track */}
                 <div className="eb-card mb-6">
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="min-w-0">
@@ -1190,8 +975,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                             <p className="text-sm font-medium mb-1">Coming soon</p>
                             <ul className="text-sm text-[rgb(var(--color-text-secondary))] list-disc pl-5 space-y-1">
                               <li>Passcode / Face ID lock</li>
-                              <li>Cloud account sign-in and sync</li>
-                              <li>Delete my data (with confirmation)</li>
+                                                            <li>Delete my data (with confirmation)</li>
                             </ul>
                           </div>
                         </div>
@@ -1308,7 +1092,157 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                             <p><span className="font-medium text-[rgb(var(--color-text-primary))]">Something broken?</span> This is a work-in-progress build. We can add a “Report a bug” flow once hosted.</p>
                           </div>
 
-                          <div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
+                          
+                          <div className="mt-4 rounded-2xl border border-neutral-200 p-4 bg-white">
+                            <p className="font-medium mb-1">Cloud sync (optional)</p>
+                            <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
+                              Local-first by default. Enable this only if you want backup and cross-device syncing. (Beta)
+                            </p>
+
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="font-medium mb-1">Enable cloud sync</p>
+                                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                                  {(() => {
+                                    const st = cloudStatus(userData);
+                                    if (st.kind === 'off') return 'Off';
+                                    if (st.kind === 'not_configured') return 'Needs Supabase keys in your .env';
+                                    return 'Ready (sign in to link your data)';
+                                  })()}
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onUpdateUserData((prev) => ({
+                                    ...prev,
+                                    cloudSyncEnabled: !prev.cloudSyncEnabled,
+                                    cloudProvider: 'supabase',
+                                  }))
+                                }
+                                className={`w-12 h-6 rounded-full transition-all ${
+                                  userData.cloudSyncEnabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                                }`}
+                              >
+                                <div
+                                  className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                    userData.cloudSyncEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+
+                            {userData.cloudSyncEnabled && (
+                              <div className="mt-4 space-y-3">
+                                {cloudStatus(userData).kind === 'not_configured' ? (
+                                  <div className="rounded-xl border border-[rgba(0,0,0,0.08)] p-4 bg-neutral-50 text-sm text-[rgb(var(--color-text-secondary))]">
+                                    Add <span className="font-medium">VITE_SUPABASE_URL</span> and{' '}
+                                    <span className="font-medium">VITE_SUPABASE_ANON_KEY</span> to your{' '}
+                                    <span className="font-medium">.env</span>, then restart the dev server.
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                      <input
+                                        className="eb-input"
+                                        placeholder="Email for magic link sign-in"
+                                        value={cloudEmail}
+                                        onChange={(e) => setCloudEmail(e.target.value)}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="eb-btn-secondary"
+                                        disabled={cloudBusy}
+                                        onClick={async () => {
+                                          try {
+                                            setCloudBusy(true);
+                                            setCloudMessage('');
+                                            await cloudSignInEmail(cloudEmail);
+                                            setCloudMessage('Magic link sent. Open your email on this device and click the link, then come back here.');
+                                          } catch (err: any) {
+                                            setCloudMessage(err?.message || 'Could not start sign-in');
+                                          } finally {
+                                            setCloudBusy(false);
+                                          }
+                                        }}
+                                      >
+                                        Send magic link
+                                      </button>
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        className="eb-btn-secondary"
+                                        disabled={cloudBusy}
+                                        onClick={async () => {
+                                          try {
+                                            setCloudBusy(true);
+                                            setCloudMessage('');
+                                            await cloudPush(userData);
+                                            setCloudMessage('Uploaded your current data to cloud.');
+                                          } catch (err: any) {
+                                            setCloudMessage(err?.message || 'Sync failed');
+                                          } finally {
+                                            setCloudBusy(false);
+                                          }
+                                        }}
+                                      >
+                                        Upload now
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className="eb-btn-secondary"
+                                        disabled={cloudBusy}
+                                        onClick={async () => {
+                                          try {
+                                            setCloudBusy(true);
+                                            setCloudMessage('');
+                                            const next = await cloudPullAndApply(userData);
+                                            onUpdateUserData(next as any);
+                                            setCloudMessage('Downloaded latest cloud data to this device.');
+                                          } catch (err: any) {
+                                            setCloudMessage(err?.message || 'Sync failed');
+                                          } finally {
+                                            setCloudBusy(false);
+                                          }
+                                        }}
+                                      >
+                                        Download now
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className="eb-btn-secondary"
+                                        disabled={cloudBusy}
+                                        onClick={async () => {
+                                          try {
+                                            setCloudBusy(true);
+                                            setCloudMessage('');
+                                            await cloudSignOut();
+                                            setCloudMessage('Signed out.');
+                                          } catch (err: any) {
+                                            setCloudMessage(err?.message || 'Could not sign out');
+                                          } finally {
+                                            setCloudBusy(false);
+                                          }
+                                        }}
+                                      >
+                                        Sign out
+                                      </button>
+                                    </div>
+
+                                    {cloudMessage && (
+                                      <div className="text-sm text-[rgb(var(--color-text-secondary))]">{cloudMessage}</div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+<div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
                             <p className="text-sm font-medium mb-1">Coming soon</p>
                             <ul className="text-sm text-[rgb(var(--color-text-secondary))] list-disc pl-5 space-y-1">
                               <li>Searchable FAQ</li>
@@ -1396,6 +1330,47 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
         ))}
 
         {/* Testing */}
+        
+        {/* Eve testing */}
+        <div className="eb-card mb-6">
+          <h3 className="mb-2">Eve</h3>
+          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">Settings for testing and cost control.</p>
+
+          <div className="flex items-center justify-between py-3 border-t border-[rgb(var(--color-border))]">
+            <div>
+              <p className="font-medium mb-1">Mock Eve (testing)</p>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                {userData.useMockEve ? 'On (no API calls, free to test)' : 'Off (uses OpenAI API)'}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled
+              onClick={() => onUpdateUserData((prev) => ({ ...prev, useMockEve: !prev.useMockEve }))}
+              className="px-3 py-2 rounded-xl border border-[rgb(var(--color-border))] text-sm opacity-50 cursor-not-allowed"
+            >
+              {'Locked'}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between py-3 border-t border-[rgb(var(--color-border))]">
+            <div>
+              <p className="font-medium mb-1">Low-cost mode</p>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                {userData.eveLowCostMode ? 'On (shorter context, shorter replies)' : 'Off'}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled
+              onClick={() => onUpdateUserData((prev) => ({ ...prev, eveLowCostMode: !prev.eveLowCostMode }))}
+              className="px-3 py-2 rounded-xl border border-[rgb(var(--color-border))] text-sm opacity-50 cursor-not-allowed"
+            >
+              {'Locked'}
+            </button>
+          </div>
+        </div>
+
         {onPreviewOnboarding && (
           <div className="eb-card mb-6">
             <h3 className="mb-2">Testing</h3>

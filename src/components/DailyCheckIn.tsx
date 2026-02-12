@@ -273,7 +273,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
       const ev = { ...((existingEntry as any)?.events ?? {}) } as Record<string, boolean>;
       setEventsState(ev);
-      setInfluencesOpen(Object.values(ev).some(Boolean));
+      setInfluencesOpen(false);
       return;
     }
 
@@ -501,7 +501,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
         </DialogContent>
       </Dialog>
 
-      <div className="eb-page-inner max-w-3xl">
+      <div className="eb-page-inner">
         <div className="flex items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="mb-1">Daily check-in</h1>
@@ -613,8 +613,10 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
             </div>
           </div>
 
+        </div>
+
         {/* Sliders */}
-        <div className="eb-card mb-6">
+        <div className="eb-card p-6 mb-6">
           <div className="flex items-center justify-between gap-3 mb-1">
             <h3 className="mb-0">Your check-in</h3>
             {onNavigate && (
@@ -673,7 +675,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
         </div>
 
           {orderedCustom.length > 0 && (
-            <div className="mt-6">
+            <div className="mt-6 mb-6">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <h3 className="mb-1">Your custom symptoms</h3>
@@ -715,11 +717,11 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
 
         {/* Other influences */}
-        <div className="eb-card mb-6">
+        <div className="eb-card p-5 mb-6">
           <button
             type="button"
             onClick={() => setInfluencesOpen((v) => !v)}
-            className="w-full flex items-center justify-between gap-3 rounded-2xl border border-[rgba(0,0,0,0.06)] bg-white px-4 py-3"
+            className="w-full flex items-center justify-between gap-3 py-1"
           >
             <div className="text-sm font-semibold text-[rgb(var(--color-text))]">Other influences</div>
             <ChevronRight
@@ -728,7 +730,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           </button>
 
           {influencesOpen && (
-            <div className="grid grid-cols-1 gap-3 mt-3">
+            <div className="grid grid-cols-1 gap-3 mt-4">
               {[
                 {
                   key: 'sex',
@@ -852,16 +854,15 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
         </div>
 
 
-        <div className="flex items-center justify-end gap-2">
-          <button type="button" className="eb-btn-secondary" onClick={onDone}>
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <button type="button" className="eb-btn-secondary min-w-[96px]" onClick={onDone}>
             Cancel
           </button>
-          <button type="button" className="eb-btn-primary" onClick={handleSubmit}>
+          <button type="button" className="eb-btn-primary min-w-[96px]" onClick={handleSubmit}>
             Save
           </button>
         </div>
       </div>
-    </div>
     </div>
   );
 }

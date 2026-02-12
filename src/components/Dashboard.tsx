@@ -644,20 +644,17 @@ export function Dashboard({
             <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
               <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
-            <div className="min-w-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="mb-1">Tip for today</h3>
-                  <p className="text-sm font-semibold">{tip.title}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setTipOffset((v) => v + 1)}
-                  className="text-sm text-[rgb(var(--color-primary))] hover:underline shrink-0"
-                >
-                  Another tip
-                </button>
-              </div>
+            <div className="relative min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => setTipOffset((v) => v + 1)}
+                className="text-sm text-[rgb(var(--color-primary))] hover:underline absolute top-0 right-0"
+              >
+                Another tip
+              </button>
+
+              <h3 className="mb-1 pr-24">Tip for today</h3>
+              <p className="text-sm font-semibold pr-24">{tip.title}</p>
 
               <p className="text-sm text-[rgba(0,0,0,0.75)] mt-2">{tip.body}</p>
 
