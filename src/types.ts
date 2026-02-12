@@ -72,6 +72,9 @@ export interface UserData {
   /** Optional: trying to conceive mode (enables fertility features like sex log + fertile window shading) */
   fertilityMode?: boolean;
 
+  /** Optional: if enabled, starting bleeding automatically starts a new period without asking. */
+  autoStartPeriodFromBleeding?: boolean;
+
   /** Optional: which 3 metrics to show on the dashboard "week at a glance" chart */
   dashboardChartMetrics?: [DashboardMetric, DashboardMetric, DashboardMetric];
 
@@ -86,6 +89,7 @@ export interface CheckInEntry {
   dateISO: string; // YYYY-MM-DD
   /** Manually mark this day as a new cycle start (day 1) */
   cycleStartOverride?: boolean;
+  breakthroughBleed?: boolean;
   /** Mood chosen on the 3-point picker */
   mood?: 1 | 2 | 3;
   notes?: string;

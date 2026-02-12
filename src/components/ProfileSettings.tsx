@@ -16,6 +16,7 @@ import {
   Sparkles as SparklesIcon,
   Moon as MoonIcon,
   Sun as SunIcon,
+  X,
 } from 'lucide-react';
 import type { ColorTheme, SymptomKey, UserData } from '../types';
 import { downloadTextFile } from '../lib/storage';
@@ -50,7 +51,6 @@ const moduleMeta: Array<{ key: SymptomKey; label: string; description: string }>
   { key: 'stress', label: 'Stress', description: 'Mental load and tension' },
   { key: 'anxiety', label: 'Anxiety', description: 'Worry, unease, or a tight chest feeling' },
   { key: 'irritability', label: 'Irritability', description: 'Short fuse, snappy, easily overwhelmed' },
-  { key: 'focus', label: 'Clarity', description: 'Brain fog vs clear thinking' },
   { key: 'bloating', label: 'Bloating', description: 'Digestive discomfort and swelling' },
   { key: 'digestion', label: 'Digestion', description: 'How your tummy feels overall today' },
   { key: 'nausea', label: 'Nausea', description: 'Queasy, unsettled stomach' },
@@ -77,7 +77,7 @@ const moduleGroups: Array<{ id: string; title: string; keys: SymptomKey[] }> = [
   { id: 'basics', title: 'Daily basics', keys: ['energy', 'sleep', 'fatigue'] },
 
   // Mind + cognition
-  { id: 'mind', title: 'Mind', keys: ['stress', 'anxiety', 'irritability', 'focus', 'brainFog'] },
+  { id: 'mind', title: 'Mind', keys: ['stress', 'anxiety', 'irritability', 'brainFog'] },
 
   // Pain + body
   { id: 'body', title: 'Body & pain', keys: ['headache', 'cramps', 'jointPain', 'pain', 'dizziness', 'breastTenderness'] },
@@ -174,6 +174,12 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [moduleSearch, setModuleSearch] = useState<string>('');
   const [customSymptomText, setCustomSymptomText] = useState<string>('');
   const [customSymptomError, setCustomSymptomError] = useState<string>('');
+
+  // Cycle behaviour
+  const autoStartPeriodFromBleeding = !!(userData as any).autoStartPeriodFromBleeding;
+  const autoStartPeriodFromBleedingLabel = autoStartPeriodFromBleeding
+    ? 'On (a new bleed will start a period automatically)'
+    : "Off (we will ask if it is a new period or just spotting)";
 
 
   // Personal info editing
@@ -525,6 +531,34 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
               />
             </button>
           </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <div>
+              <p className="font-medium mb-1">Auto-start periods from bleeding</p>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                {autoStartPeriodFromBleedingLabel}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                onUpdateUserData((prev) => ({
+                  ...prev,
+                  autoStartPeriodFromBleeding: !prev.autoStartPeriodFromBleeding,
+                }))
+              }
+              className={`w-12 h-6 rounded-full transition-all ${
+                autoStartPeriodFromBleeding ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                  autoStartPeriodFromBleeding ? 'translate-x-6' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Cloud sync (optional) */}
@@ -713,6 +747,34 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
               {userData.eveLowCostMode ? 'Turn off' : 'Turn on'}
             </button>
           </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <div>
+              <p className="font-medium mb-1">Auto-start periods from bleeding</p>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                {autoStartPeriodFromBleedingLabel}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                onUpdateUserData((prev) => ({
+                  ...prev,
+                  autoStartPeriodFromBleeding: !prev.autoStartPeriodFromBleeding,
+                }))
+              }
+              className={`w-12 h-6 rounded-full transition-all ${
+                autoStartPeriodFromBleeding ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                  autoStartPeriodFromBleeding ? 'translate-x-6' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         {/* What to track */}
@@ -742,27 +804,39 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
               </p>
 
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-                <input
-                  value={moduleSearch}
-                  onChange={(e) => setModuleSearch(e.target.value)}
-                  placeholder="Search symptoms..."
-                  className="w-full sm:flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)/0.35)]"
-                />
+                <div className="relative flex-1">
+                  <input
+                    value={moduleSearch}
+                    onChange={(e) => setModuleSearch(e.target.value)}
+                    placeholder="Search symptoms..."
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                  {moduleSearch ? (
+                    <button
+                      type="button"
+                      onClick={() => setModuleSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgb(var(--color-text-secondary))] hover:text-[rgb(var(--color-text))]"
+                      aria-label="Clear search"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : null}
+                </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex gap-2 justify-end">
                   <button
-                    type="button"
-                    onClick={() => onUpdateUserData((prev) => ({ ...prev, enabledModules: moduleMeta.map((m) => m.key) }))}
-                    className="text-sm px-3 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                    onClick={() => {
+                      setEnabledModules(moduleMeta.map((m) => m.key));
+                    }}
+                    className="px-3 py-2 border rounded-lg"
                   >
                     Enable all
                   </button>
                   <button
-                    type="button"
-                    onClick={() => onUpdateUserData((prev) => ({ ...prev, enabledModules: [] }))}
-                    className="text-sm px-3 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                    onClick={() => setEnabledModules([])}
+                    className="px-3 py-2 border rounded-lg"
                   >
-                    Clear
+                    Clear all
                   </button>
                 </div>
               </div>

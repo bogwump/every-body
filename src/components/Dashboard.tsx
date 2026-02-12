@@ -734,14 +734,41 @@ export function Dashboard({
                 )}
               </div>
 
-              <div className="flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setCycleModalOpen(false)}
-                  className="rounded-xl px-4 py-2 border border-[rgba(0,0,0,0.12)] hover:bg-neutral-50"
-                >
-                  Close
-                </button>
+              <div className="pt-1">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium mb-1">Start a new cycle today</p>
+                    <p className="text-sm text-[rgba(0,0,0,0.65)]">Use this if your cycle starts without bleeding (coil/pill). You can adjust it later in Calendar → Edit cycle.</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const now = new Date().toISOString();
+                      const isOn = Boolean((todayEntry as any)?.cycleStartOverride);
+                      if (todayEntry) {
+                        upsertEntry({ ...(todayEntry as any), cycleStartOverride: isOn ? undefined : true, updatedAt: now } as any);
+                      } else {
+                        if (!isOn) {
+                          upsertEntry({
+                            id: `${Date.now()}`,
+                            dateISO: todayISO,
+                            values: {},
+                            cycleStartOverride: true,
+                            createdAt: now,
+                            updatedAt: now,
+                          } as any);
+                        }
+                      }
+                    }}
+                    className={`flex-shrink-0 w-12 h-6 rounded-full transition-all ${Boolean((todayEntry as any)?.cycleStartOverride) ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
+                    aria-label="Toggle cycle start today"
+                  >
+                    <div
+                      className={`w-5 h-5 bg-white rounded-full transition-transform ${Boolean((todayEntry as any)?.cycleStartOverride) ? 'translate-x-6' : 'translate-x-0.5'}`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

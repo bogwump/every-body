@@ -23,7 +23,7 @@ import { useEntries, useExperiment } from '../lib/appStore';
 import { downloadTextFile } from '../lib/storage';
 import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
 import { getMixedChartColors } from '../lib/chartPalette';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
 
 interface InsightsProps {
@@ -1295,6 +1295,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             <DialogContent className="max-w-2xl rounded-2xl">
               <DialogHeader>
                 <DialogTitle>Choose metrics to analyse (max 6)</DialogTitle>
+                <DialogDescription>
+                  Select up to 6 metrics to personalise your insights.
+                </DialogDescription>
               </DialogHeader>
               <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
 
@@ -1397,6 +1400,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         <DialogContent className="max-w-lg rounded-2xl">
           <DialogHeader>
             <DialogTitle>{experimentPlan?.title ?? 'Experiment'}</DialogTitle>
+            <DialogDescription>
+              Set up a tiny experiment and keep logging a few metrics so you can spot what changes.
+            </DialogDescription>
           </DialogHeader>
           <div className="max-h-[78vh] overflow-y-auto pr-1 space-y-3">
             <div className="text-sm eb-muted">
@@ -1522,6 +1528,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Finish experiment?</DialogTitle>
+            <DialogDescription>
+              Confirm whether this experiment helped, so we can save the result for future insights.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="text-sm eb-muted">

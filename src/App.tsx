@@ -22,6 +22,7 @@ const DEFAULT_USER: UserData = {
   useMockEve: true,
   eveLowCostMode: true,
   fertilityMode: false,
+  autoStartPeriodFromBleeding: false,
   ovulationOverrideISOs: [],
   customSymptoms: [],
   enabledModules: [

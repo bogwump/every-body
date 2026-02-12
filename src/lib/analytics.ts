@@ -181,35 +181,37 @@ export function getCycleStarts(entries: CheckInEntry[] | unknown): string[] {
   const starts: string[] = [];
 
   const flowTo10 = (v: any): number | null => {
-    if (typeof v !== "number") return null;
+    if (typeof v !== 'number') return null;
     // Support older 0–100 values
     const scaled = v > 10 ? Math.round(v / 10) : v;
     return Math.max(0, Math.min(10, scaled));
   };
 
+  // Track bleeding state, treating breakthrough bleeds as NOT resetting the cycle.
+  let wasBleeding = false;
+
   for (let i = 0; i < sorted.length; i++) {
     const e: any = sorted[i];
-    const dateISO = String(e?.dateISO ?? "");
+    const dateISO = String(e?.dateISO ?? '');
     if (!dateISO) continue;
 
     if (e?.cycleStartOverride === true) {
       starts.push(dateISO);
+      wasBleeding = true;
       continue;
     }
 
-    const flow = flowTo10(e?.values?.flow);
-    const prevFlow = i > 0 ? flowTo10((sorted[i - 1] as any)?.values?.flow) : null;
+    const rawFlow = flowTo10(e?.values?.flow);
+    const isBreakthrough = Boolean(e?.breakthroughBleed);
+    const effectiveFlow = isBreakthrough ? 0 : (typeof rawFlow === 'number' ? rawFlow : 0);
 
-    const isBleeding = typeof flow === "number" && flow > 0;
-    const wasBleeding = typeof prevFlow === "number" && prevFlow > 0;
+    const isBleeding = effectiveFlow > 0;
+    if (isBleeding && !wasBleeding) starts.push(dateISO);
 
-    if (isBleeding && !wasBleeding) {
-      starts.push(dateISO);
-    }
+    wasBleeding = isBleeding;
   }
 
-  // de-dupe (in case override + flow same day)
-  return Array.from(new Set(starts)).sort();
+  return Array.from(new Set(starts)).sort((a, b) => a.localeCompare(b));
 }
 
 function daysBetweenISO(aISO: string, bISO: string): number {

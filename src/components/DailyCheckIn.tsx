@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 
 import type { CheckInEntry, SymptomKey, UserData, ExperimentPlan, InsightMetricKey } from '../types';
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { isoToday } from '../lib/analytics';
 import { useEntries, useExperiment } from '../lib/appStore';
 
@@ -39,32 +41,32 @@ const moodIcons: Array<{ value: 1 | 2 | 3; icon: React.ElementType; label: strin
 
 // Stored symptom values are now treated as 0–10.
 // (Calendar + analytics already normalise if older entries used 0–100.)
-const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType }> = {
-  energy: { label: 'Energy', icon: Battery },
-  sleep: { label: 'Sleep quality', icon: Moon },
-  stress: { label: 'Stress', icon: Zap },
-  anxiety: { label: 'Anxiety', icon: Zap },
-  irritability: { label: 'Irritability', icon: Zap },
-  focus: { label: 'Clarity', icon: Brain },
-  bloating: { label: 'Bloating', icon: Wind },
-  digestion: { label: 'Digestion', icon: Wind },
-  nausea: { label: 'Nausea', icon: Wind },
-  pain: { label: 'Pain', icon: Heart },
-  headache: { label: 'Headache', icon: Brain },
-  cramps: { label: 'Cramps', icon: Heart },
-  jointPain: { label: 'Joint pain', icon: Heart },
-  flow: { label: 'Bleeding / spotting (optional)', icon: Droplet },
-  hairShedding: { label: 'Hair shedding', icon: Sparkles },
-  facialSpots: { label: 'Facial spots', icon: Sparkles },
-  cysts: { label: 'Cysts', icon: Heart },
-  brainFog: { label: 'Brain fog', icon: Brain },
-  fatigue: { label: 'Fatigue', icon: Battery },
-  dizziness: { label: 'Dizziness', icon: Brain },
-  appetite: { label: 'Appetite', icon: Battery },
-  libido: { label: 'Libido', icon: Heart },
-  breastTenderness: { label: 'Breast tenderness', icon: Heart },
-  hotFlushes: { label: 'Hot flushes', icon: Sparkles },
-  nightSweats: { label: 'Night sweats', icon: Moon },
+const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; hint?: string }> = {
+  energy: { label: 'Energy', icon: Battery, hint: 'How much fuel you have in the tank' },
+  sleep: { label: 'Sleep quality', icon: Moon, hint: 'Quality of sleep, not just hours' },
+  stress: { label: 'Stress', icon: Zap, hint: 'Mental pressure or feeling on edge' },
+  anxiety: { label: 'Anxiety', icon: Zap, hint: 'Worry, racing thoughts' },
+  irritability: { label: 'Irritability', icon: Zap, hint: 'Short fuse, feeling snappy' },
+  focus: { label: 'Focus', icon: Brain, hint: 'Concentration and mental sharpness' },
+  bloating: { label: 'Bloating', icon: Wind, hint: 'Fullness or swollen belly feeling' },
+  digestion: { label: 'Digestion', icon: Wind, hint: 'Gut comfort and regularity' },
+  nausea: { label: 'Nausea', icon: Wind, hint: 'Sick or queasy feeling' },
+  pain: { label: 'Pain', icon: Heart, hint: 'Overall body pain or aches' },
+  headache: { label: 'Headache', icon: Brain, hint: 'Head pain or pressure' },
+  cramps: { label: 'Cramps', icon: Heart, hint: 'Lower belly cramps or spasms' },
+  jointPain: { label: 'Joint pain', icon: Heart, hint: 'Stiff or sore joints' },
+  flow: { label: 'Bleeding / spotting (optional)', icon: Droplet, hint: 'Bleeding or spotting level' },
+  hairShedding: { label: 'Hair shedding', icon: Sparkles, hint: 'More hair loss than usual' },
+  facialSpots: { label: 'Facial spots', icon: Sparkles, hint: 'Breakouts or spots on face' },
+  cysts: { label: 'Cysts', icon: Heart, hint: 'Painful lumps or cystic spots' },
+  brainFog: { label: 'Brain fog', icon: Brain, hint: 'Foggy thinking, forgetfulness' },
+  fatigue: { label: 'Fatigue', icon: Battery, hint: 'Heavy tiredness or drained feeling' },
+  dizziness: { label: 'Dizziness', icon: Brain, hint: 'Light-headed or unsteady' },
+  appetite: { label: 'Appetite', icon: Battery, hint: 'Hunger and cravings' },
+  libido: { label: 'Libido', icon: Heart, hint: 'Interest in sex' },
+  breastTenderness: { label: 'Breast tenderness', icon: Heart, hint: 'Sore or tender breasts' },
+  hotFlushes: { label: 'Hot flushes', icon: Sparkles, hint: 'Sudden heat and flushing' },
+  nightSweats: { label: 'Night sweats', icon: Moon, hint: 'Waking sweaty at night' },
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -230,6 +232,11 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
   // Quick log (under mood)
   const [markNewCycle, setMarkNewCycle] = useState(false);
+
+
+  // When bleeding starts, ask whether this is a new period or just spotting/breakthrough.
+  const [periodPromptOpen, setPeriodPromptOpen] = useState(false);
+  const [pendingEntry, setPendingEntry] = useState<CheckInEntry | null>(null);
   const [markBleedingStarted, setMarkBleedingStarted] = useState(false);
   const [markSex, setMarkSex] = useState(false);
 
@@ -289,7 +296,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   }, [existingEntry, userData.enabledModules, userData.customSymptoms, activeDateISO]);
 
   const enabledSliders = useMemo(() => {
-    return userData.enabledModules.filter((k) => Boolean(sliderMeta[k]));
+    return userData.enabledModules.filter((k) => k !== 'focus' && Boolean(sliderMeta[k]));
   }, [userData.enabledModules]);
 
   const enabledCustom = useMemo(() => {
@@ -398,12 +405,103 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       updatedAt: now,
     };
 
+    // If bleeding starts today, ask whether this is a new period (cycle start) or spotting/breakthrough.
+    // We only prompt when the user did not explicitly set a cycle start override.
+    if (isCycleEnabled && !next.cycleStartOverride) {
+      const to10 = (v: any): number => {
+        if (typeof v !== 'number') return 0;
+        const scaled = v > 10 ? Math.round(v / 10) : v;
+        return Math.max(0, Math.min(10, scaled));
+      };
+      const todayFlow = to10((next as any)?.values?.flow);
+
+      const prev = entries.find((e) => e.dateISO === addDaysISO(activeDateISO, -1));
+      const prevFlowRaw = to10((prev as any)?.values?.flow);
+      const prevFlow = (prev as any)?.breakthroughBleed ? 0 : prevFlowRaw;
+
+      const startedBleeding = todayFlow > 0 && prevFlow === 0;
+
+      // If we already marked this day as breakthrough previously, do not re-prompt.
+      const alreadyBreakthrough = Boolean((existingEntry as any)?.breakthroughBleed);
+
+      if (startedBleeding && !alreadyBreakthrough) {
+        // If the user prefers not to be asked each time, auto-start the period.
+        if (userData.autoStartPeriodFromBleeding) {
+          upsertEntry({ ...(next as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
+          onDone();
+          return;
+        }
+
+        setPendingEntry(next);
+        setPeriodPromptOpen(true);
+        return;
+      }
+    }
+
     upsertEntry(next as any);
     onDone();
   };
 
   return (
     <div className="eb-page">
+      <Dialog open={periodPromptOpen} onOpenChange={(open) => {
+        setPeriodPromptOpen(open);
+        if (!open) setPendingEntry(null);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Is this the start of a new period?</DialogTitle>
+            <DialogDescription>
+              If you choose <span className="font-semibold">Start period</span>, we will mark today as a cycle start and add a period window on your calendar.
+              If it is just spotting/breakthrough, we will log it as bleeding without starting a new cycle.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="eb-card mt-3">
+            <p className="text-[rgb(var(--color-text-secondary))]">We save this result so your future insights can become more meaningful.</p>
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              className="eb-btn-secondary"
+              onClick={() => {
+                setPeriodPromptOpen(false);
+                setPendingEntry(null);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="eb-btn-secondary"
+              onClick={() => {
+                if (!pendingEntry) return;
+                upsertEntry({ ...(pendingEntry as any), cycleStartOverride: undefined, breakthroughBleed: true } as any);
+                setPeriodPromptOpen(false);
+                setPendingEntry(null);
+                onDone();
+              }}
+            >
+              Just spotting
+            </button>
+            <button
+              type="button"
+              className="eb-btn-primary"
+              onClick={() => {
+                if (!pendingEntry) return;
+                upsertEntry({ ...(pendingEntry as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
+                setPeriodPromptOpen(false);
+                setPendingEntry(null);
+                onDone();
+              }}
+            >
+              Start period
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="eb-page-inner max-w-3xl">
         <div className="flex items-center justify-between gap-4 mb-6">
           <div>
@@ -585,6 +683,9 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                       </div>
                       <div className="min-w-0">
                         <div className="font-medium">{meta.label}</div>
+                        {meta.hint ? (
+                          <div className="text-xs text-[rgb(var(--color-text-secondary))]">{meta.hint}</div>
+                        ) : null}
                         <div className="text-xs text-[rgb(var(--color-text-secondary))]">
                           {current}/10
                           {prevVal != null ? (

@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X } from 'lucide-react';
+import { PencilLine, Droplet, Droplets, Egg, X, Flag } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey } from '../types';
@@ -105,6 +105,16 @@ function getCycleStarts(entriesSorted: any[]): string[] {
     const flowVal = e?.values?.flow;
     const flow = typeof flowVal === 'number' ? flowVal : 0;
     const override = Boolean((e as any)?.cycleStartOverride);
+    const breakthrough = Boolean((e as any)?.breakthroughBleed);
+    const effectiveFlow = breakthrough ? 0 : flow;
+
+    // Breakthrough/spotting flagged by the user should never start a cycle. Treat it as 'no flow' for cycle logic.
+    if (breakthrough && !override) {
+      prevFlow = 0;
+      spottingStreak = 0;
+      spottingStreakStartISO = null;
+      continue;
+    }
 
     if (override) {
       starts.push(e.dateISO);
@@ -115,8 +125,8 @@ function getCycleStarts(entriesSorted: any[]): string[] {
       continue;
     }
 
-    const isBleed = flow >= 3;
-    const isSpotting = flow > 0 && flow < 3;
+    const isBleed = effectiveFlow >= 3;
+    const isSpotting = effectiveFlow > 0 && effectiveFlow < 3;
 
     if (isBleed && prevFlow === 0) {
       starts.push(e.dateISO);
@@ -238,17 +248,57 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
     const s = new Set<string>();
     if (!cycleEnabled) return s;
 
-    // Period shading should reflect *actual* logged bleeding/spotting days (flow > 0).
-    // This avoids a fixed "7-day window" that can feel wrong when users have shorter/longer bleeds,
-    // or when they only log spotting.
-    for (const e of entriesSorted as any[]) {
-      const flowVal = (e as any)?.values?.flow;
+    // 1) Always shade days where the user actually logged bleeding/spotting.
+    const byISO = new Map<string, any>();
+    for (const e of entriesSorted as any[]) byISO.set(e.dateISO, e);
+
+    const loggedBleed = (iso: string): boolean => {
+      const e = byISO.get(iso);
+      const flowVal = e?.values?.flow;
       const flow = typeof flowVal === 'number' ? flowVal : 0;
-      if (flow > 0) s.add(e.dateISO);
+      return flow > 0;
+    };
+
+    for (const e of entriesSorted as any[]) {
+      if (loggedBleed(e.dateISO)) s.add(e.dateISO);
+    }
+
+    // 2) Provisional 7-day window after a cycle start.
+    //    This is a *starting point* and gets trimmed if the user logs bleeding down to zero early.
+    for (const startISO of cycleStarts) {
+      let seenPositive = false;
+      let stopAfterISO: string | null = null;
+
+      for (let i = 0; i < 7; i++) {
+        const dayISO = addDaysISO(startISO, i);
+        const e = byISO.get(dayISO);
+        const breakthrough = Boolean(e?.breakthroughBleed);
+        const flowVal = e?.values?.flow;
+        const flow = typeof flowVal === 'number' ? flowVal : 0;
+        const effectiveFlow = breakthrough ? 0 : flow;
+
+        if (effectiveFlow > 0) seenPositive = true;
+
+        // If the user has been bleeding and then explicitly logs 0, treat that as the end.
+        if (seenPositive && effectiveFlow === 0) {
+          stopAfterISO = dayISO;
+          break;
+        }
+
+        s.add(dayISO);
+      }
+
+      if (stopAfterISO) {
+        // remove stop day and anything after it in the provisional window
+        for (let i = 0; i < 7; i++) {
+          const dayISO = addDaysISO(startISO, i);
+          if (dayISO >= stopAfterISO) s.delete(dayISO);
+        }
+      }
     }
 
     return s;
-  }, [cycleEnabled, entriesSorted]);
+  }, [cycleEnabled, entriesSorted, cycleStarts]);
 
   const fertileSet = useMemo(() => {
     const s = new Set<string>();
@@ -272,11 +322,13 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
     // fall back to a sensible default so Fertility mode still shows *something*.
     const DEFAULT_CYCLE_LEN = 28;
 
-    for (let i = 0; i < cycleStarts.length; i++) {
-      const startISO = cycleStarts[i];
+    const startsToUse = cycleStarts.length > 0 ? cycleStarts : [new Date().toISOString().slice(0, 10)];
+
+    for (let i = 0; i < startsToUse.length; i++) {
+      const startISO = startsToUse[i];
 
       const nextStartISO =
-        cycleStarts[i + 1] ?? addDaysISO(startISO, avgLen ?? DEFAULT_CYCLE_LEN);
+        startsToUse[i + 1] ?? addDaysISO(startISO, avgLen ?? DEFAULT_CYCLE_LEN);
 
       const cycleLen = daysBetweenISO(startISO, nextStartISO);
 
@@ -415,7 +467,9 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
                   </div>
 
                   {isToday && (
-                    <div className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full border border-[rgb(var(--color-primary)/0.25)] bg-[rgb(var(--color-primary)/0.10)] text-[rgb(var(--color-primary-dark))]">Today</div>
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded-full border border-[rgb(var(--color-primary)/0.25)] bg-[rgb(var(--color-primary)/0.10)] text-[rgb(var(--color-primary-dark))]">
+                      Today
+                    </div>
                   )}
                 </div>
 
@@ -535,7 +589,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
               className="eb-btn-secondary flex items-center gap-2 justify-center"
               onClick={() => { toggleStart(!isStart); setEditISO(null); }}
             >
-              <span className="font-semibold">1</span>
+              <Flag className="w-4 h-4" />
               <span>{isStart ? 'Remove cycle start' : 'Set as cycle start'}</span>
             </button>
 
@@ -552,7 +606,8 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
           </div>
 
           <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
-            These edits update your cycle overlay. Your symptom logging stays the source of truth.
+            These edits update your cycle data (period and fertility). They do not change your symptom entries.
+            Bleeding logged in your daily check-in remains the primary source of truth.
           </div>
           </div>
         </div>
