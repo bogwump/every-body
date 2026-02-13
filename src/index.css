@@ -193,7 +193,7 @@ body {
     transform: scale(0.99);
   }
 .eb-input {
-    @apply w-full rounded-xl px-3 py-2 text-sm shadow-sm outline-none transition;
+    @apply w-full rounded-xl px-3 py-2 text-base shadow-sm outline-none transition;
     background: white;
     border: 1px solid rgb(228 228 231 / 1);
   }

@@ -135,7 +135,12 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
             userData={userData}
             onUpdateUserData={setUserData}
             initialDateISO={checkInDateISO}
-            onDone={() => setCurrentScreen('dashboard')}
+            onDone={() => {
+              try { (document.activeElement as HTMLElement | null)?.blur(); } catch {}
+              try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch { window.scrollTo(0, 0); }
+              setCheckInDateISO(undefined);
+              setCurrentScreen('dashboard');
+            }}
             onNavigate={setCurrentScreen}
           />
         );

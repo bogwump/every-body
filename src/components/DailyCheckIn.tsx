@@ -178,6 +178,9 @@ function Slider10({
 }
 
 export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateISO, onNavigate }: DailyCheckInProps) {
+  const safeBlur = () => {
+    try { (document.activeElement as HTMLElement | null)?.blur(); } catch {}
+  };
   const todayISO = isoToday();
   const activeDateISO = initialDateISO ?? todayISO;
 
@@ -424,6 +427,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
         // If the user prefers not to be asked each time, auto-start the period.
         if (userData.autoStartPeriodFromBleeding) {
           upsertEntry({ ...(next as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
+          safeBlur();
           onDone();
           return;
         }
@@ -435,6 +439,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     }
 
     upsertEntry(next as any);
+    safeBlur();
     onDone();
   };
 
@@ -479,6 +484,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                 upsertEntry({ ...(pendingEntry as any), cycleStartOverride: undefined, breakthroughBleed: true } as any);
                 setPeriodPromptOpen(false);
                 setPendingEntry(null);
+                safeBlur();
                 onDone();
               }}
             >
@@ -492,6 +498,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                 upsertEntry({ ...(pendingEntry as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
                 setPeriodPromptOpen(false);
                 setPendingEntry(null);
+                safeBlur();
                 onDone();
               }}
             >
