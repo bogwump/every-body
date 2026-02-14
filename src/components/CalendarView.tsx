@@ -235,7 +235,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
 
   const [editMode, setEditMode] = useState(false);
   const [editISO, setEditISO] = useState<string | null>(null);
-  const [influenceTipISO, setInfluenceTipISO] = useState<string | null>(null);
+  const [summaryISO, setSummaryISO] = useState<string | null>(null);
 
 
   const monthStart = startOfMonth(monthCursor);
@@ -455,6 +455,8 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
             const influences = influencesFromEntry(entry);
             const hasInfluences = influences.length > 0;
             const hasNote = typeof entry?.notes === 'string' && entry.notes.trim().length > 0;
+            const hasCustom = entry?.customValues && typeof entry.customValues === 'object' && Object.values(entry.customValues).some((v: any) => typeof v === 'number' && v > 0);
+            const hasExtra = hasInfluences || hasNote || hasCustom;
 
             return (
               <button
@@ -465,7 +467,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
                     setEditISO(iso);
                     return;
                   }
-                  onOpenCheckIn(iso);
+                  setSummaryISO(iso);
                 }}
                 className={`relative rounded-2xl border text-left p-2 min-h-[54px] transition shadow-sm active:scale-[0.99] ${
                   inMonth ? 'bg-white border-[rgba(0,0,0,0.08)] hover:shadow-md hover:-translate-y-[1px]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.04)]'
@@ -480,40 +482,18 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
                   <div className={`text-sm font-medium ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
 
                                     <div className="relative w-[22px] h-[14px] flex items-center justify-end">
-                    {hasInfluences && (
-
-                      <span className="absolute top-0 right-0">
+                      {hasExtra && (
                         <span
-                          onMouseEnter={() => setInfluenceTipISO(iso)}
-                          onMouseLeave={() => setInfluenceTipISO((cur) => (cur === iso ? null : cur))}
-                          onTouchStart={() => {
-                            setInfluenceTipISO(iso);
-                            window.setTimeout(() => {
-                              setInfluenceTipISO((cur) => (cur === iso ? null : cur));
-                            }, 1600);
+                          className="inline-block w-[7px] h-[7px] rounded-full"
+                          style={{
+                            background: 'rgb(var(--color-primary-dark) / 0.55)',
+                            boxShadow: '0 0 0 2px rgb(var(--color-surface))',
                           }}
-                        >
-                          <InfluenceMark size={9} title={influences.join(', ')} />
-                        </span>
-                        {influenceTipISO === iso && (
-                          <div className="absolute z-30 top-0 right-4 -translate-y-full mt-[-6px] px-2 py-1 rounded-md text-[11px] bg-white text-black shadow border border-[rgba(0,0,0,0.08)]">
-                            {influences.join(', ')}
-                          </div>
-                        )}
-                      </span>
-                    )}
-                    {hasNote && (
-                      <span
-                        className="absolute top-[1px] right-[12px] inline-block w-[6px] h-[6px] rounded-full"
-                        style={{
-                          background: 'rgb(255 255 255 / 0.95)',
-                          boxShadow: '0 0 0 1px rgba(0,0,0,0.38), 0 1px 2px rgba(0,0,0,0.12)',
-                        }}
-                        aria-label="Note added"
-                        title="Note added"
-                      />
-                    )}
-                  </div>
+                          aria-label="Extra logged"
+                          title="Extra logged"
+                        />
+                      )}
+                    </div>
 
                   {isToday && (
                     <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded-full border border-[rgb(var(--color-primary)/0.25)] bg-[rgb(var(--color-primary)/0.10)] text-[rgb(var(--color-primary-dark))]">
@@ -663,7 +643,176 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
       );
     })()}
   </SheetContent>
-</Sheet>{showLegend && (
+</Sheet>
+
+
+        <Sheet
+          open={Boolean(summaryISO)}
+          onOpenChange={(open) => {
+            if (!open) setSummaryISO(null);
+          }}
+        >
+          <SheetContent side="bottom" className="bg-transparent border-0 p-0 shadow-none">
+            {summaryISO && (() => {
+              const e = byISO.get(summaryISO);
+              const influences = influencesFromEntry(e);
+              const hasInfluences = influences.length > 0;
+              const hasNote = typeof e?.notes === 'string' && e.notes.trim().length > 0;
+
+              const prettyDate = new Date(summaryISO + 'T00:00:00').toLocaleDateString(undefined, {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              });
+
+              const mood = typeof e?.mood === 'number' ? e.mood : null;
+              const moodLabel = mood === 1 ? 'Low' : mood === 2 ? 'Okay' : mood === 3 ? 'Good' : null;
+
+              const preferred: SymptomKey[] = [
+                'sleep',
+                'energy',
+                'stress',
+                'anxiety',
+                'irritability',
+                'brainFog',
+                'fatigue',
+                'hotFlushes',
+                'nightSweats',
+                'flow',
+              ];
+              const enabled = Array.isArray(userData.enabledModules) ? userData.enabledModules : [];
+              const metricKeys = preferred.filter((k) => enabled.includes(k));
+
+              const metricRows = metricKeys
+                .map((k) => {
+                  const v = e?.values?.[k];
+                  const val = typeof v === 'number' ? v : null;
+                  return { key: k, val };
+                })
+                .filter((r) => r.val != null)
+                .slice(0, 5);
+
+              const notesPreview = hasNote ? String(e.notes).trim().split('\n')[0].slice(0, 160) : null;
+
+              const phaseChips: string[] = [];
+              if (cycleEnabled) {
+                if (periodSet.has(summaryISO)) phaseChips.push('Period');
+                if (fertilityEnabled && fertileSet.has(summaryISO)) phaseChips.push('Fertile window');
+                if (fertilityEnabled && ovulationSet.has(summaryISO)) phaseChips.push('Ovulation');
+              }
+
+              const hasData =
+                Boolean(moodLabel) ||
+                metricRows.length > 0 ||
+                hasNote ||
+                hasInfluences ||
+                (e?.customValues && typeof e.customValues === 'object' && Object.values(e.customValues).some((v: any) => typeof v === 'number'));
+
+              return (
+                <div className="px-4 pb-6">
+                  <div className="mx-auto w-full max-w-lg eb-card p-4">
+                    <div className="mb-3 flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-base font-semibold">Day summary</div>
+                        <div className="text-sm text-[rgb(var(--color-text-secondary))]">{prettyDate}</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="eb-icon-btn"
+                        onClick={() => setSummaryISO(null)}
+                        aria-label="Close"
+                        title="Close"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {phaseChips.length > 0 && (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {phaseChips.map((lab) => (
+                          <span
+                            key={lab}
+                            className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium border border-[rgba(0,0,0,0.08)] bg-[rgba(0,0,0,0.03)]"
+                          >
+                            {lab}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {!hasData && (
+                      <div className="text-sm text-[rgb(var(--color-text-secondary))]">
+                        Nothing logged for this day yet.
+                      </div>
+                    )}
+
+                    {hasData && (
+                      <div className="space-y-3">
+                        {moodLabel && (
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-medium">Mood</div>
+                            <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold border border-[rgb(var(--color-primary)/0.22)] bg-[rgb(var(--color-primary)/0.10)] text-[rgb(var(--color-primary-dark))]">
+                              {moodLabel}
+                            </span>
+                          </div>
+                        )}
+
+                        {metricRows.length > 0 && (
+                          <div className="space-y-2">
+                            {metricRows.map((r) => (
+                              <div key={r.key} className="flex items-center justify-between">
+                                <div className="text-sm">{overlayLabel(r.key)}</div>
+                                <div className="text-sm font-semibold">{Math.round((r.val as number) * 10) / 10}/10</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {hasInfluences && (
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">Other influences</div>
+                            <div className="text-sm text-[rgb(var(--color-text-secondary))]">
+                              {influences.join(', ')}
+                            </div>
+                          </div>
+                        )}
+
+                        {notesPreview && (
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">Notes</div>
+                            <div className="text-sm text-[rgb(var(--color-text-secondary))]">{notesPreview}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        className="eb-btn-primary"
+                        onClick={() => {
+                          const iso = summaryISO;
+                          setSummaryISO(null);
+                          onOpenCheckIn(iso);
+                        }}
+                      >
+                        Edit check-in
+                      </button>
+
+                      <button type="button" className="eb-btn-secondary" onClick={() => setSummaryISO(null)}>
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </SheetContent>
+        </Sheet>
+
+
+{showLegend && (
           <>
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[rgb(var(--color-text-secondary))]">
               {cycleEnabled && (
