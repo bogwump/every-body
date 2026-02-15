@@ -42,6 +42,20 @@ export default function App() {
   const [checkInDateISO, setCheckInDateISO] = useState<string | undefined>(undefined);
   const { user: userData, updateUser: setUserData } = useUser(DEFAULT_USER);
 
+  // Best-effort request for persistent storage (helps on some browsers; harmless if unsupported)
+  useEffect(() => {
+    (async () => {
+      try {
+        const nav: any = navigator;
+        if (nav?.storage?.persist) {
+          await nav.storage.persist();
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
   const FORCE_ONBOARDING_KEY = 'eb_force_onboarding_preview';
   const [forceOnboarding, setForceOnboarding] = useState<boolean>(() => {
     try {

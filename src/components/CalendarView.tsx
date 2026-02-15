@@ -364,17 +364,16 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
       return s;
     }
 
-    // If we don't yet have enough data to calculate an average cycle length,
-    // fall back to a sensible default so Fertility mode still shows *something*.
-    const DEFAULT_CYCLE_LEN = 28;
+    // With no ovulation override, only show fertile windows once we have enough cycle history
+    // to make a meaningful estimate. Avoid guessing for brand‑new users.
+    if (avgLen == null || cycleStarts.length < 2) return s;
 
-    const startsToUse = cycleStarts.length > 0 ? cycleStarts : [new Date().toISOString().slice(0, 10)];
+    const startsToUse = cycleStarts;
 
     for (let i = 0; i < startsToUse.length; i++) {
       const startISO = startsToUse[i];
 
-      const nextStartISO =
-        startsToUse[i + 1] ?? addDaysISO(startISO, avgLen ?? DEFAULT_CYCLE_LEN);
+      const nextStartISO = startsToUse[i + 1] ?? addDaysISO(startISO, avgLen);
 
       const cycleLen = daysBetweenISO(startISO, nextStartISO);
 
