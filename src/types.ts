@@ -34,10 +34,14 @@ export type SymptomKey =
 /** Metrics that can be shown on the dashboard chart */
 export type DashboardMetric = SymptomKey | 'mood';
 
+export type SymptomKind = 'behaviour' | 'state' | 'physio' | 'hormonal' | 'other';
+
 export interface CustomSymptom {
   id: string;
   label: string;
   enabled: boolean;
+  /** Optional: what kind of symptom this is (used for safer insights + experiments). */
+  kind?: SymptomKind;
 }
 
 

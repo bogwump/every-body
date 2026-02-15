@@ -20,7 +20,8 @@ import {
   X,
 } from 'lucide-react';
 import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, importBackupFile } from '../lib/backup';
-import type { ColorTheme, SymptomKey, UserData } from '../types';
+import type { ColorTheme, SymptomKey, SymptomKind, UserData } from '../types';
+import { kindLabel } from '../lib/symptomMeta';
 import { downloadTextFile } from '../lib/storage';
 import {
   cloudPullAndApply,
@@ -175,6 +176,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
 
   const [moduleSearch, setModuleSearch] = useState<string>('');
   const [customSymptomText, setCustomSymptomText] = useState<string>('');
+  const [customSymptomKind, setCustomSymptomKind] = useState<SymptomKind>('other');
   const [customSymptomError, setCustomSymptomError] = useState<string>('');
 
   // Cycle behaviour
@@ -652,6 +654,29 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                     placeholder="Type a symptom name..."
                     className="w-full sm:flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)/0.35)]"
                   />
+
+                  <select
+                    value={customSymptomKind}
+                    onChange={(e) => setCustomSymptomKind(e.target.value as SymptomKind)}
+                    className="w-full sm:w-44 rounded-xl border border-neutral-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)/0.35)]"
+                    aria-label="What kind of symptom is this"
+                    title="What kind of symptom is this"
+                  >
+                    {(
+                      [
+                        'other',
+                        'state',
+                        'behaviour',
+                        'physio',
+                        'hormonal',
+                      ] as SymptomKind[]
+                    ).map((k) => (
+                      <option key={k} value={k}>
+                        {kindLabel(k)}
+                      </option>
+                    ))}
+                  </select>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -673,7 +698,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                           ...prev,
                           customSymptoms: [
                             ...existing,
-                            { id, label, enabled: true },
+                            { id, label, enabled: true, kind: customSymptomKind },
                           ],
                         };
                       });
@@ -698,6 +723,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                         <div key={s.id} className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-3 py-2">
                           <div className="min-w-0">
                             <div className="font-medium truncate">{s.label}</div>
+                            <div className="text-xs text-[rgb(var(--color-text-secondary))]">{kindLabel(s.kind)}</div>
                           </div>
 
                           <div className="flex items-center gap-2">

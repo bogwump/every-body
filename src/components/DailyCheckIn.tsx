@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Battery,
   Moon,
@@ -149,10 +149,38 @@ function Slider10({
 }) {
   const v = clamp(value, 0, 10);
   const pct = (v / 10) * 100;
-  // Nudge keeps the value pill visually centred near the ends (0/10)
-  const nudgePx = (50 - pct) * 0.12;
 
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [bubbleLeftPx, setBubbleLeftPx] = useState<number | null>(null);
+
+  const recomputeBubble = useCallback(() => {
+    const wrap = wrapRef.current;
+    const input = inputRef.current;
+    if (!wrap || !input) return;
+
+    const w = wrap.clientWidth;
+    if (!w) return;
+
+    // Thumb size comes from CSS so mobile/desktop stay in sync.
+    const cs = window.getComputedStyle(input);
+    const thumbVar = cs.getPropertyValue('--eb-thumb-size').trim();
+    const thumb = thumbVar.endsWith('px') ? parseFloat(thumbVar) : Number(thumbVar);
+    const thumbSize = Number.isFinite(thumb) && thumb > 0 ? thumb : 22;
+
+    const ratio = v / 10;
+    const usable = Math.max(0, w - thumbSize);
+    setBubbleLeftPx(ratio * usable + thumbSize / 2);
+  }, [v]);
+
+  useLayoutEffect(() => {
+    recomputeBubble();
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const ro = new ResizeObserver(() => recomputeBubble());
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [recomputeBubble]);
 
   const setFromClientX = (clientX: number) => {
     const el = inputRef.current;
@@ -164,24 +192,62 @@ function Slider10({
     onChange(clamp(next, 0, 10));
   };
 
+  // Prevent accidental slider changes while the user is scrolling on mobile.
+  // Strategy:
+  // - Only "jump to value" on a deliberate tap (minimal movement).
+  // - Ignore onChange updates if the gesture becomes a vertical scroll.
+  const gestureRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    scroll: boolean;
+  }>({ active: false, startX: 0, startY: 0, scroll: false });
+
+  const onWrapPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e as any).isPrimary === false) return;
+    gestureRef.current = { active: true, startX: e.clientX, startY: e.clientY, scroll: false };
+  };
+
+  const onWrapPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gestureRef.current;
+    if (!g.active || g.scroll) return;
+    const dx = Math.abs(e.clientX - g.startX);
+    const dy = Math.abs(e.clientY - g.startY);
+    // If the user is moving mostly vertically, treat as scroll and do not update values.
+    if (dy > 8 && dy > dx) g.scroll = true;
+  };
+
+  const onWrapPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gestureRef.current;
+    if (!g.active) return;
+    const dx = Math.abs(e.clientX - g.startX);
+    const dy = Math.abs(e.clientY - g.startY);
+    const isTap = !g.scroll && dx < 10 && dy < 10;
+    gestureRef.current.active = false;
+    gestureRef.current.scroll = false;
+
+    // Allow "tap anywhere on track" without interfering with normal page scrolling.
+    if (isTap) setFromClientX(e.clientX);
+  };
+
   return (
-    <div className="relative pt-5">
+    <div className="relative pt-4">
       <div
-        className="absolute -top-0.5 text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--color-surface))] shadow-sm border border-[rgb(228_228_231_/_0.6)] text-[rgb(var(--color-text))]"
-        style={{ left: `calc(${pct}% + ${nudgePx}px)`, transform: 'translateX(-50%)' }}
+        className="absolute top-1 text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--color-surface))] shadow-sm border border-[rgb(228_228_231_/_0.6)] text-[rgb(var(--color-text))]"
+        style={{ left: bubbleLeftPx != null ? `${bubbleLeftPx}px` : `${pct}%`, transform: 'translateX(-50%)' }}
         aria-hidden="true"
       >
         {v}
       </div>
       <div
+        ref={wrapRef}
         className="eb-range-wrap"
-        onPointerDown={(e) => {
-          // iOS can be finicky about jumping on tap. This makes the whole track tappable.
-          // Only do the jump for primary pointers.
-          if ((e as any).isPrimary === false) return;
-          // If the user is dragging the thumb, native behaviour still works.
-          // A tap anywhere else should jump.
-          setFromClientX(e.clientX);
+        onPointerDown={onWrapPointerDown}
+        onPointerMove={onWrapPointerMove}
+        onPointerUp={onWrapPointerUp}
+        onPointerCancel={() => {
+          gestureRef.current.active = false;
+          gestureRef.current.scroll = false;
         }}
       >
         <input
@@ -191,7 +257,11 @@ function Slider10({
           max={10}
           step={1}
           value={v}
-          onChange={(e) => onChange(parseInt(e.target.value, 10))}
+          onChange={(e) => {
+            // If the user is scrolling, ignore accidental slider movement.
+            if (gestureRef.current.scroll) return;
+            onChange(parseInt(e.target.value, 10));
+          }}
           className="eb-range w-full"
           style={{
             // Keep slider colour consistent (avoid band-based shifts at higher values).
