@@ -1,15 +1,12 @@
 import type { CheckInEntry, SymptomKey } from "../types";
+import { isoFromDateLocal, isoTodayLocal } from "./date";
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
 export function isoToday(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return isoTodayLocal();
 }
 
 export function sortByDateAsc(entries: CheckInEntry[] | unknown): CheckInEntry[] {
@@ -22,7 +19,7 @@ export function filterByDays(entries: CheckInEntry[] | unknown, days: number): C
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - (Math.max(1, days) - 1));
-  const cutoffISO = cutoff.toISOString().slice(0, 10);
+  const cutoffISO = isoFromDateLocal(cutoff);
 
   return safe.filter((e) => String(e?.dateISO ?? "") >= cutoffISO);
 }
@@ -89,7 +86,7 @@ export function calculateStreak(entries: CheckInEntry[] | unknown): number {
   const d = new Date();
 
   while (true) {
-    const iso = d.toISOString().slice(0, 10);
+    const iso = isoFromDateLocal(d);
     if (!set.has(iso)) break;
     streak += 1;
     d.setDate(d.getDate() - 1);

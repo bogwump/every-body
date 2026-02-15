@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Check,
   Download,
+  Upload,
   ArrowLeft,
   Camera,
   Heart as HeartIcon,
@@ -18,6 +19,7 @@ import {
   Sun as SunIcon,
   X,
 } from 'lucide-react';
+import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, importBackupFile } from '../lib/backup';
 import type { ColorTheme, SymptomKey, UserData } from '../types';
 import { downloadTextFile } from '../lib/storage';
 import {
@@ -226,13 +228,23 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
     periodPrediction: true,
   });
 
-  const exportJson = () => {
-    const payload = {
-      user: userData,
-      entries,
-      exportedAt: new Date().toISOString(),
-    };
-    downloadTextFile('everybody-data.json', JSON.stringify(payload, null, 2), 'application/json');
+  const exportBackup = async () => {
+    const file = makeBackupFile();
+    await shareOrDownloadBackup(file);
+  };
+
+  const backupInputRef = useRef<HTMLInputElement | null>(null);
+
+  const importBackup = async (file: File) => {
+    const raw = await file.text();
+    const parsed = parseBackupJson(raw);
+    if (!parsed) {
+      alert('That backup file does not look valid.');
+      return;
+    }
+    importBackupFile(parsed);
+    // Hard reload to ensure all pages pick up the restored state cleanly.
+    window.location.reload();
   };
 
   const exportCsv = () => {
@@ -283,9 +295,8 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
     },
   ];
 
-  if (view === 'personal') {
-    return (
-      <div className="eb-page">
+  return view === 'personal' ? (
+<div className="eb-page">
         <div className="eb-page-inner">
           <div className="mb-6 flex items-center gap-3">
             <button
@@ -412,11 +423,8 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
           </div>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="eb-page">
+  ) : (
+<div className="eb-page">
       <div className="eb-page-inner">
         <div className="mb-8">
           <h1 className="mb-2">Profile & Settings</h1>
@@ -952,10 +960,32 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                             but you can already export your data anytime.
                           </p>
 
-                          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                              <input
+                                ref={backupInputRef}
+                                type="file"
+                                accept="application/json"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  void importBackup(file);
+                                  // reset so importing the same file twice still triggers
+                                  (e.currentTarget as HTMLInputElement).value = '';
+                                }}
+                              />
+
+                              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => backupInputRef.current?.click()}
+                                  className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                                >
+                                  <Upload className="w-4 h-4" />
+                                  Import JSON
+                                </button>
                             <button
                               type="button"
-                              onClick={exportJson}
+                              onClick={exportBackup}
                               className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
                             >
                               <Download className="w-4 h-4" />

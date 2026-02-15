@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -14,7 +14,9 @@ import {
 import type { DashboardMetric, SymptomKey, UserData, UserGoal } from '../types';
 import { useEntries } from '../lib/appStore';
 import { computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
+import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
+import { importBackupFile, parseBackupJson } from '../lib/backup';
 
 interface DashboardProps {
   userName: string;
@@ -191,6 +193,11 @@ export function Dashboard({
 
   const [tipOffset, setTipOffset] = React.useState(0);
 
+  // Restore nudge (local-first app means different "installs" can have separate storage,
+  // e.g. iOS Safari tab vs Add-to-Home-Screen). Import gives users a way to recover quickly.
+  const restoreInputRef = useRef<HTMLInputElement | null>(null);
+  const [restoreMsg, setRestoreMsg] = useState<string>('');
+
   const tip = useMemo(() => {
     const phase = userData.cycleTrackingMode === 'cycle' ? (dayPhaseKey(todayPhase) as any) : null;
     return getDailyTip({
@@ -205,7 +212,19 @@ export function Dashboard({
   const addDaysISO = (dateISO: string, days: number) => {
     const d = new Date(dateISO + 'T00:00:00');
     d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
+    return isoFromDateLocal(d);
+  };
+
+  const restoreFromBackup = async (file: File) => {
+    try {
+      setRestoreMsg('');
+      const text = await file.text();
+      const json = parseBackupJson(text);
+      importBackupFile(json);
+      setRestoreMsg('Backup imported.');
+    } catch (err: any) {
+      setRestoreMsg(err?.message || 'Could not import backup.');
+    }
   };
 
   const yesterdayISO = useMemo(() => addDaysISO(todayISO, -1), [todayISO]);
@@ -253,7 +272,7 @@ export function Dashboard({
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      dateISOs.push(d.toISOString().slice(0, 10));
+      dateISOs.push(isoFromDateLocal(d));
     }
     const map = new Map(entriesSorted.map((e: any) => [e.dateISO, e]));
     return buildWeekSeries(dateISOs, map, chartMetrics);
@@ -516,6 +535,54 @@ export function Dashboard({
             </div>
           </div>
         </div>
+
+        {/* Restore from backup nudge (only when there is no data yet) */}
+        {daysTracked === 0 ? (
+          <div className="eb-card mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
+                <Upload className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-1">Got a backup to restore?</h3>
+                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                  If you used EveryBody on another phone or browser, import your backup JSON to bring your check-ins back.
+                </p>
+
+                <input
+                  ref={restoreInputRef}
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    void restoreFromBackup(file);
+                    (e.currentTarget as HTMLInputElement).value = '';
+                  }}
+                />
+
+                <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                    onClick={() => restoreInputRef.current?.click()}
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import backup
+                  </button>
+                  <button type="button" className="eb-btn eb-btn-secondary" onClick={() => onNavigate('profile')}>
+                    Go to Profile
+                  </button>
+                </div>
+
+                {restoreMsg ? (
+                  <p className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">{restoreMsg}</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Action cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

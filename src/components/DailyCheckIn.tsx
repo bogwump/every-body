@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Battery,
   Moon,
@@ -22,6 +22,7 @@ import type { CheckInEntry, SymptomKey, UserData, ExperimentPlan, InsightMetricK
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { EBDialogContent } from "./EBDialog";
 import { isoToday } from '../lib/analytics';
+import { isoFromDateLocal } from '../lib/date';
 import { useEntries, useExperiment } from '../lib/appStore';
 
 interface DailyCheckInProps {
@@ -150,6 +151,19 @@ function Slider10({
   const pct = (v / 10) * 100;
   // Nudge keeps the value pill visually centred near the ends (0/10)
   const nudgePx = (50 - pct) * 0.12;
+
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const setFromClientX = (clientX: number) => {
+    const el = inputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = Math.min(rect.right, Math.max(rect.left, clientX));
+    const ratio = rect.width ? (x - rect.left) / rect.width : 0;
+    const next = Math.round(ratio * 10);
+    onChange(clamp(next, 0, 10));
+  };
+
   return (
     <div className="relative pt-5">
       <div
@@ -159,19 +173,39 @@ function Slider10({
       >
         {v}
       </div>
-      <input
-        type="range"
-        min={0}
-        max={10}
-        step={1}
-        value={v}
-        onChange={(e) => onChange(parseInt(e.target.value, 10))}
-        className="w-full"
-        style={{ accentColor: bandColorNoAlpha(band3From10(v)) }}
-        aria-label="slider"
-      />
-      <div className="flex items-center justify-between text-xs text-[rgb(var(--color-text-secondary))] -mt-1">
+      <div
+        className="eb-range-wrap"
+        onPointerDown={(e) => {
+          // iOS can be finicky about jumping on tap. This makes the whole track tappable.
+          // Only do the jump for primary pointers.
+          if ((e as any).isPrimary === false) return;
+          // If the user is dragging the thumb, native behaviour still works.
+          // A tap anywhere else should jump.
+          setFromClientX(e.clientX);
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="range"
+          min={0}
+          max={10}
+          step={1}
+          value={v}
+          onChange={(e) => onChange(parseInt(e.target.value, 10))}
+          className="eb-range w-full"
+          style={{
+            // Keep slider colour consistent (avoid band-based shifts at higher values).
+            accentColor: 'rgb(var(--color-primary))',
+            color: 'rgb(var(--color-primary))',
+            // Used by CSS for a smooth animated fill
+            ['--eb-range-fill' as any]: `${pct}%`,
+          }}
+          aria-label="slider"
+        />
+      </div>
+      <div className="flex items-center justify-between text-xs text-[rgb(var(--color-text-secondary))] -mt-1 px-1">
         <span>{leftLabel ?? '0'}</span>
+        <span>5</span>
         <span>{rightLabel ?? '10'}</span>
       </div>
     </div>
@@ -188,7 +222,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   const addDaysISO = (dateISO: string, days: number) => {
     const d = new Date(dateISO + 'T00:00:00');
     d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
+    return isoFromDateLocal(d);
   };
 
   const prevDateISO = useMemo(() => addDaysISO(activeDateISO, -1), [activeDateISO]);
@@ -209,7 +243,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     if (!experiment) return null;
     const ex = experiment as ExperimentPlan;
     if (!ex.startDateISO) return null;
-    const todayISO2 = new Date().toISOString().slice(0, 10);
+    const todayISO2 = isoToday();
     const start = new Date(ex.startDateISO + 'T00:00:00');
     const today = new Date(todayISO2 + 'T00:00:00');
     const dayIndex = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));

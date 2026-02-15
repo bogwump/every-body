@@ -32,8 +32,13 @@ const GENERAL: Tip[] = [
     cta: { label: 'Customise symptoms', screen: 'profile' },
   },
   {
+    title: 'Back up once, relax after',
+    body: 'Export a backup file now and then (Profile → Privacy & security). If you ever switch phone or browser, you can import it in seconds.',
+    cta: { label: 'Back up / restore', screen: 'profile' },
+  },
+  {
     title: 'Use yesterday as your baseline',
-    body: 'If you are unsure, compare today to yesterday (the check-in now shows yesterday’s number).',
+    body: 'If you are unsure, compare today to yesterday. The daily check-in shows yesterday’s number to make quick comparisons easier.',
   },
   {
     title: 'Tiny reset, big impact',
@@ -108,6 +113,14 @@ export function getDailyTip(args: {
 
   // Early-user nudges: keep it a bit more motivating in the first week.
   if (daysTracked < 7) {
+    // Make sure new users see the backup/restore idea early.
+    if (daysTracked <= 2) {
+      return {
+        title: 'Save your progress',
+        body: 'Before you get too far in, export a backup (Profile → Privacy & security). It is a quick safety net if you switch devices.',
+        cta: { label: 'Back up / restore', screen: 'profile' },
+      };
+    }
     pool.unshift({
       title: 'One small win',
       body: 'Log today even if it’s messy. The point is a habit, not a perfect score.',

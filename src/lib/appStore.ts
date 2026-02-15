@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { UserData } from "../types";
+import { idbSet, idbDel, hydrateFromIDB } from "./idbMirror";
 
 export const APP_NAME = "EveryBody";
 export const COMPANION_NAME = "Eve";
@@ -9,6 +10,9 @@ const USER_KEY = "everybody:v2:user";
 const ENTRIES_KEY = "everybody:v2:entries";
 const CHAT_KEY = "everybody:v2:chat";
 const EXPERIMENT_KEY = "everybody:v2:experiment";
+
+export const STORAGE_KEYS = [USER_KEY, ENTRIES_KEY, CHAT_KEY, EXPERIMENT_KEY] as const;
+export type BackupPayload = Partial<Record<(typeof STORAGE_KEYS)[number], string | null>>;
 
 // One-time migration: if a user previously ran a legacy build that stored values on
 // different scales (eg 0–100) we prefer a clean slate over guessing.
@@ -75,6 +79,29 @@ function emitKey(key: string) {
 const parsedCache = new Map<string, unknown>();
 const rawCache = new Map<string, string | null>();
 
+
+// ---- Optional self-healing storage (IndexedDB mirror) ----
+let didHydrateFromIDB = false;
+/**
+ * Call once on app start (best-effort).
+ * If localStorage is empty in this context but IndexedDB has data,
+ * restore it and notify subscribers.
+ */
+export async function initSelfHealingStorage() {
+  if (didHydrateFromIDB) return;
+  didHydrateFromIDB = true;
+  try {
+    const restored = await hydrateFromIDB(Array.from(STORAGE_KEYS));
+    if (restored) {
+      // Clear parsed cache so hooks re-parse the restored raw JSON
+      for (const k of STORAGE_KEYS) parsedCache.delete(k);
+      for (const k of STORAGE_KEYS) emitKey(k);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 function readCached<T>(key: string, fallback: T): T {
   const raw = localStorage.getItem(key);
 
@@ -100,10 +127,36 @@ function readCached<T>(key: string, fallback: T): T {
 }
 
 function writeCached<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
-  rawCache.set(key, localStorage.getItem(key));
+  const raw = JSON.stringify(value);
+  localStorage.setItem(key, raw);
+  rawCache.set(key, raw);
   parsedCache.set(key, value);
   emitKey(key);
+  // Best-effort mirror to IndexedDB for self-healing
+  try { void idbSet(key, raw); } catch {}
+}
+
+export function applyBackupPayload(payload: BackupPayload) {
+  for (const key of STORAGE_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(payload, key)) continue;
+    const v = payload[key];
+
+    if (v == null) {
+      localStorage.removeItem(key);
+      rawCache.set(key, localStorage.getItem(key));
+      parsedCache.delete(key);
+      emitKey(key);
+      try { void idbDel(key); } catch {}
+      continue;
+    }
+
+    // Store raw and let normalisers re-parse on demand
+    localStorage.setItem(key, v);
+    rawCache.set(key, v);
+    parsedCache.delete(key);
+    emitKey(key);
+    try { void idbSet(key, v); } catch {}
+  }
 }
 
 // ---- Storage normalisers (CRITICAL FIX) ----

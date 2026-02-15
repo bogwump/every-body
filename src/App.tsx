@@ -10,7 +10,7 @@ import { CalendarView } from './components/CalendarView';
 import { Navigation } from './components/Navigation';
 
 import type { UserData } from './types';
-import { APP_NAME, useUser } from './lib/appStore';
+import { APP_NAME, useUser, initSelfHealingStorage} from './lib/appStore';
 
 const DEFAULT_USER: UserData = {
   name: '',

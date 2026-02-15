@@ -22,6 +22,7 @@ import type { CheckInEntry, CyclePhase, SymptomKey, UserData, ExperimentPlan, In
 import { useEntries, useExperiment } from '../lib/appStore';
 import { downloadTextFile } from '../lib/storage';
 import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
+import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { getMixedChartColors } from '../lib/chartPalette';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
@@ -331,7 +332,7 @@ function buildHtmlReport(args: {
 }) {
   const { userData, timeframeLabel, entries, selected, highlights, topCorr } = args;
 
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = isoTodayLocal();
   const title = `EveryBody Insights Report (${timeframeLabel})`;
   const esc = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -855,7 +856,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       highlights: findings,
       topCorr: corrPairs,
     });
-    downloadTextFile(`everybody-report-${new Date().toISOString().slice(0, 10)}.html`, html, 'text/html');
+    downloadTextFile(`everybody-report-${isoTodayLocal()}.html`, html, 'text/html');
   };
 
   const downloadRawJson = () => {
@@ -866,7 +867,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       selectedMetrics: selected,
       entries: entriesSorted,
     };
-    downloadTextFile(`everybody-data-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    downloadTextFile(`everybody-data-${isoTodayLocal()}.json`, JSON.stringify(payload, null, 2), 'application/json');
   };
 
   // --- UI helpers ---
@@ -913,7 +914,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   };
 
   const startExperiment = () => {
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = isoTodayLocal();
     if (!experimentPlan) return;
     const plan: ExperimentPlan = {
       id: `${todayISO}-${Math.random().toString(16).slice(2)}`,
@@ -977,7 +978,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const experimentStatus = useMemo(() => {
     if (!experiment) return null;
     const ex = experiment as ExperimentPlan;
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = isoTodayLocal();
     const start = new Date(ex.startDateISO + 'T00:00:00');
     const today = new Date(todayISO + 'T00:00:00');
     const dayIndex = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
@@ -999,7 +1000,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const start = new Date(ex.startDateISO + 'T00:00:00');
     const end = new Date(start.getTime() + ((ex.durationDays ?? 3) - 1) * 24 * 60 * 60 * 1000);
     const startISO = ex.startDateISO;
-    const endISO = end.toISOString().slice(0, 10);
+    const endISO = isoFromDateLocal(end);
     const windowEntries = entriesAllSorted.filter((e) => e.dateISO >= startISO && e.dateISO <= endISO);
     const metrics = (ex.metrics ?? []).slice(0, 6) as MetricKey[];
 
@@ -1090,7 +1091,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                 <button
                   type="button"
                   className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
-                  onClick={() => onOpenCheckIn(new Date().toISOString().slice(0, 10))}
+                  onClick={() => onOpenCheckIn(isoTodayLocal())}
                 >
                   Log today
                 </button>

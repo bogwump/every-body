@@ -364,16 +364,21 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
       return s;
     }
 
-    // With no ovulation override, only show fertile windows once we have enough cycle history
-    // to make a meaningful estimate. Avoid guessing for brand‑new users.
-    if (avgLen == null || cycleStarts.length < 2) return s;
+    // With no ovulation override, start predicting as soon as we have *some* anchor.
+    // - 0 cycle starts: show nothing
+    // - 1 cycle start: use a default 28-day cycle
+    // - 2+ cycle starts: use personalised average length (avgLen)
+    if (cycleStarts.length === 0) return s;
+
+    const defaultLen = 28;
+    const lenForPrediction = avgLen ?? defaultLen;
 
     const startsToUse = cycleStarts;
 
     for (let i = 0; i < startsToUse.length; i++) {
       const startISO = startsToUse[i];
 
-      const nextStartISO = startsToUse[i + 1] ?? addDaysISO(startISO, avgLen);
+      const nextStartISO = startsToUse[i + 1] ?? addDaysISO(startISO, lenForPrediction);
 
       const cycleLen = daysBetweenISO(startISO, nextStartISO);
 
