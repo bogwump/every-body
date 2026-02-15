@@ -23,7 +23,8 @@ import { useEntries, useExperiment } from '../lib/appStore';
 import { downloadTextFile } from '../lib/storage';
 import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
 import { getMixedChartColors } from '../lib/chartPalette';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
 
 interface InsightsProps {
@@ -1292,7 +1293,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                 Change metrics
               </button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl rounded-2xl">
+            <EBDialogContent
+              title="Choose metrics to analyse"
+              description="Select up to 6 metrics to personalise your insights."
+              className="max-w-2xl rounded-2xl"
+            >
               <DialogHeader>
                 <DialogTitle>Choose metrics to analyse (max 6)</DialogTitle>
                 <DialogDescription>
@@ -1313,7 +1318,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               </div>
 
               <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your “top 3” and stick with them for a week.</div>
-            </DialogContent>
+            </EBDialogContent>
           </Dialog>
           </div>
         </div>
@@ -1397,7 +1402,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
       {/* Experiment dialog */}
       <Dialog open={experimentOpen} onOpenChange={setExperimentOpen}>
-        <DialogContent className="max-w-lg rounded-2xl">
+        <EBDialogContent
+          title={experimentPlan?.title ?? 'Experiment'}
+          description="Set up a tiny experiment and keep logging a few metrics so you can spot what changes."
+          className="max-w-lg rounded-2xl"
+        >
           <DialogHeader>
             <DialogTitle>{experimentPlan?.title ?? 'Experiment'}</DialogTitle>
             <DialogDescription>
@@ -1514,7 +1523,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               </button>
             </div>
           </div>
-        </DialogContent>
+        </EBDialogContent>
       </Dialog>
 
 
@@ -1525,7 +1534,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           if (!open) setFinishExperimentConfirm(null);
         }}
       >
-        <DialogContent className="max-w-md rounded-2xl">
+        <EBDialogContent
+          title="Finish experiment"
+          description="Confirm whether this experiment helped, so we can save the result."
+          className="max-w-md rounded-2xl"
+        >
           <DialogHeader>
             <DialogTitle>Finish experiment?</DialogTitle>
             <DialogDescription>
@@ -1551,7 +1564,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               </button>
             </div>
           </div>
-        </DialogContent>
+        </EBDialogContent>
       </Dialog>
 
       {/* Trends */}
@@ -1958,8 +1971,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
       {/* Export report */}
       <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0 w-full">
             <h2 className="text-xl font-semibold tracking-tight">{reportCardTitle}</h2>
             <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
               Download a readable <b>.html</b> report for you. If you ever need to share with a clinician, use the JSON as the “machine” version.
@@ -1969,16 +1982,16 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             </p>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 w-full sm:w-auto">
             <button
-              className="min-w-[240px] px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
+              className="w-full sm:min-w-[240px] px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
               onClick={downloadReportHtml}
             >
               <Download className="w-4 h-4" />
               Download report
             </button>
             <button
-              className="min-w-[240px] px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
+              className="w-full sm:min-w-[240px] px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
               onClick={downloadRawJson}
             >
               Raw JSON

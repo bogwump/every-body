@@ -19,7 +19,8 @@ import {
 
 import type { CheckInEntry, SymptomKey, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
+import { EBDialogContent } from "./EBDialog";
 import { isoToday } from '../lib/analytics';
 import { useEntries, useExperiment } from '../lib/appStore';
 
@@ -452,7 +453,10 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           if (!open) setPendingEntry(null);
         }}
       >
-        <DialogContent>
+        <EBDialogContent
+          title="New period confirmation"
+          description="Confirm whether today should be marked as the start of a new cycle."
+        >
           <DialogHeader>
             <DialogTitle>Is this the start of a new period?</DialogTitle>
             <DialogDescription>
@@ -505,7 +509,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
               Start period
             </button>
           </DialogFooter>
-        </DialogContent>
+        </EBDialogContent>
       </Dialog>
 
       <div className="eb-page-inner">
