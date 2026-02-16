@@ -25,6 +25,25 @@ import { isoToday } from '../lib/analytics';
 import { isoFromDateLocal } from '../lib/date';
 import { useEntries, useExperiment } from '../lib/appStore';
 
+const INFLUENCE_DEFS: Array<{ key: string; label: string; hint: string }> = [
+  {
+    key: 'sex',
+    label: 'Intimacy',
+    hint: 'Logged privately. Helps spot patterns with mood, confidence, bleeding and more.',
+  },
+  { key: 'exercise', label: 'Workout', hint: 'Any workout or brisk activity.' },
+  { key: 'travel', label: 'Travel', hint: 'Travel, long drives, or time zone changes.' },
+  { key: 'illness', label: 'Illness', hint: 'Cold, flu, infection, or feeling unwell.' },
+  { key: 'alcohol', label: 'Alcohol', hint: 'More than your usual.' },
+  { key: 'caffeine', label: 'Caffeine', hint: 'More caffeine than usual.' },
+  { key: 'lateNight', label: 'Late night', hint: 'Later bedtime or disrupted routine.' },
+  { key: 'stressfulDay', label: 'Stressful day', hint: 'High stress or emotional strain.' },
+  { key: 'medication', label: 'Medication', hint: 'Any medication today (yes/no). Useful for pattern spotting.' },
+  { key: 'socialising', label: 'Socialising', hint: 'More social than usual (or a big event).' },
+  { key: 'lowHydration', label: 'Low hydration', hint: 'Less water than usual.' },
+];
+
+
 interface DailyCheckInProps {
   userData: UserData;
   onUpdateUserData: (updater: ((prev: UserData) => UserData) | UserData) => void;
@@ -45,7 +64,9 @@ const moodIcons: Array<{ value: 1 | 2 | 3; icon: React.ElementType; label: strin
 // (Calendar + analytics already normalise if older entries used 0–100.)
 const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; hint?: string }> = {
   energy: { label: 'Energy', icon: Battery, hint: 'How much fuel you have in the tank' },
+  motivation: { label: 'Motivation', icon: Battery, hint: 'Drive and willingness to do things' },
   sleep: { label: 'Sleep quality', icon: Moon, hint: 'Quality of sleep, not just hours' },
+  insomnia: { label: 'Insomnia', icon: Moon, hint: 'Trouble falling or staying asleep' },
   stress: { label: 'Stress', icon: Zap, hint: 'Mental pressure or feeling on edge' },
   anxiety: { label: 'Anxiety', icon: Zap, hint: 'Worry, racing thoughts' },
   irritability: { label: 'Irritability', icon: Zap, hint: 'Short fuse, feeling snappy' },
@@ -53,14 +74,20 @@ const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; h
   bloating: { label: 'Bloating', icon: Wind, hint: 'Fullness or swollen belly feeling' },
   digestion: { label: 'Digestion', icon: Wind, hint: 'Gut comfort and regularity' },
   nausea: { label: 'Nausea', icon: Wind, hint: 'Sick or queasy feeling' },
+  acidReflux: { label: 'Acid reflux', icon: Wind, hint: 'Heartburn or reflux symptoms' },
+  constipation: { label: 'Constipation', icon: Wind, hint: 'Hard stools or difficulty going' },
+  diarrhoea: { label: 'Diarrhoea', icon: Wind, hint: 'Loose stools or urgency' },
   pain: { label: 'Pain', icon: Heart, hint: 'Overall body pain or aches' },
   headache: { label: 'Headache', icon: Brain, hint: 'Head pain or pressure' },
+  migraine: { label: 'Migraine', icon: Brain, hint: 'Migraine-type headache' },
+  backPain: { label: 'Back pain', icon: Heart, hint: 'Upper or lower back pain' },
   cramps: { label: 'Cramps', icon: Heart, hint: 'Lower belly cramps or spasms' },
   jointPain: { label: 'Joint pain', icon: Heart, hint: 'Stiff or sore joints' },
   flow: { label: 'Bleeding / spotting (optional)', icon: Droplet, hint: 'Bleeding or spotting level' },
   hairShedding: { label: 'Hair shedding', icon: Sparkles, hint: 'More hair loss than usual' },
   facialSpots: { label: 'Facial spots', icon: Sparkles, hint: 'Breakouts or spots on face' },
   cysts: { label: 'Cysts', icon: Heart, hint: 'Painful lumps or cystic spots' },
+  skinDryness: { label: 'Skin dryness', icon: Sparkles, hint: 'Dry, itchy, or sensitive skin' },
   brainFog: { label: 'Brain fog', icon: Brain, hint: 'Foggy thinking, forgetfulness' },
   fatigue: { label: 'Fatigue', icon: Battery, hint: 'Heavy tiredness or drained feeling' },
   dizziness: { label: 'Dizziness', icon: Brain, hint: 'Light-headed or unsteady' },
@@ -353,6 +380,14 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   // Behavioural influences (kept discreet, but not hidden)
   const [influencesOpen, setInfluencesOpen] = useState(false);
   const [eventsState, setEventsState] = useState<Record<string, boolean>>({});
+
+  const visibleInfluences = useMemo(() => {
+    const enabledKeys = Array.isArray(userData.enabledInfluences)
+      ? (userData.enabledInfluences as string[])
+      : INFLUENCE_DEFS.map((x) => x.key);
+    const enabled = new Set(enabledKeys);
+    return INFLUENCE_DEFS.filter((x) => enabled.has(x.key));
+  }, [userData.enabledInfluences]);
 
   const isCycleEnabled = userData.cycleTrackingMode === 'cycle';
 
@@ -846,20 +881,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
           {influencesOpen && (
             <div className="grid grid-cols-1 gap-3 mt-4">
-              {[
-                {
-                  key: 'sex',
-                  label: 'Intimacy',
-                  hint: 'Logged privately. Helps spot patterns with mood, confidence, bleeding and more.',
-                },
-                { key: 'exercise', label: 'Workout', hint: 'Any workout or brisk activity.' },
-                { key: 'travel', label: 'Travel', hint: 'Travel, long drives, or time zone changes.' },
-                { key: 'illness', label: 'Illness', hint: 'Cold, flu, infection, or feeling unwell.' },
-                { key: 'alcohol', label: 'Alcohol', hint: 'More than your usual.' },
-                { key: 'lateNight', label: 'Late night', hint: 'Later bedtime or disrupted routine.' },
-                { key: 'stressfulDay', label: 'Stressful day', hint: 'High stress or emotional strain.' },
-                { key: 'medication', label: 'Medication', hint: 'Any medication today (yes/no). Useful for pattern spotting.' },
-              ].map((item) => (
+              {visibleInfluences.map((item) => (
                 <SwitchRow
                   key={item.key}
                   checked={Boolean(eventsState[item.key])}

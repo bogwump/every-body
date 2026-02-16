@@ -5,9 +5,13 @@ export type CycleTrackingMode = 'cycle' | 'no-cycle';
 
 export type SymptomKey =
   | 'energy'
+  | 'motivation'
   | 'sleep'
+  | 'insomnia'
   | 'pain'
   | 'headache'
+  | 'migraine'
+  | 'backPain'
   | 'cramps'
   | 'jointPain'
   | 'flow'
@@ -18,10 +22,13 @@ export type SymptomKey =
   | 'bloating'
   | 'digestion'
   | 'nausea'
+  | 'constipation'
+  | 'diarrhoea'
   | 'acidReflux'
   | 'hairShedding'
   | 'facialSpots'
   | 'cysts'
+  | 'skinDryness'
   | 'brainFog'
   | 'fatigue'
   | 'dizziness'
@@ -35,6 +42,19 @@ export type SymptomKey =
 export type DashboardMetric = SymptomKey | 'mood';
 
 export type SymptomKind = 'behaviour' | 'state' | 'physio' | 'hormonal' | 'other';
+
+export type InfluenceKey =
+  | 'sex'
+  | 'exercise'
+  | 'travel'
+  | 'illness'
+  | 'alcohol'
+  | 'lateNight'
+  | 'stressfulDay'
+  | 'medication'
+  | 'caffeine'
+  | 'socialising'
+  | 'lowHydration';
 
 export interface CustomSymptom {
   id: string;
@@ -56,6 +76,12 @@ export interface UserData {
   showCycleBubble: boolean;
   /** Which symptom modules are enabled for the daily check-in */
   enabledModules: SymptomKey[];
+
+  /** Which lifestyle / influence toggles show in the daily check-in */
+  enabledInfluences?: InfluenceKey[];
+
+  /** True once we've applied goal-based defaults during first onboarding (prevents future goal changes auto-resetting settings). */
+  onboardingPresetApplied?: boolean;
 
   /** Optional: user-defined custom symptoms (freeform). Stored as ids + labels. */
   customSymptoms?: CustomSymptom[];
@@ -121,6 +147,12 @@ export interface CheckInEntry {
     stressfulDay?: boolean;
     /** Medication taken (yes/no influence) */
     medication?: boolean;
+    /** Higher caffeine than usual */
+    caffeine?: boolean;
+    /** More social than usual (or big social event) */
+    socialising?: boolean;
+    /** Low hydration */
+    lowHydration?: boolean;
   };
   createdAt: string; // ISO
   updatedAt: string; // ISO

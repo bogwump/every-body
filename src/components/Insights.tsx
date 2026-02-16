@@ -1307,7 +1307,59 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setExperiment(next);
   };
 
-  return (
+    const renderExperimentDelta = () => {
+    const s0 = experimentWindow?.series?.[0];
+    const nums = (s0?.values ?? []).filter((v) => typeof v === 'number') as number[];
+    if (nums.length < 2 || !s0) return null;
+    const first = nums[0];
+    const last = nums[nums.length - 1];
+    const delta = last - first;
+    const dir = delta === 0 ? 'stayed about the same' : delta > 0 ? 'went up' : 'went down';
+    return (
+      <span>
+        {' '}
+        Your {labelFor((s0 as any).key, userData)} {dir} from {Math.round(first)}/10 to {Math.round(last)}/10.
+      </span>
+    );
+  };
+
+  const renderExperimentCTA = (ms: any) => {
+    if (!ms) return null;
+    const strength = ms.strength;
+    const hasHormonal = Boolean(ms.hormonalInvolved);
+    const allow = Boolean(ms.allowSuggestedExperiment);
+
+    if (!allow) {
+      return (
+        <div className="text-sm eb-muted">
+          {hasHormonal ? 'Track for one more cycle to learn more.' : 'Keep logging to unlock experiment suggestions.'}
+        </div>
+      );
+    }
+
+    // If it's hormonal-related and weak, be extra conservative.
+    if (hasHormonal && strength === 'weak') {
+      return (
+        <div className="text-sm eb-muted">
+          Track for one more cycle to strengthen the signal, then we can suggest a tiny experiment.
+        </div>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
+        onClick={() => openExperiment(ms)}
+        title="Turn this finding into a tiny 3-day test"
+      >
+        <FlaskConical className="w-4 h-4" />
+        Run a 3-day experiment
+      </button>
+    );
+  };
+
+return (
     <div className="eb-container space-y-6 pt-8 pb-12">
       {/* Header */}
       <div className="pt-2">
@@ -1480,26 +1532,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             <div className="mt-4 eb-inset rounded-2xl p-4">
               <div className="text-sm font-semibold">Conclusion</div>
               <div className="mt-1 text-sm eb-muted">
-                {(() => {
-                  const r = ((experimentStatus.ex as any).outcome.rating as number);
-                  const worked = r >= 4;
-                  return worked ? "You marked this as a success." : "You marked this as not helpful.";
-                })()}
-                {experimentWindow?.series?.length ? (() => {
-                  const s0 = experimentWindow.series[0];
-                  const nums = (s0?.values ?? []).filter((v) => typeof v === 'number') as number[];
-                  if (nums.length < 2) return null;
-                  const first = nums[0];
-                  const last = nums[nums.length - 1];
-                  const delta = last - first;
-                  const dir = delta === 0 ? 'stayed about the same' : delta > 0 ? 'went up' : 'went down';
-                  return (
-                    <span>
-                      {' '}
-                      Your {labelFor(s0.key, userData)} {dir} from {Math.round(first)}/10 to {Math.round(last)}/10.
-                    </span>
-                  );
-                })() : null}
+                {Number((experimentStatus.ex as any)?.outcome?.rating ?? 0) >= 4 ? "You marked this as a success." : "You marked this as not helpful."}
+                {experimentWindow?.series?.length ? renderExperimentDelta() : null}
               </div>
               {(experimentStatus.ex as any)?.outcome?.note ? (
                 <div className="mt-2 text-sm">Note: {(experimentStatus.ex as any).outcome.note}</div>
@@ -1629,37 +1663,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                     </div>
 
                     <div className="mt-4 flex justify-end">
-                      {(() => {
-                        const ms = (f.metrics ?? []) as InsightMetricKey[];
-                        const canSuggest =
-                          ms.length === 2 &&
-                          entriesSorted.length >= 14 &&
-                          !ms.some((m) => isHormonalMetric(m, userData)) &&
-                          ((getKindForMetric(ms[0], userData) === 'behaviour' && getKindForMetric(ms[1], userData) === 'state') ||
-                            (getKindForMetric(ms[1], userData) === 'behaviour' && getKindForMetric(ms[0], userData) === 'state'));
-
-                        const hasHormonal = ms.some((m) => isHormonalMetric(m, userData));
-
-                        if (!canSuggest) {
-                          return (
-                            <div className="text-sm eb-muted">
-                              {hasHormonal ? 'Track for one more cycle to learn more.' : 'Keep logging to unlock experiment suggestions.'}
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <button
-                            type="button"
-                            className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
-                            onClick={() => openExperiment(ms)}
-                            title="Turn this finding into a tiny 3-day test"
-                          >
-                            <FlaskConical className="w-4 h-4" />
-                            Run a 3-day experiment
-                          </button>
-                        );
-                      })()}
+                      {renderExperimentCTA(f)}
                     </div>
                   </div>
                 </CarouselItem>

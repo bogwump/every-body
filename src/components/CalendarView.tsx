@@ -86,6 +86,12 @@ function influenceLabel(key: string): string | null {
       return 'Stressful day';
     case 'medication':
       return 'Medication';
+    case 'caffeine':
+      return 'Caffeine';
+    case 'socialising':
+      return 'Socialising';
+    case 'lowHydration':
+      return 'Low hydration';
     default:
       return null;
   }
@@ -401,7 +407,211 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
       }
     }
     return s;
-  }, [fertilityEnabled, cycleStarts, avgLen, periodSet, ovulationSet]);
+  }, [fertilityEnabled, cycleStarts, avgLen, periodSet, ovulationSet]);  const summaryModal = useMemo(() => {
+    if (!summaryISO) return null;
+    const e = byISO.get(summaryISO);
+    const influences = influencesFromEntry(e);
+    const note = typeof (e as any)?.notes === 'string' ? String((e as any).notes).trim() : '';
+    const mood = moodLabel((e as any)?.mood);
+
+    // Up to 5 logged metrics from enabled modules
+    const enabled = Array.isArray(userData.enabledModules) ? (userData.enabledModules as SymptomKey[]) : [];
+    const rows: Array<{ label: string; value: string }> = [];
+    for (const k of enabled) {
+      const vRaw = (e as any)?.values?.[k];
+      if (typeof vRaw !== 'number') continue;
+      const v = vRaw > 10 ? Math.round(vRaw / 10) : vRaw;
+      rows.push({ label: overlayLabel(k), value: `${clamp(v, 0, 10)}/10` });
+    }
+    const topRows = rows.slice(0, 5);
+
+    const isPeriod = periodSet.has(summaryISO);
+    const isFertile = fertileSet.has(summaryISO);
+    const isOv = fertilityEnabled && ovulationSet.has(summaryISO);
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/50"
+          onClick={() => setSummaryISO(null)}
+          aria-label="Close day summary"
+        />
+
+        <div className="relative w-full max-w-lg eb-card p-6">
+          <div className="mb-4">
+            <div className="text-xl font-semibold">Day summary</div>
+            <div className="text-sm text-[rgb(var(--color-text-secondary))]">
+              {prettyDate(new Date(summaryISO + 'T00:00:00'))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            {mood ? <span className="eb-pill">{mood}</span> : null}
+            {isPeriod ? <span className="eb-pill">Period</span> : null}
+            {isFertile ? <span className="eb-pill">Fertile</span> : null}
+            {isOv ? <span className="eb-pill">Ovulation</span> : null}
+            {influences.map((x) => (
+              <span key={x} className="eb-pill">
+                {x}
+              </span>
+            ))}
+          </div>
+
+          {topRows.length ? (
+            <div className="space-y-2 mb-4">
+              {topRows.map((r) => (
+                <div key={r.label} className="flex items-center justify-between text-sm">
+                  <div className="text-[rgb(var(--color-text-secondary))]">{r.label}</div>
+                  <div className="font-medium">{r.value}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {note ? (
+            <div className="mb-4 text-sm whitespace-pre-wrap">
+              <div className="font-semibold mb-1">Note</div>
+              <div className="text-[rgb(var(--color-text-secondary))]">{note}</div>
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              className="w-full eb-btn-primary"
+              onClick={() => {
+                const iso = summaryISO;
+                setSummaryISO(null);
+                onOpenCheckIn(iso);
+              }}
+            >
+              Edit check-in
+            </button>
+            <button type="button" className="w-full eb-btn-secondary" onClick={() => setSummaryISO(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }, [summaryISO, byISO, userData.enabledModules, periodSet, fertileSet, ovulationSet, fertilityEnabled, onOpenCheckIn]);
+
+  const cycleEditModal = useMemo(() => {
+    if (!editISO) return null;
+
+    const e = byISO.get(editISO) as any;
+    const flowVal = e?.values?.flow;
+    const flow = typeof flowVal === 'number' ? flowVal : 0;
+    const isBleeding = flow > 0;
+    const isStart = Boolean(e?.cycleStartOverride);
+    const isOv = fertilityEnabled && ovulationSet.has(editISO);
+
+    const ensureEntry = () => {
+      if (e) return e;
+      const now = new Date().toISOString();
+      return {
+        id:
+          globalThis.crypto && 'randomUUID' in globalThis.crypto
+            ? (globalThis.crypto as any).randomUUID()
+            : String(Math.random()),
+        dateISO: editISO,
+        values: {},
+        createdAt: now,
+        updatedAt: now,
+      };
+    };
+
+    const saveEntry = (next: any) => {
+      const now = new Date().toISOString();
+      upsertEntry({ ...next, updatedAt: now });
+    };
+
+    const setFlow = (v: number) => {
+      const base = ensureEntry();
+      const next = { ...base, values: { ...(base.values ?? {}), flow: v } };
+      saveEntry(next);
+    };
+
+    const toggleStart = (v: boolean) => {
+      const base = ensureEntry();
+      const now = new Date().toISOString();
+
+      // Cycle start should be an explicit, single marker.
+      // If we set a start on this day, clear any other manual starts to avoid duplicates.
+      if (v) {
+        for (const existing of entriesSorted as any[]) {
+          if (existing?.cycleStartOverride && existing.dateISO !== editISO) {
+            upsertEntry({ ...existing, cycleStartOverride: false, updatedAt: now });
+          }
+        }
+      }
+
+      const next = { ...base, cycleStartOverride: v, updatedAt: now };
+      upsertEntry(next);
+    };
+
+    const toggleOvulation = (v: boolean) => {
+      const base = ensureEntry();
+      const now = new Date().toISOString();
+      const next = { ...base, ovulationOverride: v, updatedAt: now };
+      upsertEntry(next);
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setEditISO(null)} aria-label="Close" />
+        <div className="relative w-full max-w-lg eb-card p-6">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-xl font-semibold">Edit cycle</div>
+              <div className="text-sm text-[rgb(var(--color-text-secondary))]">
+                {prettyDate(new Date(editISO + 'T00:00:00'))}
+              </div>
+            </div>
+            <button type="button" className="p-2 rounded-xl hover:bg-neutral-100" onClick={() => setEditISO(null)} aria-label="Close">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              className={cn('eb-btn-secondary flex items-center gap-2 justify-center', isBleeding ? 'bg-[rgb(var(--color-primary)/0.10)] border-[rgb(var(--color-primary)/0.30)]' : '')}
+              onClick={() => { setFlow(isBleeding ? 0 : 8); setEditISO(null); }}
+            >
+              {isBleeding ? <Droplets className="w-4 h-4" /> : <Droplet className="w-4 h-4" />}
+              <span>{isBleeding ? 'Remove bleeding' : 'Mark bleeding'}</span>
+            </button>
+
+            <button
+              type="button"
+              className={cn('eb-btn-secondary flex items-center gap-2 justify-center', isStart ? 'bg-[rgb(var(--color-primary)/0.10)] border-[rgb(var(--color-primary)/0.30)]' : '')}
+              onClick={() => { toggleStart(!isStart); setEditISO(null); }}
+            >
+              <Flag className="w-4 h-4" />
+              <span>{isStart ? 'Remove cycle start' : 'Set as cycle start'}</span>
+            </button>
+
+            {fertilityEnabled ? (
+              <button
+                type="button"
+                className="eb-btn-secondary flex items-center gap-2 justify-center sm:col-span-2"
+                onClick={() => { toggleOvulation(!isOv); setEditISO(null); }}
+              >
+                <Egg className="w-4 h-4" />
+                <span>{isOv ? 'Remove ovulation' : 'Mark as ovulation'}</span>
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
+            These edits update your cycle data (period and fertility). They do not change your symptom entries. Bleeding logged in your daily check-in remains the primary source of truth.
+          </div>
+        </div>
+      </div>
+    );
+  }, [editISO, byISO, fertilityEnabled, ovulationSet, entriesSorted, upsertEntry]);
 
   const showLegend = cycleEnabled || fertilityEnabled;
 
@@ -527,235 +737,11 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
         </div>
 
         {/* Day summary (tap a day) */}
-        {summaryISO && (() => {
-          const e = byISO.get(summaryISO);
-          const influences = influencesFromEntry(e);
-          const note = typeof e?.notes === 'string' ? e.notes.trim() : '';
-          const mood = moodLabel(e?.mood);
-
-          // Up to 5 logged metrics from enabled modules
-          const enabled = Array.isArray(userData.enabledModules) ? userData.enabledModules : [];
-          const rows: Array<{ label: string; value: string }> = [];
-          for (const k of enabled) {
-            const vRaw = e?.values?.[k];
-            if (typeof vRaw !== 'number') continue;
-            const v = vRaw > 10 ? Math.round(vRaw / 10) : vRaw;
-            rows.push({ label: overlayLabel(k), value: `${clamp(v, 0, 10)}/10` });
-          }
-          const topRows = rows.slice(0, 5);
-
-          const isPeriod = periodSet.has(summaryISO);
-          const isFertile = fertileSet.has(summaryISO);
-          const isOv = fertilityEnabled && ovulationSet.has(summaryISO);
-
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <button
-                type="button"
-                className="absolute inset-0 bg-black/50"
-                onClick={() => setSummaryISO(null)}
-                aria-label="Close day summary"
-              />
-
-              <div className="relative w-full max-w-lg eb-card p-6">
-                <div className="mb-4">
-                  <div className="text-xl font-semibold">Day summary</div>
-                  <div className="text-sm text-[rgb(var(--color-text-secondary))]">{prettyDate(new Date(summaryISO + 'T00:00:00'))}</div>
-                </div>
-
-                {(isPeriod || isFertile || isOv || mood) && (
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    {isPeriod && (
-                      <span className="px-2 py-1 rounded-full text-xs border border-[rgba(0,0,0,0.10)] bg-[rgb(var(--color-primary-dark)/0.10)]">Period</span>
-                    )}
-                    {isFertile && (
-                      <span className="px-2 py-1 rounded-full text-xs border border-[rgb(var(--color-accent)/0.45)] bg-[rgb(var(--color-accent)/0.12)]">Fertile window</span>
-                    )}
-                    {isOv && (
-                      <span className="px-2 py-1 rounded-full text-xs border border-[rgb(var(--color-accent)/0.55)] bg-[rgb(var(--color-accent)/0.14)]">Ovulation</span>
-                    )}
-                    {mood && (
-                      <span className="px-2 py-1 rounded-full text-xs border border-[rgba(0,0,0,0.10)] bg-[rgba(0,0,0,0.04)]">Mood: {mood}</span>
-                    )}
-                  </div>
-                )}
-
-                {topRows.length > 0 ? (
-                  <div className="space-y-3 mb-4">
-                    {topRows.map((r) => (
-                      <div key={r.label} className="flex items-center justify-between gap-4">
-                        <div className="text-sm">{r.label}</div>
-                        <div className="text-sm font-semibold">{r.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mb-4 text-sm text-[rgb(var(--color-text-secondary))]">No symptom scores logged for this day yet.</div>
-                )}
-
-                {influences.length > 0 && (
-                  <div className="mb-4">
-                    <div className="text-sm font-semibold mb-1">Other influences</div>
-                    <div className="text-sm text-[rgb(var(--color-text-secondary))]">{influences.join(' • ')}</div>
-                  </div>
-                )}
-
-                {note && (
-                  <div className="mb-5">
-                    <div className="text-sm font-semibold mb-1">Note</div>
-                    <div className="text-sm text-[rgb(var(--color-text-secondary))]">
-                      {note.split(/\r?\n/)[0]}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  className="w-full eb-btn-primary"
-                  onClick={() => {
-                    const iso = summaryISO;
-                    setSummaryISO(null);
-                    onOpenCheckIn(iso);
-                  }}
-                >
-                  Edit check-in
-                </button>
-                <button
-                  type="button"
-                  className="w-full eb-btn-secondary mt-3"
-                  onClick={() => setSummaryISO(null)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+        {summaryModal}
 
 
         {/* Cycle edit sheet */}
-        {editISO && (() => {
-      const e = byISO.get(editISO);
-      const flowVal = e?.values?.flow;
-      const flow = typeof flowVal === 'number' ? flowVal : 0;
-      const isBleeding = flow > 0;
-      const isStart = Boolean(e?.cycleStartOverride);
-      const isOv = fertilityEnabled && ovulationSet.has(editISO);
-
-      const ensureEntry = () => {
-        if (e) return e;
-        const now = new Date().toISOString();
-        return {
-          id: (globalThis.crypto && 'randomUUID' in globalThis.crypto) ? (globalThis.crypto as any).randomUUID() : String(Math.random()),
-          dateISO: editISO,
-          values: {},
-          createdAt: now,
-          updatedAt: now,
-        };
-      };
-
-      const saveEntry = (next: any) => {
-        const now = new Date().toISOString();
-        upsertEntry({ ...next, updatedAt: now });
-      };
-
-      const setFlow = (v: number) => {
-        const base = ensureEntry();
-        const next = { ...base, values: { ...(base.values ?? {}), flow: v } };
-        saveEntry(next);
-      };
-
-      const toggleStart = (v: boolean) => {
-        const base = ensureEntry();
-        const now = new Date().toISOString();
-
-        // Cycle start should be an explicit, single marker.
-        // If we set a start on this day, clear any other manual starts to avoid duplicates.
-        if (v) {
-          for (const existing of entriesSorted) {
-            if (existing?.cycleStartOverride && existing.dateISO !== editISO) {
-              upsertEntry({ ...existing, cycleStartOverride: false, updatedAt: now });
-            }
-          }
-        }
-
-        const next = { ...base, cycleStartOverride: v, updatedAt: now };
-        upsertEntry(next);
-      };
-
-      const toggleOvulation = (v: boolean) => {
-        onUpdateUser((prev) => {
-          const list = Array.isArray(prev.ovulationOverrideISOs) ? ([...prev.ovulationOverrideISOs] as string[]) : [];
-          const set = new Set(list);
-          if (v) set.add(editISO);
-          else set.delete(editISO);
-          return { ...prev, ovulationOverrideISOs: Array.from(set).sort((a, b) => a.localeCompare(b)) };
-        });
-      };
-
-      return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setEditISO(null)}
-            aria-label="Close cycle edit"
-          />
-          <div className="relative w-full max-w-lg eb-card p-4">
-<div className="mb-3 flex items-start justify-between gap-4">
-  <div>
-    <div className="text-base font-semibold">Edit this day</div>
-    <div className="text-sm text-[rgb(var(--color-text-secondary))]">{editISO ?? ''}</div>
-  </div>
-  <button
-    type="button"
-    className="eb-icon-btn"
-    onClick={() => setEditISO(null)}
-    aria-label="Close"
-    title="Close"
-  >
-    <X className="w-5 h-5" />
-  </button>
-</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              className="eb-btn-secondary flex items-center gap-2 justify-center"
-              onClick={() => { setFlow(isBleeding ? 0 : 5); setEditISO(null); }}
-            >
-              {isBleeding ? <Droplets className="w-4 h-4" /> : <Droplet className="w-4 h-4" />}
-              <span>{isBleeding ? 'Remove bleeding' : 'Mark as bleeding'}</span>
-            </button>
-
-            <button
-              type="button"
-              className="eb-btn-secondary flex items-center gap-2 justify-center"
-              onClick={() => { toggleStart(!isStart); setEditISO(null); }}
-            >
-              <Flag className="w-4 h-4" />
-              <span>{isStart ? 'Remove cycle start' : 'Set as cycle start'}</span>
-            </button>
-
-            {fertilityEnabled && (
-              <button
-                type="button"
-                className="eb-btn-secondary flex items-center gap-2 justify-center sm:col-span-2"
-                onClick={() => { toggleOvulation(!isOv); setEditISO(null); }}
-              >
-                <Egg className="w-4 h-4" />
-                <span>{isOv ? 'Remove ovulation' : 'Mark as ovulation'}</span>
-              </button>
-            )}
-          </div>
-
-          <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
-            These edits update your cycle data (period and fertility). They do not change your symptom entries.
-            Bleeding logged in your daily check-in remains the primary source of truth.
-          </div>
-          </div>
-        </div>
-      );
-    })()}
+        {cycleEditModal}
 
         {showLegend && (
           <>

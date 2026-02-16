@@ -32,9 +32,10 @@ const DEFAULT_USER: UserData = {
     'stress',
     'focus',
     'bloating',
-        'fatigue',
     'flow',
   ],
+  enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol'],
+  onboardingPresetApplied: false,
 };
 
 export default function App() {
@@ -99,13 +100,69 @@ export default function App() {
   };
 const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; colorTheme: UserData['colorTheme'] }) => {
     if (!data.goal) return;
-    setUserData((prev) => ({
-      ...prev,
-      name: data.name,
-      goal: data.goal,
-      colorTheme: data.colorTheme,
-      onboardingComplete: true,
-    }));
+
+    setUserData((prev) => {
+      // Only apply goal-based defaults the FIRST time someone completes onboarding.
+      // If they re-run onboarding later (preview) or change goal in Profile,
+      // we do not auto-reset their settings.
+      const shouldApplyPresets = !prev.onboardingPresetApplied && !prev.onboardingComplete;
+
+      if (!shouldApplyPresets) {
+        return {
+          ...prev,
+          name: data.name,
+          goal: data.goal,
+          colorTheme: data.colorTheme,
+          onboardingComplete: true,
+        };
+      }
+
+      // Goal-based defaults (lightweight, sensible starting point).
+      // Note: we never enable BOTH energy + fatigue by default (fatigue can be turned on manually).
+      const presetsByGoal: Record<NonNullable<UserData['goal']>, Partial<UserData>> = {
+        'cycle-health': {
+          cycleTrackingMode: 'cycle',
+          showCycleBubble: true,
+          fertilityMode: true,
+          enabledModules: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'cramps', 'flow'],
+          enabledInfluences: ['sex', 'exercise', 'stressfulDay', 'lateNight', 'alcohol'],
+        },
+        'perimenopause': {
+          cycleTrackingMode: 'cycle',
+          showCycleBubble: true,
+          fertilityMode: false,
+          enabledModules: ['energy', 'sleep', 'stress', 'brainFog', 'hotFlushes', 'nightSweats', 'hairShedding', 'facialSpots'],
+          enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol', 'caffeine', 'medication'],
+        },
+        'post-contraception': {
+          cycleTrackingMode: 'cycle',
+          showCycleBubble: true,
+          fertilityMode: true,
+          enabledModules: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'flow'],
+          enabledInfluences: ['sex', 'stressfulDay', 'lateNight', 'alcohol'],
+        },
+        'wellbeing': {
+          cycleTrackingMode: 'no-cycle',
+          showCycleBubble: false,
+          fertilityMode: false,
+          enabledModules: ['energy', 'sleep', 'stress', 'focus', 'digestion', 'appetite'],
+          enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol', 'exercise', 'caffeine'],
+        },
+      };
+
+      const preset = presetsByGoal[data.goal];
+
+      return {
+        ...prev,
+        ...preset,
+        name: data.name,
+        goal: data.goal,
+        colorTheme: data.colorTheme,
+        onboardingComplete: true,
+        onboardingPresetApplied: true,
+      };
+    });
+
     clearForceOnboarding();
     // Do-first: drop them straight into the check-in
     setCurrentScreen('check-in');

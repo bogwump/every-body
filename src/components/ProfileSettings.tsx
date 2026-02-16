@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, looksLikeInsightsExport, importBackupFile } from '../lib/backup';
-import type { ColorTheme, SymptomKey, SymptomKind, UserData } from '../types';
+import type { ColorTheme, SymptomKey, SymptomKind, UserData, InfluenceKey } from '../types';
 import { kindLabel } from '../lib/symptomMeta';
 import { downloadTextFile } from '../lib/storage';
 import {
@@ -49,56 +49,83 @@ const themes = [
 ];
 
 const moduleMeta: Array<{ key: SymptomKey; label: string; description: string }> = [
+  // Energy + sleep
   { key: 'energy', label: 'Energy', description: 'How much fuel you have in the tank' },
+  { key: 'motivation', label: 'Motivation', description: 'Drive and willingness to do things' },
   { key: 'sleep', label: 'Sleep', description: 'Quality of sleep, not just hours' },
+  { key: 'insomnia', label: 'Insomnia', description: 'Trouble falling or staying asleep' },
+
+  // Mind
   { key: 'stress', label: 'Stress', description: 'Mental load and tension' },
   { key: 'anxiety', label: 'Anxiety', description: 'Worry, unease, or a tight chest feeling' },
   { key: 'irritability', label: 'Irritability', description: 'Short fuse, snappy, easily overwhelmed' },
-  { key: 'bloating', label: 'Bloating', description: 'Digestive discomfort and swelling' },
-  { key: 'digestion', label: 'Digestion', description: 'How your tummy feels overall today' },
-  { key: 'nausea', label: 'Nausea', description: 'Queasy, unsettled stomach' },
-  { key: 'pain', label: 'Pain', description: 'Cramps, aches, headaches, etc' },
+  { key: 'focus', label: 'Focus', description: 'Concentration and mental sharpness' },
+  { key: 'brainFog', label: 'Brain fog', description: 'Foggy thinking, forgetfulness' },
+
+  // Body & pain
   { key: 'headache', label: 'Headache', description: 'Head pain or pressure today' },
+  { key: 'migraine', label: 'Migraine', description: 'Migraine-type headache (light/sound sensitivity etc)' },
   { key: 'cramps', label: 'Cramps', description: 'Pelvic cramps or period-type pain' },
   { key: 'jointPain', label: 'Joint pain', description: 'Aches or stiffness in joints' },
+  { key: 'backPain', label: 'Back pain', description: 'Upper or lower back pain' },
+  { key: 'breastTenderness', label: 'Breast tenderness', description: 'Soreness or sensitivity' },
+  { key: 'dizziness', label: 'Dizziness', description: 'Light-headed, off balance, spaced out' },
+  { key: 'pain', label: 'General aches', description: 'Overall aches or pain (optional)' },
+
+  // Digestion
+  { key: 'bloating', label: 'Bloating', description: 'Digestive discomfort and swelling' },
+  { key: 'digestion', label: 'Digestion', description: 'How your tummy feels overall today' },
+  { key: 'acidReflux', label: 'Acid reflux', description: 'Heartburn or reflux symptoms' },
+  { key: 'nausea', label: 'Nausea', description: 'Queasy, unsettled stomach' },
+  { key: 'constipation', label: 'Constipation', description: 'Hard stools or difficulty going' },
+  { key: 'diarrhoea', label: 'Diarrhoea', description: 'Loose stools or urgency' },
+  { key: 'appetite', label: 'Appetite', description: 'Hunger, cravings, or low appetite' },
+
+  // Skin & hair
   { key: 'hairShedding', label: 'Hair shedding', description: 'Shedding or thinning today' },
   { key: 'facialSpots', label: 'Facial spots', description: 'Breakouts or skin changes' },
   { key: 'cysts', label: 'Cysts', description: 'Cystic spots or tenderness' },
-  { key: 'brainFog', label: 'Brain fog', description: 'Foggy thinking, forgetfulness' },
-  { key: 'fatigue', label: 'Fatigue', description: 'Heavy tiredness or drained feeling' },
-  { key: 'dizziness', label: 'Dizziness', description: 'Light-headed, off balance, spaced out' },
-  { key: 'appetite', label: 'Appetite', description: 'Hunger, cravings, or low appetite' },
-  { key: 'libido', label: 'Libido', description: 'Sex drive or interest' },
-  { key: 'breastTenderness', label: 'Breast tenderness', description: 'Soreness or sensitivity' },
+  { key: 'skinDryness', label: 'Skin dryness', description: 'Dry, itchy, or sensitive skin' },
+
+  // Hormones
   { key: 'hotFlushes', label: 'Hot flushes', description: 'Sudden heat, flushing, or sweating' },
   { key: 'nightSweats', label: 'Night sweats', description: 'Sweats or overheating at night' },
+  { key: 'libido', label: 'Libido', description: 'Sex drive or interest' },
+
+  // Cycle (optional)
   { key: 'flow', label: 'Bleeding / spotting', description: 'Optional, only if it’s relevant to you' },
+
+  // Optional extras
+  { key: 'fatigue', label: 'Fatigue', description: 'Heavy tiredness or drained feeling' },
 ];
+
 
 
 const moduleGroups: Array<{ id: string; title: string; keys: SymptomKey[] }> = [
-  { id: 'basics', title: 'Daily basics', keys: ['energy', 'sleep', 'fatigue'] },
-
-  // Mind + cognition
-  { id: 'mind', title: 'Mind', keys: ['stress', 'anxiety', 'irritability', 'brainFog'] },
-
-  // Pain + body
-  { id: 'body', title: 'Body & pain', keys: ['headache', 'cramps', 'jointPain', 'pain', 'dizziness', 'breastTenderness'] },
-
-  // Digestion
-  { id: 'digestion', title: 'Digestion', keys: ['bloating', 'digestion', 'acidReflux', 'nausea', 'appetite'] },
-
-  // Skin & hair
-  { id: 'skinHair', title: 'Skin & hair', keys: ['hairShedding', 'facialSpots', 'cysts'] },
-
-  // Temperature + hormones
-  { id: 'temperature', title: 'Temperature', keys: ['hotFlushes', 'nightSweats'] },
-  { id: 'hormones', title: 'Hormones & sex', keys: ['libido'] },
-
-  // Cycle
-  { id: 'cycle', title: 'Cycle', keys: ['flow'] },
+  { id: 'energySleep', title: 'Energy & sleep', keys: ['energy', 'motivation', 'sleep', 'insomnia'] },
+  { id: 'mind', title: 'Mind', keys: ['stress', 'anxiety', 'irritability', 'focus', 'brainFog'] },
+  { id: 'bodyPain', title: 'Body & pain', keys: ['headache', 'migraine', 'cramps', 'jointPain', 'backPain', 'breastTenderness', 'dizziness', 'pain'] },
+  { id: 'digestion', title: 'Digestion', keys: ['bloating', 'digestion', 'acidReflux', 'nausea', 'constipation', 'diarrhoea', 'appetite'] },
+  { id: 'skinHair', title: 'Skin & hair', keys: ['hairShedding', 'facialSpots', 'cysts', 'skinDryness'] },
+  { id: 'hormones', title: 'Hormones', keys: ['hotFlushes', 'nightSweats', 'libido', 'flow'] },
+  { id: 'optional', title: 'Optional extras', keys: ['fatigue'] },
 ];
 
+
+
+const influenceMeta: Array<{ key: InfluenceKey; label: string; description: string }> = [
+  { key: 'sex', label: 'Intimacy', description: 'Logged privately. Helps spot patterns with mood, confidence, bleeding and more.' },
+  { key: 'exercise', label: 'Workout', description: 'Any workout or brisk activity.' },
+  { key: 'travel', label: 'Travel', description: 'Travel, long drives, or time zone changes.' },
+  { key: 'illness', label: 'Illness', description: 'Cold, flu, infection, or feeling unwell.' },
+  { key: 'alcohol', label: 'Alcohol', description: 'More than your usual.' },
+  { key: 'caffeine', label: 'Caffeine', description: 'More caffeine than usual.' },
+  { key: 'lateNight', label: 'Late night', description: 'Later bedtime or disrupted routine.' },
+  { key: 'stressfulDay', label: 'Stressful day', description: 'High stress or emotional strain.' },
+  { key: 'medication', label: 'Medication', description: 'Any medication today (yes/no). Useful for pattern spotting.' },
+  { key: 'socialising', label: 'Socialising', description: 'More social than usual (or a big event).' },
+  { key: 'lowHydration', label: 'Low hydration', description: 'Less water than usual.' },
+];
 
 const STOCK_AVATARS: Array<{ id: string; label: string }> = [
   { id: 'moon', label: 'Moon' },
@@ -166,6 +193,13 @@ function toggleInList<T>(list: T[], item: T): T[] {
   return list.includes(item) ? list.filter((x) => x !== item) : [...list, item];
 }
 
+function cloudStatusLabel(userData: UserData): string {
+  const st = cloudStatus(userData);
+  if (st.kind === 'off') return 'Off';
+  if (st.kind === 'not_configured') return 'Needs Supabase keys in your .env';
+  return 'Ready (sign in to link your data)';
+}
+
 export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onPreviewOnboarding }: ProfileSettingsProps) {
   const [view, setView] = useState<'main' | 'personal'>('main');
   const [showThemeSelector, setShowThemeSelector] = useState(false);
@@ -178,6 +212,14 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [customSymptomText, setCustomSymptomText] = useState<string>('');
   const [customSymptomKind, setCustomSymptomKind] = useState<SymptomKind>('other');
   const [customSymptomError, setCustomSymptomError] = useState<string>('');
+
+  const setEnabledModules = (next: SymptomKey[]) => {
+    onUpdateUserData((prev) => ({ ...prev, enabledModules: next }));
+  };
+
+  const setEnabledInfluences = (next: InfluenceKey[]) => {
+    onUpdateUserData((prev) => ({ ...prev, enabledInfluences: next }));
+  };
 
   // Cycle behaviour
   const autoStartPeriodFromBleeding = !!(userData as any).autoStartPeriodFromBleeding;
@@ -830,8 +872,71 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                         </div>
                       </div>
                     </details>
+
+
                   );
                 })}
+
+                <details className="mt-3 rounded-2xl border border-neutral-200 overflow-hidden group">
+                  <summary className="list-none cursor-pointer select-none p-4 flex items-center justify-between hover:bg-neutral-50">
+                    <span className="font-medium">Customise lifestyle & influences</span>
+                    <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                  </summary>
+
+                  <div className="p-4 pt-0">
+                    <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
+                      This controls what shows up under “Other influences” in your daily check-in, so it stays short and relevant.
+                    </p>
+
+                    <div className="flex gap-2 justify-end mb-3">
+                      <button
+                        onClick={() => setEnabledInfluences(influenceMeta.map((m) => m.key))}
+                        className="px-3 py-2 border rounded-lg"
+                      >
+                        Enable all
+                      </button>
+                      <button
+                        onClick={() => setEnabledInfluences([])}
+                        className="px-3 py-2 border rounded-lg"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {influenceMeta.map((m) => {
+                        const enabled = (userData.enabledInfluences ?? []).includes(m.key);
+                        return (
+                          <div key={m.key} className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100 last:border-b-0">
+                            <div className="min-w-0">
+                              <p className="font-medium mb-1">{m.label}</p>
+                              <p className="text-sm text-[rgb(var(--color-text-secondary))]">{m.description}</p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateUserData((prev) => ({
+                                  ...prev,
+                                  enabledInfluences: toggleInList((prev.enabledInfluences ?? []) as InfluenceKey[], m.key),
+                                }))
+                              }
+                              className={`w-12 h-6 rounded-full transition-all ${enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
+                              aria-label={enabled ? `Disable ${m.label}` : `Enable ${m.label}`}
+                            >
+                              <div
+                                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                  enabled ? 'translate-x-6' : 'translate-x-0.5'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </details>
+
 
                 {moduleSearch.trim() && (
                   (() => {
@@ -1171,12 +1276,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               <div>
                                 <p className="font-medium mb-1">Enable cloud sync</p>
                                 <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                                  {(() => {
-                                    const st = cloudStatus(userData);
-                                    if (st.kind === 'off') return 'Off';
-                                    if (st.kind === 'not_configured') return 'Needs Supabase keys in your .env';
-                                    return 'Ready (sign in to link your data)';
-                                  })()}
+                                  {cloudStatusLabel(userData)}
                                 </p>
                               </div>
 
