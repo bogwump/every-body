@@ -45,6 +45,10 @@ const TIMEFRAMES: Array<{ key: Timeframe; label: string; days: number }> = [
   { key: '3months', label: '90 days', days: 90 },
 ];
 
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
 function fmtDateShort(iso: string): string {
   const [y, m, d] = iso.split('-').map((s) => Number(s));
   if (!y || !m || !d) return iso;
@@ -195,6 +199,40 @@ function qualityScore(rAbs: number, n: number): number {
   const strength = Math.min(1, Math.max(0, (rAbs - 0.35) / 0.45));
   const support = Math.min(1, n / 14);
   return Math.round(100 * (0.65 * strength + 0.35 * support));
+}
+
+function insightQualityScore(args: {
+  r: number;
+  n: number;
+  kindA: SymptomKind;
+  kindB: SymptomKind;
+  aKey: InsightMetricKey;
+  bKey: InsightMetricKey;
+  userData: any;
+}): number {
+  const rAbs = Math.abs(args.r);
+  let score = qualityScore(rAbs, args.n);
+
+  const { kindA, kindB, n } = args;
+
+  const isBehaviourState =
+    (kindA === 'behaviour' && kindB === 'state') || (kindA === 'state' && kindB === 'behaviour');
+
+  const isPhysPair =
+    (kindA === 'physio' || kindA === 'hormonal') && (kindB === 'physio' || kindB === 'hormonal');
+
+  const mixesBodyAndLife =
+    (kindA === 'behaviour' && (kindB === 'physio' || kindB === 'hormonal')) ||
+    (kindB === 'behaviour' && (kindA === 'physio' || kindA === 'hormonal'));
+
+  if (isBehaviourState) score += 10;
+  if (isPhysPair) score -= 15;
+  if (mixesBodyAndLife) score -= 10;
+
+  if (n < 6) score = Math.min(score, 55);
+  if (rAbs < 0.4) score -= 12;
+
+  return clamp(Math.round(score), 0, 100);
 }
 
 
@@ -494,16 +532,33 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     return dedup([...(enabled as any), ...all, ...customs]);
   }, [userData.enabledModules, userData.customSymptoms]);
 
+  // Backwards-compatible alias: older logic refers to allMetricKeys.
+  // Keep them identical so we do not accidentally change behaviour.
+  const allMetricKeys = selectableKeys;
+
+
   const [selected, setSelected] = useState<Array<MetricKey>>(() => {
+    const defaultKeys: Array<MetricKey> = ['mood', 'sleep', 'energy', 'stress'];
+    // Add a couple more if available so the Insights panels have enough to work with.
+    const extras = allMetricKeys.filter((k) => !defaultKeys.includes(k)).slice(0, 2);
+    const fallback = [...defaultKeys, ...extras].slice(0, 6);
+
     try {
       const saved = localStorage.getItem('insights:selected');
       const parsed = saved ? (JSON.parse(saved) as unknown) : null;
-      if (Array.isArray(parsed) && parsed.length) return parsed.slice(0, 6) as any;
+      if (Array.isArray(parsed) && parsed.length) {
+        const valid = (parsed as Array<MetricKey>).filter((k) => allMetricKeys.includes(k));
+        // If the saved list is tiny (for example after using the old “Focus” button),
+        // fall back so the page stays testable.
+        if (valid.length < 4) return fallback;
+        return valid.slice(0, 6);
+      }
     } catch {
       // ignore
     }
+
     // Keep it light by default: mood + the app's core metrics
-    return ['mood', 'sleep', 'energy', 'stress'];
+    return fallback;
   });
 
   useEffect(() => {
@@ -681,12 +736,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         const kindA = getKindForMetric(a as any, userData);
         const kindB = getKindForMetric(b as any, userData);
 
-        // If we have fewer than 4 days logged, only allow behaviour↔state pairings.
-        if (!allowEarlyBehaviourState) {
-          const isBehaviourState =
-            (kindA === 'behaviour' && kindB === 'state') || (kindB === 'behaviour' && kindA === 'state');
-          if (!isBehaviourState) continue;
-        }
+        const isBehaviourState =
+          (kindA === 'behaviour' && kindB === 'state') || (kindA === 'state' && kindB === 'behaviour');
+        if (!deepReady && !isBehaviourState) continue;
         const hormonal = isHormonalMetric(a as any, userData) || isHormonalMetric(b as any, userData);
         if (hormonal && (entriesSorted.length < 14 || n < 10)) continue;
         const bothBodyish =
@@ -727,7 +779,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   // --- Correlations list (for soft display + report) ---
   const corrPairs = useMemo(() => {
-    if (!deepReady) {
+    const allowEarlyBehaviourState = entriesSorted.length >= 4;
+    // If the user has <4 days, we avoid showing relationships because they are too jumpy.
+    if (!deepReady && !allowEarlyBehaviourState) {
       return [] as Array<{
         a: string;
         b: string;
@@ -736,114 +790,169 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         aKey: InsightMetricKey;
         bKey: InsightMetricKey;
         quality: number;
-        confidence: ConfidenceLevel;
         kindA: SymptomKind;
         kindB: SymptomKind;
-        hormonalInvolved: boolean;
-        allowSuggestedExperiment: boolean;
-        why: string[];
       }>;
     }
 
-    const metrics = selected.slice(0, 6);
-    const pairs: Array<{
+    const minAbsR = 0.4;
 
-      // Early phase: only show behaviour↔state patterns from day 4 onward.
-      // (Before that, any signal is too jumpy and easy to misread.)
-      const allowEarlyBehaviourState = entriesSorted.length >= 4;
-      a: string;
-      b: string;
-      r: number;
-      n: number;
-      aKey: InsightMetricKey;
-      bKey: InsightMetricKey;
-      quality: number;
-      confidence: ConfidenceLevel;
-      kindA: SymptomKind;
-      kindB: SymptomKind;
-      hormonalInvolved: boolean;
-      allowSuggestedExperiment: boolean;
-      why: string[];
-    }> = [];
+    // We want users to see *some* early signal by day 4, otherwise it's too easy to lose interest.
+    // Hormonal-related patterns stay strict, everything else can surface earlier as "early signal".
+    const minOverlapForPair = (aKey: InsightMetricKey, bKey: InsightMetricKey, kindA: SymptomKind, kindB: SymptomKind) => {
+      const hormonal = isHormonalMetric(aKey, userData) || isHormonalMetric(bKey, userData);
+      if (hormonal) return 10; // stricter support for hormonal insights
+      // Early phase (4–6 days): allow a bit earlier, but only for relationships that are less "body ↔ body".
+      if (!deepReady) return 4;
+      return 6;
+    };
 
-    for (let i = 0; i < metrics.length; i++) {
-      for (let j = i + 1; j < metrics.length; j++) {
-        const a = metrics[i] as InsightMetricKey;
-        const b = metrics[j] as InsightMetricKey;
-        const xs: number[] = [];
-        const ys: number[] = [];
-        entriesSorted.forEach((e) => {
-          const x = getMetricValue(e, a as any);
-          const y = getMetricValue(e, b as any);
-          if (x != null && y != null) {
-            xs.push(x);
-            ys.push(y);
+    const computePairs = (keys: InsightMetricKey[]) => {
+      const out: Array<{
+        a: string;
+        b: string;
+        r: number;
+        n: number;
+        aKey: InsightMetricKey;
+        bKey: InsightMetricKey;
+        quality: number;
+        kindA: SymptomKind;
+        kindB: SymptomKind;
+      }> = [];
+
+      for (let i = 0; i < keys.length; i++) {
+        for (let j = i + 1; j < keys.length; j++) {
+          const aKey = keys[i];
+          const bKey = keys[j];
+
+          // Ignore self / identical keys
+          if (aKey === bKey) continue;
+
+          // Align series on overlapping days
+          const xs: number[] = [];
+          const ys: number[] = [];
+          for (const e of entriesSorted) {
+            const av = valueForMetric(e, aKey);
+            const bv = valueForMetric(e, bKey);
+            if (typeof av === 'number' && typeof bv === 'number') {
+              xs.push(av);
+              ys.push(bv);
+            }
           }
-        });
 
-        const n = xs.length;
-        if (n < 6) continue;
-        if (variance(xs) < 0.15 || variance(ys) < 0.15) continue;
+          const n = xs.length;
 
-        const r = pearsonCorrelation(xs, ys);
-        if (!Number.isFinite(r)) continue;
+          const kindA = getKindForMetric(aKey, userData);
+          const kindB = getKindForMetric(bKey, userData);
 
-        const rAbs = Math.abs(r);
-        if (rAbs < 0.4) continue;
+          // Hormonal correlations stay strict (needs more days and overlap).
+          const hormonalPair = isHormonalMetric(aKey, userData) || isHormonalMetric(bKey, userData);
+          if (hormonalPair && (entriesSorted.length < 14 || n < 10)) continue;
 
-        const kindA = getKindForMetric(a, userData);
-        const kindB = getKindForMetric(b, userData);
+          const minOverlap = minOverlapForPair(aKey, bKey, kindA, kindB);
+          if (n < minOverlap) continue;
 
-        // If we have fewer than 4 days logged, only allow behaviour↔state pairings.
-        if (!allowEarlyBehaviourState) {
-          const isBehaviourState =
-            (kindA === 'behaviour' && kindB === 'state') || (kindB === 'behaviour' && kindA === 'state');
-          if (!isBehaviourState) continue;
+          // Ignore flat-line variables (very low variance)
+          const vA = variance(xs);
+          const vB = variance(ys);
+          if (vA < 0.15 || vB < 0.15) continue;
+
+          const r = pearsonCorrelation(xs, ys);
+          if (!Number.isFinite(r)) continue;
+          if (Math.abs(r) < minAbsR) continue;
+
+          // Block physio ↔ physio (including hormonal) suggestions entirely.
+          const bothBodyish = (kindA === 'physio' || kindA === 'hormonal') && (kindB === 'physio' || kindB === 'hormonal');
+          if (bothBodyish) continue;
+
+          // Early phase (4–6 days): allow a few more useful relationships so the page doesn't feel empty.
+          // We still keep it conservative: no body↔body, and we prioritise behaviour/state links.
+          if (!deepReady) {
+            const isBehaviourState =
+              (kindA === 'behaviour' && kindB === 'state') || (kindA === 'state' && kindB === 'behaviour');
+
+            const involvesBehaviour = kindA === 'behaviour' || kindB === 'behaviour';
+            const involvesState = kindA === 'state' || kindB === 'state';
+
+            // Allow behaviour↔state, and behaviour↔body (e.g. sleep ↔ stress, alcohol ↔ hot flushes),
+            // but avoid state↔body in early phase as it tends to overfit.
+            const allowedEarly = isBehaviourState || (involvesBehaviour && !isBehaviourState) || (involvesBehaviour && involvesState);
+
+            if (!allowedEarly) continue;
+          }
+
+          const quality = insightQualityScore({ r, n, kindA, kindB, aKey, bKey, userData });
+
+          out.push({
+            a: labelFor(aKey, userData),
+            b: labelFor(bKey, userData),
+            r,
+            n,
+            aKey,
+            bKey,
+            quality,
+            kindA,
+            kindB,
+          });
         }
-        const hormonalInvolved = isHormonalMetric(a, userData) || isHormonalMetric(b, userData);
-
-        // Higher bar for hormone-driven signals.
-        // Higher bar for hormone-driven signals.
-        if (hormonalInvolved && (entriesSorted.length < 14 || n < 10)) continue;
-
-        // Avoid body↔body claims.
-        const bothBodyish =
-          (kindA === 'physio' || kindA === 'hormonal') && (kindB === 'physio' || kindB === 'hormonal');
-        if (bothBodyish) continue;
-
-        const confidence = confidenceFrom(rAbs, n);
-        const quality = qualityScore(rAbs, n);
-        if (quality < 35) continue;
-
-        const allowSuggestedExperiment =
-          entriesSorted.length >= 5 &&
-          (confidence === 'high' || confidence === 'medium') &&
-          ((kindA === 'behaviour' && kindB === 'state') || (kindB === 'behaviour' && kindA === 'state'));
-
-        pairs.push({
-          a: labelFor(a as any, userData),
-          b: labelFor(b as any, userData),
-          r,
-          n,
-          aKey: a,
-          bKey: b,
-          quality,
-          confidence,
-          kindA,
-          kindB,
-          hormonalInvolved,
-          allowSuggestedExperiment,
-          why: [
-            `We’ve seen this on ${n} days where you logged both.`,
-            `They tended to move ${r < 0 ? 'in opposite directions' : 'in the same direction'}.`,
-            `This is a hint, not proof, especially early on.`,
-          ],
-        });
       }
+
+      return out.sort((p, q) => q.quality - p.quality);
+    };
+
+    // First: try the user's selected metrics (keeps the feature feeling personal).
+    let out = computePairs(selected);
+
+    // If nothing qualifies, fall back to "anything you have actually logged".
+    // This avoids the empty state when the user changes their selected list or hasn't logged some of those yet.
+    if (out.length === 0) {
+      const candidate = (allMetricKeys as InsightMetricKey[]).filter((k) => {
+        // Must have enough data points on its own
+        let count = 0;
+        const vals: number[] = [];
+        for (const e of entriesSorted) {
+          const v = valueForMetric(e, k);
+          if (typeof v === 'number') {
+            count++;
+            vals.push(v);
+          }
+        }
+        if (count < (deepReady ? 6 : 4)) return false;
+        if (variance(vals) < 0.15) return false;
+        return true;
+      });
+
+      // Keep it bounded for performance
+      const limited = candidate.slice(0, 14);
+      out = computePairs(limited);
     }
-    pairs.sort((p, q) => q.quality - p.quality || Math.abs(q.r) - Math.abs(p.r));
-    return pairs;
-  }, [deepReady, entriesSorted, selected, userData]);
+
+    const base = out.slice(0, 6);
+
+    // Enrich for UI copy (keeps render simple + avoids undefined refs when logic changes).
+    return base.map((p) => {
+      const hormonalInvolved = isHormonalMetric(p.aKey, userData) || isHormonalMetric(p.bKey, userData);
+      const confidence = confidenceFrom(Math.abs(p.r), p.n);
+      const allowSuggestedExperiment =
+        (p.kindA === 'behaviour' || p.kindB === 'behaviour') &&
+        // avoid suggesting experiments when the relationship is based on very few points
+        p.n >= 4 &&
+        // still avoid anything "body ↔ body"
+        !((p.kindA === 'physio' || p.kindA === 'hormonal') && (p.kindB === 'physio' || p.kindB === 'hormonal'));
+
+      const why = [
+        `You logged both metrics on ${p.n} day${p.n === 1 ? '' : 's'}.`,
+        deepReady
+          ? `This is calculated from your recent logs and will update as you add more days.`
+          : `This is an early signal. With only a few days logged, it may change as you add more data.`,
+        hormonalInvolved
+          ? `Hormones can influence lots of symptoms at once, so treat this as a prompt to notice patterns, not a diagnosis.`
+          : `Correlation does not mean one causes the other.`,
+      ].filter(Boolean);
+
+      return { ...p, hormonalInvolved, confidence, allowSuggestedExperiment, why };
+    });
+  }, [deepReady, entriesSorted, selected, userData, allMetricKeys]);
 
   // --- Relationship explorer ---
   const [scatterX, setScatterX] = useState<SymptomKey | 'mood'>(() => selected[0] ?? 'mood');
@@ -1019,18 +1128,20 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const downloadRawJson = () => {
     const payload = {
-      generatedAt: new Date().toISOString(),
+      type: 'everybody-insights-export',
+      version: 1,
+      generatedAtISO: new Date().toISOString(),
       timeframe: TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? timeframe,
       days: entriesSorted.length,
       selectedMetrics: selected,
       entries: entriesSorted,
     };
-    downloadTextFile(`everybody-data-${isoTodayLocal()}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    downloadTextFile(`everybody-insights-report-${isoTodayLocal()}.json`, JSON.stringify(payload, null, 2), 'application/json');
   };
 
   // --- UI helpers ---
   const metricsSummary = selected.map((k) => labelFor(k, userData)).join(' • ');
-  const reportCardTitle = 'Export your report';
+  const reportCardTitle = 'Export Insights report';
 
   // Experiment dialog state
   const [experimentOpen, setExperimentOpen] = useState(false);
@@ -1245,7 +1356,777 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2">
-              {!experimentStatus.done && onOpenCheckIn ? ({p.allowSuggestedExperiment ? (
+              {!experimentStatus.done && onOpenCheckIn ? (
+                <button
+                  type="button"
+                  className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                  onClick={() => onOpenCheckIn(isoTodayLocal())}
+                >
+                  Log today
+                </button>
+              ) : null}
+              {!experimentStatus.done ? (
+                <button
+                  type="button"
+                  className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium whitespace-nowrap"
+                  onClick={() => extendExperiment(2)}
+                >
+                  Extend 2 days
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
+                onClick={() => clearExperiment()}
+              >
+                {experimentStatus.done ? 'Clear' : 'Stop'}
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {experimentStatus.ex.steps?.slice(0, 3)?.map((s: string, i: number) => (
+              <div key={i} className="eb-inset rounded-2xl p-4">
+                <div className="text-sm font-semibold">Step {i + 1}</div>
+                <div className="mt-1 text-sm eb-muted">{s}</div>
+              </div>
+            ))}
+
+            {/* Step 4: outcome (available any time) */}
+            {!experimentStatus.done ? (
+              <div className="eb-inset rounded-2xl p-4">
+                <div className="text-sm font-semibold">Step 4</div>
+                <div className="mt-1 text-sm eb-muted">
+                  Tell me if it worked. We'll save the result so your future insights can become more meaningful.
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+                    onClick={() => markExperimentOutcome(true)}
+                  >
+                    Yes, it helped
+                  </button>
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
+                    onClick={() => markExperimentOutcome(false)}
+                  >
+                    Not really
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="eb-inset rounded-2xl p-4">
+                <div className="text-sm font-semibold">Step 4</div>
+                <div className="mt-1 text-sm eb-muted">Experiment complete. Thanks for telling me what helped.</div>
+              </div>
+            )}
+          </div>
+          {experimentStatus.ex.note ? <div className="mt-3 text-sm eb-muted">{experimentStatus.ex.note}</div> : null}
+
+          {/* Mini chart: appears once day 2 has some data */}
+          {experimentWindow && experimentStatus.day >= 2 ? (
+            <div className="mt-4 eb-inset rounded-2xl p-4">
+              <div className="text-sm font-semibold">Experiment mini chart</div>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {experimentWindow.series.slice(0, 3).map((s) => (
+                  <div key={String(s.key)} className="rounded-2xl border border-black/5 bg-white p-3">
+                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">{labelFor(s.key, userData)}</div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <Sparkline values={s.values} />
+                      <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">
+                        Day {Math.min(experimentStatus.day, experimentStatus.ex.durationDays ?? 3)}/{experimentStatus.ex.durationDays ?? 3}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Day 3 outcome capture */}
+          {experimentStatus.day >= (experimentStatus.ex.durationDays ?? 3) && !(experimentStatus.ex as any)?.outcome?.rating ? (
+            <div className="mt-4 eb-inset rounded-2xl p-4">
+              <div className="text-sm font-semibold">Did it help?</div>
+              <div className="mt-1 text-sm eb-muted">Quick 5-point rating so we can turn this into a real conclusion.</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className="eb-pill"
+                    style={{ background: 'rgba(0,0,0,0.06)' }}
+                    onClick={() => setOutcomeRating(n as any)}
+                    aria-label={`Rate ${n} out of 5`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3">
+                <textarea
+                  className="eb-input"
+                  placeholder="Optional: what changed (sleep, food, stress, meds, ...)?"
+                  rows={2}
+                  value={outcomeNote}
+                  onChange={(e) => setOutcomeNote(e.target.value)}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {/* Conclusion once rated */}
+          {(experimentStatus.ex as any)?.outcome?.rating ? (
+            <div className="mt-4 eb-inset rounded-2xl p-4">
+              <div className="text-sm font-semibold">Conclusion</div>
+              <div className="mt-1 text-sm eb-muted">
+                {(() => {
+                  const r = ((experimentStatus.ex as any).outcome.rating as number);
+                  const worked = r >= 4;
+                  return worked ? "You marked this as a success." : "You marked this as not helpful.";
+                })()}
+                {experimentWindow?.series?.length ? (() => {
+                  const s0 = experimentWindow.series[0];
+                  const nums = (s0?.values ?? []).filter((v) => typeof v === 'number') as number[];
+                  if (nums.length < 2) return null;
+                  const first = nums[0];
+                  const last = nums[nums.length - 1];
+                  const delta = last - first;
+                  const dir = delta === 0 ? 'stayed about the same' : delta > 0 ? 'went up' : 'went down';
+                  return (
+                    <span>
+                      {' '}
+                      Your {labelFor(s0.key, userData)} {dir} from {Math.round(first)}/10 to {Math.round(last)}/10.
+                    </span>
+                  );
+                })() : null}
+              </div>
+              {(experimentStatus.ex as any)?.outcome?.note ? (
+                <div className="mt-2 text-sm">Note: {(experimentStatus.ex as any).outcome.note}</div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* Your settings */}
+      <div className="eb-card eb-hero-surface">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold tracking-tight eb-hero-on-dark">Your settings</h2>
+            <p className="text-sm mt-1 eb-hero-on-dark-muted">
+              Keep it simple: 3–5 metrics gives you the cleanest signals.
+            </p>
+          </div>
+
+          
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2 items-center">
+          {TIMEFRAMES.map((t) => (
+            <button key={t.key} className={chipClass(timeframe === t.key)} onClick={() => setTimeframe(t.key)}>
+              {t.label}
+            </button>
+          ))}</div>
+
+        <div className="mt-5 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+          <div className="text-xs eb-hero-on-dark-muted">Selected metrics</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {selected.length ? (
+              selected.map((m) => (
+                <span
+                  key={String(m)}
+                  className="inline-flex items-center rounded-full px-3 py-1 text-sm"
+                  style={{
+                    background: 'rgba(255,255,255,0.14)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    color: 'rgba(255,255,255,0.92)',
+                  }}
+                >
+                  {labelFor(m, userData)}
+                </span>
+              ))
+            ) : (
+              <div className="text-sm mt-1 eb-hero-on-dark-muted">Pick a few metrics to get started.</div>
+            )}
+          </div>
+          </div>
+
+          <div className="shrink-0">
+            <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="px-5 py-2 rounded-xl bg-white/10 border border-white/15 text-sm text-white hover:bg-white/15 transition-all font-medium"
+              >
+                Change metrics
+              </button>
+            </DialogTrigger>
+            <EBDialogContent
+              title="Choose metrics to analyse"
+              description="Select up to 6 metrics to personalise your insights."
+              className="max-w-2xl rounded-2xl"
+            >
+              <DialogHeader>
+                <DialogTitle>Choose metrics to analyse (max 6)</DialogTitle>
+                <DialogDescription>
+                  Select up to 6 metrics to personalise your insights.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
+                  Mood
+                </button>
+                {selectableKeys.map((k) => (
+                  <button key={k} className={chipClass(selected.includes(k))} onClick={() => toggleMetric(k)} title={labelFor(k, userData)}>
+                    {labelFor(k, userData)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your “top 3” and stick with them for a week.</div>
+            </EBDialogContent>
+          </Dialog>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Highlights + Top findings carousel */}
+      <div className="eb-card">
+        <div className="eb-card-header">
+          <div>
+            <div className="eb-card-title">Top findings</div>
+            <div className="eb-card-sub">The “headline” signals from your recent data.</div>
+          </div>
+          <Sparkles className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+        </div>
+
+        {!deepReady && (
+          <div className="mt-2 text-sm eb-muted">
+            The deep dive gets better at {minDaysForDeep} days in this timeframe. Keep logging. You are close.
+          </div>
+        )}
+
+        <div className="mt-4">
+          <Carousel opts={{ align: 'start' }} className="w-full">
+            <CarouselContent>
+              {findings.map((f, idx) => (
+                <CarouselItem key={idx} className="basis-full md:basis-1/2">
+                  <div className="eb-inset rounded-2xl p-5 h-full">
+                    <div className="text-sm font-semibold">{f.title}</div>
+                    <div className="mt-1 text-sm eb-muted">{f.body}</div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {f.metrics?.slice(0, 2).map((m) => (
+                        <span key={String(m)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.04)' }}>
+                          {labelFor(m, userData)}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex justify-end">
+                      {(() => {
+                        const ms = (f.metrics ?? []) as InsightMetricKey[];
+                        const canSuggest =
+                          ms.length === 2 &&
+                          entriesSorted.length >= 14 &&
+                          !ms.some((m) => isHormonalMetric(m, userData)) &&
+                          ((getKindForMetric(ms[0], userData) === 'behaviour' && getKindForMetric(ms[1], userData) === 'state') ||
+                            (getKindForMetric(ms[1], userData) === 'behaviour' && getKindForMetric(ms[0], userData) === 'state'));
+
+                        const hasHormonal = ms.some((m) => isHormonalMetric(m, userData));
+
+                        if (!canSuggest) {
+                          return (
+                            <div className="text-sm eb-muted">
+                              {hasHormonal ? 'Track for one more cycle to learn more.' : 'Keep logging to unlock experiment suggestions.'}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
+                            onClick={() => openExperiment(ms)}
+                            title="Turn this finding into a tiny 3-day test"
+                          >
+                            <FlaskConical className="w-4 h-4" />
+                            Run a 3-day experiment
+                          </button>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </CarouselItem>
+              ))}
+              <CarouselItem key="custom" className="basis-full md:basis-1/2">
+                <div className="eb-inset rounded-2xl p-5 h-full">
+                  <div className="text-sm font-semibold">Found something yourself?</div>
+                  <div className="mt-1 text-sm eb-muted">
+                    Something you want to track or test (like magnesium, earlier bedtime, or less caffeine)?
+                    Turn it into a tiny experiment.
+                  </div>
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
+                      onClick={openCustomExperiment}
+                      title="Create your own experiment"
+                    >
+                      <FlaskConical className="w-4 h-4" />
+                      Run a 3-day experiment
+                    </button>
+                  </div>
+                </div>
+              </CarouselItem>
+            </CarouselContent>
+            <CarouselPrevious className="hidden md:flex" />
+            <CarouselNext className="hidden md:flex" />
+          </Carousel>
+        </div>
+      </div>
+
+      {/* Experiment dialog */}
+      <Dialog open={experimentOpen} onOpenChange={setExperimentOpen}>
+        <EBDialogContent
+          title={experimentPlan?.title ?? 'Experiment'}
+          description="Set up a tiny experiment and keep logging a few metrics so you can spot what changes."
+          className="max-w-lg rounded-2xl"
+        >
+          <DialogHeader>
+            <DialogTitle>{experimentPlan?.title ?? 'Experiment'}</DialogTitle>
+            <DialogDescription>
+              Set up a tiny experiment and keep logging a few metrics so you can spot what changes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[78vh] overflow-y-auto pr-1 space-y-3">
+            <div className="text-sm eb-muted">
+              Tiny, realistic actions. You are testing what helps your body, not trying to “fix everything”.
+            </div>
+
+            {isCustomExperiment && (
+              <div className="eb-inset rounded-2xl p-4">
+                <div className="text-sm font-semibold">Name your experiment</div>
+                <input
+                  className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-black/20"
+                  value={customExperimentTitle}
+                  onChange={(e) => setCustomExperimentTitle(e.target.value)}
+                  placeholder="e.g. Magnesium trial"
+                />
+                <div className="mt-2 text-sm eb-muted">
+                  Keep it simple. You can always tweak it later.
+                </div>
+              </div>
+            )}
+
+            {/* What to log */}
+            <div className="eb-inset rounded-2xl p-4">
+              <div className="text-sm font-semibold">What to log (daily)</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {isCustomExperiment ? (
+                  (() => {
+                    const options: MetricKey[] = Array.from(new Set((['mood' as any] as MetricKey[]).concat(selectableKeys)));
+                    const toggle = (k: MetricKey) => {
+                      setExperimentMetrics((prev) => {
+                        const next = prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k];
+                        return next.slice(0, 6);
+                      });
+                    };
+                    return options.map((k) => {
+                      const on = experimentMetrics.includes(k);
+                      return (
+                        <button
+                          key={String(k)}
+                          type="button"
+                          className="eb-pill"
+                          style={{
+                            background: on ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.06)',
+                            border: '1px solid rgba(0,0,0,0.08)',
+                          }}
+                          onClick={() => toggle(k)}
+                          aria-pressed={on}
+                        >
+                          {labelFor(k as any, userData)}
+                        </button>
+                      );
+                    });
+                  })()
+                ) : (
+                  (experimentMetrics.length ? experimentMetrics : selected)
+                    .slice(0, 6)
+                    .map((k) => (
+                      <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                        {labelFor(k as any, userData)}
+                      </span>
+                    ))
+                )}
+              </div>
+              <div className="mt-2 text-sm eb-muted">
+                You do not need to track everything. Consistency beats completeness.
+              </div>
+            </div>
+
+            {/* Steps */}
+            <ul className="list-disc pl-5 text-sm">
+              {(experimentPlan?.steps ?? []).map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+
+            {experimentPlan?.note && <div className="text-sm eb-muted">{experimentPlan.note}</div>}
+            <div className="pt-2">
+              <div className="text-sm font-semibold">How long?</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[3, 7, 30].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className="eb-pill"
+                    style={{ background: d === experimentDurationDays ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.06)' }}
+                    onClick={() => setExperimentDurationDays(d)}
+                    aria-label={`Set experiment length to ${d} days`}
+                  >
+                    {d} days
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
+              <button
+                type="button"
+                className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
+                onClick={() => setExperimentOpen(false)}
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+                onClick={startExperiment}
+              >
+                {`Start ${experimentDurationDays}-day experiment`}
+              </button>
+            </div>
+          </div>
+        </EBDialogContent>
+      </Dialog>
+
+
+      {/* Finish experiment confirm dialog */}
+      <Dialog
+        open={Boolean(finishExperimentConfirm)}
+        onOpenChange={(open) => {
+          if (!open) setFinishExperimentConfirm(null);
+        }}
+      >
+        <EBDialogContent
+          title="Finish experiment"
+          description="Confirm whether this experiment helped, so we can save the result."
+          className="max-w-md rounded-2xl"
+        >
+          <DialogHeader>
+            <DialogTitle>Finish experiment?</DialogTitle>
+            <DialogDescription>
+              Confirm whether this experiment helped, so we can save the result for future insights.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm eb-muted">
+              {finishExperimentConfirm?.worked
+                ? 'Mark this experiment as helpful and finish it now?'
+                : 'Finish this experiment now and mark it as not really helpful?'}
+            </div>
+            <div className="text-sm eb-muted">
+              We will save the result so your future insights can become more meaningful.
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button type="button" className="eb-btn-secondary" onClick={() => setFinishExperimentConfirm(null)}>
+                Cancel
+              </button>
+              <button type="button" className="eb-btn-primary" onClick={confirmFinishExperiment}>
+                Finish and save
+              </button>
+            </div>
+          </div>
+        </EBDialogContent>
+      </Dialog>
+
+      {/* Trends */}
+      <div className="eb-card">
+        <div className="eb-card-header">
+          <div className="flex items-start justify-between gap-4 w-full">
+            <div>
+              <div className="eb-card-title">Trends</div>
+              <div className="eb-card-sub">Your selected metrics over time (0–10). The key is underneath.</div>
+            </div>
+            <button
+              type="button"
+              className="eb-pill"
+              style={{ background: smoothTrends ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.06)' }}
+              onClick={() => setSmoothTrends((s) => !s)}
+              aria-label="Toggle rolling average smoothing"
+              title="Smooth the lines (3‑day rolling average)"
+            >
+              {smoothTrends ? 'Rolling avg: on' : 'Rolling avg: off'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 eb-chart">
+          <div style={{ width: '100%', height: 280 }}>
+            <ResponsiveContainer>
+              <LineChart data={seriesForChart} margin={{ left: 6, right: 16, top: 10, bottom: 6 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
+                  formatter={(value: any, name: any) => [value == null ? '–' : Number(value).toFixed(0), labelFor(String(name) as any, userData)]}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  height={36}
+                  formatter={(value: any) => <span style={{ fontSize: 12 }}>{labelFor(String(value) as any, userData)}</span>}
+                />
+                {selected.map((k, i) => (
+                  <Line
+                    key={String(k)}
+                    type="monotone"
+                    dataKey={String(k)}
+                    dot={{ r: 2 }}
+                    connectNulls
+                    strokeWidth={2}
+                    stroke={linePalette[i % linePalette.length]}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-2 text-sm eb-muted">We connect across missed days so you still see the story.</div>
+        </div>
+      {/* Distribution + high symptom days */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="eb-card">
+          <div className="eb-card-header">
+            <div className="flex items-start justify-between gap-4 w-full">
+              <div>
+                <div className="eb-card-title">Symptom distribution</div>
+                <div className="eb-card-sub">How often your chosen metric sits low, mid, or high.</div>
+              </div>
+              <select
+                className="eb-input !w-auto !py-2"
+                value={String(distributionMetric)}
+                onChange={(e) => setDistributionMetric(e.target.value as any)}
+                aria-label="Choose distribution metric"
+              >
+                {selected.map((k) => (
+                  <option key={String(k)} value={String(k)}>
+                    {labelFor(k, userData)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3 eb-chart">
+            <div style={{ width: '100%', height: 220 }}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={distributionData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="55%"
+                    outerRadius="80%"
+                    paddingAngle={4}
+                    isAnimationActive={false}
+                  >
+                    {distributionData.map((_, i) => (
+                      <Cell key={i} fill={linePalette[i % linePalette.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
+                    formatter={(value: any, name: any) => [`${value} day${Number(value) === 1 ? '' : 's'}`, String(name)]}
+                  />
+                  <Legend verticalAlign="bottom" height={28} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <div className="eb-card">
+          <div className="eb-card-header">
+            <div>
+              <div className="eb-card-title">High symptom days</div>
+              <div className="eb-card-sub">Days where a symptom hit 7/10 or higher.</div>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {highSymptomDays.length === 0 ? (
+              <div className="eb-inset rounded-2xl p-4 text-sm eb-muted">
+                No “high” days yet in this timeframe. Keep logging and this section will start to light up.
+              </div>
+            ) : (
+              highSymptomDays.map((it) => (
+                <div key={String(it.key)} className="eb-inset rounded-2xl p-4">
+                  <div className="text-sm font-semibold">{labelFor(it.key, userData)}</div>
+                  <div className="mt-1 text-sm eb-muted">
+                    {it.count} day{it.count === 1 ? '' : 's'} at 7+ in the last {days}.
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      </div>
+
+      {/* Symptoms by cycle phase (restored) */}
+      <div className="eb-card">
+        <div className="eb-card-header">
+          <div>
+            <div className="eb-card-title">Symptoms by cycle phase</div>
+            <div className="eb-card-sub">Optional: if cycle tracking is on and you log bleeding/spotting.</div>
+          </div>
+        </div>
+
+        {!cycleEnabled && !hasCycleSignal ? (
+          <div className="mt-2 text-sm eb-muted">Cycle tracking is off. You can still use trends and correlations.</div>
+        ) : !hasCycleSignal ? (
+          <div className="mt-2 text-sm eb-muted">
+            To show this, either log <b>Bleeding / spotting</b> (Profile → Symptoms) or use <b>New cycle started today</b> in your Daily Check-in.
+          </div>
+        ) : phasePointCount < 2 ? (
+          <div className="mt-2 text-sm eb-muted">Keep logging for a bit longer and we will start showing phase-based patterns.</div>
+        ) : !hasCycleMetricData ? (
+          <div className="mt-3 eb-inset rounded-2xl p-5">
+            <div className="text-sm font-semibold">No data for these symptoms yet</div>
+            <div className="mt-1 text-sm eb-muted">Try choosing symptoms you have logged (or keep logging for a few more days).</div>
+          </div>
+        ) : (
+          <>
+            <div className="mt-3">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={cycleData} margin={{ left: 6, right: 16, top: 10, bottom: 6 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                  <XAxis dataKey="phase" stroke="rgba(0,0,0,0.45)" fontSize={12} />
+                  <YAxis stroke="rgba(0,0,0,0.45)" fontSize={12} domain={[0, 10]} ticks={[0, 2, 4, 6, 8, 10]} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid rgba(0,0,0,0.12)',
+                      borderRadius: '12px',
+                      boxShadow: '0 6px 18px rgba(0,0,0,0.10)',
+                    }}
+                    formatter={(value: any, name: any) => {
+                      const label =
+                        name === 'm0'
+                          ? labelFor(phaseMetrics[0] as any, userData)
+                          : name === 'm1'
+                            ? labelFor(phaseMetrics[1] as any, userData)
+                            : name === 'm2'
+                              ? labelFor(phaseMetrics[2] as any, userData)
+                              : String(name);
+                      return [typeof value === 'number' ? value.toFixed(1) : value, label];
+                    }}
+                  />
+                  <Bar dataKey="m0" fill={phaseMetricColor(0)} radius={[10, 10, 0, 0]} />
+                  <Bar dataKey="m1" fill={phaseMetricColor(1)} radius={[10, 10, 0, 0]} />
+                  <Bar dataKey="m2" fill={phaseMetricColor(2)} radius={[10, 10, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+
+              <div className="mt-4 flex flex-wrap gap-3 justify-center text-sm">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full" style={{ background: phaseMetricColor(i as any) }} />
+                    <span>{labelFor(phaseMetrics[i as 0 | 1 | 2] as any, userData)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6">
+                <div className="text-sm eb-muted mb-2">Pick 3 symptoms to show</div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {[0, 1, 2].map((i) => (
+                    <select
+                      key={i}
+                      className="eb-input !py-2 !h-10"
+                      value={phaseMetrics[i as 0 | 1 | 2]}
+                      onChange={(e) => setPhaseMetricAt(i as 0 | 1 | 2, e.target.value as any)}
+                      style={{ borderColor: phaseMetricColor(i as any) }}
+                      aria-label={`Cycle phase metric ${i + 1}`}
+                    >
+                      {PHASE_METRICS.map((opt) => (
+                        <option key={String(opt.key)} value={opt.key as any}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Correlations (soft) */}
+      <div className="eb-card">
+        <div className="eb-card-header">
+          <div>
+            <div className="eb-card-title">What moves together</div>
+            <div className="eb-card-sub">A softer view of correlations. Use Relationship Explorer for the deep dive.</div>
+          </div>
+        </div>
+
+        {corrPairs.length < 1 ? (
+          <div className="mt-2 text-sm eb-muted">Log a few days with the same metrics to reveal relationships.</div>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {corrPairs.slice(0, 4).map((p, idx) => {
+              const confLabel = p.confidence === 'high' ? 'Stronger pattern' : p.confidence === 'medium' ? 'Possible pattern' : 'Weak pattern';
+              const direction = p.r > 0 ? 'move together' : 'move in opposite directions';
+              const safeCopy = p.hormonalInvolved
+                ? `There may be a ${p.confidence === 'low' ? 'weak' : 'possible'} pattern where these ${direction}. This could reflect stress, lifestyle, or hormonal changes.`
+                : `There may be a ${p.confidence === 'low' ? 'weak' : 'possible'} pattern where these ${direction}.`;
+
+              return (
+                <div key={idx} className="eb-inset rounded-2xl p-5 flex flex-col min-h-[170px]">
+                  <div className="text-sm font-semibold">
+                    {p.a} + {p.b}
+                  </div>
+                  <div className="mt-1 text-xs eb-muted">
+                    {confLabel} · based on {p.n} days logged together
+                  </div>
+                  <div className="mt-2 text-sm eb-muted">{safeCopy}</div>
+
+                  <details className="mt-3 rounded-2xl border border-neutral-200 bg-white/60 px-3 py-2">
+                    <summary className="cursor-pointer text-sm font-medium">Why am I seeing this?</summary>
+                    <div className="mt-2 text-sm eb-muted space-y-1">
+                      {(p.why ?? []).map((w, i) => (
+                        <div key={i}>{w}</div>
+                      ))}
+                      <div className="pt-1 text-xs eb-muted">Patterns are a hint, not proof.</div>
+                    </div>
+                  </details>
+
+                  <div className="mt-auto pt-4 flex items-center justify-between gap-2">
+
+                    {p.allowSuggestedExperiment ? (
                       <button
                         type="button"
                         className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 text-sm"
@@ -1412,7 +2293,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           <div className="min-w-0 w-full">
             <h2 className="text-xl font-semibold tracking-tight">{reportCardTitle}</h2>
             <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
-              Download a readable <b>.html</b> report for you. If you ever need to share with a clinician, use the JSON as the “machine” version.
+              Download a readable <b>.html</b> report for you. The JSON export is the “machine” version, but it can’t be restored as an in-app backup.
             </p>
             <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
               To open: tap the file in your downloads and choose Chrome/Safari.
@@ -1431,7 +2312,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               className="w-full sm:min-w-[240px] px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
               onClick={downloadRawJson}
             >
-              Raw JSON
+              Export Insights data (.json)
             </button>
           </div>
         </div>

@@ -16,7 +16,7 @@ import { useEntries } from '../lib/appStore';
 import { computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
 import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
-import { importBackupFile, parseBackupJson } from '../lib/backup';
+import { importBackupFile, parseBackupJson, looksLikeInsightsExport } from '../lib/backup';
 
 interface DashboardProps {
   userName: string;
@@ -220,6 +220,10 @@ export function Dashboard({
       setRestoreMsg('');
       const text = await file.text();
       const json = parseBackupJson(text);
+      if (!json) {
+        setRestoreMsg(looksLikeInsightsExport(text) ? 'That file is an Insights export, not a backup.' : 'That backup file does not look valid.');
+        return;
+      }
       importBackupFile(json);
       setRestoreMsg('Backup imported.');
     } catch (err: any) {

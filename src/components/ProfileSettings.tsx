@@ -19,7 +19,7 @@ import {
   Sun as SunIcon,
   X,
 } from 'lucide-react';
-import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, importBackupFile } from '../lib/backup';
+import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, looksLikeInsightsExport, importBackupFile } from '../lib/backup';
 import type { ColorTheme, SymptomKey, SymptomKind, UserData } from '../types';
 import { kindLabel } from '../lib/symptomMeta';
 import { downloadTextFile } from '../lib/storage';
@@ -241,9 +241,17 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
     const raw = await file.text();
     const parsed = parseBackupJson(raw);
     if (!parsed) {
-      alert('That backup file does not look valid.');
-      return;
-    }
+  alert(
+    looksLikeInsightsExport(raw)
+      ? `That file is an Insights export. It cannot be restored as a full backup.
+
+To restore, use a file named everybody-backup-YYYY-MM-DD.json.`
+      : `That backup file does not look valid.
+
+To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
+  );
+  return;
+}
     importBackupFile(parsed);
     // Hard reload to ensure all pages pick up the restored state cleanly.
     window.location.reload();
@@ -1007,7 +1015,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                                   className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
                                 >
                                   <Upload className="w-4 h-4" />
-                                  Import JSON
+                                  Restore from backup
                                 </button>
                             <button
                               type="button"
@@ -1015,7 +1023,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                               className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
                             >
                               <Download className="w-4 h-4" />
-                              Export JSON
+                              Create full backup
                             </button>
                             <button
                               type="button"
@@ -1026,6 +1034,10 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
                               Export CSV
                             </button>
                           </div>
+                              <p className="mt-2 text-sm opacity-80">
+                                <strong>Backups</strong> restore your full app data (check-ins, settings and anything else stored on this device).
+                                Insights exports are separate and can’t be restored here.
+                              </p>
 
                           <div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
                             <p className="text-sm font-medium mb-1">Coming soon</p>

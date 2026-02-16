@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { PencilLine, Droplet, Droplets, Egg, X, Flag } from 'lucide-react';
 import { cn } from './ui/utils';
-import type { UserData, SymptomKey } from '../types';
+import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries } from '../lib/appStore';
 import { computeCycleStats, sortByDateAsc } from '../lib/analytics';
 
@@ -134,7 +134,7 @@ function moodLabel(m?: number): string | null {
   return null;
 }
 
-function getCycleStarts(entriesSorted: any[]): string[] {
+function getCycleStarts(entriesSorted: CheckInEntry[]): string[] {
   const starts: string[] = [];
 
   // We want to avoid treating a single day of very light / breakthrough spotting as a new cycle.
@@ -149,8 +149,8 @@ function getCycleStarts(entriesSorted: any[]): string[] {
   for (const e of entriesSorted) {
     const flowVal = e?.values?.flow;
     const flow = typeof flowVal === 'number' ? flowVal : 0;
-    const override = Boolean((e as any)?.cycleStartOverride);
-    const breakthrough = Boolean((e as any)?.breakthroughBleed);
+    const override = Boolean(e?.cycleStartOverride);
+    const breakthrough = Boolean(e?.breakthroughBleed);
     const effectiveFlow = breakthrough ? 0 : flow;
 
     // Breakthrough/spotting flagged by the user should never start a cycle. Treat it as 'no flow' for cycle logic.
@@ -199,7 +199,7 @@ function getCycleStarts(entriesSorted: any[]): string[] {
 }
 
 
-function getOverlayValue(entry: any, key: SymptomKey | 'mood'): number | null {
+function getOverlayValue(entry: CheckInEntry | null | undefined, key: SymptomKey | 'mood'): number | null {
   if (!entry) return null;
   if (key === 'mood') {
     const m = entry.mood;
@@ -239,9 +239,9 @@ function overlayLabel(key: SymptomKey | 'mood'): string {
 
 export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser }: Props) {
   const { entries, upsertEntry } = useEntries();
-  const entriesSorted = useMemo(() => sortByDateAsc(entries as any[]), [entries]);
+  const entriesSorted = useMemo(() => sortByDateAsc(entries), [entries]);
 
-  const cycleStats = useMemo(() => computeCycleStats(entriesSorted as any), [entriesSorted]);
+  const cycleStats = useMemo(() => computeCycleStats(entriesSorted), [entriesSorted]);
   const avgLen = cycleStats?.avgLength ?? null;
 
   const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
@@ -270,7 +270,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
 
   const byISO = useMemo(() => {
     const m = new Map<string, any>();
-    (entriesSorted as any[]).forEach((e) => m.set(e.dateISO, e));
+    entriesSorted.forEach((e) => m.set(e.dateISO, e));
     return m;
   }, [entriesSorted]);
 
@@ -281,13 +281,13 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
   const fertilityEnabled = Boolean(userData.fertilityMode) && cycleEnabled;
 
   const ovulationSet = useMemo(() => {
-    const list = Array.isArray((userData as any).ovulationOverrideISOs)
-      ? ((userData as any).ovulationOverrideISOs as string[])
+    const list = Array.isArray(userData.ovulationOverrideISOs)
+      ? (userData.ovulationOverrideISOs as string[])
       : [];
     return new Set(list);
   }, [userData]);
 
-  const cycleStarts = useMemo(() => (cycleEnabled ? getCycleStarts(entriesSorted as any[]) : []), [cycleEnabled, entriesSorted]);
+  const cycleStarts = cycleEnabled ? (cycleStats?.cycleStarts ?? []) : [];
 
   // Build period + fertile windows
   const periodSet = useMemo(() => {
@@ -296,7 +296,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
 
     // 1) Always shade days where the user actually logged bleeding/spotting.
     const byISO = new Map<string, any>();
-    for (const e of entriesSorted as any[]) byISO.set(e.dateISO, e);
+    for (const e of entriesSorted) byISO.set(e.dateISO, e);
 
     const loggedBleed = (iso: string): boolean => {
       const e = byISO.get(iso);
@@ -305,7 +305,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
       return flow > 0;
     };
 
-    for (const e of entriesSorted as any[]) {
+    for (const e of entriesSorted) {
       if (loggedBleed(e.dateISO)) s.add(e.dateISO);
     }
 
@@ -672,7 +672,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
         // Cycle start should be an explicit, single marker.
         // If we set a start on this day, clear any other manual starts to avoid duplicates.
         if (v) {
-          for (const existing of entriesSorted as any[]) {
+          for (const existing of entriesSorted) {
             if (existing?.cycleStartOverride && existing.dateISO !== editISO) {
               upsertEntry({ ...existing, cycleStartOverride: false, updatedAt: now });
             }
@@ -685,11 +685,11 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
 
       const toggleOvulation = (v: boolean) => {
         onUpdateUser((prev) => {
-          const list = Array.isArray((prev as any).ovulationOverrideISOs) ? ([...(prev as any).ovulationOverrideISOs] as string[]) : [];
+          const list = Array.isArray(prev.ovulationOverrideISOs) ? ([...prev.ovulationOverrideISOs] as string[]) : [];
           const set = new Set(list);
           if (v) set.add(editISO);
           else set.delete(editISO);
-          return { ...(prev as any), ovulationOverrideISOs: Array.from(set).sort((a, b) => a.localeCompare(b)) };
+          return { ...prev, ovulationOverrideISOs: Array.from(set).sort((a, b) => a.localeCompare(b)) };
         });
       };
 
