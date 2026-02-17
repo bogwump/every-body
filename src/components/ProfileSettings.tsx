@@ -54,6 +54,8 @@ const moduleMeta: Array<{ key: SymptomKey; label: string; description: string }>
   { key: 'motivation', label: 'Motivation', description: 'Drive and willingness to do things' },
   { key: 'sleep', label: 'Sleep', description: 'Quality of sleep, not just hours' },
   { key: 'insomnia', label: 'Insomnia', description: 'Trouble falling or staying asleep' },
+  { key: 'fatigue', label: 'Fatigue', description: 'Heavy tiredness or drained feeling (optional)' },
+  { key: 'restlessLegs', label: 'Restless legs', description: 'Urge to move your legs or uncomfortable leg sensations at night' },
 
   // Mind
   { key: 'stress', label: 'Stress', description: 'Mental load and tension' },
@@ -96,20 +98,17 @@ const moduleMeta: Array<{ key: SymptomKey; label: string; description: string }>
   { key: 'flow', label: 'Bleeding / spotting', description: 'Optional, only if it’s relevant to you' },
 
   // Optional extras
-  { key: 'fatigue', label: 'Fatigue', description: 'Heavy tiredness or drained feeling' },
 ];
 
 
 
 const moduleGroups: Array<{ id: string; title: string; keys: SymptomKey[] }> = [
-  { id: 'energySleep', title: 'Energy & sleep', keys: ['energy', 'motivation', 'sleep', 'insomnia'] },
+  { id: 'energySleep', title: 'Energy & sleep', keys: ['energy', 'motivation', 'sleep', 'insomnia', 'fatigue'] },
   { id: 'mind', title: 'Mind', keys: ['stress', 'anxiety', 'irritability', 'focus', 'brainFog'] },
-  { id: 'bodyPain', title: 'Body & pain', keys: ['headache', 'migraine', 'cramps', 'jointPain', 'backPain', 'breastTenderness', 'dizziness', 'pain'] },
+  { id: 'bodyPain', title: 'Body & pain', keys: ['headache', 'migraine', 'cramps', 'jointPain', 'backPain', 'breastTenderness', 'dizziness', 'restlessLegs', 'pain'] },
   { id: 'digestion', title: 'Digestion', keys: ['bloating', 'digestion', 'acidReflux', 'nausea', 'constipation', 'diarrhoea', 'appetite'] },
   { id: 'skinHair', title: 'Skin & hair', keys: ['hairShedding', 'facialSpots', 'cysts', 'skinDryness'] },
-  { id: 'hormones', title: 'Hormones', keys: ['hotFlushes', 'nightSweats', 'libido', 'flow'] },
-  { id: 'optional', title: 'Optional extras', keys: ['fatigue'] },
-];
+  { id: 'hormones', title: 'Hormones', keys: ['hotFlushes', 'nightSweats', 'libido', 'flow'] },];
 
 
 
@@ -869,6 +868,37 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               </div>
                             );
                           })}
+                          {group.id === 'energySleep' ? (
+                            <div className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100 last:border-b-0">
+                              <div className="min-w-0">
+                                <p className="font-medium mb-1">Sleep details</p>
+                                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                                  Optional extra sleep questions (collapsed by default in check-in).
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onUpdateUserData((prev) => ({
+                                    ...prev,
+                                    sleepDetailsEnabled: !prev.sleepDetailsEnabled,
+                                  }))
+                                }
+                                className={`w-12 h-6 rounded-full transition-all ${
+                                  userData.sleepDetailsEnabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                                }`}
+                                aria-label="Toggle sleep details"
+                              >
+                                <span
+                                  className={`block w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
+                                    userData.sleepDetailsEnabled ? 'translate-x-6' : 'translate-x-1'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          ) : null}
+
                         </div>
                       </div>
                     </details>

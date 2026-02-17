@@ -2102,11 +2102,14 @@ return (
         ) : (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             {corrPairs.slice(0, 4).map((p, idx) => {
-              const confLabel = p.confidence === 'high' ? 'Stronger pattern' : p.confidence === 'medium' ? 'Possible pattern' : 'Weak pattern';
+              // Avoid "weak/strong" language early on – keep it inviting.
+              const confLabel =
+                p.confidence === 'high' ? 'Clearer pattern' : p.confidence === 'medium' ? 'Possible pattern' : 'Emerging pattern';
               const direction = p.r > 0 ? 'move together' : 'move in opposite directions';
+              const opener = p.confidence === 'low' ? 'There may be an emerging pattern where' : 'There may be a pattern where';
               const safeCopy = p.hormonalInvolved
-                ? `There may be a ${p.confidence === 'low' ? 'weak' : 'possible'} pattern where these ${direction}. This could reflect stress, lifestyle, or hormonal changes.`
-                : `There may be a ${p.confidence === 'low' ? 'weak' : 'possible'} pattern where these ${direction}.`;
+                ? `${opener} these ${direction}. This could reflect stress, lifestyle, or hormonal changes.`
+                : `${opener} these ${direction}.`;
 
               return (
                 <div key={idx} className="eb-inset rounded-2xl p-5 flex flex-col min-h-[170px]">
@@ -2118,6 +2121,9 @@ return (
                   </div>
                   <div className="mt-2 text-sm eb-muted">{safeCopy}</div>
 
+                  {/* Spacer to keep "Why am I seeing this?" in a stable spot near the bottom */}
+                  <div className="flex-1" />
+
                   <details className="mt-3 rounded-2xl border border-neutral-200 bg-white/60 px-3 py-2">
                     <summary className="cursor-pointer text-sm font-medium">Why am I seeing this?</summary>
                     <div className="mt-2 text-sm eb-muted space-y-1">
@@ -2128,8 +2134,7 @@ return (
                     </div>
                   </details>
 
-                  <div className="mt-auto pt-4 flex items-center justify-between gap-2">
-
+                  <div className="pt-4 flex items-center justify-between gap-2">
                     {p.allowSuggestedExperiment ? (
                       <button
                         type="button"

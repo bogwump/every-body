@@ -40,6 +40,13 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     kind: 'state',
     hormonal: true,
   },
+  restlessLegs: {
+    key: 'restlessLegs',
+    label: 'Restless legs',
+    description: 'Urge to move your legs or uncomfortable sensations at night',
+    kind: 'physio',
+    hormonal: true,
+  },
   stress: {
     key: 'stress',
     label: 'Stress',

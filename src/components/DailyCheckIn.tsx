@@ -374,6 +374,12 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   const [values, setValues] = useState<Partial<Record<SymptomKey, number>>>({});
   const [customValues, setCustomValues] = useState<Record<string, number>>({});
 
+  const [sleepDetails, setSleepDetails] = useState<{
+    timesWoke: 0 | 1 | 2 | 3;
+    troubleFallingAsleep: 0 | 1 | 2;
+    wokeTooEarly: boolean;
+  }>({ timesWoke: 0, troubleFallingAsleep: 0, wokeTooEarly: false });
+
   // When bleeding starts, ask whether this is a new period or just spotting/breakthrough.
   const [periodPromptOpen, setPeriodPromptOpen] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<CheckInEntry | null>(null);
@@ -439,12 +445,29 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     setCustomValues(customDefaults);
 
 
+    // Sleep details
+    if (userData.sleepDetailsEnabled) {
+      const sd = (existingEntry as any)?.sleepDetails;
+      setSleepDetails({
+        timesWoke: (sd?.timesWoke ?? 0) as any,
+        troubleFallingAsleep: (sd?.troubleFallingAsleep ?? 0) as any,
+        wokeTooEarly: Boolean(sd?.wokeTooEarly ?? false),
+      });
+    } else {
+      // keep stored values if any, but reset UI to defaults
+      setSleepDetails({ timesWoke: 0, troubleFallingAsleep: 0, wokeTooEarly: false });
+    }
+
     setEventsState({});
     setInfluencesOpen(false);
-  }, [existingEntry, userData.enabledModules, userData.customSymptoms, activeDateISO]);
+  }, [existingEntry, userData.enabledModules, userData.customSymptoms, activeDateISO, userData.sleepDetailsEnabled]);
 
   const enabledSliders = useMemo(() => {
-    return userData.enabledModules.filter((k) => k !== 'focus' && Boolean(sliderMeta[k]));
+    return userData.enabledModules.filter((k) => {
+      if (k === 'focus') return false;
+      if (userData.sleepDetailsEnabled && k === 'nightSweats') return false;
+      return Boolean(sliderMeta[k]);
+    });
   }, [userData.enabledModules]);
 
   const enabledCustom = useMemo(() => {
@@ -538,6 +561,13 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       notes: notes.trim() ? notes.trim() : undefined,
       values: nextValues,
       customValues: Object.keys(nextCustomValues).length ? nextCustomValues : undefined,
+      sleepDetails: userData.sleepDetailsEnabled
+        ? {
+            timesWoke: sleepDetails.timesWoke,
+            troubleFallingAsleep: sleepDetails.troubleFallingAsleep,
+            wokeTooEarly: sleepDetails.wokeTooEarly,
+          }
+        : (existingEntry as any)?.sleepDetails,
       events: Object.keys(nextEvents).length ? nextEvents : undefined,
       cycleStartOverride: (existingEntry as any)?.cycleStartOverride ?? undefined,
       createdAt: existingEntry?.createdAt ?? now,
@@ -783,6 +813,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
           <div className="space-y-5">
             {orderedSliders.map((key) => {
+              if (userData.sleepDetailsEnabled && key === 'nightSweats') return null;
               const meta = sliderMeta[key];
               const Icon = meta.icon;
               const current = normalise10((values as any)?.[key]);
@@ -818,6 +849,101 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                     leftLabel={key === 'flow' ? '0' : '0'}
                     rightLabel={key === 'flow' ? '10' : '10'}
                   />
+
+                  {key === 'sleep' && userData.sleepDetailsEnabled ? (
+                    <details className="mt-4 rounded-xl border border-[rgba(0,0,0,0.06)] bg-[rgba(0,0,0,0.02)] overflow-hidden group">
+                      <summary className="list-none cursor-pointer select-none px-3 py-2 flex items-center justify-between">
+                        <span className="text-sm font-medium">Sleep details</span>
+                        <ChevronRight className="w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                      </summary>
+                      <div className="px-3 pb-4 pt-3 space-y-6">
+                        <div>
+                          <div className="text-sm font-medium mb-2">Night time awakenings</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {[0, 1, 2, 3].map((n) => {
+                              const label = n === 0 ? 'None' : n === 1 ? 'Once' : n === 2 ? 'Twice' : '3+ times';
+                              const active = sleepDetails.timesWoke === n;
+                              return (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  onClick={() => setSleepDetails((p) => ({ ...p, timesWoke: n as any }))}
+                                  className="eb-pill"
+                                  style={
+                                    active
+                                      ? { background: 'rgba(var(--color-primary), 0.15)', color: 'rgb(var(--color-primary))' }
+                                      : { background: 'rgba(0,0,0,0.05)', color: 'rgb(var(--color-text-secondary))' }
+                                  }
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-sm font-medium mb-2">Trouble falling asleep</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {[
+                              { v: 0, label: 'None' },
+                              { v: 1, label: 'A little' },
+                              { v: 2, label: 'A lot' },
+                            ].map((opt) => {
+                              const active = sleepDetails.troubleFallingAsleep === opt.v;
+                              return (
+                                <button
+                                  key={opt.v}
+                                  type="button"
+                                  onClick={() => setSleepDetails((p) => ({ ...p, troubleFallingAsleep: opt.v as any }))}
+                                  className="eb-pill"
+                                  style={
+                                    active
+                                      ? { background: 'rgba(var(--color-primary), 0.15)', color: 'rgb(var(--color-primary))' }
+                                      : { background: 'rgba(0,0,0,0.05)', color: 'rgb(var(--color-text-secondary))' }
+                                  }
+                                >
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <SwitchRow
+                          checked={sleepDetails.wokeTooEarly}
+                          onChange={(next) => setSleepDetails((p) => ({ ...p, wokeTooEarly: next }))}
+                          label="Awake earlier than planned"
+                        />
+
+                        <div>
+                          <div className="text-sm font-medium mb-2">Night sweats</div>
+                          {userData.enabledModules.includes('nightSweats') ? (
+                            <div className="mt-2">
+                              <div className="text-xs text-[rgb(var(--color-text-secondary))]">
+                                {normalise10((values as any)?.nightSweats)}/10
+                              </div>
+                              <div className="mt-2">
+                                <Slider10
+                                  value={normalise10((values as any)?.nightSweats)}
+                                  onChange={(n) => setValues((prev) => ({ ...prev, nightSweats: n }))}
+                                  leftLabel="0"
+                                  rightLabel="10"
+                                />
+                              </div>
+                              <div className="mt-1 text-xs text-[rgb(var(--color-text-secondary))]">
+                                Tracked under Hormones. Shown here to make logging easier.
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-xs text-[rgb(var(--color-text-secondary))]">
+                              Enable Night sweats in Hormones to track this.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </details>
+                  ) : null}
                 </div>
               );
             })}

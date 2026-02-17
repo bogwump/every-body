@@ -36,7 +36,8 @@ export type SymptomKey =
   | 'libido'
   | 'breastTenderness'
   | 'hotFlushes'
-  | 'nightSweats';
+  | 'nightSweats'
+  | 'restlessLegs';
 
 /** Metrics that can be shown on the dashboard chart */
 export type DashboardMetric = SymptomKey | 'mood';
@@ -80,7 +81,10 @@ export interface UserData {
   /** Which lifestyle / influence toggles show in the daily check-in */
   enabledInfluences?: InfluenceKey[];
 
-  /** True once we've applied goal-based defaults during first onboarding (prevents future goal changes auto-resetting settings). */
+    /** Optional: show extra sleep detail questions in the daily check-in (collapsed by default). */
+  sleepDetailsEnabled?: boolean;
+
+/** True once we've applied goal-based defaults during first onboarding (prevents future goal changes auto-resetting settings). */
   onboardingPresetApplied?: boolean;
 
   /** Optional: user-defined custom symptoms (freeform). Stored as ids + labels. */
@@ -128,6 +132,15 @@ export interface CheckInEntry {
 
   /** Optional custom symptom values keyed by CustomSymptom.id (0-10) */
   customValues?: Record<string, number>;
+
+  /** Optional extra sleep detail fields (not part of the 0–10 symptom sliders) */
+  sleepDetails?: {
+    /** 0, 1, 2, or 3 (meaning 3+) */
+    timesWoke?: 0 | 1 | 2 | 3;
+    /** 0 none, 1 a bit, 2 a lot */
+    troubleFallingAsleep?: 0 | 1 | 2;
+    wokeTooEarly?: boolean;
+  };
 
   /** Optional non-symptom events (kept separate from symptom modules) */
   events?: {
