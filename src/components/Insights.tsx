@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  ComposedChart,
   ScatterChart,
   Scatter,
   ZAxis,
@@ -17,7 +18,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { Activity, ArrowRight, Download, FlaskConical, Sparkles } from 'lucide-react';
+import { Activity, ArrowRight, Download, FlaskConical, Sparkles, Moon, Heart } from 'lucide-react';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
 import { downloadTextFile } from '../lib/storage';
@@ -489,11 +490,115 @@ export function Insights({ userData, onOpenCheckIn }: InsightsProps) {
 
   const [timeframe, setTimeframe] = useState<Timeframe>('month');
     const [smoothTrends, setSmoothTrends] = useState<boolean>(false);
+  const [sleepExploreOpen, setSleepExploreOpen] = useState<boolean>(false);
+  const [sleepShowExercise, setSleepShowExercise] = useState<boolean>(true);
+  const [sleepShowSex, setSleepShowSex] = useState<boolean>(true);
+    const [sleepOtherKey, setSleepOtherKey] = useState<string>('');
 const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const entriesSorted = useMemo(() => filterByDays(entriesAllSorted, days), [entriesAllSorted, days]);
   const streak = useMemo(() => calculateStreak(entriesAllSorted), [entriesAllSorted]);
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
+
+  const sleepInsightsOn = Boolean(userData.sleepInsightsEnabled);
+
+  const sleepSeries = useMemo(() => {
+    return entriesSorted.map((e) => {
+      const sleep10 = getMetricValue(e, 'sleep');
+      const sd = (e as any)?.sleepDetails;
+      const hasExtras = !!(
+        sd &&
+        ((typeof sd.timesWoke === 'number' && sd.timesWoke > 0) ||
+          (typeof sd.troubleFallingAsleep === 'number' && sd.troubleFallingAsleep > 0) ||
+          Boolean(sd.wokeTooEarly))
+      );
+            const ev = (e as any)?.events ?? {};
+      const anyOther = Object.keys(ev).some((k) => k !== 'exercise' && k !== 'sex' && Boolean((ev as any)[k]));
+      return {
+        dateISO: e.dateISO,
+        dateLabel: fmtDateShort(e.dateISO),
+        sleep: sleep10,
+        extras: hasExtras,
+        exercise: Boolean((ev as any).exercise),
+        sex: Boolean((ev as any).sex),
+        other: anyOther,
+        events: ev,
+        intensity: (e as any)?.eventsDetails?.exerciseIntensity as any,
+      };
+    });
+  }, [entriesSorted]);
+
+  const OTHER_INFLUENCE_KEYS = [
+    'travel',
+    'illness',
+    'alcohol',
+    'lateNight',
+    'stressfulDay',
+    'medication',
+    'caffeine',
+    'socialising',
+    'lowHydration',
+  ] as const;
+
+  const otherInfluenceLabel = (k: string) => {
+    switch (k) {
+      case 'travel':
+        return 'Travel';
+      case 'illness':
+        return 'Feeling unwell';
+      case 'alcohol':
+        return 'Alcohol';
+      case 'lateNight':
+        return 'Late night';
+      case 'stressfulDay':
+        return 'Stressful day';
+      case 'medication':
+        return 'Medication';
+      case 'caffeine':
+        return 'Caffeine';
+      case 'socialising':
+        return 'Socialising';
+      case 'lowHydration':
+        return 'Low hydration';
+      default:
+        return k;
+    }
+  };
+
+  const sleepOtherOptions = useMemo(() => {
+    return OTHER_INFLUENCE_KEYS.filter((k) => sleepSeries.some((r) => Boolean((r as any).events?.[k])));
+  }, [sleepSeries]);
+
+  const sleepExtrasCount = useMemo(() => sleepSeries.filter((r) => r.extras).length, [sleepSeries]);
+
+  const sleepGentleHint = useMemo(() => {
+    const withSleep = sleepSeries.filter((r) => typeof r.sleep === 'number') as Array<{ sleep: number; exercise: boolean; sex: boolean; other: boolean; intensity?: any }>;
+    if (withSleep.length < 6) return 'Log a few more days and we’ll start spotting what helps your sleep.';
+
+    const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : NaN);
+
+    const exDays = withSleep.filter((r) => r.exercise).map((r) => r.sleep);
+    const nonEx = withSleep.filter((r) => !r.exercise).map((r) => r.sleep);
+    const exDiff = avg(exDays) - avg(nonEx);
+
+    const hardDays = withSleep.filter((r) => r.intensity === 'hard').map((r) => r.sleep);
+    const lightMod = withSleep.filter((r) => r.intensity === 'light' || r.intensity === 'moderate').map((r) => r.sleep);
+    const hardDiff = avg(hardDays) - avg(lightMod);
+
+    if (Number.isFinite(exDiff) && exDays.length >= 4 && nonEx.length >= 4 && Math.abs(exDiff) >= 0.7) {
+      return exDiff > 0
+        ? 'So far, your sleep looks a touch better on days you log a workout.'
+        : 'So far, your sleep looks a bit more fragile on workout days. That might just be timing or intensity.';
+    }
+
+    if (Number.isFinite(hardDiff) && hardDays.length >= 3 && lightMod.length >= 3 && Math.abs(hardDiff) >= 0.7) {
+      return hardDiff < 0
+        ? 'Hard workouts sometimes go hand-in-hand with a slightly more restless night. Keep an eye on it.'
+        : 'Hard workouts sometimes line up with better sleep for you. Nice.';
+    }
+
+    return 'Nothing shouty yet, which is normal. Keep logging and we’ll build a clearer picture.';
+  }, [sleepSeries]);
 
   // --- metric selection (for analysis) ---
   const selectableKeys: MetricKey[] = useMemo(() => {
@@ -1437,7 +1542,7 @@ return (
           </div>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             {experimentStatus.ex.steps?.slice(0, 3)?.map((s: string, i: number) => (
-              <div key={i} className="eb-inset rounded-2xl p-4">
+              <div key={i} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
                 <div className="text-sm font-semibold">Step {i + 1}</div>
                 <div className="mt-1 text-sm eb-muted">{s}</div>
               </div>
@@ -1445,7 +1550,7 @@ return (
 
             {/* Step 4: outcome (available any time) */}
             {!experimentStatus.done ? (
-              <div className="eb-inset rounded-2xl p-4">
+              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
                 <div className="text-sm font-semibold">Step 4</div>
                 <div className="mt-1 text-sm eb-muted">
                   Tell me if it worked. We'll save the result so your future insights can become more meaningful.
@@ -1468,7 +1573,7 @@ return (
                 </div>
               </div>
             ) : (
-              <div className="eb-inset rounded-2xl p-4">
+              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
                 <div className="text-sm font-semibold">Step 4</div>
                 <div className="mt-1 text-sm eb-muted">Experiment complete. Thanks for telling me what helped.</div>
               </div>
@@ -1690,13 +1795,140 @@ return (
                 </div>
               </CarouselItem>
             </CarouselContent>
-            <CarouselPrevious className="hidden md:flex" />
-            <CarouselNext className="hidden md:flex" />
+            <CarouselPrevious className="flex opacity-70" />
+            <CarouselNext className="flex opacity-70" />
           </Carousel>
         </div>
       </div>
 
-      {/* Experiment dialog */}
+      {/* Sleep Insights (optional) */}
+      {sleepInsightsOn ? (
+        <div className="eb-card p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center">
+                  <Moon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />
+                </div>
+                <div>
+                  <h2 className="mb-0.5">Sleep</h2>
+                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                    {sleepGentleHint}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
+                Extra sleep details logged on <span className="font-medium">{sleepExtrasCount}</span> day{sleepExtrasCount === 1 ? '' : 's'}.
+              </div>
+            </div>
+
+            <button type="button" className="eb-btn eb-btn-secondary shrink-0" onClick={() => setSleepExploreOpen(true)}>
+              Explore sleep
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="mt-4 h-44">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
+                <Tooltip />
+                <Line type="monotone" dataKey="sleep" dot={false} stroke="rgb(var(--color-primary))" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Explore modal */}
+          <Dialog open={sleepExploreOpen} onOpenChange={setSleepExploreOpen}>
+            <EBDialogContent>
+              <DialogHeader>
+                <DialogTitle>Sleep explorer</DialogTitle>
+                <DialogDescription>
+                  A simple timeline view, with optional markers for what was going on that day.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="mt-4 eb-inset rounded-2xl p-4">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={sleepShowExercise ? 'eb-btn eb-btn-primary !py-2 !px-3 text-sm' : 'eb-btn eb-btn-secondary !py-2 !px-3 text-sm'}
+                    onClick={() => setSleepShowExercise((v) => !v)}
+                  >
+                    <Activity className="w-4 h-4" /> Workout
+                  </button>
+                  <button
+                    type="button"
+                    className={sleepShowSex ? 'eb-btn eb-btn-primary !py-2 !px-3 text-sm' : 'eb-btn eb-btn-secondary !py-2 !px-3 text-sm'}
+                    onClick={() => setSleepShowSex((v) => !v)}
+                  >
+                    <Heart className="w-4 h-4" /> Intimacy
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 opacity-70" />
+                    <select
+                      className="eb-input !w-auto !py-2 text-sm"
+                      value={sleepOtherKey}
+                      onChange={(e) => setSleepOtherKey(e.target.value)}
+                      aria-label="Choose an influence marker"
+                      title="Choose one influence to show as markers"
+                    >
+                      <option value="">Other influence: none</option>
+                      {sleepOtherOptions.map((k) => (
+                        <option key={k} value={k}>
+                          {otherInfluenceLabel(k)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
+                      <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="sleep" dot={false} stroke="rgb(var(--color-primary))" strokeWidth={2} />
+
+                      {sleepShowExercise ? (
+                        <Scatter data={sleepSeries.filter((r) => r.exercise)} dataKey="sleep" fill="rgb(var(--color-primary-dark))" />
+                      ) : null}
+                      {sleepShowSex ? (
+                        <Scatter data={sleepSeries.filter((r) => r.sex)} dataKey="sleep" fill="rgb(var(--color-accent))" />
+                      ) : null}
+                      {sleepOtherKey ? (
+                        <Scatter
+                          data={sleepSeries.filter((r) => Boolean((r as any).events?.[sleepOtherKey]))}
+                          dataKey="sleep"
+                          fill="rgba(0,0,0,0.35)"
+                        />
+                      ) : null}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
+                  Tip: the dots are just markers. Your sleep line is the main thing.
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setSleepExploreOpen(false)}>
+                  Close
+                </button>
+              </div>
+            </EBDialogContent>
+          </Dialog>
+        </div>
+      ) : null}
+
+      
+
+{/* Experiment dialog */}
       <Dialog open={experimentOpen} onOpenChange={setExperimentOpen}>
         <EBDialogContent
           title={experimentPlan?.title ?? 'Experiment'}
@@ -1715,7 +1947,7 @@ return (
             </div>
 
             {isCustomExperiment && (
-              <div className="eb-inset rounded-2xl p-4">
+              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
                 <div className="text-sm font-semibold">Name your experiment</div>
                 <input
                   className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-black/20"
@@ -1730,7 +1962,7 @@ return (
             )}
 
             {/* What to log */}
-            <div className="eb-inset rounded-2xl p-4">
+            <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
               <div className="text-sm font-semibold">What to log (daily)</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {isCustomExperiment ? (
@@ -1918,7 +2150,7 @@ return (
           <div className="mt-2 text-sm eb-muted">We connect across missed days so you still see the story.</div>
         </div>
       {/* Distribution + high symptom days */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="eb-card">
           <div className="eb-card-header">
             <div className="flex items-start justify-between gap-4 w-full">
@@ -1977,14 +2209,14 @@ return (
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
             {highSymptomDays.length === 0 ? (
               <div className="eb-inset rounded-2xl p-4 text-sm eb-muted">
                 No “high” days yet in this timeframe. Keep logging and this section will start to light up.
               </div>
             ) : (
               highSymptomDays.map((it) => (
-                <div key={String(it.key)} className="eb-inset rounded-2xl p-4">
+                <div key={String(it.key)} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
                   <div className="text-sm font-semibold">{labelFor(it.key, userData)}</div>
                   <div className="mt-1 text-sm eb-muted">
                     {it.count} day{it.count === 1 ? '' : 's'} at 7+ in the last {days}.

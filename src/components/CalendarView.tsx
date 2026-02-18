@@ -1,6 +1,6 @@
 
-import React, { useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X, Flag } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries } from '../lib/appStore';
@@ -225,22 +225,32 @@ function getOverlayValue(entry: CheckInEntry | null | undefined, key: SymptomKey
 
 function overlayLabel(key: SymptomKey | 'mood'): string {
   if (key === 'mood') return 'Overall mood';
+  // Prefer explicit labels where phrasing matters, otherwise fall back to a
+  // safe humaniser (camelCase -> spaced Title case).
   const map: Partial<Record<SymptomKey, string>> = {
-    energy: 'Energy',
-    sleep: 'Sleep',
-    stress: 'Stress',
-    focus: 'Clarity',
-    bloating: 'Bloating',
-    pain: 'Pain',
-    fatigue: 'Fatigue',
+    flow: 'Bleeding/spotting',
     brainFog: 'Brain fog',
     nightSweats: 'Night sweats',
     hairShedding: 'Hair shedding',
     facialSpots: 'Facial spots',
-    cysts: 'Cysts',
-    flow: 'Bleeding/spotting',
+    backPain: 'Back pain',
+    jointPain: 'Joint pain',
+    breastTenderness: 'Breast tenderness',
+    acidReflux: 'Acid reflux',
+    hotFlushes: 'Hot flushes',
+    restlessLegs: 'Restless legs',
+    focus: 'Focus',
   };
-  return map[key] ?? String(key);
+  if (map[key]) return map[key]!;
+
+  const raw = String(key);
+  // Insert spaces before capitals (camelCase), then Title-case words.
+  const withSpaces = raw.replace(/([a-z])([A-Z])/g, '$1 $2');
+  return withSpaces
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser }: Props) {
@@ -257,6 +267,12 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
   const [editMode, setEditMode] = useState(false);
   const [editISO, setEditISO] = useState<string | null>(null);
   const [summaryISO, setSummaryISO] = useState<string | null>(null);
+  const [sleepPeekOpen, setSleepPeekOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Reset the sleep details peek when switching days or closing.
+    setSleepPeekOpen(false);
+  }, [summaryISO]);
 
 
   const monthStart = startOfMonth(monthCursor);
@@ -414,6 +430,21 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
     const note = typeof (e as any)?.notes === 'string' ? String((e as any).notes).trim() : '';
     const mood = moodLabel((e as any)?.mood);
 
+    const sd = (e as any)?.sleepDetails as any;
+    const hasSleepDetails = !!(
+      sd &&
+      ((typeof sd.timesWoke === 'number' && sd.timesWoke > 0) ||
+        (typeof sd.troubleFallingAsleep === 'number' && sd.troubleFallingAsleep > 0) ||
+        Boolean(sd.wokeTooEarly))
+    );
+
+    const troubleLabel = (v: any): string => {
+      if (v === 0) return 'No';
+      if (v === 1) return 'A bit';
+      if (v === 2) return 'Yes';
+      return '—';
+    };
+
     // Up to 5 logged metrics from enabled modules
     const enabled = Array.isArray(userData.enabledModules) ? (userData.enabledModules as SymptomKey[]) : [];
     const rows: Array<{ label: string; value: string }> = [];
@@ -433,12 +464,12 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <button
           type="button"
-          className="absolute inset-0 bg-black/50"
+          className="absolute inset-0 bg-black/50 z-0"
           onClick={() => setSummaryISO(null)}
           aria-label="Close day summary"
         />
 
-        <div className="relative w-full max-w-lg eb-card p-6">
+        <div className="relative z-10 w-full max-w-lg eb-card p-6 pointer-events-auto">
           <div className="mb-4">
             <div className="text-xl font-semibold">Day summary</div>
             <div className="text-sm text-[rgb(var(--color-text-secondary))]">
@@ -466,6 +497,56 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
                   <div className="font-medium">{r.value}</div>
                 </div>
               ))}
+            </div>
+          ) : null}
+
+          {userData.sleepDetailsEnabled ? (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setSleepPeekOpen((v) => !v)}
+                onTouchStart={(e) => {
+                  // iOS Safari can be flaky with fixed modals; make touch feel responsive.
+                  e.preventDefault();
+                  setSleepPeekOpen((v) => !v);
+                }}
+                className="w-full flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm"
+              >
+                <div className="text-[rgb(var(--color-text-secondary))]">Sleep details</div>
+                <div className="flex items-center gap-2">
+                  <span className={hasSleepDetails ? 'font-medium' : 'text-[rgb(var(--color-text-secondary))]'}>
+                    {hasSleepDetails ? 'Logged' : 'Not today'}
+                  </span>
+                  <ChevronRight className={`w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform ${sleepPeekOpen ? 'rotate-90' : ''}`} />
+                </div>
+              </button>
+
+              {sleepPeekOpen ? (
+                <div className="mt-3 eb-inset rounded-2xl p-4">
+                  {hasSleepDetails ? (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[rgb(var(--color-text-secondary))]">Night-time awakenings</span>
+                        <span className="font-medium">
+                          {typeof sd?.timesWoke === 'number' ? (sd.timesWoke === 3 ? '3+' : String(sd.timesWoke)) : '—'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[rgb(var(--color-text-secondary))]">Trouble falling asleep</span>
+                        <span className="font-medium">{troubleLabel(sd?.troubleFallingAsleep)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[rgb(var(--color-text-secondary))]">Awake earlier than planned</span>
+                        <span className="font-medium">{sd?.wokeTooEarly ? 'Yes' : 'No'}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-[rgb(var(--color-text-secondary))]">
+                      Nothing extra logged for this day.
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           ) : null}
 

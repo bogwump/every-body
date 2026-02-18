@@ -36,6 +36,8 @@ const DEFAULT_USER: UserData = {
   ],
   enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol'],
   sleepDetailsEnabled: false,
+  sleepInsightsEnabled: false,
+  fitbitEnabled: false,
   onboardingPresetApplied: false,
 };
 

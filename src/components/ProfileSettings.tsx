@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   User,
   Palette,
@@ -32,6 +32,8 @@ import {
 } from '../lib/cloudSync';
 import { useEntries } from '../lib/appStore';
 import { calculateStreak } from '../lib/analytics';
+
+import appLogo from '../assets/everybody-logo-256.png';
 
 interface ProfileSettingsProps {
   userData: UserData;
@@ -201,6 +203,16 @@ function cloudStatusLabel(userData: UserData): string {
 
 export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onPreviewOnboarding }: ProfileSettingsProps) {
   const [view, setView] = useState<'main' | 'personal'>('main');
+
+  // iOS Safari often preserves scroll position when navigating within an SPA.
+  // When opening a sub-view (like Personal information), ensure the top content is visible.
+  useEffect(() => {
+    try {
+      setTimeout(() => window.scrollTo(0, 0), 0);
+    } catch {
+      // ignore
+    }
+  }, [view]);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [showPrivacyPanel, setShowPrivacyPanel] = useState(false);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
@@ -211,6 +223,8 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [customSymptomText, setCustomSymptomText] = useState<string>('');
   const [customSymptomKind, setCustomSymptomKind] = useState<SymptomKind>('other');
   const [customSymptomError, setCustomSymptomError] = useState<string>('');
+
+  const [lifestyleOpen, setLifestyleOpen] = useState(false);
 
   const setEnabledModules = (next: SymptomKey[]) => {
     onUpdateUserData((prev) => ({ ...prev, enabledModules: next }));
@@ -484,8 +498,9 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
         {/* Profile hero card */}
         <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-6 mb-6 shadow-lg overflow-hidden">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-[rgba(255,255,255,0.22)] border border-[rgba(255,255,255,0.28)] flex items-center justify-center overflow-hidden">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-[rgba(255,255,255,0.22)] border border-[rgba(255,255,255,0.28)] flex items-center justify-center overflow-hidden">
               {(userData as any).avatarDataUrl ? (
                 <img src={(userData as any).avatarDataUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (userData as any).avatarStockId ? (
@@ -495,17 +510,23 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               ) : (
                 <div className="text-white text-2xl font-semibold">{initialsFromName(userData.name)}</div>
               )}
+              </div>
+
+              <div>
+                <h2 className="mb-1 text-white">{userData.name?.trim() || 'Friend'}</h2>
+                <p className="text-sm text-white/80">
+                  {userData.goal === 'cycle-health' && 'Tracking cycle health'}
+                  {userData.goal === 'perimenopause' && 'Perimenopause support'}
+                  {userData.goal === 'post-contraception' && 'Post-contraception journey'}
+                  {userData.goal === 'wellbeing' && 'Wellbeing support'}
+                  {!userData.goal && 'Just exploring'}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <h2 className="mb-1 text-white">{userData.name?.trim() || 'Friend'}</h2>
-              <p className="text-sm text-white/80">
-                {userData.goal === 'cycle-health' && 'Tracking cycle health'}
-                {userData.goal === 'perimenopause' && 'Perimenopause support'}
-                {userData.goal === 'post-contraception' && 'Post-contraception journey'}
-                {userData.goal === 'wellbeing' && 'Wellbeing support'}
-                {!userData.goal && 'Just exploring'}
-              </p>
+            {/* App icon (helps brand recognition on mobile) */}
+            <div className="eb-appicon w-12 h-12 p-1 shrink-0" aria-label="EveryBody">
+              <img src={appLogo} alt="EveryBody" className="w-full h-full" />
             </div>
           </div>
 
@@ -869,34 +890,70 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                             );
                           })}
                           {group.id === 'energySleep' ? (
-                            <div className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100 last:border-b-0">
-                              <div className="min-w-0">
-                                <p className="font-medium mb-1">Sleep details</p>
-                                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                                  Optional extra sleep questions (collapsed by default in check-in).
-                                </p>
+                            <>
+                              <div className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100">
+                                <div className="min-w-0">
+                                  <p className="font-medium mb-1">Sleep details</p>
+                                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                                    Optional extra sleep questions (collapsed by default in check-in).
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onUpdateUserData((prev) => {
+                                      const next = !prev.sleepDetailsEnabled;
+                                      return {
+                                        ...prev,
+                                        sleepDetailsEnabled: next,
+                                        // If someone turns on sleep details, also show the Sleep section in Insights by default.
+                                        sleepInsightsEnabled: next ? true : prev.sleepInsightsEnabled,
+                                      };
+                                    })
+                                  }
+                                  className={`w-12 h-6 rounded-full transition-all ${
+                                    userData.sleepDetailsEnabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                                  }`}
+                                  aria-label="Toggle sleep details"
+                                >
+                                  <span
+                                    className={`block w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
+                                      userData.sleepDetailsEnabled ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                  />
+                                </button>
                               </div>
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  onUpdateUserData((prev) => ({
-                                    ...prev,
-                                    sleepDetailsEnabled: !prev.sleepDetailsEnabled,
-                                  }))
-                                }
-                                className={`w-12 h-6 rounded-full transition-all ${
-                                  userData.sleepDetailsEnabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-                                }`}
-                                aria-label="Toggle sleep details"
-                              >
-                                <span
-                                  className={`block w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
-                                    userData.sleepDetailsEnabled ? 'translate-x-6' : 'translate-x-1'
+                              <div className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100 last:border-b-0">
+                                <div className="min-w-0">
+                                  <p className="font-medium mb-1">Sleep insights</p>
+                                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                                    Adds a Sleep section to Insights, so your sleep patterns don’t get lost.
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onUpdateUserData((prev) => ({
+                                      ...prev,
+                                      sleepInsightsEnabled: !prev.sleepInsightsEnabled,
+                                    }))
+                                  }
+                                  className={`w-12 h-6 rounded-full transition-all ${
+                                    userData.sleepInsightsEnabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
                                   }`}
-                                />
-                              </button>
-                            </div>
+                                  aria-label="Toggle sleep insights"
+                                >
+                                  <span
+                                    className={`block w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
+                                      userData.sleepInsightsEnabled ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            </>
                           ) : null}
 
                         </div>
@@ -907,65 +964,79 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                   );
                 })}
 
-                <details className="mt-3 rounded-2xl border border-neutral-200 overflow-hidden group">
-                  <summary className="list-none cursor-pointer select-none p-4 flex items-center justify-between hover:bg-neutral-50">
+                {/* iOS Safari can be picky with <details>/<summary> click targets, so we use a simple toggle button here. */}
+                <div className="mt-3 rounded-2xl border border-neutral-200 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setLifestyleOpen((v) => !v)}
+                    className="w-full p-4 flex items-center justify-between hover:bg-neutral-50"
+                  >
                     <span className="font-medium">Customise lifestyle & influences</span>
-                    <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
-                  </summary>
+                    <ChevronRight
+                      className={`w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform ${
+                        lifestyleOpen ? 'rotate-90' : ''
+                      }`}
+                    />
+                  </button>
 
-                  <div className="p-4 pt-0">
-                    <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
-                      This controls what shows up under “Other influences” in your daily check-in, so it stays short and relevant.
-                    </p>
+                  {lifestyleOpen ? (
+                    <div className="p-4 pt-0">
+                      <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
+                        This controls what shows up under “Other influences” in your daily check-in, so it stays short and relevant.
+                      </p>
 
-                    <div className="flex gap-2 justify-end mb-3">
-                      <button
-                        onClick={() => setEnabledInfluences(influenceMeta.map((m) => m.key))}
-                        className="px-3 py-2 border rounded-lg"
-                      >
-                        Enable all
-                      </button>
-                      <button
-                        onClick={() => setEnabledInfluences([])}
-                        className="px-3 py-2 border rounded-lg"
-                      >
-                        Clear all
-                      </button>
-                    </div>
+                      <div className="flex gap-2 justify-end mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setEnabledInfluences(influenceMeta.map((m) => m.key))}
+                          className="px-3 py-2 border rounded-lg"
+                        >
+                          Enable all
+                        </button>
+                        <button type="button" onClick={() => setEnabledInfluences([])} className="px-3 py-2 border rounded-lg">
+                          Clear all
+                        </button>
+                      </div>
 
-                    <div className="space-y-3">
-                      {influenceMeta.map((m) => {
-                        const enabled = (userData.enabledInfluences ?? []).includes(m.key);
-                        return (
-                          <div key={m.key} className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100 last:border-b-0">
-                            <div className="min-w-0">
-                              <p className="font-medium mb-1">{m.label}</p>
-                              <p className="text-sm text-[rgb(var(--color-text-secondary))]">{m.description}</p>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onUpdateUserData((prev) => ({
-                                  ...prev,
-                                  enabledInfluences: toggleInList((prev.enabledInfluences ?? []) as InfluenceKey[], m.key),
-                                }))
-                              }
-                              className={`w-12 h-6 rounded-full transition-all ${enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
-                              aria-label={enabled ? `Disable ${m.label}` : `Enable ${m.label}`}
+                      <div className="space-y-3">
+                        {influenceMeta.map((m) => {
+                          const enabled = (userData.enabledInfluences ?? []).includes(m.key);
+                          return (
+                            <div
+                              key={m.key}
+                              className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100 last:border-b-0"
                             >
-                              <div
-                                className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                                  enabled ? 'translate-x-6' : 'translate-x-0.5'
+                              <div className="min-w-0">
+                                <p className="font-medium mb-1">{m.label}</p>
+                                <p className="text-sm text-[rgb(var(--color-text-secondary))]">{m.description}</p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onUpdateUserData((prev) => ({
+                                    ...prev,
+                                    enabledInfluences: toggleInList((prev.enabledInfluences ?? []) as InfluenceKey[], m.key),
+                                  }))
+                                }
+                                className={`w-12 h-6 rounded-full transition-all ${
+                                  enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
                                 }`}
-                              />
-                            </button>
-                          </div>
-                        );
-                      })}
+                                aria-label={enabled ? `Disable ${m.label}` : `Enable ${m.label}`}
+                              >
+                                <div
+                                  className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                    enabled ? 'translate-x-6' : 'translate-x-0.5'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                </details>
+                  ) : null}
+                </div>
 
 
                 {moduleSearch.trim() && (
@@ -1173,6 +1244,35 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                 <strong>Backups</strong> restore your full app data (check-ins, settings and anything else stored on this device).
                                 Insights exports are separate and can’t be restored here.
                               </p>
+
+                              <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                                <div className="min-w-0">
+                                  <p className="font-medium mb-1">Fitbit import</p>
+                                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                                    Ready for later. Switch this on when Fitbit support is available for sleep and workouts.
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onUpdateUserData((prev) => ({
+                                      ...prev,
+                                      fitbitEnabled: !prev.fitbitEnabled,
+                                    }))
+                                  }
+                                  className={`w-12 h-6 rounded-full transition-all ${
+                                    userData.fitbitEnabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                                  }`}
+                                  aria-label="Toggle Fitbit import"
+                                >
+                                  <span
+                                    className={`block w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
+                                      userData.fitbitEnabled ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                  />
+                                </button>
+                              </div>
 
                           <div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
                             <p className="text-sm font-medium mb-1">Coming soon</p>

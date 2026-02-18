@@ -84,6 +84,12 @@ export interface UserData {
     /** Optional: show extra sleep detail questions in the daily check-in (collapsed by default). */
   sleepDetailsEnabled?: boolean;
 
+  /** Optional: show sleep charts and pattern views in Insights. */
+  sleepInsightsEnabled?: boolean;
+
+  /** Optional: Fitbit import toggle (wiring prepared; can be switched on later). */
+  fitbitEnabled?: boolean;
+
 /** True once we've applied goal-based defaults during first onboarding (prevents future goal changes auto-resetting settings). */
   onboardingPresetApplied?: boolean;
 
@@ -166,6 +172,12 @@ export interface CheckInEntry {
     socialising?: boolean;
     /** Low hydration */
     lowHydration?: boolean;
+  };
+
+  /** Optional extra details for events (kept small and future-proof). */
+  eventsDetails?: {
+    /** If exercise is logged, how intense did it feel? */
+    exerciseIntensity?: 'light' | 'moderate' | 'hard';
   };
   createdAt: string; // ISO
   updatedAt: string; // ISO

@@ -386,6 +386,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   // Behavioural influences (kept discreet, but not hidden)
   const [influencesOpen, setInfluencesOpen] = useState(false);
   const [eventsState, setEventsState] = useState<Record<string, boolean>>({});
+  const [exerciseIntensity, setExerciseIntensity] = useState<'light' | 'moderate' | 'hard' | null>(null);
 
   const visibleInfluences = useMemo(() => {
     const enabledKeys = Array.isArray(userData.enabledInfluences)
@@ -420,8 +421,21 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       }
       setCustomValues({ ...((existingEntry as any)?.customValues ?? {}), ...nextCustom });
 
+      // Sleep details (only shown if enabled in settings)
+      if (userData.sleepDetailsEnabled) {
+        const sd = (existingEntry as any)?.sleepDetails;
+        setSleepDetails({
+          timesWoke: (sd?.timesWoke ?? 0) as any,
+          troubleFallingAsleep: (sd?.troubleFallingAsleep ?? 0) as any,
+          wokeTooEarly: Boolean(sd?.wokeTooEarly ?? false),
+        });
+      } else {
+        setSleepDetails({ timesWoke: 0, troubleFallingAsleep: 0, wokeTooEarly: false });
+      }
+
       const ev = { ...((existingEntry as any)?.events ?? {}) } as Record<string, boolean>;
       setEventsState(ev);
+      setExerciseIntensity(((existingEntry as any)?.eventsDetails?.exerciseIntensity as any) ?? null);
       setInfluencesOpen(false);
       return;
     }
@@ -459,8 +473,25 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     }
 
     setEventsState({});
+    setExerciseIntensity(null);
     setInfluencesOpen(false);
-  }, [existingEntry, userData.enabledModules, userData.customSymptoms, activeDateISO, userData.sleepDetailsEnabled]);
+  }, [existingEntry, userData.enabledModules, userData.customSymptoms, activeDateISO]);
+
+  // If someone turns Sleep details on/off mid-check-in, update just the sleep panel
+  // without wiping anything else (like your ticked influences).
+  useEffect(() => {
+    if (!userData.sleepDetailsEnabled) {
+      setSleepDetails({ timesWoke: 0, troubleFallingAsleep: 0, wokeTooEarly: false });
+      return;
+    }
+    const sd = (existingEntry as any)?.sleepDetails;
+    setSleepDetails({
+      timesWoke: (sd?.timesWoke ?? 0) as any,
+      troubleFallingAsleep: (sd?.troubleFallingAsleep ?? 0) as any,
+      wokeTooEarly: Boolean(sd?.wokeTooEarly ?? false),
+    });
+  }, [userData.sleepDetailsEnabled, existingEntry, activeDateISO]);
+
 
   const enabledSliders = useMemo(() => {
     return userData.enabledModules.filter((k) => {
@@ -545,6 +576,14 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       if (v) nextEvents[k] = true;
     }
 
+    const nextEventsDetails: any = { ...((existingEntry as any)?.eventsDetails ?? {}) };
+    if (eventsState.exercise) {
+      if (exerciseIntensity) nextEventsDetails.exerciseIntensity = exerciseIntensity;
+      else delete nextEventsDetails.exerciseIntensity;
+    } else {
+      delete nextEventsDetails.exerciseIntensity;
+    }
+
     // Custom symptom values (0–10)
     const nextCustomValues: Record<string, number> = { ...((existingEntry as any)?.customValues ?? {}), ...(customValues ?? {}) };
     for (const s of enabledCustom) {
@@ -569,6 +608,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           }
         : (existingEntry as any)?.sleepDetails,
       events: Object.keys(nextEvents).length ? nextEvents : undefined,
+      eventsDetails: Object.keys(nextEventsDetails).length ? nextEventsDetails : undefined,
       cycleStartOverride: (existingEntry as any)?.cycleStartOverride ?? undefined,
       createdAt: existingEntry?.createdAt ?? now,
       updatedAt: now,
@@ -750,7 +790,12 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
           {/* Mood buttons (high contrast, theme-driven) */}
           <div className="mt-2 flex justify-center">
-            <div className="inline-flex gap-3 rounded-2xl bg-white/90 p-3 shadow-sm border border-black/5">
+            {/*
+              Mobile: prevent horizontal overflow on narrow screens.
+              The mood buttons used to be a fixed-width row that could spill off the right edge.
+              We allow wrapping and slightly smaller sizing on the smallest viewports.
+            */}
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-3 rounded-2xl bg-white/90 p-2 sm:p-3 shadow-sm border border-black/5 max-w-full">
               {moodIcons.map((m) => {
                 const Icon = m.icon;
                 const selected = selectedMood === m.value;
@@ -763,7 +808,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                     onClick={() => setSelectedMood(m.value)}
                     aria-pressed={selected}
                     className={[
-                      "group relative w-[86px] h-[92px] rounded-2xl border text-center",
+                      "group relative w-[78px] h-[88px] sm:w-[86px] sm:h-[92px] rounded-2xl border text-center",
                       "transition shadow-sm active:scale-[0.99]",
                       "hover:-translate-y-[1px] hover:shadow-md",
                       selected
@@ -997,7 +1042,11 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           <button
             type="button"
             onClick={() => setInfluencesOpen((v) => !v)}
-            className="w-full flex items-center justify-between gap-3 py-1"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              setInfluencesOpen((v) => !v);
+            }}
+            className="w-full flex items-center justify-between gap-3 py-1 cursor-pointer"
           >
             <div className="text-sm font-semibold text-[rgb(var(--color-text))]">Other influences</div>
             <ChevronRight
@@ -1008,18 +1057,54 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           {influencesOpen && (
             <div className="grid grid-cols-1 gap-3 mt-4">
               {visibleInfluences.map((item) => (
-                <SwitchRow
-                  key={item.key}
-                  checked={Boolean(eventsState[item.key])}
-                  onChange={(checked) =>
-                    setEventsState((prev) => ({
-                      ...prev,
-                      [item.key]: checked,
-                    }))
-                  }
-                  label={item.label}
-                  hint={item.hint}
-                />
+                <div key={item.key}>
+                  <SwitchRow
+                    checked={Boolean(eventsState[item.key])}
+                    onChange={(checked) => {
+                      setEventsState((prev) => ({
+                        ...prev,
+                        [item.key]: checked,
+                      }));
+                      if (item.key === 'exercise' && !checked) setExerciseIntensity(null);
+                    }}
+                    label={item.label}
+                    hint={item.hint}
+                  />
+
+                  {item.key === 'exercise' && Boolean(eventsState.exercise) ? (
+                    <div className="mt-2 ml-1 rounded-2xl border border-neutral-200 bg-white p-3">
+                      <div className="text-sm font-medium mb-2">How did it feel?</div>
+                      <div className="flex flex-wrap gap-2">
+                        {(
+                          [
+                            { k: 'light', label: 'Light' },
+                            { k: 'moderate', label: 'Moderate' },
+                            { k: 'hard', label: 'Hard' },
+                          ] as const
+                        ).map((opt) => {
+                          const active = exerciseIntensity === opt.k;
+                          return (
+                            <button
+                              key={opt.k}
+                              type="button"
+                              onClick={() => setExerciseIntensity(opt.k)}
+                              className={
+                                active
+                                  ? 'eb-btn eb-btn-primary !py-2 !px-3 text-sm'
+                                  : 'eb-btn eb-btn-secondary !py-2 !px-3 text-sm'
+                              }
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-2 text-xs text-[rgb(var(--color-text-secondary))]">
+                        Keep it simple. This helps Sleep Insights spot gentle patterns.
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               ))}
             </div>
           )}
