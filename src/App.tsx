@@ -4,7 +4,7 @@ import { DailyCheckIn } from './components/DailyCheckIn';
 import { Dashboard } from './components/Dashboard';
 import { Insights } from './components/Insights';
 import { AIChat } from './components/AIChat';
-import { Resources } from './components/Resources';
+import { Rhythm } from './components/Rhythm';
 import { ProfileSettings } from './components/ProfileSettings';
 import { CalendarView } from './components/CalendarView';
 import { Navigation } from './components/Navigation';
@@ -230,7 +230,7 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
         return <AIChat userName={userData.name || 'there'} userData={userData} />;
 
       case 'resources':
-        return <Resources />;
+        return <Rhythm userData={userData} />;
 
       case 'profile':
         return (

@@ -447,9 +447,9 @@ export function Dashboard({
             <Calendar className="w-5 h-5" />
           </button>
 
-          <h3 className="mb-1 text-lg font-semibold eb-hero-on-dark text-white">Symptom tracking</h3>
+          <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">Symptom tracking</h3>
 
-          <p className="text-sm eb-hero-on-dark-muted mb-5 text-white">
+          <p className="eb-hero-subtitle eb-hero-on-dark-muted mb-5 text-white">
             {userData.cycleTrackingMode === 'no-cycle'
               ? 'Cycle features are off, but you can still track symptoms and patterns.'
               : 'Add bleeding or spotting (optional) to unlock cycle-phase insights.'}

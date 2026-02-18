@@ -1652,8 +1652,8 @@ return (
       <div className="eb-card eb-hero-surface">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-xl font-semibold tracking-tight eb-hero-on-dark">Your settings</h2>
-            <p className="text-sm mt-1 eb-hero-on-dark-muted">
+            <h3 className="eb-hero-title eb-hero-on-dark">Your settings</h3>
+            <p className="eb-hero-subtitle mt-1 eb-hero-on-dark-muted">
               Keep it simple: 3–5 metrics gives you the cleanest signals.
             </p>
           </div>
