@@ -576,7 +576,18 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
         </div>
       </div>
     );
-  }, [summaryISO, byISO, userData.enabledModules, periodSet, fertileSet, ovulationSet, fertilityEnabled, onOpenCheckIn]);
+  }, [
+    summaryISO,
+    byISO,
+    userData.enabledModules,
+    userData.sleepDetailsEnabled,
+    sleepPeekOpen,
+    periodSet,
+    fertileSet,
+    ovulationSet,
+    fertilityEnabled,
+    onOpenCheckIn,
+  ]);
 
   const cycleEditModal = useMemo(() => {
     if (!editISO) return null;
