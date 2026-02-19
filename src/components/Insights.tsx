@@ -1465,7 +1465,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   };
 
 return (
-    <div className="eb-container space-y-6 pt-8 pb-12">
+    <div className="eb-container space-y-6 pt-8 pb-12 overflow-x-hidden">
       {/* Header */}
       <div className="pt-2">
         <h1 className="mb-1">Insights &amp; Patterns</h1>

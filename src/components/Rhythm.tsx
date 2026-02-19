@@ -532,11 +532,8 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 </div>
                 <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">{computed.soft}</h3>
               </div>
-              {/* Align phase subtext with the start of the title (not the icon) */}
-              <div className="pl-[52px]">
-                <div className="eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{computed.sci}</div>
-                <div className="text-xs text-white/80 mt-1">Based on your recent check-ins.</div>
-              </div>
+              <div className="eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{computed.sci}</div>
+              <div className="text-xs text-white/80 mt-1">Based on your recent check-ins.</div>
             </div>
             <div className="text-right">
               <div className="text-xs text-white/80">Confidence</div>
@@ -605,7 +602,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             );
           })()}
 
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex justify-center">
             <div className="text-xs text-neutral-600 flex items-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--color-primary-dark))]" />
               You’re here
