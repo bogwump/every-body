@@ -664,14 +664,13 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             </div>
           </div>
 
-          {/* On mobile, avoid heavy nested borders/padding inside cards */}
-          <details className="mt-4 overflow-hidden group border-b border-neutral-200 sm:border sm:border-neutral-200 sm:rounded-2xl">
-            <summary className="list-none cursor-pointer select-none px-4 py-3 flex items-center justify-between hover:bg-neutral-50">
+          <details className="mt-4 rounded-2xl border border-neutral-200 overflow-hidden group">
+            <summary className="list-none cursor-pointer select-none p-4 flex items-center justify-between hover:bg-neutral-50">
               <span className="font-medium">Customise symptoms</span>
               <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
             </summary>
 
-            <div className="px-4 pb-4">
+            <div className="p-4 pt-0">
               <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
                 Turning a symptom off hides it from your check-in. Your past data stays saved, so Insights can still use it when you turn it back on.
               </p>
@@ -716,7 +715,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
 
               {/* Custom symptoms */}
-              <div className="mt-4 mb-5 rounded-2xl bg-white/60 p-3 sm:p-4 sm:border sm:border-neutral-200">
+              <div className="mt-4 mb-5 rounded-2xl border border-neutral-200 bg-white/60 p-4">
                 <p className="font-medium mb-1">Add your own symptom</p>
                 <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
                   Freeform labels like “Jaw pain”, “Sugar cravings”, “Tinnitus”. You can turn them on and off any time.
@@ -860,10 +859,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                   if (items.length === 0) return null;
 
                   return (
-                    <details
-                      key={group.id}
-                      className="overflow-hidden group border-b border-neutral-200 sm:rounded-2xl sm:border sm:border-neutral-200"
-                    >
+                    <details key={group.id} className="rounded-2xl border border-neutral-200 overflow-hidden group">
                       <summary className="list-none cursor-pointer select-none px-4 py-3 flex items-center justify-between hover:bg-neutral-50">
                         <span className="font-medium">{group.title}</span>
                         <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />

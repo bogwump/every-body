@@ -464,96 +464,87 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <button
           type="button"
-          className="absolute inset-0 bg-black/50 z-0"
+          className="absolute inset-0 bg-black/30"
+          aria-label="Close"
           onClick={() => setSummaryISO(null)}
-          aria-label="Close day summary"
         />
-
-        <div className="relative z-10 w-full max-w-lg eb-card p-6 pointer-events-auto">
+        <div className="relative w-full max-w-md eb-card p-5">
           <div className="mb-4">
             <div className="text-xl font-semibold">Day summary</div>
             <div className="text-sm text-[rgb(var(--color-text-secondary))]">
-              {prettyDate(new Date(summaryISO + 'T00:00:00'))}
+              {prettyDate(new Date(`${summaryISO}T00:00:00`))}
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-4">
-            {mood ? <span className="eb-pill">{mood}</span> : null}
-            {isPeriod ? <span className="eb-pill">Period</span> : null}
-            {isFertile ? <span className="eb-pill">Fertile</span> : null}
-            {isOv ? <span className="eb-pill">Ovulation</span> : null}
-            {influences.map((x) => (
-              <span key={x} className="eb-pill">
-                {x}
-              </span>
+          {(() => {
+            const pills = [mood, ...influences].filter(Boolean) as string[];
+            return pills.length ? (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {pills.map((p) => (
+                  <span key={p} className="eb-pill">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            ) : null;
+          })()}
+
+          <div className="mb-4 space-y-2">
+            {topRows.map((r) => (
+              <div key={r.label} className="flex items-center justify-between">
+                <span className="text-[rgb(var(--color-text-secondary))]">{r.label}</span>
+                <span className="font-medium">{r.value}</span>
+              </div>
             ))}
           </div>
 
-          {topRows.length ? (
-            <div className="space-y-2 mb-4">
-              {topRows.map((r) => (
-                <div key={r.label} className="flex items-center justify-between text-sm">
-                  <div className="text-[rgb(var(--color-text-secondary))]">{r.label}</div>
-                  <div className="font-medium">{r.value}</div>
-                </div>
-              ))}
+          <button
+            type="button"
+            disabled={!hasSleepDetails}
+            onClick={() => {
+              if (!hasSleepDetails) return;
+              setSleepPeekOpen((v) => !v);
+            }}
+            className={
+              'mb-4 w-full flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm ' +
+              (hasSleepDetails ? 'cursor-pointer' : 'opacity-60 cursor-default')
+            }
+          >
+            <div className="text-[rgb(var(--color-text-secondary))]">Sleep details</div>
+            <div className="flex items-center gap-2">
+              <span className={hasSleepDetails ? 'font-medium' : 'text-[rgb(var(--color-text-secondary))]'}>
+                {hasSleepDetails ? 'Logged' : 'Not today'}
+              </span>
+              <ChevronRight
+                className={`w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform ${
+                  sleepPeekOpen ? 'rotate-90' : ''
+                }`}
+              />
             </div>
-          ) : null}
+          </button>
 
-          {userData.sleepDetailsEnabled ? (
-            <div className="mb-4">
-              <button
-                type="button"
-                disabled={!hasSleepDetails}
-                onClick={() => {
-                  if (!hasSleepDetails) return;
-                  setSleepPeekOpen((v) => !v);
-                }}
-                className={cn(
-                  "w-full flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm",
-                  !hasSleepDetails && "opacity-60"
-                )}
-              >
-                <div className="text-[rgb(var(--color-text-secondary))]">Sleep details</div>
-                <div className="flex items-center gap-2">
-                  <span className={hasSleepDetails ? "font-medium" : "text-[rgb(var(--color-text-secondary))]"}>
-                    {hasSleepDetails ? "Logged" : "Not today"}
-                  </span>
-                  <ChevronRight
-                    className={cn(
-                      "w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform",
-                      hasSleepDetails && sleepPeekOpen && "rotate-90"
-                    )}
-                  />
+          {sleepPeekOpen ? (
+            <div className="mb-4 eb-inset rounded-2xl p-4">
+              {hasSleepDetails ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[rgb(var(--color-text-secondary))]">Night-time awakenings</span>
+                    <span className="font-medium">
+                      {typeof sd?.timesWoke === 'number' ? (sd.timesWoke === 3 ? '3+' : String(sd.timesWoke)) : '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[rgb(var(--color-text-secondary))]">Trouble falling asleep</span>
+                    <span className="font-medium">{troubleLabel(sd?.troubleFallingAsleep)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[rgb(var(--color-text-secondary))]">Awake earlier than planned</span>
+                    <span className="font-medium">{sd?.wokeTooEarly ? 'Yes' : 'No'}</span>
+                  </div>
                 </div>
-              </button>
-
-              {sleepPeekOpen ? (
-                <div className="mt-3 eb-inset rounded-2xl p-4">
-                  {hasSleepDetails ? (
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[rgb(var(--color-text-secondary))]">Night-time awakenings</span>
-                        <span className="font-medium">
-                          {typeof sd?.timesWoke === 'number' ? (sd.timesWoke === 3 ? '3+' : String(sd.timesWoke)) : '—'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[rgb(var(--color-text-secondary))]">Trouble falling asleep</span>
-                        <span className="font-medium">{troubleLabel(sd?.troubleFallingAsleep)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[rgb(var(--color-text-secondary))]">Awake earlier than planned</span>
-                        <span className="font-medium">{sd?.wokeTooEarly ? 'Yes' : 'No'}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-[rgb(var(--color-text-secondary))]">
-                      Nothing extra logged for this day.
-                    </div>
-                  )}
-                </div>
-              ) : null}
+              ) : (
+                <div className="text-sm text-[rgb(var(--color-text-secondary))]">Nothing extra logged for this day.</div>
+              )}
             </div>
           ) : null}
 

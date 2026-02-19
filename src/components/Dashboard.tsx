@@ -663,10 +663,10 @@ export function Dashboard({
             </div>
             <div style={{ width: '100%', height: 220 }}>
               <ResponsiveContainer>
-                <LineChart data={weekSeries}>
+                <LineChart data={weekSeries} margin={{ top: 10, right: 10, left: -12, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
-                  <YAxis domain={[0, 10]} />
+                  <YAxis domain={[0, 10]} width={32} tickMargin={6} />
                   <Tooltip />
                   <Legend />
                   {chartMetrics.map((m, idx) => (

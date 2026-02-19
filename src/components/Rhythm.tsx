@@ -612,16 +612,18 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         
 
-        <div className="eb-card p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <IconBadge icon={<Eye className="w-5 h-5" />} />
-            <h3 className="mb-1">What this can look like</h3>
-          </div>
-          <p className="text-neutral-700">
-            {content.lookLikeIntro}
-          </p>
+        <div className="eb-card p-6">
+          <div className="flex items-start gap-4">
+            <div className="shrink-0 mt-0.5">
+              <IconBadge icon={<Eye className="w-5 h-5" />} />
+            </div>
+            <div className="min-w-0 flex-1 space-y-4">
+              <div>
+                <h3 className="mb-1">What this can look like</h3>
+              </div>
+              <p className="text-neutral-700">{content.lookLikeIntro}</p>
 
-          <ul className="space-y-3">
+              <ul className="space-y-3">
             {content.lookLikeBullets.map((t, i) => {
               const dot =
                 i % 3 === 0
@@ -636,22 +638,26 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 </li>
               );
             })}
-          </ul>
+              </ul>
 
-          <p className="text-neutral-700">{content.lookLikeDuration}</p>
+              <p className="text-neutral-700">{content.lookLikeDuration}</p>
+            </div>
+          </div>
         </div>
 
         {/* What you can do */}
-        <div className="eb-card p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <IconBadge icon={<Leaf className="w-5 h-5" />} />
-            <h3 className="mb-1 font-semibold tracking-tight">What you can do about it</h3>
-          </div>
-          <p className="text-neutral-700">
-            {content.doIntro}
-          </p>
+        <div className="eb-card p-6">
+          <div className="flex items-start gap-4">
+            <div className="shrink-0 mt-0.5">
+              <IconBadge icon={<Leaf className="w-5 h-5" />} />
+            </div>
+            <div className="min-w-0 flex-1 space-y-4">
+              <div>
+                <h3 className="mb-1 font-semibold tracking-tight">What you can do about it</h3>
+              </div>
+              <p className="text-neutral-700">{content.doIntro}</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="eb-inset rounded-xl p-4 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
               <div className="eb-inset-label !text-base !font-medium !text-neutral-800">Permission</div>
               <div className="eb-inset-value !text-base !font-normal !text-neutral-800">{content.doCards.permission}</div>
@@ -668,23 +674,31 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
               <div className="eb-inset-label !text-base !font-medium !text-neutral-800">Body</div>
               <div className="eb-inset-value !text-base !font-normal !text-neutral-800">{content.doCards.body}</div>
             </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* What usually comes next */}
-        <div className="eb-card p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <IconBadge icon={<Compass className="w-5 h-5" />} />
-            <h3 className="mb-1 font-semibold tracking-tight">What usually comes next</h3>
-          </div>
+        <div className="eb-card p-6">
+          <div className="flex items-start gap-4">
+            <div className="shrink-0 mt-0.5">
+              <IconBadge icon={<Compass className="w-5 h-5" />} />
+            </div>
+            <div className="min-w-0 flex-1 space-y-4">
+              <div>
+                <h3 className="mb-1 font-semibold tracking-tight">What usually comes next</h3>
+              </div>
 
-          <p className="text-neutral-700">
+              <p className="text-neutral-700">
             If this rhythm follows your usual pattern, you’ll likely shift into your <span className="font-medium opacity-90">{computed.nextPhase}</span> ({computed.nextSci}) in around <span className="font-medium opacity-90">{computed.daysToNext ?? 5} days</span>.
           </p>
 
-          <div className="eb-inset rounded-xl p-4 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
-            <div className="text-base font-medium text-neutral-800">{content.nextPlanTitle}</div>
-            <div className="text-base text-neutral-800 font-normal">{content.nextPlanBody}</div>
+              <div className="eb-inset rounded-xl p-4 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
+                <div className="text-base font-medium text-neutral-800">{content.nextPlanTitle}</div>
+                <div className="text-base text-neutral-800 font-normal">{content.nextPlanBody}</div>
+              </div>
+            </div>
           </div>
         </div>
 
