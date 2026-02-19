@@ -447,7 +447,9 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     for (const k of userData.enabledModules) {
       if (!sliderMeta[k]) continue;
       // default 5/10 for most symptoms, 0 for flow
-      defaults[k] = k === 'flow' ? 0 : 5;
+      // IMPORTANT: Night sweats can be tucked inside Sleep details.
+      // If the user doesn't open that section, a mid-point default can create accidental false positives.
+      defaults[k] = k === 'flow' ? 0 : k === 'nightSweats' ? 0 : 5;
     }
     setValues(defaults);
 
@@ -965,17 +967,24 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                           <div className="text-sm font-medium mb-2">Night sweats</div>
                           {userData.enabledModules.includes('nightSweats') ? (
                             <div className="mt-2">
-                              <div className="text-xs text-[rgb(var(--color-text-secondary))]">
-                                {normalise10((values as any)?.nightSweats)}/10
-                              </div>
-                              <div className="mt-2">
-                                <Slider10
-                                  value={normalise10((values as any)?.nightSweats)}
-                                  onChange={(n) => setValues((prev) => ({ ...prev, nightSweats: n }))}
-                                  leftLabel="0"
-                                  rightLabel="10"
-                                />
-                              </div>
+                              {(() => {
+                                // IMPORTANT: default to 0 (not 5) to avoid accidental logging when this section is hidden.
+                                const raw = (values as any)?.nightSweats;
+                                const nsVal = typeof raw === 'number' ? normalise10(raw) : 0;
+                                return (
+                                  <>
+                                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">{nsVal}/10</div>
+                                    <div className="mt-2">
+                                      <Slider10
+                                        value={nsVal}
+                                        onChange={(n) => setValues((prev) => ({ ...prev, nightSweats: n }))}
+                                        leftLabel="0"
+                                        rightLabel="10"
+                                      />
+                                    </div>
+                                  </>
+                                );
+                              })()}
                               <div className="mt-1 text-xs text-[rgb(var(--color-text-secondary))]">
                                 Tracked under Hormones. Shown here to make logging easier.
                               </div>

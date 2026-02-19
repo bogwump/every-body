@@ -219,6 +219,13 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showLogoutPanel, setShowLogoutPanel] = useState(false);
 
+  // Simple feedback form (Help centre)
+  const [feedbackSubject, setFeedbackSubject] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackEmail, setFeedbackEmail] = useState('');
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState<string | null>(null);
+
   const [moduleSearch, setModuleSearch] = useState<string>('');
   const [customSymptomText, setCustomSymptomText] = useState<string>('');
   const [customSymptomKind, setCustomSymptomKind] = useState<SymptomKind>('other');
@@ -1393,6 +1400,79 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                             <p><span className="font-medium text-[rgb(var(--color-text-primary))]">What is this?</span> A simple daily symptom tracker with optional cycle predictions.</p>
                             <p><span className="font-medium text-[rgb(var(--color-text-primary))]">How do insights work?</span> You need a few days of check-ins before patterns appear. More data = better signals.</p>
                             <p><span className="font-medium text-[rgb(var(--color-text-primary))]">Something broken?</span> This is a work-in-progress build. We can add a “Report a bug” flow once hosted.</p>
+                          </div>
+
+                          {/* Feedback / contact */}
+                          <div className="mt-4 rounded-2xl border border-neutral-200 p-4 bg-white">
+                            <p className="font-medium mb-1">Contact / feedback</p>
+                            <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
+                              Send a quick note. Your message goes straight to the app maker.
+                            </p>
+
+                            <div className="space-y-2">
+                              <input
+                                className="eb-input"
+                                placeholder="Subject"
+                                value={feedbackSubject}
+                                onChange={(e) => setFeedbackSubject(e.target.value)}
+                              />
+                              <textarea
+                                className="eb-input"
+                                placeholder="What’s on your mind?"
+                                rows={4}
+                                value={feedbackMessage}
+                                onChange={(e) => setFeedbackMessage(e.target.value)}
+                              />
+                              <input
+                                className="eb-input"
+                                placeholder="Your email (optional, if you want a reply)"
+                                value={feedbackEmail}
+                                onChange={(e) => setFeedbackEmail(e.target.value)}
+                              />
+
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  className="eb-btn"
+                                  disabled={feedbackBusy || !feedbackMessage.trim()}
+                                  onClick={async () => {
+                                    setFeedbackStatus(null);
+                                    setFeedbackBusy(true);
+                                    try {
+                                      const res = await fetch('/api/feedback', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                          subject: feedbackSubject,
+                                          message: feedbackMessage,
+                                          email: feedbackEmail,
+                                          // Helpful context for debugging
+                                          meta: {
+                                            ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+                                            ts: new Date().toISOString(),
+                                          },
+                                        }),
+                                      });
+                                      const json = await res.json().catch(() => ({}));
+                                      if (!res.ok) throw new Error(json?.error || 'Could not send');
+                                      setFeedbackStatus('Sent. Thank you!');
+                                      setFeedbackSubject('');
+                                      setFeedbackMessage('');
+                                      setFeedbackEmail('');
+                                    } catch (err: any) {
+                                      setFeedbackStatus(err?.message || 'Could not send right now');
+                                    } finally {
+                                      setFeedbackBusy(false);
+                                    }
+                                  }}
+                                >
+                                  {feedbackBusy ? 'Sending…' : 'Send'}
+                                </button>
+                                {feedbackStatus ? (
+                                  <div className="text-sm text-[rgb(var(--color-text-secondary))]">{feedbackStatus}</div>
+                                ) : null}
+                              </div>
+                            </div>
                           </div>
 
                           
