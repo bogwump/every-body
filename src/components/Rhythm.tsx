@@ -526,16 +526,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-8 sm:p-10 overflow-hidden shadow-sm space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
                   <div className="text-white">{phaseIcon}</div>
                 </div>
-                <div>
-                  <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">{computed.soft}</h3>
-                  <div className="eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{computed.sci}</div>
-                  <div className="text-xs text-white/80 mt-1">Based on your recent check-ins.</div>
-                </div>
+                <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">{computed.soft}</h3>
               </div>
+              <div className="eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{computed.sci}</div>
+              <div className="text-xs text-white/80 mt-1">Based on your recent check-ins.</div>
             </div>
             <div className="text-right">
               <div className="text-xs text-white/80">Confidence</div>

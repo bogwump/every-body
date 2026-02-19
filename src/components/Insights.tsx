@@ -1469,7 +1469,7 @@ return (
       {/* Header */}
       <div className="pt-2">
         <h1 className="mb-1">Insights &amp; Patterns</h1>
-        <p className="text-[rgb(var(--color-text-secondary))]">Discover connections between your symptoms and cycle.</p>
+        <p className="text-[rgb(var(--color-text-secondary))]">Discover connections between your symptoms and cycle.</p>
 
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="eb-pill">
@@ -1703,12 +1703,12 @@ return (
             <EBDialogContent
               title="Choose metrics to analyse"
               description="Select up to 6 metrics to personalise your insights."
-              className="relative rounded-2xl max-w-[calc(100%-3rem)] sm:max-w-lg"
+              className="max-w-[calc(100%-3rem)] sm:max-w-lg rounded-2xl"
             >
               <DialogClose asChild>
                 <button
                   type="button"
-                  className="absolute right-4 top-4 rounded-lg px-2 py-1 text-sm text-neutral-600 hover:bg-neutral-100"
+                  className="absolute top-4 right-4 rounded-full border px-3 py-1 text-sm eb-muted hover:bg-black/5"
                 >
                   Close
                 </button>
