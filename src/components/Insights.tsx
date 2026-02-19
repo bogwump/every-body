@@ -74,7 +74,7 @@ function moodTo10(mood?: 1 | 2 | 3): number | undefined {
 
 // Read a metric value from an entry.
 // - Symptom keys live in entry.values
-// - Overall mood lives in entry.mood (mapped to 0–10)
+// - Overall mood lives in entry.mood (mapped to 0-10)
 // - Custom metrics are stored in entry.customValues keyed by custom id
 function valueForMetric(entry: CheckInEntry, key: MetricKey): number | undefined {
   if (key === 'mood') return moodTo10(entry.mood);
@@ -320,7 +320,7 @@ function suggestionForPair(r: number, aKey: MetricKey, bKey: MetricKey, aLabel: 
   if (has('energy') && has('focus')) {
     return r < 0
       ? 'Want to try a pacing experiment for 3 days and see if focus improves?'
-      : 'Want to try a 3-day “steady routine” experiment and see if both lift together?';
+      : 'Want to try a 3-day "steady routine" experiment and see if both lift together?';
   }
 
   // Default: only suggest when the relationship is clearer.
@@ -341,16 +341,16 @@ function buildExperimentPlan(metrics: Array<MetricKey>): { title: string; steps:
     .filter(Boolean) as Array<SymptomKey | 'mood'>;
   const has = (k: any) => keys.includes(k);
 
-  // A few gentle, “soft” experiments. These are suggestions, not medical advice.
+  // A few gentle, "soft" experiments. These are suggestions, not medical advice.
   if (has('sleep') && (has('stress') || has('anxiety') || has('irritability'))) {
     return {
       title: '3-day sleep buffer',
       steps: [
-        'Pick a fixed “lights out” target and set a 30-minute wind-down alarm.',
+        'Pick a fixed "lights out" target and set a 30-minute wind-down alarm.',
         'No caffeine after lunch. Swap to decaf or herbal tea.',
         'Do a 10-minute downshift: gentle stretch, shower, or a short walk.',
       ],
-      note: 'Log sleep + stress each day. If stress drops even 1–2 points, keep it going for a week.',
+      note: 'Log sleep + stress each day. If stress drops even 1-2 points, keep it going for a week.',
     };
   }
 
@@ -374,7 +374,7 @@ function buildExperimentPlan(metrics: Array<MetricKey>): { title: string; steps:
         'Try a simple baseline breakfast (repeat it for 3 days).',
         'Add a short walk after eating if you can.',
       ],
-      note: 'If bloating improves, you can test one change at a time next week to find your “lever”.',
+      note: 'If bloating improves, you can test one change at a time next week to find your "lever".',
     };
   }
 
@@ -386,7 +386,7 @@ function buildExperimentPlan(metrics: Array<MetricKey>): { title: string; steps:
         'Avoid alcohol and spicy food in the evening for 3 days.',
         'Try a 5-minute slow breathing wind-down before bed.',
       ],
-      note: 'If night sweats improve, keep the “cooler nights” routine as your default.',
+      note: 'If night sweats improve, keep the "cooler nights" routine as your default.',
     };
   }
 
@@ -395,7 +395,7 @@ function buildExperimentPlan(metrics: Array<MetricKey>): { title: string; steps:
     steps: [
       'Pick ONE small change you can actually do (sleep, hydration, caffeine, movement).',
       'Repeat it for 3 days (consistency beats intensity).',
-      'Keep logging the same 3–5 metrics so the signal is clear.',
+      'Keep logging the same 3-5 metrics so the signal is clear.',
     ],
     note: 'The goal is to learn what moves your numbers, not be perfect.',
   };
@@ -452,7 +452,7 @@ function buildHtmlReport(args: {
     <div class="card">
       <h2>Top findings</h2>
       <ul>
-        ${highlights.slice(0, 8).map((f) => `<li><b>${esc(f.title)}</b> – ${esc(f.body)}</li>`).join('')}
+        ${highlights.slice(0, 8).map((f) => `<li><b>${esc(f.title)}</b> - ${esc(f.body)}</li>`).join('')}
       </ul>
       <div class="note">Early signals, not medical conclusions. More days logged = more reliable patterns.</div>
     </div>
@@ -471,7 +471,7 @@ function buildHtmlReport(args: {
             .join('')}
         </tbody>
       </table>
-      <div class="note">Correlation means “moves together”, not “causes”. Use the app’s experiments to test what helps you.</div>
+      <div class="note">Correlation means "moves together", not "causes". Use the app's experiments to test what helps you.</div>
     </div>
 
     <div class="card">
@@ -573,7 +573,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const sleepGentleHint = useMemo(() => {
     const withSleep = sleepSeries.filter((r) => typeof r.sleep === 'number') as Array<{ sleep: number; exercise: boolean; sex: boolean; other: boolean; intensity?: any }>;
-    if (withSleep.length < 6) return 'Log a few more days and we’ll start spotting what helps your sleep.';
+    if (withSleep.length < 6) return "Log a few more days and we'll start spotting what helps your sleep.";
 
     const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : NaN);
 
@@ -597,7 +597,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         : 'Hard workouts sometimes line up with better sleep for you. Nice.';
     }
 
-    return 'Nothing shouty yet, which is normal. Keep logging and we’ll build a clearer picture.';
+    return "Nothing shouty yet, which is normal. Keep logging and we'll build a clearer picture.";
   }, [sleepSeries]);
 
   // --- metric selection (for analysis) ---
@@ -653,7 +653,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       const parsed = saved ? (JSON.parse(saved) as unknown) : null;
       if (Array.isArray(parsed) && parsed.length) {
         const valid = (parsed as Array<MetricKey>).filter((k) => allMetricKeys.includes(k));
-        // If the saved list is tiny (for example after using the old “Focus” button),
+        // If the saved list is tiny (for example after using the old "Focus" button),
         // fall back so the page stays testable.
         if (valid.length < 4) return fallback;
         return valid.slice(0, 6);
@@ -710,7 +710,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     if (!smoothTrends) return out;
 
-    // 3‑day rolling average (only across available data points).
+    // 3-day rolling average (only across available data points).
     const smoothed = out.map((row, idx) => {
       const next = { ...row };
       selected.forEach((k) => {
@@ -729,9 +729,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [entriesSorted, selected, smoothTrends]);
 
   const distributionData = useMemo(() => {
-    const low = { name: '0–3', value: 0 };
-    const mid = { name: '4–6', value: 0 };
-    const high = { name: '7–10', value: 0 };
+    const low = { name: '0-3', value: 0 };
+    const mid = { name: '4-6', value: 0 };
+    const high = { name: '7-10', value: 0 };
 
     entriesSorted.forEach((e) => {
       const v = getMetricValue(e, distributionMetric);
@@ -875,7 +875,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       out.push({
         kind: 'pattern',
         title: 'Want sharper insights?',
-        body: 'In Profile, switch on 1–2 extra symptoms you care about. Keep it lightweight.',
+        body: 'In Profile, switch on 1-2 extra symptoms you care about. Keep it lightweight.',
       });
     }
 
@@ -907,7 +907,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const minOverlapForPair = (aKey: InsightMetricKey, bKey: InsightMetricKey, kindA: SymptomKind, kindB: SymptomKind) => {
       const hormonal = isHormonalMetric(aKey, userData) || isHormonalMetric(bKey, userData);
       if (hormonal) return 10; // stricter support for hormonal insights
-      // Early phase (4–6 days): allow a bit earlier, but only for relationships that are less "body ↔ body".
+      // Early phase (4-6 days): allow a bit earlier, but only for relationships that are less "body <-> body".
       if (!deepReady) return 4;
       return 6;
     };
@@ -966,12 +966,12 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           if (!Number.isFinite(r)) continue;
           if (Math.abs(r) < minAbsR) continue;
 
-          // Block physio ↔ physio (including hormonal) suggestions entirely.
+          // Block physio <-> physio (including hormonal) suggestions entirely.
           const bothBodyish = (kindA === 'physio' || kindA === 'hormonal') && (kindB === 'physio' || kindB === 'hormonal');
           if (bothBodyish) continue;
 
-          // Early phase (4–6 days): allow a few more useful relationships so the page doesn't feel empty.
-          // We still keep it conservative: no body↔body, and we prioritise behaviour/state links.
+          // Early phase (4-6 days): allow a few more useful relationships so the page doesn't feel empty.
+          // We still keep it conservative: no body<->body, and we prioritise behaviour/state links.
           if (!deepReady) {
             const isBehaviourState =
               (kindA === 'behaviour' && kindB === 'state') || (kindA === 'state' && kindB === 'behaviour');
@@ -979,8 +979,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             const involvesBehaviour = kindA === 'behaviour' || kindB === 'behaviour';
             const involvesState = kindA === 'state' || kindB === 'state';
 
-            // Allow behaviour↔state, and behaviour↔body (e.g. sleep ↔ stress, alcohol ↔ hot flushes),
-            // but avoid state↔body in early phase as it tends to overfit.
+            // Allow behaviour<->state, and behaviour<->body (e.g. sleep <-> stress, alcohol <-> hot flushes),
+            // but avoid state<->body in early phase as it tends to overfit.
             const allowedEarly = isBehaviourState || (involvesBehaviour && !isBehaviourState) || (involvesBehaviour && involvesState);
 
             if (!allowedEarly) continue;
@@ -1042,7 +1042,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         (p.kindA === 'behaviour' || p.kindB === 'behaviour') &&
         // avoid suggesting experiments when the relationship is based on very few points
         p.n >= 4 &&
-        // still avoid anything "body ↔ body"
+        // still avoid anything "body <-> body"
         !((p.kindA === 'physio' || p.kindA === 'hormonal') && (p.kindB === 'physio' || p.kindB === 'hormonal'));
 
       const why = [
@@ -1468,20 +1468,18 @@ return (
     <div className="eb-container space-y-6 pt-8 pb-12">
       {/* Header */}
       <div className="pt-2">
-        <h1 className="mb-1">Insights Dashboard</h1>
-        <p className="text-[rgb(var(--color-text-secondary))]">
-          Clear patterns, gentle nudges. Pick a few things to track, then use the findings to try small experiments.
-        </p>
+        <h1 className="mb-1">Insights &amp; Patterns</h1>
+        <p className="text-[rgb(var(--color-text-secondary))]">Discover connections between your symptoms and cycle.</p>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
-            {entriesSorted.length} days logged
+          <span className="eb-pill">
+            Days logged • {entriesSorted.length}
           </span>
-          <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
-            {streak} day streak
+          <span className="eb-pill">
+            Streak • {streak}
           </span>
-          <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
-            {TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? timeframe} view
+          <span className="eb-pill">
+            View • {TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? timeframe}
           </span>
         </div>
       </div>
@@ -1654,7 +1652,7 @@ return (
           <div className="min-w-0">
             <h3 className="eb-hero-title eb-hero-on-dark">Your settings</h3>
             <p className="eb-hero-subtitle mt-1 eb-hero-on-dark-muted">
-              Keep it simple: 3–5 metrics gives you the cleanest signals.
+              Keep it simple: 3-5 metrics gives you the cleanest signals.
             </p>
           </div>
 
@@ -1726,7 +1724,7 @@ return (
                 ))}
               </div>
 
-              <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your “top 3” and stick with them for a week.</div>
+              <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your "top 3" and stick with them for a week.</div>
             </EBDialogContent>
           </Dialog>
           </div>
@@ -1739,7 +1737,7 @@ return (
         <div className="eb-card-header">
           <div>
             <div className="eb-card-title">Top findings</div>
-            <div className="eb-card-sub">The “headline” signals from your recent data.</div>
+            <div className="eb-card-sub">The "headline" signals from your recent data.</div>
           </div>
           <Sparkles className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
         </div>
@@ -1804,29 +1802,30 @@ return (
       {/* Sleep Insights (optional) */}
       {sleepInsightsOn ? (
         <div className="eb-card p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center">
-                  <Moon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />
-                </div>
-                <div>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0 self-start">
+              <Moon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <h2 className="mb-0.5">Sleep</h2>
-                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                    {sleepGentleHint}
-                  </p>
+                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">{sleepGentleHint}</p>
                 </div>
+
+                <button type="button" className="eb-btn eb-btn-secondary shrink-0" onClick={() => setSleepExploreOpen(true)}>
+                  Explore sleep
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
+
               <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
                 Extra sleep details logged on <span className="font-medium">{sleepExtrasCount}</span> day{sleepExtrasCount === 1 ? '' : 's'}.
               </div>
             </div>
-
-            <button type="button" className="eb-btn eb-btn-secondary shrink-0" onClick={() => setSleepExploreOpen(true)}>
-              Explore sleep
-              <ArrowRight className="w-4 h-4" />
-            </button>
           </div>
+
 
           <div className="mt-4 h-44">
             <ResponsiveContainer width="100%" height="100%">
@@ -1943,7 +1942,7 @@ return (
           </DialogHeader>
           <div className="max-h-[78vh] overflow-y-auto pr-1 space-y-3">
             <div className="text-sm eb-muted">
-              Tiny, realistic actions. You are testing what helps your body, not trying to “fix everything”.
+              Tiny, realistic actions. You are testing what helps your body, not trying to "fix everything".
             </div>
 
             {isCustomExperiment && (
@@ -2101,7 +2100,7 @@ return (
           <div className="flex items-start justify-between gap-4 w-full">
             <div>
               <div className="eb-card-title">Trends</div>
-              <div className="eb-card-sub">Your selected metrics over time (0–10). The key is underneath.</div>
+              <div className="eb-card-sub">Your selected metrics over time (0-10). The key is underneath.</div>
             </div>
             <button
               type="button"
@@ -2109,7 +2108,7 @@ return (
               style={{ background: smoothTrends ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.06)' }}
               onClick={() => setSmoothTrends((s) => !s)}
               aria-label="Toggle rolling average smoothing"
-              title="Smooth the lines (3‑day rolling average)"
+              title="Smooth the lines (3-day rolling average)"
             >
               {smoothTrends ? 'Rolling avg: on' : 'Rolling avg: off'}
             </button>
@@ -2119,13 +2118,13 @@ return (
         <div className="mt-3 eb-chart">
           <div style={{ width: '100%', height: 280 }}>
             <ResponsiveContainer>
-              <LineChart data={seriesForChart} margin={{ left: 6, right: 16, top: 10, bottom: 6 }}>
+              <LineChart data={seriesForChart} margin={{ left: -10, right: 8, top: 10, bottom: 6 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={28} />
                 <Tooltip
                   contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-                  formatter={(value: any, name: any) => [value == null ? '–' : Number(value).toFixed(0), labelFor(String(name) as any, userData)]}
+                  formatter={(value: any, name: any) => [value == null ? '-' : Number(value).toFixed(0), labelFor(String(name) as any, userData)]}
                 />
                 <Legend
                   verticalAlign="bottom"
@@ -2212,7 +2211,7 @@ return (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
             {highSymptomDays.length === 0 ? (
               <div className="eb-inset rounded-2xl p-4 text-sm eb-muted">
-                No “high” days yet in this timeframe. Keep logging and this section will start to light up.
+                No "high" days yet in this timeframe. Keep logging and this section will start to light up.
               </div>
             ) : (
               highSymptomDays.map((it) => (
@@ -2325,7 +2324,7 @@ return (
         <div className="eb-card-header">
           <div>
             <div className="eb-card-title">What moves together</div>
-            <div className="eb-card-sub">A softer view of correlations. Use Relationship Explorer for the deep dive.</div>
+            <div className="eb-card-sub">A softer view of correlations.</div>
           </div>
         </div>
 
@@ -2334,7 +2333,7 @@ return (
         ) : (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             {corrPairs.slice(0, 4).map((p, idx) => {
-              // Avoid "weak/strong" language early on – keep it inviting.
+              // Avoid "weak/strong" language early on - keep it inviting.
               const confLabel =
                 p.confidence === 'high' ? 'Clearer pattern' : p.confidence === 'medium' ? 'Possible pattern' : 'Emerging pattern';
               const direction = p.r > 0 ? 'move together' : 'move in opposite directions';
@@ -2349,7 +2348,7 @@ return (
                     {p.a} + {p.b}
                   </div>
                   <div className="mt-1 text-xs eb-muted">
-                    {confLabel} · based on {p.n} days logged together
+                    {confLabel} Â· based on {p.n} days logged together
                   </div>
                   <div className="mt-2 text-sm eb-muted">{safeCopy}</div>
 
@@ -2389,66 +2388,7 @@ return (
         )}
       </div>
 
-      {/* Relationship explorer (kept) */}
-      <div className="eb-card">
-        <div className="eb-card-header">
-          <div>
-            <div className="eb-card-title">Relationship Explorer</div>
-            <div className="eb-card-sub">Pick two metrics and see how they behave together.</div>
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2 items-center">
-          <div className="text-sm eb-muted">X:</div>
-          <select className="eb-input !w-auto !py-2 !h-10" value={scatterX} onChange={(e) => setScatterX(e.target.value as any)}>
-            {selected.map((k) => (
-              <option key={String(k)} value={k}>
-                {labelFor(k, userData)}
-              </option>
-            ))}
-          </select>
-
-          <div className="text-sm eb-muted">Y:</div>
-          <select className="eb-input !w-auto !py-2 !h-10" value={scatterY} onChange={(e) => setScatterY(e.target.value as any)}>
-            {selected.map((k) => (
-              <option key={String(k)} value={k}>
-                {labelFor(k, userData)}
-              </option>
-            ))}
-          </select>
-
-          <div className="ml-auto text-sm eb-muted">
-            {scatterData.length >= 3 ? (
-              <span>Strength: {strengthLabel(pearsonCorrelation(scatterData.map((d) => d.x), scatterData.map((d) => d.y)))} (across {scatterData.length} days)</span>
-            ) : (
-              <span>Log both metrics on a few days to see the relationship.</span>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-3 eb-chart">
-          <div style={{ width: '100%', height: 260 }}>
-            <ResponsiveContainer>
-              <ScatterChart margin={{ left: 6, right: 16, top: 10, bottom: 6 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" dataKey="x" domain={[0, 10]} tick={{ fontSize: 12 }} />
-                <YAxis type="number" dataKey="y" domain={[0, 10]} tick={{ fontSize: 12 }} />
-                <ZAxis type="number" dataKey="z" range={[60, 60]} />
-                <Tooltip
-                  cursor={{ strokeDasharray: '3 3' }}
-                  contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-                  formatter={(value: any, name: any) => [Number(value).toFixed(0), name === 'x' ? labelFor(scatterX, userData) : labelFor(scatterY, userData)]}
-                  labelFormatter={(label: any, payload: any) => {
-                    if (payload && payload.length && payload[0]?.payload?.dateLabel) return payload[0].payload.dateLabel;
-                    return '';
-                  }}
-                />
-                <Scatter data={scatterData} fill="rgb(var(--color-accent))" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+      {/* Relationship explorer removed */}
 
       {/* Weekday pattern */}
       <div className="eb-card">
@@ -2482,13 +2422,13 @@ return (
         <div className="mt-3 eb-chart">
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>
-              <BarChart data={weekdayBar} margin={{ left: 6, right: 16, top: 10, bottom: 6 }}>
+              <BarChart data={weekdayBar} margin={{ left: -10, right: 8, top: 10, bottom: 6 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={28} />
                 <Tooltip
                   contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-                  formatter={(value: any) => [value == null ? '–' : Number(value).toFixed(1), labelFor(selected[0] ?? 'mood', userData)]}
+                  formatter={(value: any) => [value == null ? '-' : Number(value).toFixed(1), labelFor(selected[0] ?? 'mood', userData)]}
                 />
                 <Bar dataKey="avg" fill="rgb(var(--color-primary))" radius={[10, 10, 10, 10]} />
               </BarChart>
@@ -2534,7 +2474,7 @@ return (
           <div className="min-w-0 w-full">
             <h2 className="text-xl font-semibold tracking-tight">{reportCardTitle}</h2>
             <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
-              Download a readable <b>.html</b> report for you. The JSON export is the “machine” version, but it can’t be restored as an in-app backup.
+              Download a readable <b>.html</b> report for you. The JSON export is the "machine" version, but it can't be restored as an in-app backup.
             </p>
             <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
               To open: tap the file in your downloads and choose Chrome/Safari.
