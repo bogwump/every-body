@@ -26,7 +26,7 @@ import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, 
 import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
-import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
 
@@ -1469,7 +1469,7 @@ return (
       {/* Header */}
       <div className="pt-2">
         <h1 className="mb-1">Insights &amp; Patterns</h1>
-        <p className="text-[rgb(var(--color-text-secondary))]">Discover connections between your symptoms and cycle.</p>
+        <p className="text-[rgb(var(--color-text-secondary))]">Discover connections between your symptoms and cycle.</p>
 
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="eb-pill">
@@ -1703,8 +1703,16 @@ return (
             <EBDialogContent
               title="Choose metrics to analyse"
               description="Select up to 6 metrics to personalise your insights."
-              className="max-w-2xl rounded-2xl"
+              className="relative rounded-2xl max-w-[calc(100%-3rem)] sm:max-w-lg"
             >
+              <DialogClose asChild>
+                <button
+                  type="button"
+                  className="absolute right-4 top-4 rounded-lg px-2 py-1 text-sm text-neutral-600 hover:bg-neutral-100"
+                >
+                  Close
+                </button>
+              </DialogClose>
               <DialogHeader>
                 <DialogTitle>Choose metrics to analyse (max 6)</DialogTitle>
                 <DialogDescription>
