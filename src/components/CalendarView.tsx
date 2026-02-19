@@ -504,20 +504,27 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
             <div className="mb-4">
               <button
                 type="button"
-                onClick={() => setSleepPeekOpen((v) => !v)}
-                onTouchStart={(e) => {
-                  // iOS Safari can be flaky with fixed modals; make touch feel responsive.
-                  e.preventDefault();
+                disabled={!hasSleepDetails}
+                onClick={() => {
+                  if (!hasSleepDetails) return;
                   setSleepPeekOpen((v) => !v);
                 }}
-                className="w-full flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm"
+                className={cn(
+                  "w-full flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm",
+                  !hasSleepDetails && "opacity-60"
+                )}
               >
                 <div className="text-[rgb(var(--color-text-secondary))]">Sleep details</div>
                 <div className="flex items-center gap-2">
-                  <span className={hasSleepDetails ? 'font-medium' : 'text-[rgb(var(--color-text-secondary))]'}>
-                    {hasSleepDetails ? 'Logged' : 'Not today'}
+                  <span className={hasSleepDetails ? "font-medium" : "text-[rgb(var(--color-text-secondary))]"}>
+                    {hasSleepDetails ? "Logged" : "Not today"}
                   </span>
-                  <ChevronRight className={`w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform ${sleepPeekOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight
+                    className={cn(
+                      "w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform",
+                      hasSleepDetails && sleepPeekOpen && "rotate-90"
+                    )}
+                  />
                 </div>
               </button>
 

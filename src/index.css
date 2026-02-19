@@ -203,7 +203,17 @@ body {
   }
 
   .eb-pill {
-    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+    color: rgb(var(--color-text-secondary));
+    background: rgb(var(--color-text) / 0.06);
+    border: 1px solid rgb(var(--color-text) / 0.10);
+    white-space: nowrap;
   }
 
   .eb-pill-active {
