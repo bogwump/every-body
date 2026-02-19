@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
 import { useEntries, useUser } from '../lib/appStore';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
@@ -224,14 +225,14 @@ function inferPhaseKeyFromSignals(sorted: CheckInEntry[]): PhaseKey | null {
 function softPhaseMeta(key: PhaseKey) {
   switch (key) {
     case 'reset':
-      return { soft: 'Reset Phase', sci: 'Menstrual phase', icon: '🌙' };
+      return { soft: 'Reset Phase', sci: 'Menstrual phase' };
     case 'rebuilding':
-      return { soft: 'Rebuilding Phase', sci: 'Follicular phase', icon: '🌱' };
+      return { soft: 'Rebuilding Phase', sci: 'Follicular phase' };
     case 'expressive':
-      return { soft: 'Expressive Phase', sci: 'Ovulatory phase', icon: '✨' };
+      return { soft: 'Expressive Phase', sci: 'Ovulatory phase' };
     case 'protective':
     default:
-      return { soft: 'Protective Phase', sci: 'Luteal phase', icon: '🌙' };
+      return { soft: 'Protective Phase', sci: 'Luteal phase' };
   }
 }
 
@@ -362,6 +363,29 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
   const softMeta = softPhaseMeta(phaseKey);
   const gentleReminder = useMemo(() => pickDailyReminder(phaseKey, localISODate(new Date())), [phaseKey]);
 
+  function IconBadge({ icon }: { icon: React.ReactNode }) {
+    return (
+      <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
+        <div className="text-[rgb(var(--color-primary))]">{icon}</div>
+      </div>
+    );
+  }
+
+  const phaseIcon = useMemo(() => {
+    switch (phaseKey) {
+      case 'reset':
+        return <Moon className="w-5 h-5" />;
+      case 'rebuilding':
+        return <Sprout className="w-5 h-5" />;
+      case 'expressive':
+        return <Sparkles className="w-5 h-5" />;
+      case 'protective':
+      default:
+        return <Shield className="w-5 h-5" />;
+    }
+  }, [phaseKey]);
+
+
 
 
   
@@ -377,7 +401,12 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-8 sm:p-10 overflow-hidden shadow-sm space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">{softMeta.icon} {computed.soft}</h3>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                  <div className="text-white">{phaseIcon}</div>
+                </div>
+                <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">{computed.soft}</h3>
+              </div>
               <div className="eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{computed.sci}</div>
               <div className="text-xs text-white/80 mt-1">Based on your recent check-ins.</div>
             </div>
@@ -400,7 +429,10 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         {/* Phase timeline */}
         <div className="eb-card p-5">
-          <h3 className="mb-3 font-semibold tracking-tight">🔄 Your cycle, at a glance</h3>
+          <div className="flex items-center gap-3 mb-3">
+            <IconBadge icon={<Compass className="w-5 h-5" />} />
+            <h3 className="font-semibold tracking-tight">Your cycle, at a glance</h3>
+          </div>
 
           {(() => {
             const steps: Array<{ key: PhaseKey; label: string; sci: string }> = [
@@ -443,7 +475,10 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         
 
         <div className="eb-card p-6 space-y-4">
-          <h3 className="mb-1">🪞 What this can look like</h3>
+          <div className="flex items-center gap-3">
+            <IconBadge icon={<Eye className="w-5 h-5" />} />
+            <h3 className="mb-1">What this can look like</h3>
+          </div>
           <p className="text-neutral-700">
             These are common signs in this phase. Over time, we’ll swap more of these for patterns that are uniquely yours.
           </p>
@@ -470,7 +505,10 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         {/* What you can do */}
         <div className="eb-card p-6 space-y-4">
-          <h3 className="mb-1 font-semibold tracking-tight">🌿 What you can do about it</h3>
+          <div className="flex items-center gap-3">
+            <IconBadge icon={<Leaf className="w-5 h-5" />} />
+            <h3 className="mb-1 font-semibold tracking-tight">What you can do about it</h3>
+          </div>
           <p className="text-neutral-700">
             This isn’t about “pushing through”. It’s about giving your body what it’s quietly asking for.
           </p>
@@ -499,24 +537,24 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         <div className="eb-card p-6 sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="text-xl">🌱</div>
+              <IconBadge icon={<Sprout className="w-5 h-5" />} />
               <div>
                 <h3 className="mb-1 font-semibold tracking-tight">It grows with you</h3>
                 <div className="mt-2 text-neutral-800">
                   This space gets smarter as you use it. You’ll see helpful reflections from day one, but the real magic appears after a few consistent weeks. Patterns take a little time to emerge. Keep logging, and we’ll build your rhythm together.
                 </div>
-                <div className="mt-4 text-neutral-800">
-                  It’s early days. For now, we’ll keep things gentle and learn as you log.
-                </div>
+                <div className="mt-4 text-neutral-800">{confidenceCopy(level)}</div>
               </div>
             </div>
-            <div className="eb-pill text-xs shrink-0">Learning</div>
-          </div>
+</div>
         </div>
 
         {/* What usually comes next */}
         <div className="eb-card p-6 space-y-4">
-          <h3 className="mb-1 font-semibold tracking-tight flex items-center gap-2">🧭 What usually comes next</h3>
+          <div className="flex items-center gap-3">
+            <IconBadge icon={<Compass className="w-5 h-5" />} />
+            <h3 className="mb-1 font-semibold tracking-tight">What usually comes next</h3>
+          </div>
 
           <p className="text-neutral-700">
             If this rhythm follows your usual pattern, you’ll likely shift into your <span className="font-medium opacity-90">{computed.nextPhase}</span> ({computed.nextSci}) in around <span className="font-medium opacity-90">{computed.daysToNext ?? 5} days</span>.
@@ -531,7 +569,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         {/* Why this happens */}
         <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
           <details>
-            <summary className="cursor-pointer font-medium text-neutral-900">📖 Why this happens</summary>
+            <summary className="cursor-pointer font-medium text-neutral-900">
+              <span className="inline-flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
+                  <span className="text-[rgb(var(--color-primary))]"><Info className="w-5 h-5" /></span>
+                </span>
+                <span>Why this happens</span>
+              </span>
+            </summary>
             <div className="mt-3 space-y-2 text-neutral-700">
               <p>
                 In the luteal phase, progesterone rises. For many people that can increase sleep need, change appetite, and make the body feel a little more sensitive.
