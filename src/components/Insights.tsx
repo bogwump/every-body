@@ -1701,38 +1701,92 @@ return (
               </button>
             </DialogTrigger>
             <EBDialogContent
-              title="Choose metrics to analyse"
-              description="Select up to 6 metrics to personalise your insights."
-              className="max-w-[calc(100%-3rem)] sm:max-w-lg rounded-2xl"
-            >
-              <DialogClose asChild>
-                <button
-                  type="button"
-                  className="absolute top-4 right-4 rounded-full border px-3 py-1 text-sm eb-muted hover:bg-black/5"
-                >
-                  Close
-                </button>
-              </DialogClose>
-              <DialogHeader>
-                <DialogTitle>Choose metrics to analyse (max 6)</DialogTitle>
-                <DialogDescription>
-                  Select up to 6 metrics to personalise your insights.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
-                  Mood
-                </button>
-                {selectableKeys.map((k) => (
-                  <button key={k} className={chipClass(selected.includes(k))} onClick={() => toggleMetric(k)} title={labelFor(k, userData)}>
-                    {labelFor(k, userData)}
-                  </button>
-                ))}
+              title="Choose metrics to analyse"
+
+              description="Select up to 6 metrics to personalise your insights."
+
+              className="w-[92vw] max-w-[420px] sm:max-w-lg rounded-2xl p-0 overflow-hidden max-h-[80vh]"
+
+            >
+
+              <div className="flex max-h-[80vh] flex-col">
+
+                <div className="flex items-start justify-between gap-3 border-b border-black/10 p-4">
+
+                  <div className="min-w-0">
+
+                    <div className="text-lg font-semibold">Choose metrics to analyse (max 6)</div>
+
+                    <div className="mt-1 text-sm eb-muted">Select up to 6 metrics to personalise your insights.</div>
+
+                  </div>
+
+
+                  <DialogClose asChild>
+
+                    <button
+
+                      type="button"
+
+                      className="shrink-0 rounded-full border border-black/10 px-3 py-1 text-sm eb-muted hover:bg-black/5"
+
+                    >
+
+                      Close
+
+                    </button>
+
+                  </DialogClose>
+
+                </div>
+
+
+                <div className="min-h-0 overflow-y-auto p-4">
+
+                  <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
+
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+
+                    <button type="button" className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
+
+                      Mood
+
+                    </button>
+
+
+                    {selectableKeys.map((k) => (
+
+                      <button
+
+                        type="button"
+
+                        key={k}
+
+                        className={chipClass(selected.includes(k))}
+
+                        onClick={() => toggleMetric(k)}
+
+                        title={labelFor(k, userData)}
+
+                      >
+
+                        {labelFor(k, userData)}
+
+                      </button>
+
+                    ))}
+
+                  </div>
+
+
+                  <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your &quot;top 3&quot; and stick with them for a week.</div>
+
+                </div>
+
               </div>
 
-              <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your "top 3" and stick with them for a week.</div>
             </EBDialogContent>
           </Dialog>
           </div>
