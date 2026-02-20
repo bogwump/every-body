@@ -265,7 +265,18 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
       {userData.onboardingComplete && !forceOnboarding && (
         <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
       )}
-      <main className={userData.onboardingComplete && !forceOnboarding ? 'pb-20 md:pb-0 md:pl-64' : ''}>{main}</main>
+      <main
+        className={
+          userData.onboardingComplete && !forceOnboarding
+            ? // Most pages need space for the iPhone bottom nav.
+              // Eve is a full-height chat screen, so we avoid the extra page padding and
+              // handle safe spacing inside the chat layout itself.
+              (currentScreen === 'chat' ? 'md:pl-64' : 'pb-20 md:pb-0 md:pl-64')
+            : ''
+        }
+      >
+        {main}
+      </main>
     </div>
   );
 }

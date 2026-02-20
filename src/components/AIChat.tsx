@@ -294,10 +294,6 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // iOS Safari can trigger pull-to-refresh if the *page* scrolls rather than our chat scroller.
-  // We keep the scroll inside the chat area and block the “rubber band” gesture at the top.
-  const touchStartYRef = useRef<number | null>(null);
-
   const SCROLL_TOP_KEY = 'everybody_eve_scrollTop_v1';
   const SCROLL_MANUAL_KEY = 'everybody_eve_manualScroll_v1';
 
@@ -310,6 +306,33 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   });
 
   const opening = useMemo(() => `Hi, I’m ${COMPANION_NAME}. Want help joining the dots today?`, []);
+
+  // Chat should feel like a full-screen view on mobile.
+  // Lock the page scroll so the ONLY scroll area is the message list.
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    const prevBeh = (document.documentElement.style as any).overscrollBehaviorY;
+
+    try {
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      // Helps prevent “scroll the page behind the chat” on browsers that support it.
+      (document.documentElement.style as any).overscrollBehaviorY = 'none';
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      try {
+        document.documentElement.style.overflow = prevHtml;
+        document.body.style.overflow = prevBody;
+        (document.documentElement.style as any).overscrollBehaviorY = prevBeh || '';
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -341,38 +364,6 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   useLayoutEffect(() => {
     restoreScrollPosition();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const el = scrollAreaRef.current;
-    if (!el) return;
-
-    const onTouchStart = (e: TouchEvent) => {
-      touchStartYRef.current = e.touches?.[0]?.clientY ?? null;
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      const startY = touchStartYRef.current;
-      const currentY = e.touches?.[0]?.clientY;
-      if (startY == null || currentY == null) return;
-
-      const dy = currentY - startY;
-
-      // If the user is pulling DOWN while already at the top, block the gesture
-      // so Safari doesn't treat it as a page refresh.
-      if (dy > 0 && el.scrollTop <= 0) {
-        e.preventDefault();
-      }
-    };
-
-    // passive: false is required so preventDefault actually works.
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-
-    return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove as any);
-    };
   }, []);
 
   useEffect(() => {
@@ -536,135 +527,143 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   };
 
   return (
-    <div className="eb-page flex flex-col h-[100svh] overflow-hidden py-0">
-      <div className="eb-page-inner flex-1 flex flex-col min-h-0 pb-24 space-y-0">
-        <div className="eb-card p-0 overflow-hidden flex flex-col flex-1 min-h-0">
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-neutral-200 bg-white flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[rgb(var(--color-primary))] to-[rgb(var(--color-primary-dark))] flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3>{COMPANION_NAME}</h3>
-                <p className="text-xs text-[rgb(var(--color-text-secondary))]">Here to support you with care and understanding</p>
+    <div className="bg-[rgb(var(--color-background))] h-[100svh] overflow-hidden">
+      <div className="h-full flex flex-col px-3 sm:px-4 md:px-6 pt-4 md:pt-6 pb-24 md:pb-6">
+        <div className="mx-auto w-full max-w-4xl flex flex-col flex-1 min-h-0">
+          <div className="eb-card p-0 overflow-hidden flex flex-col flex-1 min-h-0">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-neutral-200 bg-white flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[rgb(var(--color-primary))] to-[rgb(var(--color-primary-dark))] flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="truncate">{COMPANION_NAME}</h3>
+                  <p className="text-xs text-[rgb(var(--color-text-secondary))] truncate">
+                    Here to support you with care and understanding
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Messages */}
-          <div
-            ref={scrollAreaRef}
-            onScroll={handleScroll}
-            className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`w-fit max-w-[85%] sm:max-w-[80%] lg:max-w-[44rem] rounded-2xl px-4 py-3 ${
-                      message.sender === 'user'
-                        ? 'bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-text-primary))] border border-[rgb(var(--color-primary))]'
-                        : 'bg-white border border-neutral-200'
-                    }`}
-                  >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{stripLegacyJunk(message.text)}</p>
-                    <div className="flex items-center gap-1 mt-2">
-                      <Clock
-                        className={`w-3 h-3 ${
-                          message.sender === 'user' ? 'text-[rgb(var(--color-text-secondary))]' : 'text-neutral-400'
-                        }`}
-                      />
-                      <span
-                        className={`text-xs ${
-                          message.sender === 'user' ? 'text-[rgb(var(--color-text-secondary))]' : 'text-neutral-400'
-                        }`}
-                      >
-                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
+            {/* Messages (this is the ONLY scroll container) */}
+            <div
+              ref={scrollAreaRef}
+              onScroll={handleScroll}
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
+            >
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`w-fit max-w-[78%] sm:max-w-[70%] lg:max-w-[42rem] rounded-2xl px-4 py-3 shadow-sm ${
+                        message.sender === 'user'
+                          ? 'bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-text-primary))] border border-[rgb(var(--color-primary))]'
+                          : 'bg-white border border-neutral-200'
+                      }`}
+                    >
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{stripLegacyJunk(message.text)}</p>
 
-                    {/* Follow-up suggestion pills (shown only under the latest AI message) */}
-                    {message.sender === 'ai' && followUps?.aiId === message.id && followUps.questions.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-neutral-100">
-                        <p className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">You could ask me:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {followUps.questions.map((q, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => handleSendMessage(q)}
-                              className="text-xs px-3 py-1.5 rounded-full border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))] hover:text-white transition-all"
-                            >
-                              {q}
-                            </button>
-                          ))}
-                        </div>
+                      <div className="flex items-center gap-1 mt-2">
+                        <Clock
+                          className={`w-3 h-3 ${
+                            message.sender === 'user' ? 'text-[rgb(var(--color-text-secondary))]' : 'text-neutral-400'
+                          }`}
+                        />
+                        <span
+                          className={`text-xs ${
+                            message.sender === 'user' ? 'text-[rgb(var(--color-text-secondary))]' : 'text-neutral-400'
+                          }`}
+                        >
+                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))}
 
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-white border border-neutral-200 rounded-2xl px-4 py-3">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary))] animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary))] animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary))] animate-bounce" style={{ animationDelay: '300ms' }} />
+                      {/* Follow-up suggestion pills (shown only under the latest AI message) */}
+                      {message.sender === 'ai' && followUps?.aiId === message.id && followUps.questions.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-neutral-100">
+                          <p className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">You could ask me:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {followUps.questions.map((q, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleSendMessage(q)}
+                                className="text-xs px-3 py-1.5 rounded-full border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))] hover:text-white transition-all"
+                              >
+                                {q}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-
-          {/* Suggested Questions */}
-          {messages.length === 1 && (
-            <div className="px-6 py-4 bg-white border-t border-neutral-200">
-              <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">Suggested questions:</p>
-              <div className="flex flex-wrap gap-2">
-                {suggestedQuestions.map((question, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSendMessage(question)}
-                    className="text-sm px-4 py-2 rounded-full border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))] hover:text-white transition-all"
-                    type="button"
-                  >
-                    {question}
-                  </button>
                 ))}
+
+                {/* Starter chips sit INSIDE the scroll area so they don’t squash the chat on desktop */}
+                {messages.length === 1 && (
+                  <div className="pt-2">
+                    <div className="bg-white border border-neutral-200 rounded-2xl p-4">
+                      <p className="text-xs text-[rgb(var(--color-text-secondary))] mb-3">Try one of these:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {suggestedQuestions.map((question, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handleSendMessage(question)}
+                            className="text-sm px-4 py-2 rounded-full border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))] hover:text-white transition-all"
+                            type="button"
+                          >
+                            {question}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="bg-white border border-neutral-200 rounded-2xl px-4 py-3 shadow-sm">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary))] animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary))] animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary))] animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
               </div>
             </div>
-          )}
 
-          {/* Input */}
-          <div className="bg-white border-t border-neutral-200 px-6 py-4 flex-shrink-0">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask me anything about your symptoms..."
-                className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary))] focus:border-transparent"
-              />
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={!inputText.trim()}
-                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                type="button"
-              >
-                <Send className="w-5 h-5" />
-              </button>
+            {/* Input */}
+            <div className="bg-white border-t border-neutral-200 px-4 sm:px-6 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] flex-shrink-0">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask me anything about your symptoms..."
+                  className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary))] focus:border-transparent"
+                />
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={!inputText.trim()}
+                  className="px-5 sm:px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                  type="button"
+                  aria-label="Send"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-center mt-3 text-[rgb(var(--color-text-secondary))]">
+                Guidance is informational only. For medical advice, speak to a healthcare professional.
+              </p>
             </div>
-            <p className="text-xs text-center mt-3 text-[rgb(var(--color-text-secondary))]">
-              Guidance is informational only. For medical advice, speak to a healthcare professional.
-            </p>
           </div>
         </div>
       </div>
