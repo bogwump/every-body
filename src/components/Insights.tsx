@@ -1327,10 +1327,19 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const [experimentDurationDays, setExperimentDurationDays] = useState<number>(3);
   const [isCustomExperiment, setIsCustomExperiment] = useState<boolean>(false);
   const [customExperimentTitle, setCustomExperimentTitle] = useState<string>('Your experiment');
+  const [customExperimentChangeKey, setCustomExperimentChangeKey] = useState<string>('');
+  const [experimentMetricLimitFlash, setExperimentMetricLimitFlash] = useState<boolean>(false);
+  const [replaceExperimentConfirm, setReplaceExperimentConfirm] = useState<null | ExperimentPlan>(null);
 
   const { experiment, setExperiment, clearExperiment } = useExperiment();
 
+  const CUSTOM_EXPERIMENT_MAX_METRICS = 5;
+  const [preOpenExperimentConfirm, setPreOpenExperimentConfirm] = useState<null | { type: 'custom' | 'suggested'; metrics?: Array<MetricKey> }>(null);
   const openExperiment = (metrics?: Array<MetricKey>) => {
+    if (experimentStatus && !experimentStatus.done) {
+      setPreOpenExperimentConfirm({ type: 'suggested', metrics });
+      return;
+    }
     const focus = (metrics && metrics.length ? metrics : selected).slice(0, 5);
     const plan = buildExperimentPlan(focus);
     setExperimentMetrics(focus);
@@ -1338,8 +1347,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setIsCustomExperiment(false);
     setExperimentOpen(true);
   };
-
   const openCustomExperiment = () => {
+    if (experimentStatus && !experimentStatus.done) {
+      setPreOpenExperimentConfirm({ type: 'custom' });
+      return;
+    }
     const focus = selected.slice(0, 5);
     // A gentle, generic plan. User can choose what to log.
     setExperimentPlan({
@@ -1351,37 +1363,46 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       ],
       note: 'This is a tiny test, not a diagnosis. If something makes you feel worse, stop and switch to something gentler.',
     });
-    setExperimentMetrics(focus);
+    setExperimentMetrics(focus.slice(0, CUSTOM_EXPERIMENT_MAX_METRICS));
     setExperimentDurationDays(3);
     setIsCustomExperiment(true);
     setCustomExperimentTitle('Your experiment');
+    setCustomExperimentChangeKey('');
     setExperimentOpen(true);
   };
 
   const startExperiment = () => {
     const todayISO = isoTodayLocal();
     if (!experimentPlan) return;
+    const baseMetrics = (experimentMetrics.length ? experimentMetrics : selected).slice(0, isCustomExperiment ? CUSTOM_EXPERIMENT_MAX_METRICS : 6) as any;
+    const trimmedMetrics = isCustomExperiment ? baseMetrics.slice(0, CUSTOM_EXPERIMENT_MAX_METRICS) : baseMetrics;
+    const safeMetrics = isCustomExperiment && (!trimmedMetrics || trimmedMetrics.length === 0) ? (['mood'] as any) : trimmedMetrics;
+
     const plan: ExperimentPlan = {
       id: `${todayISO}-${Math.random().toString(16).slice(2)}`,
       title: isCustomExperiment ? (customExperimentTitle.trim() || 'Your experiment') : experimentPlan.title,
       startDateISO: todayISO,
       durationDays: experimentDurationDays,
-      metrics: (experimentMetrics.length ? experimentMetrics : selected).slice(0, 6) as any,
+      metrics: safeMetrics,
+      changeKey: isCustomExperiment && customExperimentChangeKey ? customExperimentChangeKey : undefined,
       steps: experimentPlan.steps,
       note: experimentPlan.note,
     };
+
+    // Single-active-experiment guardrail
+    if (experimentStatus && !experimentStatus.done) {
+      setReplaceExperimentConfirm(plan);
+      return;
+    }
+
     setExperiment(plan);
     setExperimentOpen(false);
     setIsCustomExperiment(false);
 
-    // The active experiment banner sits at the top of the Insights page.
-    // Scroll up so the user immediately sees that the experiment has started.
+    // Scroll to Experiments section (hero stays first)
     try {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setTimeout(() => {
-        const el = document.getElementById('eb-active-experiment');
-        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 50);
+      const el = document.getElementById('eb-experiments');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch {
       // ignore
     }
@@ -1417,6 +1438,24 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     });
 
     setFinishExperimentConfirm(null);
+  };
+
+  const confirmReplaceExperiment = () => {
+    if (!replaceExperimentConfirm) return;
+    // Stop existing + start new
+    clearExperiment();
+    setExperiment(replaceExperimentConfirm);
+    setReplaceExperimentConfirm(null);
+    setExperimentOpen(false);
+    setIsCustomExperiment(false);
+    setExperimentStartedFlash(true);
+    try {
+      const el = document.getElementById('eb-experiments');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+      // ignore
+    }
+    window.setTimeout(() => setExperimentStartedFlash(false), 3200);
   };
 
 
@@ -1466,6 +1505,57 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     };
   }, [experimentStatus, entriesAllSorted]);
 
+  const experimentsMaturity = useMemo(() => {
+    const n = entriesSorted.length;
+    if (n <= 6) return { label: 'Early', hint: 'You are building the baseline.' };
+    if (n <= 29) return { label: 'Learning', hint: 'Patterns are starting to form.' };
+    if (n <= 59) return { label: 'Emerging', hint: 'Signals are getting clearer.' };
+    return { label: 'Established', hint: 'Great baseline. Experiments are more meaningful now.' };
+  }, [entriesSorted.length]);
+
+  const suggestedExperiments = useMemo(() => {
+    const items: Array<{
+      id: string;
+      title: string;
+      body: string;
+      confidence: 'low' | 'medium' | 'high';
+      metrics: MetricKey[];
+      allow: boolean;
+    }> = [];
+
+    corrPairs.slice(0, 8).forEach((p, idx) => {
+      items.push({
+        id: `corr-${idx}`,
+        title: `${p.a} + ${p.b}`,
+        body: `A ${p.confidence === 'high' ? 'clearer' : p.confidence === 'medium' ? 'possible' : 'new'} pattern based on ${p.n} days logged together.`,
+        confidence: p.confidence,
+        metrics: [p.aKey, p.bKey].filter(Boolean) as any,
+        allow: Boolean(p.allowSuggestedExperiment),
+      });
+    });
+
+    findings
+      .filter((f: any) => Boolean(f?.allowSuggestedExperiment) && Array.isArray(f?.metrics) && f.metrics.length)
+      .slice(0, 8)
+      .forEach((f: any, idx: number) => {
+        items.push({
+          id: `find-${idx}`,
+          title: f.title,
+          body: f.body,
+          confidence: (f.confidence as any) || 'medium',
+          metrics: (f.metrics as any[]).slice(0, 3) as any,
+          allow: true,
+        });
+      });
+
+    const uniq = new Map<string, (typeof items)[number]>();
+    items.forEach((it) => {
+      const key = it.metrics.join('|');
+      if (!uniq.has(key)) uniq.set(key, it);
+    });
+    return Array.from(uniq.values()).filter((it) => it.allow).slice(0, 10);
+  }, [corrPairs, findings]);
+
   const [outcomeNote, setOutcomeNote] = useState<string>('');
 
   const setOutcomeRating = (rating: 1 | 2 | 3 | 4 | 5) => {
@@ -1506,20 +1596,12 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const allow = Boolean(ms.allowSuggestedExperiment);
 
     if (!allow) {
-      return (
-        <div className="text-sm eb-muted">
-          {hasHormonal ? 'Track for one more cycle to learn more.' : 'Keep logging to unlock experiment suggestions.'}
-        </div>
-      );
+      return null;
     }
 
     // If it's hormonal-related and weak, be extra conservative.
     if (hasHormonal && strength === 'weak') {
-      return (
-        <div className="text-sm eb-muted">
-          Track for one more cycle to strengthen the signal, then we can suggest a tiny experiment.
-        </div>
-      );
+      return null;
     }
 
     return (
@@ -1535,6 +1617,170 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     );
   };
 
+  const renderActiveExperimentCard = () => {
+    if (!experimentStatus) return null;
+    return (
+      <div id="eb-active-experiment" className="eb-inset rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold flex items-center gap-2">
+              <FlaskConical className="w-4 h-4" />
+              {experimentStatus.done
+                ? 'Experiment complete'
+                : `Experiment in progress (Day ${experimentStatus.day}/${experimentStatus.ex.durationDays ?? 3})`}
+            </div>
+            <div className="mt-1 text-sm eb-muted">
+              {experimentStatus.ex.title}
+              {experimentStatus.ex.changeKey ? (
+                <span> • Changing: {otherInfluenceLabel(String(experimentStatus.ex.changeKey))}</span>
+              ) : null}
+              {Array.isArray(experimentStatus.ex.metrics) && experimentStatus.ex.metrics.length ? (
+                <span>
+                  {' '}
+                  • Measuring:{' '}
+                  {(experimentStatus.ex.metrics as any[])
+                    .slice(0, 5)
+                    .map((k) => labelFor(k as any, userData))
+                    .join(' • ')}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            {!experimentStatus.done && onOpenCheckIn ? (
+              <button
+                type="button"
+                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                onClick={() => onOpenCheckIn(isoTodayLocal())}
+              >
+                Log today
+              </button>
+            ) : null}
+            {!experimentStatus.done ? (
+              <button
+                type="button"
+                className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium whitespace-nowrap"
+                onClick={() => extendExperiment(2)}
+              >
+                Extend 2 days
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
+              onClick={() => clearExperiment()}
+            >
+              {experimentStatus.done ? 'Clear' : 'Stop'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+          {experimentStatus.ex.steps?.slice(0, 3)?.map((s: string, i: number) => (
+            <div key={i} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
+              <div className="text-sm font-semibold">Step {i + 1}</div>
+              <div className="mt-1 text-sm eb-muted">{s}</div>
+            </div>
+          ))}
+
+          {!experimentStatus.done ? (
+            <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
+              <div className="text-sm font-semibold">Step 4</div>
+              <div className="mt-1 text-sm eb-muted">
+                Tell me if it helped. We'll save the result so your future insights can become more meaningful.
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+                  onClick={() => markExperimentOutcome(true)}
+                >
+                  Yes, it helped
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
+                  onClick={() => markExperimentOutcome(false)}
+                >
+                  Not really
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
+              <div className="text-sm font-semibold">Step 4</div>
+              <div className="mt-1 text-sm eb-muted">Experiment complete. Thanks for telling me what helped.</div>
+            </div>
+          )}
+        </div>
+
+        {experimentStatus.ex.note ? <div className="mt-3 text-sm eb-muted">{experimentStatus.ex.note}</div> : null}
+
+        {experimentWindow && experimentStatus.day >= 2 ? (
+          <div className="mt-4 eb-inset rounded-2xl p-4">
+            <div className="text-sm font-semibold">Experiment mini chart</div>
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {experimentWindow.series.slice(0, 3).map((s) => (
+                <div key={String(s.key)} className="rounded-2xl border border-black/5 bg-white p-3">
+                  <div className="text-xs text-[rgb(var(--color-text-secondary))]">{labelFor(s.key, userData)}</div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <Sparkline values={s.values} />
+                    <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">
+                      Day {Math.min(experimentStatus.day, experimentStatus.ex.durationDays ?? 3)}/{experimentStatus.ex.durationDays ?? 3}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {experimentStatus.day >= (experimentStatus.ex.durationDays ?? 3) && !(experimentStatus.ex as any)?.outcome?.rating ? (
+          <div className="mt-4 eb-inset rounded-2xl p-4">
+            <div className="text-sm font-semibold">Did it help?</div>
+            <div className="mt-1 text-sm eb-muted">Quick 5-point rating so we can turn this into a real conclusion.</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={chipClass((experimentStatus.ex as any)?.outcome?.rating === n)}
+                  onClick={() => setOutcomeRating(n as any)}
+                  aria-label={`Rate ${n} out of 5`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3">
+              <textarea
+                className="eb-input"
+                placeholder="Optional: what changed (sleep, food, stress, meds, ...)?"
+                rows={2}
+                value={outcomeNote}
+                onChange={(e) => setOutcomeNote(e.target.value)}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {(experimentStatus.ex as any)?.outcome?.rating ? (
+          <div className="mt-4 eb-inset rounded-2xl p-4">
+            <div className="text-sm font-semibold">Conclusion</div>
+            <div className="mt-1 text-sm eb-muted">
+              {Number((experimentStatus.ex as any)?.outcome?.rating ?? 0) >= 4 ? 'You marked this as a success.' : 'You marked this as not helpful.'}
+              {experimentWindow?.series?.length ? renderExperimentDelta() : null}
+            </div>
+            {(experimentStatus.ex as any)?.outcome?.note ? (
+              <div className="mt-2 text-sm">Note: {(experimentStatus.ex as any).outcome.note}</div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <div className="eb-container space-y-6 pt-8 pb-12 overflow-x-hidden">
       {/* Header */}
@@ -1547,175 +1793,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             Days logged • {entriesSorted.length}
           </span>
           <span className="eb-pill">
-            Check-ins • {streak}
+            Current streak • {streak}
           </span>
           <span className="eb-pill">
             View • {TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? timeframe}
           </span>
         </div>
       </div>
-
-      {/* Active experiment */}
-      {experimentStatus && (
-        <div id="eb-active-experiment" className="eb-inset rounded-2xl p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold flex items-center gap-2">
-                <FlaskConical className="w-4 h-4" />
-                {experimentStatus.done
-                  ? 'Experiment complete'
-                  : `Experiment in progress (Day ${experimentStatus.day}/${experimentStatus.ex.durationDays ?? 3})`}
-              </div>
-              <div className="mt-1 text-sm eb-muted">
-                {experimentStatus.ex.title}
-                {Array.isArray(experimentStatus.ex.metrics) && experimentStatus.ex.metrics.length ? (
-                  <span>
-                    {' '}
-                    • Logging:{' '}
-                    {(experimentStatus.ex.metrics as any[])
-                      .slice(0, 5)
-                      .map((k) => labelFor(k as any, userData))
-                      .join(' • ')}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-2">
-              {!experimentStatus.done && onOpenCheckIn ? (
-                <button
-                  type="button"
-                  className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
-                  onClick={() => onOpenCheckIn(isoTodayLocal())}
-                >
-                  Log today
-                </button>
-              ) : null}
-              {!experimentStatus.done ? (
-                <button
-                  type="button"
-                  className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium whitespace-nowrap"
-                  onClick={() => extendExperiment(2)}
-                >
-                  Extend 2 days
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
-                onClick={() => clearExperiment()}
-              >
-                {experimentStatus.done ? 'Clear' : 'Stop'}
-              </button>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {experimentStatus.ex.steps?.slice(0, 3)?.map((s: string, i: number) => (
-              <div key={i} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
-                <div className="text-sm font-semibold">Step {i + 1}</div>
-                <div className="mt-1 text-sm eb-muted">{s}</div>
-              </div>
-            ))}
-
-            {/* Step 4: outcome (available any time) */}
-            {!experimentStatus.done ? (
-              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
-                <div className="text-sm font-semibold">Step 4</div>
-                <div className="mt-1 text-sm eb-muted">
-                  Tell me if it worked. We'll save the result so your future insights can become more meaningful.
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
-                    onClick={() => markExperimentOutcome(true)}
-                  >
-                    Yes, it helped
-                  </button>
-                  <button
-                    type="button"
-                    className="px-4 py-2 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
-                    onClick={() => markExperimentOutcome(false)}
-                  >
-                    Not really
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
-                <div className="text-sm font-semibold">Step 4</div>
-                <div className="mt-1 text-sm eb-muted">Experiment complete. Thanks for telling me what helped.</div>
-              </div>
-            )}
-          </div>
-          {experimentStatus.ex.note ? <div className="mt-3 text-sm eb-muted">{experimentStatus.ex.note}</div> : null}
-
-          {/* Mini chart: appears once day 2 has some data */}
-          {experimentWindow && experimentStatus.day >= 2 ? (
-            <div className="mt-4 eb-inset rounded-2xl p-4">
-              <div className="text-sm font-semibold">Experiment mini chart</div>
-              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {experimentWindow.series.slice(0, 3).map((s) => (
-                  <div key={String(s.key)} className="rounded-2xl border border-black/5 bg-white p-3">
-                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">{labelFor(s.key, userData)}</div>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <Sparkline values={s.values} />
-                      <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">
-                        Day {Math.min(experimentStatus.day, experimentStatus.ex.durationDays ?? 3)}/{experimentStatus.ex.durationDays ?? 3}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Day 3 outcome capture */}
-          {experimentStatus.day >= (experimentStatus.ex.durationDays ?? 3) && !(experimentStatus.ex as any)?.outcome?.rating ? (
-            <div className="mt-4 eb-inset rounded-2xl p-4">
-              <div className="text-sm font-semibold">Did it help?</div>
-              <div className="mt-1 text-sm eb-muted">Quick 5-point rating so we can turn this into a real conclusion.</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className="eb-pill"
-                    style={{ background: 'rgba(0,0,0,0.06)' }}
-                    onClick={() => setOutcomeRating(n as any)}
-                    aria-label={`Rate ${n} out of 5`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3">
-                <textarea
-                  className="eb-input"
-                  placeholder="Optional: what changed (sleep, food, stress, meds, ...)?"
-                  rows={2}
-                  value={outcomeNote}
-                  onChange={(e) => setOutcomeNote(e.target.value)}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {/* Conclusion once rated */}
-          {(experimentStatus.ex as any)?.outcome?.rating ? (
-            <div className="mt-4 eb-inset rounded-2xl p-4">
-              <div className="text-sm font-semibold">Conclusion</div>
-              <div className="mt-1 text-sm eb-muted">
-                {Number((experimentStatus.ex as any)?.outcome?.rating ?? 0) >= 4 ? "You marked this as a success." : "You marked this as not helpful."}
-                {experimentWindow?.series?.length ? renderExperimentDelta() : null}
-              </div>
-              {(experimentStatus.ex as any)?.outcome?.note ? (
-                <div className="mt-2 text-sm">Note: {(experimentStatus.ex as any).outcome.note}</div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      )}
 
       {/* Your settings */}
       <div className="eb-card eb-hero-surface">
@@ -1904,27 +1988,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                   </div>
                 </CarouselItem>
               ))}
-              <CarouselItem key="custom" className="basis-full md:basis-1/2">
-                <div className="eb-inset rounded-2xl p-5 h-full">
-                  <div className="text-sm font-semibold">Found something yourself?</div>
-                  <div className="mt-1 text-sm eb-muted">
-                    Something you want to track or test (like magnesium, earlier bedtime, or less caffeine)?
-                    Turn it into a tiny experiment.
-                  </div>
-
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      type="button"
-                      className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
-                      onClick={openCustomExperiment}
-                      title="Create your own experiment"
-                    >
-                      <FlaskConical className="w-4 h-4" />
-                      Run a 3-day experiment
-                    </button>
-                  </div>
-                </div>
-              </CarouselItem>
             </CarouselContent>
             <CarouselPrevious className="flex opacity-70" />
             <CarouselNext className="flex opacity-70" />
@@ -2057,7 +2120,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         <EBDialogContent
           title={experimentPlan?.title ?? 'Experiment'}
           description="Set up a tiny experiment and keep logging a few metrics so you can spot what changes."
-          className="max-w-lg rounded-2xl"
+          className="w-[92vw] max-w-[420px] sm:max-w-lg rounded-2xl"
         >
           <DialogHeader>
             <DialogTitle>{experimentPlan?.title ?? 'Experiment'}</DialogTitle>
@@ -2065,7 +2128,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               Set up a tiny experiment and keep logging a few metrics so you can spot what changes.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[78vh] overflow-y-auto pr-1 space-y-3">
+          <div className="max-h-[72vh] overflow-y-auto pr-1 space-y-3 pb-4">
             <div className="text-sm eb-muted">
               Tiny, realistic actions. You are testing what helps your body, not trying to "fix everything".
             </div>
@@ -2085,17 +2148,54 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               </div>
             )}
 
+            {isCustomExperiment && (
+              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
+                <div className="text-sm font-semibold">What are you changing?</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(() => {
+                    const enabled = Array.isArray(userData.enabledInfluences) ? (userData.enabledInfluences as string[]) : [];
+                    const opts = Array.from(new Set(enabled.concat(Array.from(OTHER_INFLUENCE_KEYS as any)))).slice(0, 14);
+                    const toggle = (k: string) => setCustomExperimentChangeKey((prev) => (prev === k ? '' : k));
+                    return opts.map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        className={chipClass(customExperimentChangeKey === k)}
+                        onClick={() => toggle(k)}
+                        aria-pressed={customExperimentChangeKey === k}
+                      >
+                        {otherInfluenceLabel(k)}
+                      </button>
+                    ));
+                  })()}
+                </div>
+                <div className="mt-2 text-sm eb-muted">Pick one thing to change, if you can.</div>
+              </div>
+            )}
+
             {/* What to log */}
             <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
-              <div className="text-sm font-semibold">What to log (daily)</div>
+              <div className="text-sm font-semibold flex items-center justify-between gap-2">
+                <span>What to measure (daily)</span>
+                {isCustomExperiment ? (
+                  <span className="text-xs eb-muted">Selected {experimentMetrics.length}/{CUSTOM_EXPERIMENT_MAX_METRICS}</span>
+                ) : null}
+              </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {isCustomExperiment ? (
                   (() => {
                     const options: MetricKey[] = Array.from(new Set((['mood' as any] as MetricKey[]).concat(selectableKeys)));
                     const toggle = (k: MetricKey) => {
                       setExperimentMetrics((prev) => {
-                        const next = prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k];
-                        return next.slice(0, 6);
+                        if (prev.includes(k)) return prev.filter((x) => x !== k);
+
+                        if (prev.length >= CUSTOM_EXPERIMENT_MAX_METRICS) {
+                          setExperimentMetricLimitFlash(true);
+                          window.setTimeout(() => setExperimentMetricLimitFlash(false), 1800);
+                          return prev;
+                        }
+
+                        return [...prev, k];
                       });
                     };
                     return options.map((k) => {
@@ -2104,11 +2204,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                         <button
                           key={String(k)}
                           type="button"
-                          className="eb-pill"
-                          style={{
-                            background: on ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.06)',
-                            border: '1px solid rgba(0,0,0,0.08)',
-                          }}
+                          className={chipClass(on)}
                           onClick={() => toggle(k)}
                           aria-pressed={on}
                         >
@@ -2128,7 +2224,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                 )}
               </div>
               <div className="mt-2 text-sm eb-muted">
-                You do not need to track everything. Consistency beats completeness.
+                Pick up to 5 measures. Consistency beats completeness.
+                {experimentMetricLimitFlash ? (
+                  <span className="ml-2 font-medium">Max 5 selected.</span>
+                ) : null}
               </div>
             </div>
 
@@ -2147,8 +2246,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                   <button
                     key={d}
                     type="button"
-                    className="eb-pill"
-                    style={{ background: d === experimentDurationDays ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.06)' }}
+                    className={chipClass(d === experimentDurationDays)}
                     onClick={() => setExperimentDurationDays(d)}
                     aria-label={`Set experiment length to ${d} days`}
                   >
@@ -2158,26 +2256,94 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               </div>
             </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row sm:justify-end gap-2">
-              <button
-                type="button"
-                className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
-                onClick={() => setExperimentOpen(false)}
-              >
-                Not now
-              </button>
-              <button
-                type="button"
-                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
-                onClick={startExperiment}
-              >
-                {`Start ${experimentDurationDays}-day experiment`}
-              </button>
-            </div>
+          </div>
+
+          <div className="pt-3 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+            <button
+              type="button"
+              className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
+              onClick={() => setExperimentOpen(false)}
+            >
+              Not now
+            </button>
+            <button
+              type="button"
+              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+              onClick={startExperiment}
+            >
+              {`Start ${experimentDurationDays}-day experiment`}
+            </button>
           </div>
         </EBDialogContent>
       </Dialog>
 
+
+
+
+      {/* Start new experiment confirm (pre-open) */}
+      <Dialog
+        open={!!preOpenExperimentConfirm}
+        onOpenChange={(open) => {
+          if (!open) setPreOpenExperimentConfirm(null);
+        }}
+      >
+        <EBDialogContent
+          title="Start a new experiment?"
+          description="You already have an experiment in progress."
+          className="w-[92vw] max-w-[420px] rounded-2xl"
+        >
+          <DialogHeader>
+            <DialogTitle>Start a new experiment?</DialogTitle>
+            <DialogDescription>
+              You already have an experiment in progress. You can keep it, or stop it and start a new one.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex flex-col gap-2">
+            <button type="button" className="eb-btn eb-btn-secondary w-full" onClick={() => setPreOpenExperimentConfirm(null)}>
+              Keep current experiment
+            </button>
+            <button
+              type="button"
+              className="eb-btn eb-btn-primary w-full"
+              onClick={() => {
+                const next = preOpenExperimentConfirm;
+                setPreOpenExperimentConfirm(null);
+                clearExperiment();
+                window.setTimeout(() => {
+                  if (next?.type === 'custom') {
+                    // open without re-triggering the confirm
+                    const focus = selected.slice(0, 5);
+                    setExperimentPlan({
+                      title: 'Create your own experiment',
+                      steps: [
+                        'Pick what you want to try (for example magnesium, earlier bedtime, or less caffeine).',
+                        'Keep everything else roughly the same for the duration, if you can.',
+                        'Log your chosen metrics each day, then review the mini chart and the before/after summary.',
+                      ],
+                      note: 'This is a tiny test, not a diagnosis. If something makes you feel worse, stop and switch to something gentler.',
+                    });
+                    setExperimentMetrics(focus.slice(0, CUSTOM_EXPERIMENT_MAX_METRICS));
+                    setExperimentDurationDays(3);
+                    setIsCustomExperiment(true);
+                    setCustomExperimentTitle('Your experiment');
+                    setCustomExperimentChangeKey('');
+                    setExperimentOpen(true);
+                  } else {
+                    const focus = (next?.metrics && next.metrics.length ? next.metrics : selected).slice(0, 5);
+                    const plan = buildExperimentPlan(focus);
+                    setExperimentMetrics(focus);
+                    setExperimentPlan(plan);
+                    setIsCustomExperiment(false);
+                    setExperimentOpen(true);
+                  }
+                }, 0);
+              }}
+            >
+              Stop and start a new one
+            </button>
+          </div>
+        </EBDialogContent>
+      </Dialog>
 
       {/* Finish experiment confirm dialog */}
       <Dialog
@@ -2213,6 +2379,40 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               </button>
               <button type="button" className="eb-btn-primary" onClick={confirmFinishExperiment}>
                 Finish and save
+              </button>
+            </div>
+          </div>
+        </EBDialogContent>
+      </Dialog>
+
+      {/* Replace active experiment confirm */}
+      <Dialog
+        open={Boolean(replaceExperimentConfirm)}
+        onOpenChange={(open) => {
+          if (!open) setReplaceExperimentConfirm(null);
+        }}
+      >
+        <EBDialogContent
+          title="One experiment at a time"
+          description="To keep results meaningful, you can run one active experiment at a time."
+          className="w-[92vw] max-w-[420px] sm:max-w-md rounded-2xl"
+        >
+          <DialogHeader>
+            <DialogTitle>Replace your current experiment?</DialogTitle>
+            <DialogDescription>
+              You already have an experiment in progress. If you start a new one, we will stop the current one.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm eb-muted">
+              Tip: if you want clean results, finish the current one first.
+            </div>
+            <div className="pt-2 flex justify-end gap-2">
+              <button type="button" className="eb-btn-secondary" onClick={() => setReplaceExperimentConfirm(null)}>
+                Keep current
+              </button>
+              <button type="button" className="eb-btn-primary" onClick={confirmReplaceExperiment}>
+                Stop and start new
               </button>
             </div>
           </div>
@@ -2589,6 +2789,95 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           <div id="eb-active-experiment" className="eb-inset rounded-2xl p-5">
             <div className="text-sm font-semibold">Keep it light</div>
             <div className="mt-1 text-sm eb-muted">If you feel overwhelmed, switch off a symptom or two in Profile. You can always switch them back on.</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Experiments */}
+      <div id="eb-experiments" className="eb-card">
+        <div className="eb-card-header">
+          <div>
+            <div className="eb-card-title">Experiments</div>
+            <div className="eb-card-sub">
+              Tiny tests to learn what helps. Maturity: <b>{experimentsMaturity.label}</b> · {experimentsMaturity.hint}
+            </div>
+          </div>
+          <FlaskConical className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+        </div>
+
+        {renderActiveExperimentCard()}
+
+        <div className="mt-4">
+          <div className="text-sm font-semibold">Suggested experiments</div>
+          <div className="mt-1 text-sm eb-muted">Suggested based on your data when the signal is strong enough.</div>
+
+          {suggestedExperiments.length === 0 ? (
+            <div className="mt-3 eb-inset rounded-2xl p-5 text-sm eb-muted">
+              Keep logging a few consistent metrics and this section will start to fill up.
+            </div>
+          ) : (
+            <div className="mt-3">
+              <Carousel opts={{ align: 'start' }} className="w-full">
+                <CarouselContent>
+                  {suggestedExperiments.map((s) => {
+                    const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
+                    return (
+                      <CarouselItem key={s.id} className="basis-full md:basis-1/2">
+                        <div className="eb-inset rounded-2xl p-5 h-full flex flex-col">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="text-sm font-semibold">{s.title}</div>
+                            <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                              {conf}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-sm eb-muted">{s.body}</div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {s.metrics.slice(0, 3).map((k) => (
+                              <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                                {labelFor(k as any, userData)}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="flex-1" />
+
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
+                              onClick={() => openExperiment(s.metrics)}
+                            >
+                              <FlaskConical className="w-4 h-4" />
+                              Try a 3-day experiment
+                            </button>
+                          </div>
+                        </div>
+                      </CarouselItem>
+                    );
+                  })}
+                </CarouselContent>
+                <CarouselPrevious className="flex opacity-70" />
+                <CarouselNext className="flex opacity-70" />
+              </Carousel>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 eb-inset rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold">Run your own experiment</div>
+              <div className="mt-1 text-sm eb-muted">Name it first, then pick what you’re changing and what you’ll measure.</div>
+            </div>
+            <button
+              type="button"
+              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 whitespace-nowrap"
+              onClick={openCustomExperiment}
+            >
+              <FlaskConical className="w-4 h-4" />
+              Create experiment
+            </button>
           </div>
         </div>
       </div>

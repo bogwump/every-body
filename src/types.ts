@@ -202,6 +202,8 @@ export interface ExperimentPlan {
   durationDays: number;
   /** Which metrics to focus on logging during the experiment */
   metrics: InsightMetricKey[];
+  /** What the user is changing (influence tag), e.g. caffeine, medication, lateNight */
+  changeKey?: string;
   /** Small, realistic steps */
   steps: string[];
   /** A short coaching note */
