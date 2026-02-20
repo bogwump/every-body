@@ -548,7 +548,14 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           (typeof sd.troubleFallingAsleep === 'number' && sd.troubleFallingAsleep > 0) ||
           Boolean(sd.wokeTooEarly))
       );
-            const ev = (e as any)?.events ?? {};
+            const evRaw = (e as any)?.events ?? {};
+      // Respect Insights scoping for influences too (retired metrics / goal pivots).
+      const ev: Record<string, any> = {};
+      Object.keys(evRaw).forEach((k) => {
+        if (!Boolean((evRaw as any)[k])) return;
+        if (!isMetricInScope(userData, `influence:${k}`, String(e.dateISO))) return;
+        (ev as any)[k] = (evRaw as any)[k];
+      });
       const anyOther = Object.keys(ev).some((k) => k !== 'exercise' && k !== 'sex' && Boolean((ev as any)[k]));
       return {
         dateISO: e.dateISO,

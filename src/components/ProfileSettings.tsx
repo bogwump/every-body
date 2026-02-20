@@ -222,7 +222,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [resetConfirm, setResetConfirm] = useState<null | 'logs' | 'all'>(null);
 
   // When turning off a symptom, ask whether to retire its past data from Insights.
-  const [retirePrompt, setRetirePrompt] = useState<null | { metricId: string; label: string; kind: 'module' | 'custom'; customId?: string }>(null);
+  const [retirePrompt, setRetirePrompt] = useState<null | { metricId: string; label: string; kind: 'module' | 'custom' | 'influence'; customId?: string }>(null);
 
   // Simple feedback form (Help centre)
   const [feedbackSubject, setFeedbackSubject] = useState('');
@@ -1137,12 +1137,17 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
                               <button
                                 type="button"
-                                onClick={() =>
+                                onClick={() => {
+                                  // If turning OFF, ask whether to retire past data from Insights.
+                                  if (enabled) {
+                                    setRetirePrompt({ kind: 'influence', metricId: `influence:${m.key}`, label: m.label });
+                                    return;
+                                  }
                                   onUpdateUserData((prev) => ({
                                     ...prev,
                                     enabledInfluences: toggleInList((prev.enabledInfluences ?? []) as InfluenceKey[], m.key),
-                                  }))
-                                }
+                                  }));
+                                }}
                                 className={`shrink-0 w-12 h-6 rounded-full transition-all ${
                                   enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
                                 }`}
@@ -1951,7 +1956,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
         {/* Retire symptom data prompt */}
         {retirePrompt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Retire symptom data">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Retire tracking data">
             <button
               type="button"
               className="absolute inset-0 bg-black/40"
@@ -1962,7 +1967,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             <div className="relative w-full max-w-lg eb-card p-5">
               <div className="font-semibold">Turn off {retirePrompt.label}?</div>
               <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
-                Do you want Insights to keep using your past data for this symptom, or retire it so it stops shaping your patterns?
+                Do you want Insights to keep using your past data for this, or retire it so it stops shaping your patterns?
               </div>
 
               <div className="mt-4 space-y-2">
@@ -1973,6 +1978,13 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                     // Keep past data: just disable.
                     const metricId = retirePrompt.metricId;
                     onUpdateUserData((prev) => {
+                      if (retirePrompt.kind === 'influence') {
+                        const key = String(retirePrompt.metricId).replace('influence:', '') as InfluenceKey;
+                        return {
+                          ...prev,
+                          enabledInfluences: (prev.enabledInfluences ?? []).filter((k) => k !== key),
+                        };
+                      }
                       if (retirePrompt.kind === 'module') {
                         const nextEnabledModules = (prev.enabledModules ?? []).filter((k) => k !== metricId);
                         if (metricId === 'sleep') {
@@ -2003,6 +2015,15 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                     onUpdateUserData((prev) => {
                       const nextMap = { ...(prev.metricRetiredFromISO ?? {}) };
                       nextMap[metricId] = todayISO;
+
+                      if (retirePrompt.kind === 'influence') {
+                        const key = String(retirePrompt.metricId).replace('influence:', '') as InfluenceKey;
+                        return {
+                          ...prev,
+                          enabledInfluences: (prev.enabledInfluences ?? []).filter((k) => k !== key),
+                          metricRetiredFromISO: nextMap,
+                        };
+                      }
 
                       if (retirePrompt.kind === 'module') {
                         const nextEnabledModules = (prev.enabledModules ?? []).filter((k) => k !== metricId);
