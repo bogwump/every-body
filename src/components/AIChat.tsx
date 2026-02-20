@@ -294,6 +294,11 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // iOS Safari can "pull to refresh" if a scrollable area doesn't properly capture touch scroll.
+  // Track touch start and gently prevent the refresh gesture when the chat is already at the top.
+  const touchStartYRef = useRef<number>(0);
+  const touchStartScrollTopRef = useRef<number>(0);
+
   const SCROLL_TOP_KEY = 'everybody_eve_scrollTop_v1';
   const SCROLL_MANUAL_KEY = 'everybody_eve_manualScroll_v1';
 
@@ -356,6 +361,33 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
     };
   }, [manualScroll]);
 
+  // Native listener fallback (some iOS versions treat React's touch handlers as passive).
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+
+    const onTouchStart = (ev: TouchEvent) => {
+      touchStartYRef.current = ev.touches?.[0]?.clientY ?? 0;
+      touchStartScrollTopRef.current = el.scrollTop ?? 0;
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      const y = ev.touches?.[0]?.clientY ?? 0;
+      const pullingDown = y > touchStartYRef.current;
+      const atTop = (touchStartScrollTopRef.current <= 0) && (el.scrollTop <= 0);
+      if (pullingDown && atTop) {
+        ev.preventDefault();
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+    };
+  }, []);
+
   const handleScroll = () => {
     const el = scrollAreaRef.current;
     if (!el) return;
@@ -384,6 +416,25 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
       } catch {
         // ignore
       }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    touchStartYRef.current = e.touches?.[0]?.clientY ?? 0;
+    touchStartScrollTopRef.current = scrollAreaRef.current?.scrollTop ?? 0;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+
+    // If the user is trying to pull down while already at the very top,
+    // prevent Safari's pull-to-refresh from hijacking the gesture.
+    const y = e.touches?.[0]?.clientY ?? 0;
+    const pullingDown = y > touchStartYRef.current;
+    const atTop = (touchStartScrollTopRef.current <= 0) && (el.scrollTop <= 0);
+    if (pullingDown && atTop) {
+      e.preventDefault();
     }
   };
 
@@ -500,7 +551,7 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   };
 
   return (
-    <div className="eb-page flex flex-col h-[100dvh] overflow-hidden py-0">
+    <div className="eb-page flex flex-col min-h-[100svh] h-[100dvh] overflow-hidden py-0">
       <div className="eb-page-inner flex-1 flex flex-col pb-24 space-y-0">
         <div className="eb-card p-0 overflow-hidden flex flex-col flex-1 min-h-0">
           {/* Header */}
@@ -520,7 +571,10 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
           <div
             ref={scrollAreaRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
           >
             <div className="space-y-4">
               {messages.map((message) => (
