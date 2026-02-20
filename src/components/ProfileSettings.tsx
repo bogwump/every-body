@@ -256,6 +256,57 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [draftAvatarDataUrl, setDraftAvatarDataUrl] = useState<string | undefined>((userData as any).avatarDataUrl);
   const [draftAvatarStockId, setDraftAvatarStockId] = useState<string | undefined>((userData as any).avatarStockId);
 
+const downscaleImageFileToDataUrl = async (file: File) => {
+  // iPhone photos can be huge. If we store the raw base64 in localStorage,
+  // the save can fail (quota exceeded). Downscale + compress first.
+  const readAsDataUrl = (f: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(f);
+    });
+
+  const dataUrl = await readAsDataUrl(file);
+  if (!dataUrl) return '';
+
+  // If it's already small-ish, keep it as-is.
+  // (Base64 inflates size, so we use a conservative threshold.)
+  if (file.size <= 250_000) return dataUrl;
+
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Image decode failed'));
+      i.src = dataUrl;
+    });
+
+    const maxDim = 512;
+    const srcW = img.naturalWidth || img.width;
+    const srcH = img.naturalHeight || img.height;
+    const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+    const dstW = Math.max(1, Math.round(srcW * scale));
+    const dstH = Math.max(1, Math.round(srcH * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = dstW;
+    canvas.height = dstH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return dataUrl;
+
+    ctx.drawImage(img, 0, 0, dstW, dstH);
+
+    // JPEG keeps size down and is broadly supported.
+    const out = canvas.toDataURL('image/jpeg', 0.85);
+    return out || dataUrl;
+  } catch {
+    // If anything goes wrong (HEIC decode etc), fall back to original.
+    return dataUrl;
+  }
+};
+
+
   const openPersonal = () => {
     setDraftName(userData.name || '');
     setDraftAvatarDataUrl((userData as any).avatarDataUrl);
@@ -448,13 +499,21 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const result = typeof reader.result === 'string' ? reader.result : undefined;
+
+                  (async () => {
+                    const result = await downscaleImageFileToDataUrl(file);
+                    if (!result) return;
+
                     setDraftAvatarDataUrl(result);
                     setDraftAvatarStockId(undefined);
-                  };
-                  reader.readAsDataURL(file);
+
+                    // Allow picking the same photo again later.
+                    try {
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    } catch {
+                      // ignore
+                    }
+                  })();
                 }}
               />
 
