@@ -294,10 +294,9 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // iOS Safari can "pull to refresh" if a scrollable area doesn't properly capture touch scroll.
-  // Track touch start and gently prevent the refresh gesture when the chat is already at the top.
-  const touchStartYRef = useRef<number>(0);
-  const touchStartScrollTopRef = useRef<number>(0);
+  // iOS Safari can trigger pull-to-refresh if the *page* scrolls rather than our chat scroller.
+  // We keep the scroll inside the chat area and block the “rubber band” gesture at the top.
+  const touchStartYRef = useRef<number | null>(null);
 
   const SCROLL_TOP_KEY = 'everybody_eve_scrollTop_v1';
   const SCROLL_MANUAL_KEY = 'everybody_eve_manualScroll_v1';
@@ -345,6 +344,38 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   }, []);
 
   useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartYRef.current = e.touches?.[0]?.clientY ?? null;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      const startY = touchStartYRef.current;
+      const currentY = e.touches?.[0]?.clientY;
+      if (startY == null || currentY == null) return;
+
+      const dy = currentY - startY;
+
+      // If the user is pulling DOWN while already at the top, block the gesture
+      // so Safari doesn't treat it as a page refresh.
+      if (dy > 0 && el.scrollTop <= 0) {
+        e.preventDefault();
+      }
+    };
+
+    // passive: false is required so preventDefault actually works.
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove as any);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!manualScroll) scrollToBottom('auto');
   }, [messages, manualScroll]);
 
@@ -360,33 +391,6 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
       }
     };
   }, [manualScroll]);
-
-  // Native listener fallback (some iOS versions treat React's touch handlers as passive).
-  useEffect(() => {
-    const el = scrollAreaRef.current;
-    if (!el) return;
-
-    const onTouchStart = (ev: TouchEvent) => {
-      touchStartYRef.current = ev.touches?.[0]?.clientY ?? 0;
-      touchStartScrollTopRef.current = el.scrollTop ?? 0;
-    };
-
-    const onTouchMove = (ev: TouchEvent) => {
-      const y = ev.touches?.[0]?.clientY ?? 0;
-      const pullingDown = y > touchStartYRef.current;
-      const atTop = (touchStartScrollTopRef.current <= 0) && (el.scrollTop <= 0);
-      if (pullingDown && atTop) {
-        ev.preventDefault();
-      }
-    };
-
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-    };
-  }, []);
 
   const handleScroll = () => {
     const el = scrollAreaRef.current;
@@ -416,25 +420,6 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
       } catch {
         // ignore
       }
-    }
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    touchStartYRef.current = e.touches?.[0]?.clientY ?? 0;
-    touchStartScrollTopRef.current = scrollAreaRef.current?.scrollTop ?? 0;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    const el = scrollAreaRef.current;
-    if (!el) return;
-
-    // If the user is trying to pull down while already at the very top,
-    // prevent Safari's pull-to-refresh from hijacking the gesture.
-    const y = e.touches?.[0]?.clientY ?? 0;
-    const pullingDown = y > touchStartYRef.current;
-    const atTop = (touchStartScrollTopRef.current <= 0) && (el.scrollTop <= 0);
-    if (pullingDown && atTop) {
-      e.preventDefault();
     }
   };
 
@@ -551,8 +536,8 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   };
 
   return (
-    <div className="eb-page flex flex-col min-h-[100svh] h-[100dvh] overflow-hidden py-0">
-      <div className="eb-page-inner flex-1 flex flex-col pb-24 space-y-0">
+    <div className="eb-page flex flex-col h-[100svh] overflow-hidden py-0">
+      <div className="eb-page-inner flex-1 flex flex-col min-h-0 pb-24 space-y-0">
         <div className="eb-card p-0 overflow-hidden flex flex-col flex-1 min-h-0">
           {/* Header */}
           <div className="px-6 py-4 border-b border-neutral-200 bg-white flex-shrink-0">
@@ -571,16 +556,14 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
           <div
             ref={scrollAreaRef}
             onScroll={handleScroll}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
-            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
+            style={{ WebkitOverflowScrolling: 'touch' }}
           >
             <div className="space-y-4">
               {messages.map((message) => (
                 <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`w-full max-w-[85%] sm:max-w-[80%] lg:max-w-[44rem] rounded-2xl px-4 py-3 ${
+                    className={`w-fit max-w-[85%] sm:max-w-[80%] lg:max-w-[44rem] rounded-2xl px-4 py-3 ${
                       message.sender === 'user'
                         ? 'bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-text-primary))] border border-[rgb(var(--color-primary))]'
                         : 'bg-white border border-neutral-200'
