@@ -18,7 +18,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { Activity, ArrowRight, Download, FlaskConical, Sparkles, Moon, Heart } from 'lucide-react';
+import { ArrowRight, Download, FlaskConical, Sparkles, Moon } from 'lucide-react';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
 import { downloadTextFile } from '../lib/storage';
@@ -491,9 +491,16 @@ export function Insights({ userData, onOpenCheckIn }: InsightsProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>('month');
     const [smoothTrends, setSmoothTrends] = useState<boolean>(false);
   const [sleepExploreOpen, setSleepExploreOpen] = useState<boolean>(false);
-  const [sleepShowExercise, setSleepShowExercise] = useState<boolean>(true);
-  const [sleepShowSex, setSleepShowSex] = useState<boolean>(true);
-    const [sleepOtherKey, setSleepOtherKey] = useState<string>('');
+  // Sleep explorer overlay (single overlay at a time to keep the chart readable on mobile).
+  // Stored so the choice feels consistent.
+  const [sleepOverlayKey, setSleepOverlayKey] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('sleepExplorer:overlay');
+      return typeof saved === 'string' ? saved : '';
+    } catch {
+      return '';
+    }
+  });
 const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const entriesSorted = useMemo(() => filterByDays(entriesAllSorted, days), [entriesAllSorted, days]);
@@ -527,6 +534,34 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       };
     });
   }, [entriesSorted]);
+
+  // Sleep explorer overlays should never re-index the data (Recharts will plot by index on a categorical X axis).
+  // Instead we keep the same full series and expose a single marker field that is null on non-matching days.
+  const sleepExplorerSeries = useMemo(() => {
+    return sleepSeries.map((r) => {
+      const sleepVal = typeof r.sleep === 'number' ? r.sleep : null;
+      const k = (sleepOverlayKey || '').trim();
+
+      let matches = false;
+      if (k === 'exercise') matches = Boolean(r.exercise);
+      else if (k === 'sex') matches = Boolean(r.sex);
+      else if (k) matches = Boolean((r as any).events?.[k]);
+
+      return {
+        ...r,
+        overlayMarker: matches ? sleepVal : null,
+      };
+    });
+  }, [sleepSeries, sleepOverlayKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sleepExplorer:overlay', sleepOverlayKey);
+    } catch {
+      // ignore
+    }
+  }, [sleepOverlayKey]);
+
 
   const OTHER_INFLUENCE_KEYS = [
     'travel',
@@ -565,9 +600,22 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
   };
 
-  const sleepOtherOptions = useMemo(() => {
-    return OTHER_INFLUENCE_KEYS.filter((k) => sleepSeries.some((r) => Boolean((r as any).events?.[k])));
-  }, [sleepSeries]);
+  // Overlay options: only show influences the user has enabled.
+  // (We still allow "None" so the chart can be completely clean.)
+  const enabledInfluenceKeys = useMemo(() => {
+    const keys = Array.isArray(userData.enabledInfluences) ? (userData.enabledInfluences as string[]) : [];
+    // Keep order stable and predictable (workout + intimacy first).
+    const preferred = ['exercise', 'sex'];
+    const rest = keys.filter((k) => !preferred.includes(k));
+    const merged = [...preferred.filter((k) => keys.includes(k)), ...rest];
+    return Array.from(new Set(merged));
+  }, [userData.enabledInfluences]);
+
+  const influenceLabel = (k: string) => {
+    if (k === 'exercise') return 'Workout';
+    if (k === 'sex') return 'Intimacy';
+    return otherInfluenceLabel(k);
+  };
 
   const sleepExtrasCount = useMemo(() => sleepSeries.filter((r) => r.extras).length, [sleepSeries]);
 
@@ -1465,7 +1513,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   };
 
 return (
-    <div className="eb-container space-y-6 pt-8 pb-12 overflow-x-hidden">
+    <div className="eb-container space-y-6 pt-8 pb-12">
       {/* Header */}
       <div className="pt-2">
         <h1 className="mb-1">Insights &amp; Patterns</h1>
@@ -1891,7 +1939,7 @@ return (
 
           <div className="mt-4 h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+              <ComposedChart data={sleepExplorerSeries} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
                 <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
@@ -1912,34 +1960,21 @@ return (
               </DialogHeader>
 
               <div className="mt-4 eb-inset rounded-2xl p-4">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className={sleepShowExercise ? 'eb-btn eb-btn-primary !py-2 !px-3 text-sm' : 'eb-btn eb-btn-secondary !py-2 !px-3 text-sm'}
-                    onClick={() => setSleepShowExercise((v) => !v)}
-                  >
-                    <Activity className="w-4 h-4" /> Workout
-                  </button>
-                  <button
-                    type="button"
-                    className={sleepShowSex ? 'eb-btn eb-btn-primary !py-2 !px-3 text-sm' : 'eb-btn eb-btn-secondary !py-2 !px-3 text-sm'}
-                    onClick={() => setSleepShowSex((v) => !v)}
-                  >
-                    <Heart className="w-4 h-4" /> Intimacy
-                  </button>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="text-sm font-medium">Influence overlay</div>
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 opacity-70" />
                     <select
-                      className="eb-input !w-auto !py-2 text-sm"
-                      value={sleepOtherKey}
-                      onChange={(e) => setSleepOtherKey(e.target.value)}
-                      aria-label="Choose an influence marker"
+                      className="eb-input !w-auto !py-2 !px-4 text-sm !rounded-full"
+                      value={sleepOverlayKey}
+                      onChange={(e) => setSleepOverlayKey(e.target.value)}
+                      aria-label="Influence overlay"
                       title="Choose one influence to show as markers"
                     >
-                      <option value="">Other influence: none</option>
-                      {sleepOtherOptions.map((k) => (
+                      <option value="">None</option>
+                      {enabledInfluenceKeys.map((k) => (
                         <option key={k} value={k}>
-                          {otherInfluenceLabel(k)}
+                          {influenceLabel(k)}
                         </option>
                       ))}
                     </select>
@@ -1948,27 +1983,21 @@ return (
 
                 <div className="mt-4 h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+                    <ComposedChart data={sleepExplorerSeries} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
                       <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
                       <Tooltip />
                       <Line type="monotone" dataKey="sleep" dot={false} stroke="rgb(var(--color-primary))" strokeWidth={2} />
 
-                      {sleepShowExercise ? (
-                        <Scatter data={sleepSeries.filter((r) => r.exercise)} dataKey="sleep" fill="rgb(var(--color-primary-dark))" />
-                      ) : null}
-                      {sleepShowSex ? (
-                        <Scatter data={sleepSeries.filter((r) => r.sex)} dataKey="sleep" fill="rgb(var(--color-accent))" />
-                      ) : null}
-                      {sleepOtherKey ? (
+                      {sleepOverlayKey ? (
                         <Scatter
-                          data={sleepSeries.filter((r) => Boolean((r as any).events?.[sleepOtherKey]))}
-                          dataKey="sleep"
-                          fill="rgba(0,0,0,0.35)"
+                          dataKey="overlayMarker"
+                          name={influenceLabel(sleepOverlayKey)}
+                          fill="rgb(var(--color-text))"
                         />
                       ) : null}
-                    </ComposedChart>
+</ComposedChart>
                   </ResponsiveContainer>
                 </div>
 

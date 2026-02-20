@@ -602,7 +602,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             );
           })()}
 
-          <div className="mt-3 flex justify-center">
+          <div className="mt-3 flex justify-end">
             <div className="text-xs text-neutral-600 flex items-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--color-primary-dark))]" />
               You’re here
