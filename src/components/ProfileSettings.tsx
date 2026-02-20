@@ -368,8 +368,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
   ];
 
   return view === 'personal' ? (
-<div className="eb-page">
-        <div className="eb-page-inner">
+<div className="eb-page overflow-x-hidden">
+        <div className="mx-auto w-full max-w-4xl px-4 space-y-6 pb-28">
           <div className="mb-6 flex items-center gap-3">
             <button
               type="button"
@@ -496,8 +496,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
         </div>
       </div>
   ) : (
-<div className="eb-page">
-      <div className="eb-page-inner">
+<div className="eb-page overflow-x-hidden">
+      <div className="mx-auto w-full max-w-4xl px-4 space-y-6 pb-28">
         <div className="mb-8">
           <h1 className="mb-2">Profile & Settings</h1>
           <p className="text-[rgb(var(--color-text-secondary))]">Make it personal</p>
@@ -543,7 +543,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               <p className="text-xl font-medium text-white">{daysTracked}</p>
             </div>
             <div>
-              <p className="text-xs text-white/80 mb-1">Current streak</p>
+              <p className="text-xs text-white/80 mb-1">Check-ins</p>
               <p className="text-xl font-medium text-white">{streak}</p>
             </div>
             <div>
@@ -650,7 +650,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
         
 {/* What to track */}
-	        <div className="mb-6 rounded-3xl border border-[rgb(var(--color-accent)/0.18)] bg-[rgb(var(--color-accent)/0.10)] p-3 sm:p-4">
+	        <div className="mb-6 rounded-3xl border border-[rgb(var(--color-accent)/0.22)] bg-[rgb(var(--color-accent)/0.10)] p-3 sm:p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="min-w-0">
               <h3 className="mb-1">What you track</h3>

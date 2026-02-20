@@ -1537,7 +1537,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             Days logged • {entriesSorted.length}
           </span>
           <span className="eb-pill">
-            Streak • {streak}
+            Check-ins • {streak}
           </span>
           <span className="eb-pill">
             View • {TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? timeframe}

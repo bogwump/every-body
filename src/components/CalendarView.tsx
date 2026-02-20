@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight } from 'lucide-react';
+import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, Frown } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries } from '../lib/appStore';
@@ -139,6 +139,15 @@ function moodLabel(m?: number): string | null {
   if (m === 3) return 'Good';
   return null;
 }
+
+
+function MoodIcon({ mood, className, size = 20 }: { mood?: number; className?: string; size?: number }) {
+  if (mood === 1) return <Frown className={className} width={size} height={size} aria-hidden="true" />;
+  if (mood === 2) return <Meh className={className} width={size} height={size} aria-hidden="true" />;
+  if (mood === 3) return <Smile className={className} width={size} height={size} aria-hidden="true" />;
+  return null;
+}
+
 
 function getCycleStarts(entriesSorted: CheckInEntry[]): string[] {
   const starts: string[] = [];
@@ -428,7 +437,8 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
     const e = byISO.get(summaryISO);
     const influences = influencesFromEntry(e);
     const note = typeof (e as any)?.notes === 'string' ? String((e as any).notes).trim() : '';
-    const mood = moodLabel((e as any)?.mood);
+    const moodNum = (e as any)?.mood as number | undefined;
+    const mood = moodLabel(moodNum);
 
     const sd = (e as any)?.sleepDetails as any;
     const hasSleepDetails = !!(
@@ -470,19 +480,31 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
         />
         <div className="relative w-full max-w-md eb-card p-5">
           <div className="mb-4">
-            <div className="text-xl font-semibold">Day summary</div>
+            <div className="flex items-center gap-2 text-xl font-semibold">
+              {moodNum ? (
+                <span aria-label={mood ? `Mood: ${mood}` : 'Mood'} title={mood ? `Mood: ${mood}` : 'Mood'}>
+                  <MoodIcon mood={moodNum} className="text-[rgb(var(--color-accent))] opacity-80" size={20} />
+                </span>
+              ) : null}
+              <span>Day summary</span>
+            </div>
             <div className="text-sm text-[rgb(var(--color-text-secondary))]">
               {prettyDate(new Date(`${summaryISO}T00:00:00`))}
             </div>
+            {mood ? (
+              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Mood: {mood}</div>
+            ) : null}
           </div>
 
           {(() => {
-            const pills = [mood, ...influences].filter(Boolean) as string[];
-            return pills.length ? (
+            const items: Array<{ key: string; text: string; title?: string }> = [];
+            for (const inf of influences) items.push({ key: `inf:${inf}`, text: inf });
+
+            return items.length ? (
               <div className="mb-4 flex flex-wrap gap-2">
-                {pills.map((p) => (
-                  <span key={p} className="eb-pill">
-                    {p}
+                {items.map((p) => (
+                  <span key={p.key} className="eb-pill" title={p.title} aria-label={p.title ?? p.text}>
+                    {p.text}
                   </span>
                 ))}
               </div>

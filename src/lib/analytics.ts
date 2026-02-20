@@ -76,29 +76,57 @@ export function getSeries(
 export function calculateStreak(entries: CheckInEntry[] | unknown): number {
   const safe = asArray<CheckInEntry>(entries);
 
-  const set = new Set(
-    safe
-      .map((e) => String(e?.dateISO ?? ""))
-      .filter((d) => d.length === 10) // crude but effective YYYY-MM-DD check
-  );
+  // NOTE: In this app, we treat "streak" as a gentle *habit count* (how many
+  // days the user has checked in), not a consecutive-days counter.
+  // This avoids users feeling penalised if they miss a day.
+  const hasAnyMeaningfulData = (e: any): boolean => {
+    if (!e) return false;
+    // Mood is stored top-level in entries.
+    if (typeof e.mood === 'number' && Number.isFinite(e.mood)) return true;
 
-  let streak = 0;
-  const d = new Date();
+    // Numeric symptom values.
+    const v = e.values as Record<string, any> | undefined;
+    if (v && typeof v === 'object') {
+      for (const val of Object.values(v)) {
+        if (typeof val === 'number' && Number.isFinite(val)) return true;
+      }
+    }
 
-  // UX: If the user hasn't checked in yet today, the "current streak" should
-  // still show the streak up to *yesterday* (rather than dropping to 0).
-  // Start counting from today if present, otherwise from yesterday.
-  const todayISO = isoFromDateLocal(d);
-  if (!set.has(todayISO)) d.setDate(d.getDate() - 1);
+    // Influences/events.
+    const ev = e.events as Record<string, any> | undefined;
+    if (ev && typeof ev === 'object') {
+      for (const val of Object.values(ev)) {
+        if (val) return true;
+      }
+    }
 
-  while (true) {
-    const iso = isoFromDateLocal(d);
-    if (!set.has(iso)) break;
-    streak += 1;
-    d.setDate(d.getDate() - 1);
+    // Notes.
+    if (typeof e.notes === 'string' && e.notes.trim().length > 0) return true;
+
+    // Sleep details.
+    const sd = e.sleepDetails as any;
+    if (sd && typeof sd === 'object') {
+      if (typeof sd.timesWoke === 'number' && sd.timesWoke > 0) return true;
+      if (typeof sd.troubleFallingAsleep === 'number' && sd.troubleFallingAsleep > 0) return true;
+      if (Boolean(sd.wokeTooEarly)) return true;
+      if (Boolean(sd.nightSweats)) return true;
+    }
+
+    // Cycle override (manual "new cycle started") still counts as a check-in day.
+    if (Boolean(e.cycleStartOverride)) return true;
+
+    return false;
+  };
+
+  const set = new Set<string>();
+  for (const e of safe) {
+    const iso = String((e as any)?.dateISO ?? '');
+    if (iso.length !== 10) continue; // crude but effective YYYY-MM-DD check
+    if (!hasAnyMeaningfulData(e)) continue;
+    set.add(iso);
   }
 
-  return streak;
+  return set.size;
 }
 
 export function labelCorrelation(r: number): string {
