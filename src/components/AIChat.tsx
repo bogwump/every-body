@@ -334,6 +334,40 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
     };
   }, []);
 
+  // iOS Safari: keep the chat shell sized to the *visual* viewport (keyboard-safe).
+  // This prevents the composer being pushed under the on-screen keyboard.
+  useEffect(() => {
+    const vv = window.visualViewport;
+
+    const setVars = () => {
+      const height = vv?.height ?? window.innerHeight;
+      const offsetTop = vv?.offsetTop ?? 0;
+      const kb = vv ? Math.max(0, window.innerHeight - vv.height - offsetTop) : 0;
+
+      document.documentElement.style.setProperty('--eb-vvh', `${Math.round(height)}px`);
+      document.documentElement.style.setProperty('--eb-kb', `${Math.round(kb)}px`);
+    };
+
+    setVars();
+    vv?.addEventListener('resize', setVars);
+    vv?.addEventListener('scroll', setVars);
+    window.addEventListener('resize', setVars);
+
+    return () => {
+      vv?.removeEventListener('resize', setVars);
+      vv?.removeEventListener('scroll', setVars);
+      window.removeEventListener('resize', setVars);
+
+      // Clean up so other pages aren't affected
+      try {
+        document.documentElement.style.removeProperty('--eb-vvh');
+        document.documentElement.style.removeProperty('--eb-kb');
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (messages.length === 0) {
       addMessage({ sender: 'ai', text: opening, timestampISO: new Date().toISOString() });
@@ -527,8 +561,7 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   };
 
   return (
-    // iOS Safari + bottom nav: reserve space so the composer is never clipped behind the fixed nav.
-    <div className="bg-[rgb(var(--color-background))] h-[100svh] overflow-hidden pb-[calc(env(safe-area-inset-bottom)+5.25rem)] md:pb-0">
+    <div className="bg-[rgb(var(--color-background))] h-[var(--eb-vvh,100svh)] overflow-hidden">
       <div className="h-full flex flex-col px-3 sm:px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-6">
         <div className="mx-auto w-full max-w-4xl flex flex-col flex-1 min-h-0">
           <div className="eb-card p-0 overflow-hidden flex flex-col flex-1 min-h-0">
@@ -551,7 +584,7 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
             <div
               ref={scrollAreaRef}
               onScroll={handleScroll}
-              className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))] pb-[calc(env(safe-area-inset-bottom)+5.25rem+9rem)] md:pb-6"
             >
               <div className="space-y-4">
                 {messages.map((message) => (
@@ -639,8 +672,8 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
               </div>
             </div>
 
-            {/* Input */}
-            <div className="bg-white border-t border-neutral-200 px-4 sm:px-6 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] flex-shrink-0">
+            {/* Desktop composer lives in-flow */}
+            <div className="hidden md:block bg-white border-t border-neutral-200 px-4 sm:px-6 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] flex-shrink-0">
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -665,6 +698,40 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
                 Guidance is informational only. For medical advice, speak to a healthcare professional.
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile composer is fixed and lifted above the iOS keyboard */}
+      <div
+        className="md:hidden fixed left-0 right-0 z-50 px-3 sm:px-4"
+        style={{ bottom: 'calc(var(--eb-kb, 0px) + env(safe-area-inset-bottom) + 5.25rem)' }}
+      >
+        <div className="mx-auto w-full max-w-4xl">
+          <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask me anything about your symptoms..."
+                className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary))] focus:border-transparent"
+              />
+              <button
+                onClick={() => handleSendMessage()}
+                disabled={!inputText.trim()}
+                className="px-5 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center"
+                type="button"
+                aria-label="Send"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-center mt-3 text-[rgb(var(--color-text-secondary))]">
+              Guidance is informational only. For medical advice, speak to a healthcare professional.
+            </p>
           </div>
         </div>
       </div>
