@@ -2306,7 +2306,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         <EBDialogContent
           title={experimentPlan?.title ?? 'Experiment'}
           description="Set up a tiny experiment and keep logging a few metrics so you can spot what changes."
-          className="w-[92vw] max-w-[420px] sm:max-w-lg rounded-2xl"
+          className="w-[88vw] max-w-[380px] sm:max-w-lg rounded-2xl max-h-[90vh] overflow-hidden flex flex-col"
         >
           <DialogHeader>
             <DialogTitle>{experimentPlan?.title ?? 'Experiment'}</DialogTitle>
@@ -2314,7 +2314,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
               Set up a tiny experiment and keep logging a few metrics so you can spot what changes.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[72vh] overflow-y-auto pr-1 space-y-3 pb-4">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 pb-4">
             <div className="text-sm eb-muted">
               Tiny, realistic actions. You are testing what helps your body, not trying to "fix everything".
             </div>
@@ -2444,7 +2444,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
           </div>
 
-          <div className="pt-3 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+          <div className="pt-3 shrink-0 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
             <button
               type="button"
               className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
