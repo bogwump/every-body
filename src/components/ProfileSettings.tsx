@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, looksLikeInsightsExport, importBackupFile } from '../lib/backup';
 import type { ColorTheme, SymptomKey, SymptomKind, UserData, InfluenceKey } from '../types';
+import { DEFAULT_USER } from '../lib/defaultUser';
 import { kindLabel } from '../lib/symptomMeta';
 import { downloadTextFile } from '../lib/storage';
 import {
@@ -30,7 +31,7 @@ import {
   cloudSignOut,
   cloudStatus,
 } from '../lib/cloudSync';
-import { useEntries } from '../lib/appStore';
+import { useEntries, useChat, useExperiment } from '../lib/appStore';
 import { calculateStreak } from '../lib/analytics';
 
 import appLogo from '../assets/everybody-logo-256.png';
@@ -218,6 +219,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showLogoutPanel, setShowLogoutPanel] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState<null | 'logs' | 'all'>(null);
 
   // Simple feedback form (Help centre)
   const [feedbackSubject, setFeedbackSubject] = useState('');
@@ -271,7 +273,9 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
     setView('main');
   };
 
-  const { entries } = useEntries();
+  const { entries, clearEntries } = useEntries();
+  const { clearChat } = useChat();
+  const { clearExperiment } = useExperiment();
   const daysTracked = entries.length;
   const streak = calculateStreak(entries);
 
@@ -341,6 +345,28 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
         ].join(',');
       });
     downloadTextFile('everybody-data.csv', [header.join(','), ...rows].join('\n'), 'text/csv');
+  };
+
+  const resetLogsOnly = () => {
+    clearEntries();
+    clearChat();
+    clearExperiment();
+    setResetConfirm(null);
+  };
+
+  const resetEverything = () => {
+    clearEntries();
+    clearChat();
+    clearExperiment();
+    onUpdateUserData(DEFAULT_USER);
+    // Close any open panels so the user sees a clean slate straight away.
+    setShowThemeSelector(false);
+    setShowPrivacyPanel(false);
+    setShowNotificationsPanel(false);
+    setShowHelpPanel(false);
+    setShowLogoutPanel(false);
+    setView('main');
+    setResetConfirm(null);
   };
 
   const settingsSections = [
@@ -1265,7 +1291,82 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               <p className="mt-2 text-sm opacity-80">
                                 <strong>Backups</strong> restore your full app data (check-ins, settings and anything else stored on this device).
                                 Insights exports are separate and can’t be restored here.
-                              </p>
+                              
+                              <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                                <p className="font-medium mb-1">Reset app data</p>
+                                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                                  Useful if you want to start fresh on this device. Resetting can’t be undone.
+                                </p>
+
+                                <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setResetConfirm('logs')}
+                                    className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                                  >
+                                    Reset logs only
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setResetConfirm('all')}
+                                    className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                                  >
+                                    Reset everything
+                                  </button>
+                                </div>
+
+                                {resetConfirm === 'logs' ? (
+                                  <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                                    <p className="text-sm font-medium mb-1">Confirm reset logs</p>
+                                    <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                                      This will delete your check-ins, experiments and Eve chat from this device, but keep your settings.
+                                    </p>
+                                    <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setResetConfirm(null)}
+                                        className="eb-btn eb-btn-secondary"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={resetLogsOnly}
+                                        className="eb-btn eb-btn-primary"
+                                      >
+                                        Yes, reset logs
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : null}
+
+                                {resetConfirm === 'all' ? (
+                                  <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                                    <p className="text-sm font-medium mb-1">Confirm reset everything</p>
+                                    <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                                      This will delete your check-ins, experiments, Eve chat and settings from this device and take you back to day 1.
+                                    </p>
+                                    <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setResetConfirm(null)}
+                                        className="eb-btn eb-btn-secondary"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={resetEverything}
+                                        className="eb-btn eb-btn-primary"
+                                      >
+                                        Yes, reset everything
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </div>
+
+</p>
 
                               <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
                                 <div className="min-w-0">
@@ -1299,9 +1400,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                           <div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
                             <p className="text-sm font-medium mb-1">Coming soon</p>
                             <ul className="text-sm text-[rgb(var(--color-text-secondary))] list-disc pl-5 space-y-1">
-                              <li>Passcode / Face ID lock</li>
-                                                            <li>Delete my data (with confirmation)</li>
-                            </ul>
+                              <li>Passcode / Face ID lock</li>                            </ul>
                           </div>
                         </div>
                       </div>

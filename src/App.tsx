@@ -10,37 +10,9 @@ import { CalendarView } from './components/CalendarView';
 import { Navigation } from './components/Navigation';
 
 import type { UserData } from './types';
+import { DEFAULT_USER } from './lib/defaultUser';
 import { APP_NAME, useUser, initSelfHealingStorage} from './lib/appStore';
 
-const DEFAULT_USER: UserData = {
-  name: '',
-  goal: null,
-  colorTheme: 'sage',
-  onboardingComplete: false,
-  cycleTrackingMode: 'cycle',
-    showCycleBubble: true,
-  useMockEve: true,
-  eveLowCostMode: true,
-  fertilityMode: false,
-  autoStartPeriodFromBleeding: false,
-  ovulationOverrideISOs: [],
-  customSymptoms: [],
-  enabledModules: [
-    // Keep the app light on day 1. Users can turn on more in Profile.
-    'energy',
-    'sleep',
-    'stress',
-    'focus',
-    'bloating',
-    'flow',
-  ],
-  enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol'],
-  sleepDetailsEnabled: false,
-  // Sleep is enabled by default, so keep the Sleep section in Insights on by default too.
-  sleepInsightsEnabled: true,
-  fitbitEnabled: false,
-  onboardingPresetApplied: false,
-};
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
