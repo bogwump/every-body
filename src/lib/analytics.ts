@@ -85,6 +85,12 @@ export function calculateStreak(entries: CheckInEntry[] | unknown): number {
   let streak = 0;
   const d = new Date();
 
+  // UX: If the user hasn't checked in yet today, the "current streak" should
+  // still show the streak up to *yesterday* (rather than dropping to 0).
+  // Start counting from today if present, otherwise from yesterday.
+  const todayISO = isoFromDateLocal(d);
+  if (!set.has(todayISO)) d.setDate(d.getDate() - 1);
+
   while (true) {
     const iso = isoFromDateLocal(d);
     if (!set.has(iso)) break;

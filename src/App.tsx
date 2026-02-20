@@ -36,7 +36,8 @@ const DEFAULT_USER: UserData = {
   ],
   enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol'],
   sleepDetailsEnabled: false,
-  sleepInsightsEnabled: false,
+  // Sleep is enabled by default, so keep the Sleep section in Insights on by default too.
+  sleepInsightsEnabled: true,
   fitbitEnabled: false,
   onboardingPresetApplied: false,
 };
@@ -127,7 +128,8 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
           cycleTrackingMode: 'cycle',
           showCycleBubble: true,
           fertilityMode: true,
-           sleepDetailsEnabled: false,
+          sleepDetailsEnabled: false,
+          sleepInsightsEnabled: true,
           enabledModules: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'cramps', 'flow'],
           enabledInfluences: ['sex', 'exercise', 'stressfulDay', 'lateNight', 'alcohol'],
         },
@@ -135,7 +137,8 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
           cycleTrackingMode: 'cycle',
           showCycleBubble: true,
           fertilityMode: false,
-           sleepDetailsEnabled: true,
+          sleepDetailsEnabled: true,
+          sleepInsightsEnabled: true,
           enabledModules: ['energy', 'sleep', 'stress', 'brainFog', 'hotFlushes', 'nightSweats', 'hairShedding', 'facialSpots'],
           enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol', 'caffeine', 'medication'],
         },
@@ -143,7 +146,8 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
           cycleTrackingMode: 'cycle',
           showCycleBubble: true,
           fertilityMode: true,
-           sleepDetailsEnabled: false,
+          sleepDetailsEnabled: false,
+          sleepInsightsEnabled: true,
           enabledModules: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'flow'],
           enabledInfluences: ['sex', 'stressfulDay', 'lateNight', 'alcohol'],
         },
@@ -151,7 +155,8 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
           cycleTrackingMode: 'no-cycle',
           showCycleBubble: false,
           fertilityMode: false,
-           sleepDetailsEnabled: false,
+          sleepDetailsEnabled: false,
+          sleepInsightsEnabled: true,
           enabledModules: ['energy', 'sleep', 'stress', 'focus', 'digestion', 'appetite'],
           enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol', 'exercise', 'caffeine'],
         },
@@ -174,6 +179,19 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
     // Do-first: drop them straight into the check-in
     setCurrentScreen('check-in');
   };
+
+  // Existing users upgrading: if Sleep tracking is on, keep Sleep insights on by default.
+  // (Guarded so it only runs when needed.)
+  useEffect(() => {
+    const sleepOn = (userData.enabledModules ?? []).includes('sleep');
+    if (sleepOn && !userData.sleepInsightsEnabled) {
+      setUserData((prev) => {
+        const stillSleepOn = (prev.enabledModules ?? []).includes('sleep');
+        if (!stillSleepOn || prev.sleepInsightsEnabled) return prev;
+        return { ...prev, sleepInsightsEnabled: true };
+      });
+    }
+  }, [userData.enabledModules, userData.sleepInsightsEnabled, setUserData]);
 
   const main = useMemo(() => {
     if (!userData.onboardingComplete || forceOnboarding) {

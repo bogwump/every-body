@@ -589,12 +589,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                   const here =
                     "border-[rgb(var(--color-primary-dark)/0.40)] bg-[rgb(var(--color-primary-dark)/0.18)] font-medium text-neutral-900";
                   return (
-                    <div key={s.key} className={`${base} ${isHere ? here : ""}`}>
-                      {s.label}
-                      <br />
-                      <span className={`text-[11px] ${isHere ? "text-neutral-700 font-normal" : "text-neutral-600"}`}>
+                    <div
+                      key={s.key}
+                      className={`${base} ${isHere ? here : ""} flex flex-col items-center justify-center text-center`}
+                    >
+                      <div className="leading-tight">{s.label}</div>
+                      <div className={`text-[11px] leading-tight ${isHere ? "text-neutral-700 font-normal" : "text-neutral-600"}`}>
                         {s.sci}
-                      </span>
+                      </div>
                     </div>
                   );
                 })}
@@ -602,7 +604,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             );
           })()}
 
-          <div className="mt-3 flex justify-center">
+          <div className="mt-3 flex justify-end">
             <div className="text-xs text-neutral-600 flex items-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--color-primary-dark))]" />
               You’re here

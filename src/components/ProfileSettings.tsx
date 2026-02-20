@@ -650,7 +650,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
         
 {/* What to track */}
-                <div className="eb-card mb-6">
+	        <div className="mb-6 rounded-3xl border border-[rgb(var(--color-accent)/0.18)] bg-[rgb(var(--color-accent)/0.10)] p-4">
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="min-w-0">
               <h3 className="mb-1">What you track</h3>
@@ -664,7 +664,9 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             </div>
           </div>
 
-          <details className="mt-4 rounded-2xl border border-neutral-200 overflow-hidden group">
+	          {/* Keep interactive content white, sitting inside the tinted panel */}
+	          <div className="mt-4 rounded-3xl border border-neutral-200 bg-white p-4">
+	          <details className="rounded-2xl border border-neutral-200 overflow-hidden group">
             <summary className="list-none cursor-pointer select-none p-4 flex items-center justify-between hover:bg-neutral-50">
               <span className="font-medium">Customise symptoms</span>
               <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
@@ -715,7 +717,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
 
               {/* Custom symptoms */}
-              <div className="mt-4 mb-5 rounded-2xl border border-neutral-200 bg-white/60 p-4">
+	              <div className="mt-4 mb-5 rounded-2xl border border-neutral-200 bg-white p-4">
                 <p className="font-medium mb-1">Add your own symptom</p>
                 <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
                   Freeform labels like “Jaw pain”, “Sugar cravings”, “Tinnitus”. You can turn them on and off any time.
@@ -879,10 +881,24 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    onUpdateUserData((prev) => ({
-                                      ...prev,
-                                      enabledModules: toggleInList(prev.enabledModules, m.key),
-                                    }))
+                                    onUpdateUserData((prev) => {
+                                      const currentlyOn = prev.enabledModules.includes(m.key);
+                                      const nextEnabledModules = toggleInList(prev.enabledModules, m.key);
+
+                                      // Sleep insights auto-on when Sleep tracking is on.
+                                      if (m.key === 'sleep') {
+                                        return {
+                                          ...prev,
+                                          enabledModules: nextEnabledModules,
+                                          sleepInsightsEnabled: currentlyOn ? false : true,
+                                        };
+                                      }
+
+                                      return {
+                                        ...prev,
+                                        enabledModules: nextEnabledModules,
+                                      };
+                                    })
                                   }
                                   className={`shrink-0 w-12 h-6 rounded-full transition-all ${enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
                                   aria-label={enabled ? `Disable ${m.label}` : `Enable ${m.label}`}
@@ -1060,8 +1076,9 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                 )}
               </div>
             </div>
-          </details>
-        </div>
+	          </details>
+	          </div>
+	        </div>
 
 <div className="eb-card mb-6">
           <h3 className="mb-4">Notifications</h3>

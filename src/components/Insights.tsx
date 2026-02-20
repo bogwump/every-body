@@ -507,6 +507,26 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const sleepInsightsOn = Boolean(userData.sleepInsightsEnabled);
 
+  // Recharts + iOS Safari can be flaky when SVG attributes rely on CSS var functions.
+  // Use computed RGB strings so the line always renders in modals/portals.
+  const chartColors = useMemo(() => {
+    const safe = (v: string) => v.trim().replace(/\s+/g, ' ');
+    try {
+      const cs = getComputedStyle(document.documentElement);
+      const primary = safe(cs.getPropertyValue('--color-primary'));
+      const primaryDark = safe(cs.getPropertyValue('--color-primary-dark'));
+      return {
+        primary: primary ? `rgb(${primary})` : 'rgb(120, 140, 135)',
+        primaryDark: primaryDark ? `rgb(${primaryDark})` : 'rgb(80, 95, 90)',
+      };
+    } catch {
+      return {
+        primary: 'rgb(120, 140, 135)',
+        primaryDark: 'rgb(80, 95, 90)',
+      };
+    }
+  }, [userData.colorTheme]);
+
   useEffect(() => {
     try {
       localStorage.setItem('eb_sleep_overlay', sleepOverlayKey);
@@ -592,14 +612,24 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const sleepOverlayLabel = useMemo(() => (sleepOverlayKey ? otherInfluenceLabel(sleepOverlayKey) : ''), [sleepOverlayKey]);
 
-  const sleepOverlayPoints = useMemo(() => {
-    if (!sleepOverlayKey) return [] as Array<any>;
-    return sleepSeries
-      .filter((r) => typeof r.sleep === 'number' && Boolean((r as any).events?.[sleepOverlayKey]))
-      .map((r) => ({
+  // Important: the sleep line should always be based on the full sleepSeries.
+  // The overlay is only a marker layer, not a filter.
+  const sleepSeriesWithOverlay = useMemo(() => {
+    // NOTE: On iOS Safari, giving <Scatter> its own `data` prop can cause the
+    // X domain to collapse to just the scatter points. To guarantee the sleep
+    // line always spans the full period, we keep ONE dataset for the chart and
+    // add an `overlayMarker` value only on matching days.
+    if (!sleepOverlayKey) {
+      return (sleepSeries as any[]).map((r) => ({ ...r, overlay: undefined, overlayMarker: null }));
+    }
+    return sleepSeries.map((r) => {
+      const has = Boolean((r as any).events?.[sleepOverlayKey]);
+      return {
         ...r,
-        overlay: sleepOverlayLabel,
-      }));
+        overlay: has ? sleepOverlayLabel : undefined,
+        overlayMarker: has && typeof (r as any).sleep === 'number' ? (r as any).sleep : null,
+      };
+    });
   }, [sleepSeries, sleepOverlayKey, sleepOverlayLabel]);
 
   const sleepGentleHint = useMemo(() => {
@@ -1927,7 +1957,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                 <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
                 <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
                 <Tooltip />
-                <Line type="monotone" dataKey="sleep" dot={false} stroke="rgb(var(--color-primary))" strokeWidth={2} />
+                <Line type="monotone" dataKey="sleep" dot={false} stroke={chartColors.primary} strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -1962,7 +1992,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
                 <div className="mt-4 h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
+                    <ComposedChart data={sleepSeriesWithOverlay} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
                       <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
@@ -1981,10 +2011,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                           );
                         }}
                       />
-                      <Line type="monotone" dataKey="sleep" dot={false} stroke="rgb(var(--color-primary))" strokeWidth={2} />
+                      <Line type="monotone" dataKey="sleep" dot={false} stroke={chartColors.primary} strokeWidth={2} />
 
                       {sleepOverlayKey ? (
-                        <Scatter data={sleepOverlayPoints} dataKey="sleep" fill="rgb(var(--color-primary-dark))" />
+                        <Scatter dataKey="overlayMarker" fill={chartColors.primaryDark} />
                       ) : null}
                     </ComposedChart>
                   </ResponsiveContainer>
