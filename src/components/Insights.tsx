@@ -26,6 +26,7 @@ import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, 
 import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
+import { isMetricInScope } from '../lib/insightsScope';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
@@ -237,7 +238,9 @@ function insightQualityScore(args: {
 }
 
 
-function getMetricValue(entry: CheckInEntry, key: MetricKey): number | undefined {
+function getMetricValue(entry: CheckInEntry, key: MetricKey, userData: UserData): number | undefined {
+  // Respect Insights scoping (goal pivots + retired metrics).
+  if (!isMetricInScope(userData, String(key), String(entry.dateISO))) return undefined;
   if (key === 'mood') return moodTo10(entry.mood);
   if (typeof key === 'string' && key.startsWith('custom:')) {
     const id = key.slice('custom:'.length);
@@ -537,7 +540,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const sleepSeries = useMemo(() => {
     return entriesSorted.map((e) => {
-      const sleep10 = getMetricValue(e, 'sleep');
+      const sleep10 = getMetricValue(e, 'sleep', userData);
       const sd = (e as any)?.sleepDetails;
       const hasExtras = !!(
         sd &&
@@ -764,7 +767,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     entriesSorted.forEach((e) => {
       const row: Record<string, any> = { dateISO: e.dateISO, dateLabel: fmtDateShort(e.dateISO) };
       selected.forEach((k) => {
-        row[String(k)] = getMetricValue(e, k);
+        row[String(k)] = getMetricValue(e, k, userData);
       });
       out.push(row);
     });
@@ -795,7 +798,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const high = { name: '7-10', value: 0 };
 
     entriesSorted.forEach((e) => {
-      const v = getMetricValue(e, distributionMetric);
+      const v = getMetricValue(e, distributionMetric, userData);
       if (typeof v !== 'number') return;
       if (v <= 3) low.value += 1;
       else if (v <= 6) mid.value += 1;
@@ -810,7 +813,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const items = selected.map((k) => {
       let count = 0;
       entriesSorted.forEach((e) => {
-        const v = getMetricValue(e, k);
+        const v = getMetricValue(e, k, userData);
         if (typeof v === 'number' && v >= 7) count += 1;
       });
       return { key: k, count };
@@ -832,7 +835,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       .map((k) => {
         const pts: Array<{ x: number; y: number }> = [];
         entriesSorted.forEach((e, idx) => {
-          const v = getMetricValue(e, k);
+          const v = getMetricValue(e, k, userData);
           if (v != null) pts.push({ x: idx, y: v });
         });
         const s = slope(pts);
@@ -858,8 +861,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       const prev = entriesAllSorted[entriesAllSorted.length - 2];
       const deltas: Array<{ key: SymptomKey | 'mood'; d: number }> = [];
       selected.forEach((k) => {
-        const a = getMetricValue(last, k);
-        const b = getMetricValue(prev, k);
+        const a = getMetricValue(last, k, userData);
+        const b = getMetricValue(prev, k, userData);
         if (a != null && b != null) deltas.push({ key: k, d: a - b });
       });
       deltas.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
@@ -884,8 +887,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         const xs: number[] = [];
         const ys: number[] = [];
         entriesSorted.forEach((e) => {
-          const x = getMetricValue(e, a);
-          const y = getMetricValue(e, b);
+          const x = getMetricValue(e, a, userData);
+          const y = getMetricValue(e, b, userData);
           if (x != null && y != null) {
             xs.push(x);
             ys.push(y);
@@ -1132,8 +1135,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const scatterData = useMemo(() => {
     const out: Array<{ x: number; y: number; z: number; dateLabel: string }> = [];
     entriesSorted.forEach((e) => {
-      const x = getMetricValue(e, scatterX);
-      const y = getMetricValue(e, scatterY);
+      const x = getMetricValue(e, scatterX, userData);
+      const y = getMetricValue(e, scatterY, userData);
       if (x != null && y != null) {
         out.push({ x, y, z: 1, dateLabel: fmtDateShort(e.dateISO) });
       }
@@ -1149,7 +1152,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     entriesSorted.forEach((e) => {
       const dt = new Date(e.dateISO + 'T00:00:00');
       const wd = dt.toLocaleDateString(undefined, { weekday: 'short' });
-      const v = getMetricValue(e, key);
+      const v = getMetricValue(e, key, userData);
       if (v != null) buckets[wd]?.push(v);
     });
     const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -1238,7 +1241,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const avgForMetric = (list: CheckInEntry[], k: PhaseMetric): number | null => {
     const vals = list
-      .map((e) => getMetricValue(e, k))
+      .map((e) => getMetricValue(e, k, userData))
       .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
     if (!vals.length) return null;
     return vals.reduce((a, b) => a + b, 0) / vals.length;

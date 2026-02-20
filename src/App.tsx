@@ -12,6 +12,7 @@ import { Navigation } from './components/Navigation';
 import type { UserData } from './types';
 import { DEFAULT_USER } from './lib/defaultUser';
 import { APP_NAME, useUser, initSelfHealingStorage} from './lib/appStore';
+import { getGoalPreset } from './lib/goalPresets';
 
 
 export default function App() {
@@ -94,47 +95,8 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
       }
 
       // Goal-based defaults (lightweight, sensible starting point).
-      // Note: we never enable BOTH energy + fatigue by default (fatigue can be turned on manually).
-      const presetsByGoal: Record<NonNullable<UserData['goal']>, Partial<UserData>> = {
-        'cycle-health': {
-          cycleTrackingMode: 'cycle',
-          showCycleBubble: true,
-          fertilityMode: true,
-          sleepDetailsEnabled: false,
-          sleepInsightsEnabled: true,
-          enabledModules: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'cramps', 'flow'],
-          enabledInfluences: ['sex', 'exercise', 'stressfulDay', 'lateNight', 'alcohol'],
-        },
-        'perimenopause': {
-          cycleTrackingMode: 'cycle',
-          showCycleBubble: true,
-          fertilityMode: false,
-          sleepDetailsEnabled: true,
-          sleepInsightsEnabled: true,
-          enabledModules: ['energy', 'sleep', 'stress', 'brainFog', 'hotFlushes', 'nightSweats', 'hairShedding', 'facialSpots'],
-          enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol', 'caffeine', 'medication'],
-        },
-        'post-contraception': {
-          cycleTrackingMode: 'cycle',
-          showCycleBubble: true,
-          fertilityMode: true,
-          sleepDetailsEnabled: false,
-          sleepInsightsEnabled: true,
-          enabledModules: ['energy', 'sleep', 'stress', 'focus', 'bloating', 'flow'],
-          enabledInfluences: ['sex', 'stressfulDay', 'lateNight', 'alcohol'],
-        },
-        'wellbeing': {
-          cycleTrackingMode: 'no-cycle',
-          showCycleBubble: false,
-          fertilityMode: false,
-          sleepDetailsEnabled: false,
-          sleepInsightsEnabled: true,
-          enabledModules: ['energy', 'sleep', 'stress', 'focus', 'digestion', 'appetite'],
-          enabledInfluences: ['stressfulDay', 'lateNight', 'alcohol', 'exercise', 'caffeine'],
-        },
-      };
-
-      const preset = presetsByGoal[data.goal];
+      // Used ONLY on first-time onboarding.
+      const preset = getGoalPreset(data.goal) ?? {};
 
       return {
         ...prev,

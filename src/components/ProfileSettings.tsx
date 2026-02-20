@@ -32,7 +32,7 @@ import {
   cloudStatus,
 } from '../lib/cloudSync';
 import { useEntries, useChat, useExperiment } from '../lib/appStore';
-import { calculateStreak } from '../lib/analytics';
+import { calculateStreak, isoToday } from '../lib/analytics';
 
 import appLogo from '../assets/everybody-logo-256.png';
 
@@ -220,6 +220,9 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showLogoutPanel, setShowLogoutPanel] = useState(false);
   const [resetConfirm, setResetConfirm] = useState<null | 'logs' | 'all'>(null);
+
+  // When turning off a symptom, ask whether to retire its past data from Insights.
+  const [retirePrompt, setRetirePrompt] = useState<null | { metricId: string; label: string; kind: 'module' | 'custom'; customId?: string }>(null);
 
   // Simple feedback form (Help centre)
   const [feedbackSubject, setFeedbackSubject] = useState('');
@@ -758,7 +761,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
             <div className="p-3 sm:p-4 pt-0">
               <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
-                Turning a symptom off hides it from your check-in. Your past data stays saved, so Insights can still use it when you turn it back on.
+                Turning a symptom off hides it from your check-in. When you switch something off, we’ll ask if you want to retire its past data from Insights (so it stops shaping your patterns).
               </p>
 
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
@@ -892,14 +895,21 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                // If turning OFF, ask whether to retire past data from Insights.
+                                if (s.enabled) {
+                                  setRetirePrompt({ kind: 'custom', metricId: `custom:${s.id}`, label: s.label, customId: s.id });
+                                  return;
+                                }
+
+                                // Turning ON: just enable.
                                 onUpdateUserData((prev) => ({
                                   ...prev,
                                   customSymptoms: (prev.customSymptoms ?? []).map((x) =>
-                                    x.id === s.id ? { ...x, enabled: !x.enabled } : x
+                                    x.id === s.id ? { ...x, enabled: true } : x
                                   ),
-                                }))
-                              }
+                                }));
+                              }}
                               className={`shrink-0 w-12 h-6 rounded-full transition-all ${s.enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
                               aria-label={s.enabled ? `Disable ${s.label}` : `Enable ${s.label}`}
                             >
@@ -964,7 +974,14 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
                                 <button
                                   type="button"
-                                  onClick={() =>
+                                  onClick={() => {
+                                    // If turning OFF, ask whether to retire past data from Insights.
+                                    if (enabled) {
+                                      setRetirePrompt({ kind: 'module', metricId: m.key, label: m.label });
+                                      return;
+                                    }
+
+                                    // Turning ON: apply immediately.
                                     onUpdateUserData((prev) => {
                                       const currentlyOn = prev.enabledModules.includes(m.key);
                                       const nextEnabledModules = toggleInList(prev.enabledModules, m.key);
@@ -982,8 +999,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                         ...prev,
                                         enabledModules: nextEnabledModules,
                                       };
-                                    })
-                                  }
+                                    });
+                                  }}
                                   className={`shrink-0 w-12 h-6 rounded-full transition-all ${enabled ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
                                   aria-label={enabled ? `Disable ${m.label}` : `Enable ${m.label}`}
                                 >
@@ -1929,6 +1946,97 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             <button type="button" onClick={onPreviewOnboarding} className="w-full eb-btn-primary">
               Preview onboarding
             </button>
+          </div>
+        )}
+
+        {/* Retire symptom data prompt */}
+        {retirePrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Retire symptom data">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setRetirePrompt(null)}
+              aria-label="Close"
+            />
+
+            <div className="relative w-full max-w-lg eb-card p-5">
+              <div className="font-semibold">Turn off {retirePrompt.label}?</div>
+              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
+                Do you want Insights to keep using your past data for this symptom, or retire it so it stops shaping your patterns?
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <button
+                  type="button"
+                  className="w-full eb-btn-secondary"
+                  onClick={() => {
+                    // Keep past data: just disable.
+                    const metricId = retirePrompt.metricId;
+                    onUpdateUserData((prev) => {
+                      if (retirePrompt.kind === 'module') {
+                        const nextEnabledModules = (prev.enabledModules ?? []).filter((k) => k !== metricId);
+                        if (metricId === 'sleep') {
+                          return { ...prev, enabledModules: nextEnabledModules, sleepInsightsEnabled: false };
+                        }
+                        return { ...prev, enabledModules: nextEnabledModules };
+                      }
+                      // custom symptom
+                      const id = retirePrompt.customId;
+                      return {
+                        ...prev,
+                        customSymptoms: (prev.customSymptoms ?? []).map((s) => (s.id === id ? { ...s, enabled: false } : s)),
+                      };
+                    });
+                    setRetirePrompt(null);
+                  }}
+                >
+                  Keep past data
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full eb-btn-primary"
+                  onClick={() => {
+                    // Retire past data: disable + set per-metric cutoff to today.
+                    const metricId = retirePrompt.metricId;
+                    const todayISO = isoToday();
+                    onUpdateUserData((prev) => {
+                      const nextMap = { ...(prev.metricRetiredFromISO ?? {}) };
+                      nextMap[metricId] = todayISO;
+
+                      if (retirePrompt.kind === 'module') {
+                        const nextEnabledModules = (prev.enabledModules ?? []).filter((k) => k !== metricId);
+                        if (metricId === 'sleep') {
+                          return {
+                            ...prev,
+                            enabledModules: nextEnabledModules,
+                            sleepInsightsEnabled: false,
+                            metricRetiredFromISO: nextMap,
+                          };
+                        }
+                        return { ...prev, enabledModules: nextEnabledModules, metricRetiredFromISO: nextMap };
+                      }
+
+                      const id = retirePrompt.customId;
+                      return {
+                        ...prev,
+                        customSymptoms: (prev.customSymptoms ?? []).map((s) => (s.id === id ? { ...s, enabled: false } : s)),
+                        metricRetiredFromISO: nextMap,
+                      };
+                    });
+                    setRetirePrompt(null);
+                  }}
+                >
+                  Retire past data from Insights
+                </button>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button type="button" className="eb-btn-secondary" onClick={() => setRetirePrompt(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
 </div>

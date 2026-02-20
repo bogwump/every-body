@@ -17,6 +17,7 @@ import { computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByD
 import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
 import { importBackupFile, parseBackupJson, looksLikeInsightsExport } from '../lib/backup';
+import { getGoalPreset } from '../lib/goalPresets';
 
 interface DashboardProps {
   userName: string;
@@ -178,6 +179,8 @@ export function Dashboard({
   const goalLabel = prettyGoal(userGoal);
 
   const [showGoalPicker, setShowGoalPicker] = React.useState(false);
+  const [pendingGoal, setPendingGoal] = React.useState<UserGoal | null>(null);
+  const [showGoalChangeModal, setShowGoalChangeModal] = React.useState(false);
 
   const cycleStats = useMemo(() => computeCycleStats(entriesSorted), [entriesSorted]);
 
@@ -526,7 +529,12 @@ export function Dashboard({
                             : 'hover:bg-[rgba(0,0,0,0.04)]'
                         }`}
                         onClick={() => {
-                          onUpdateUserData((prev) => ({ ...prev, goal: g.id }));
+                          if (userData.goal === g.id) {
+                            closeGoalPicker();
+                            return;
+                          }
+                          setPendingGoal(g.id);
+                          setShowGoalChangeModal(true);
                           closeGoalPicker();
                         }}
                       >
@@ -538,6 +546,91 @@ export function Dashboard({
               )}
             </div>
           </div>
+
+          {/* Goal change modal */}
+          {showGoalChangeModal && pendingGoal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Change goal">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/40"
+                onClick={() => {
+                  setShowGoalChangeModal(false);
+                  setPendingGoal(null);
+                }}
+                aria-label="Close"
+              />
+
+              <div className="relative w-full max-w-lg eb-card p-5">
+                <div className="font-semibold">Switch goal?</div>
+                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
+                  You can just change the goal label, or switch to the recommended tracking setup. If you’re pivoting, you can also start fresh for Insights without deleting your history.
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <button
+                    type="button"
+                    className="w-full eb-btn-secondary"
+                    onClick={() => {
+                      onUpdateUserData((prev) => ({ ...prev, goal: pendingGoal }));
+                      setShowGoalChangeModal(false);
+                      setPendingGoal(null);
+                    }}
+                  >
+                    Keep my settings
+                  </button>
+
+                  <button
+                    type="button"
+                    className="w-full eb-btn-secondary"
+                    onClick={() => {
+                      const preset = getGoalPreset(pendingGoal) ?? {};
+                      onUpdateUserData((prev) => ({
+                        ...prev,
+                        goal: pendingGoal,
+                        ...preset,
+                      }));
+                      setShowGoalChangeModal(false);
+                      setPendingGoal(null);
+                    }}
+                  >
+                    Switch to recommended tracking
+                  </button>
+
+                  <button
+                    type="button"
+                    className="w-full eb-btn-primary"
+                    onClick={() => {
+                      const preset = getGoalPreset(pendingGoal) ?? {};
+                      const todayISO = isoToday();
+                      onUpdateUserData((prev) => ({
+                        ...prev,
+                        goal: pendingGoal,
+                        ...preset,
+                        insightsFromISO: todayISO,
+                      }));
+                      setShowGoalChangeModal(false);
+                      setPendingGoal(null);
+                    }}
+                  >
+                    Recommended + start fresh for Insights
+                  </button>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    className="eb-btn-secondary"
+                    onClick={() => {
+                      setShowGoalChangeModal(false);
+                      setPendingGoal(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Restore from backup nudge (only when there is no data yet) */}

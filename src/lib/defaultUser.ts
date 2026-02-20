@@ -32,4 +32,8 @@ export const DEFAULT_USER: UserData = {
   fitbitEnabled: false,
 
   onboardingPresetApplied: false,
+
+  // Insights scoping
+  insightsFromISO: null,
+  metricRetiredFromISO: {},
 };

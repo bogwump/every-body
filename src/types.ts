@@ -121,6 +121,12 @@ export interface UserData {
   /** Optional: user-confirmed ovulation dates (YYYY-MM-DD) to override predicted fertile windows */
   ovulationOverrideISOs?: string[];
 
+  /** Optional: ignore older check-ins for Insights (keeps data saved, but Insights only uses entries on/after this date). */
+  insightsFromISO?: string | null;
+
+  /** Optional: per-metric cutoff for Insights. Keyed by metric id (eg "sleep" or "custom:abc"). */
+  metricRetiredFromISO?: Record<string, string>;
+
 }
 
 
