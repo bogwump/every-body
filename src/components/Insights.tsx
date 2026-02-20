@@ -18,7 +18,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { ArrowRight, Download, FlaskConical, Sparkles, Moon } from 'lucide-react';
+import { ArrowRight, Download, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
 import { downloadTextFile } from '../lib/storage';
@@ -27,6 +27,7 @@ import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
 import { isMetricInScope } from '../lib/insightsScope';
+import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
@@ -66,6 +67,33 @@ function normalise10(v: unknown): number | undefined {
   if (!hasNum(v)) return undefined;
   const scaled = v > 10 ? Math.round(v / 10) : v;
   return Math.max(0, Math.min(10, scaled));
+}
+
+
+function experimentSummarySentence(
+  comparison: any,
+  userData: UserData,
+  maxParts = 2
+): string | null {
+  if (!comparison?.enoughData || !Array.isArray(comparison?.metrics)) return null;
+
+  const usable = (comparison.metrics as any[])
+    .filter((m) => m?.hasEnoughData && hasNum(m?.delta))
+    .map((m) => ({ ...m, abs: Math.abs(Number(m.delta)) }))
+    .sort((a, b) => (b.abs ?? 0) - (a.abs ?? 0))
+    .slice(0, maxParts);
+
+  if (!usable.length) return null;
+
+  const parts = usable.map((m) => {
+    const delta = Number(m.delta);
+    const dir = delta >= 0 ? 'higher' : 'lower';
+    const amt = Math.abs(delta).toFixed(1);
+    return `${labelFor(m.key as any, userData)} averaged ${amt} ${dir}`;
+  });
+
+  if (parts.length === 1) return `During this experiment, ${parts[0]}.`;
+  return `During this experiment, ${parts[0]}, while ${parts[1]}.`;
 }
 
 function moodTo10(mood?: 1 | 2 | 3): number | undefined {
@@ -1434,6 +1462,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         ...(ex.outcome ?? {}),
         rating: worked ? 5 : 2,
         completedAtISO: new Date().toISOString(),
+        digest: buildExperimentDigest(experimentComparison),
       },
     });
 
@@ -1505,6 +1534,20 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     };
   }, [experimentStatus, entriesAllSorted]);
 
+  const experimentComparison = useMemo(() => {
+    if (!experimentStatus) return null;
+    try {
+      return computeExperimentComparison({
+        entries: entriesAllSorted,
+        experiment: experimentStatus.ex as ExperimentPlan,
+        user: userData,
+        maxMetrics: 5,
+      });
+    } catch {
+      return null;
+    }
+  }, [experimentStatus, entriesAllSorted, userData]);
+
   const experimentsMaturity = useMemo(() => {
     const n = entriesSorted.length;
     if (n <= 6) return { label: 'Early', hint: 'You are building the baseline.' };
@@ -1557,6 +1600,35 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [corrPairs, findings]);
 
   const [outcomeNote, setOutcomeNote] = useState<string>('');
+  const [showAllExperimentMetrics, setShowAllExperimentMetrics] = useState(false);
+
+  const buildExperimentDigest = (cmp: any) => {
+    if (!cmp) return undefined;
+    try {
+      const top = (cmp.metrics ?? []).slice(0, 5).map((m: any) => ({
+        key: m.key,
+        label: m.label,
+        beforeAvg: m.before?.avg ?? null,
+        beforeCount: m.before?.count ?? 0,
+        duringAvg: m.during?.avg ?? null,
+        duringCount: m.during?.count ?? 0,
+        delta: m.delta ?? null,
+        enough: Boolean(m.hasEnoughData),
+      }));
+      return {
+        createdAtISO: new Date().toISOString(),
+        enoughData: Boolean(cmp.enoughData),
+        window: cmp.window,
+        durationDays: cmp.durationDays,
+        beforeDaysWithAny: cmp.beforeDaysWithAny,
+        duringDaysWithAny: cmp.duringDaysWithAny,
+        summarySentence: experimentSummarySentence(cmp, userData) || undefined,
+        metrics: top,
+      };
+    } catch {
+      return undefined;
+    }
+  };
 
   const setOutcomeRating = (rating: 1 | 2 | 3 | 4 | 5) => {
     if (!experiment) return;
@@ -1568,24 +1640,107 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         rating,
         note: outcomeNote.trim() ? outcomeNote.trim() : undefined,
         completedAtISO: new Date().toISOString(),
+        digest: buildExperimentDigest(experimentComparison),
       },
     };
     setExperiment(next);
   };
 
-    const renderExperimentDelta = () => {
-    const s0 = experimentWindow?.series?.[0];
-    const nums = (s0?.values ?? []).filter((v) => typeof v === 'number') as number[];
-    if (nums.length < 2 || !s0) return null;
-    const first = nums[0];
-    const last = nums[nums.length - 1];
-    const delta = last - first;
-    const dir = delta === 0 ? 'stayed about the same' : delta > 0 ? 'went up' : 'went down';
+  const renderExperimentComparisonBlock = (mode: 'progress' | 'conclusion') => {
+    if (!experimentStatus) return null;
+    const digest = (experimentStatus.ex as any)?.outcome?.digest;
+    const cmp =
+      mode === 'conclusion' && digest
+        ? {
+            ...digest,
+            metrics: (digest.metrics ?? []).map((m: any) => ({
+              key: m.key,
+              label: m.label,
+              before: { avg: m.beforeAvg, count: m.beforeCount },
+              during: { avg: m.duringAvg, count: m.duringCount },
+              delta: m.delta,
+              hasEnoughData: Boolean(m.enough),
+            })),
+          }
+        : experimentComparison;
+
+    if (!cmp) return null;
+
+    const title = mode === 'progress' ? 'So far' : 'Before vs during';
+    const subtitle = mode === 'progress'
+      ? `Logged ${cmp.duringDaysWithAny}/${cmp.durationDays} experiment days · ${cmp.beforeDaysWithAny}/${cmp.durationDays} baseline days`
+      : `Baseline: ${cmp.window.beforeStartISO} to ${cmp.window.beforeEndISO} · During: ${cmp.window.duringStartISO} to ${cmp.window.duringEndISO}`;
+
+    if (!cmp.metrics.length) return null;
+
+    // If there isn't enough data, we still show a gentle coverage hint.
+    if (!cmp.enoughData) {
+      return (
+        <div className="mt-4 eb-inset rounded-2xl p-4">
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="mt-1 text-sm eb-muted">{subtitle}</div>
+          <div className="mt-3 text-sm eb-muted">
+            Not enough data yet for a meaningful before/after comparison. Aim for at least 2 logged days in both windows.
+          </div>
+        </div>
+      );
+    }
+
+    const fmt = (n: number | null) => (n == null ? '–' : n.toFixed(1));
+    const fmtDelta = (d: number | null) => {
+      if (d == null) return '–';
+      const s = d >= 0 ? '+' : '';
+      return `${s}${d.toFixed(1)}`;
+    };
+
+    const visibleMetrics = showAllExperimentMetrics ? cmp.metrics : cmp.metrics.slice(0, 3);
+
     return (
-      <span>
-        {' '}
-        Your {labelFor((s0 as any).key, userData)} {dir} from {Math.round(first)}/10 to {Math.round(last)}/10.
-      </span>
+      <div className="mt-4 eb-inset rounded-2xl p-4">
+        <div className="text-sm font-semibold">{title}</div>
+        <div className="mt-1 text-sm eb-muted">{subtitle}</div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+          {visibleMetrics.slice(0, 5).map((m) => (
+            <div key={String(m.key)} className="rounded-2xl border border-black/5 bg-white p-4">
+              <div className="text-sm font-semibold">{labelFor(m.key as any, userData)}</div>
+              {m.hasEnoughData ? (
+                <>
+                  <div className="mt-2 text-sm eb-muted">
+                    Baseline <b>{fmt(m.before.avg)}</b> · During <b>{fmt(m.during.avg)}</b> · Change <b>{fmtDelta(m.delta)}</b>
+                  </div>
+                  <div className="mt-2 text-xs eb-muted">
+                    Data: {m.before.count} baseline points · {m.during.count} during points
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mt-2 text-sm eb-muted">
+                    Not enough data for this measure yet.
+                  </div>
+                  <div className="mt-2 text-xs eb-muted">
+                    Data: {m.before.count} baseline points · {m.during.count} during points
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {cmp.metrics.length > 3 && (
+          <div className="mt-3">
+            <button
+              type="button"
+              className="text-sm font-semibold underline"
+              onClick={() => setShowAllExperimentMetrics((v) => !v)}
+            >
+              {showAllExperimentMetrics
+                ? 'Show fewer measures'
+                : `Show all ${Math.min(5, cmp.metrics.length)} measures`}
+            </button>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -1736,6 +1891,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           </div>
         ) : null}
 
+        {!experimentStatus.done && experimentStatus.day >= 2 ? renderExperimentComparisonBlock('progress') : null}
+
         {experimentStatus.day >= (experimentStatus.ex.durationDays ?? 3) && !(experimentStatus.ex as any)?.outcome?.rating ? (
           <div className="mt-4 eb-inset rounded-2xl p-4">
             <div className="text-sm font-semibold">Did it help?</div>
@@ -1767,16 +1924,45 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
         {(experimentStatus.ex as any)?.outcome?.rating ? (
           <div className="mt-4 eb-inset rounded-2xl p-4">
-            <div className="text-sm font-semibold">Conclusion</div>
-            <div className="mt-1 text-sm eb-muted">
-              {Number((experimentStatus.ex as any)?.outcome?.rating ?? 0) >= 4 ? 'You marked this as a success.' : 'You marked this as not helpful.'}
-              {experimentWindow?.series?.length ? renderExperimentDelta() : null}
-            </div>
-            {(experimentStatus.ex as any)?.outcome?.note ? (
-              <div className="mt-2 text-sm">Note: {(experimentStatus.ex as any).outcome.note}</div>
-            ) : null}
+            {(() => {
+              const rating = Number((experimentStatus.ex as any)?.outcome?.rating ?? 0);
+              const label = rating >= 4 ? 'Successful' : rating <= 2 ? 'Unsuccessful' : 'Mixed';
+              const Icon = rating >= 4 ? CheckCircle2 : rating <= 2 ? XCircle : HelpCircle;
+              const digest = (experimentStatus.ex as any)?.outcome?.digest;
+              const summary =
+                digest?.summarySentence ||
+                experimentSummarySentence(experimentComparison, userData) ||
+                (experimentComparison?.enoughData
+                  ? null
+                  : 'Not enough baseline data for a clean comparison yet, so your rating matters most.');
+              return (
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">Conclusion</div>
+                    <div className="mt-1 text-sm eb-muted">
+                      <span className="inline-flex items-center gap-2 font-medium text-[rgb(var(--color-text))]">
+                        <Icon size={18} className="text-[rgb(var(--color-text))]" />
+                        {label}
+                      </span>
+                      {summary ? <span> · {summary}</span> : null}
+                      {experimentComparison?.enoughData && !summary ? (
+                        <span> · Here is what changed, on average.</span>
+                      ) : null}
+                    </div>
+                    {(experimentStatus.ex as any)?.outcome?.note ? (
+                      <div className="mt-2 text-sm">
+                        <span className="font-medium">Note:</span> {(experimentStatus.ex as any).outcome.note}
+                      </div>
+                    ) : null}
+                  </div>
+                  <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>Result saved</span>
+                </div>
+              );
+            })()}
           </div>
         ) : null}
+
+        {(experimentStatus.ex as any)?.outcome?.rating ? renderExperimentComparisonBlock('conclusion') : null}
       </div>
     );
   };
