@@ -290,6 +290,15 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [followUps, setFollowUps] = useState<{ aiId: string; questions: string[] } | null>(null);
+  const [composerFocused, setComposerFocused] = useState(false);
+  const [isMobileChat, setIsMobileChat] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.matchMedia('(max-width: 767px)').matches;
+    } catch {
+      return false;
+    }
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -307,9 +316,28 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
 
   const opening = useMemo(() => `Hi, I’m ${COMPANION_NAME}. Want help joining the dots today?`, []);
 
-  // Chat should feel like a full-screen view on mobile.
-  // Lock the page scroll so the ONLY scroll area is the message list.
+  // Track whether we are in the mobile layout. UI-only.
   useEffect(() => {
+    try {
+      const mq = window.matchMedia('(max-width: 767px)');
+      const update = () => setIsMobileChat(Boolean(mq.matches));
+      update();
+      if (mq.addEventListener) mq.addEventListener('change', update);
+      else mq.addListener(update);
+      return () => {
+        if (mq.removeEventListener) mq.removeEventListener('change', update);
+        else mq.removeListener(update);
+      };
+    } catch {
+      return;
+    }
+  }, []);
+
+  // On mobile, lock the page scroll so the ONLY scroll area is the message list.
+  // On desktop, do NOT lock scroll (it can interfere with wheel/trackpad behaviour inside nested scroll areas).
+  useEffect(() => {
+    if (!isMobileChat) return;
+
     const prevHtml = document.documentElement.style.overflow;
     const prevBody = document.body.style.overflow;
     const prevBeh = (document.documentElement.style as any).overscrollBehaviorY;
@@ -317,7 +345,6 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
     try {
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
-      // Helps prevent “scroll the page behind the chat” on browsers that support it.
       (document.documentElement.style as any).overscrollBehaviorY = 'none';
     } catch {
       // ignore
@@ -332,41 +359,38 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
         // ignore
       }
     };
-  }, []);
+  }, [isMobileChat]);
 
-  // iOS Safari: keep the chat shell sized to the *visual* viewport (keyboard-safe).
-  // This prevents the composer being pushed under the on-screen keyboard.
+  // iOS keyboard handling: track the visual viewport so the composer can sit above the keyboard.
+  // UI-only.
   useEffect(() => {
     const vv = window.visualViewport;
+    if (!vv) return;
 
     const setVars = () => {
-      const height = vv?.height ?? window.innerHeight;
-      const offsetTop = vv?.offsetTop ?? 0;
-      const kb = vv ? Math.max(0, window.innerHeight - vv.height - offsetTop) : 0;
-
-      document.documentElement.style.setProperty('--eb-vvh', `${Math.round(height)}px`);
-      document.documentElement.style.setProperty('--eb-kb', `${Math.round(kb)}px`);
+      const vvh = Math.round(vv.height);
+      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      document.documentElement.style.setProperty('--eb-vvh', `${vvh}px`);
+      document.documentElement.style.setProperty('--eb-kb', `${kb}px`);
     };
 
     setVars();
-    vv?.addEventListener('resize', setVars);
-    vv?.addEventListener('scroll', setVars);
-    window.addEventListener('resize', setVars);
+    vv.addEventListener('resize', setVars);
+    vv.addEventListener('scroll', setVars);
 
     return () => {
-      vv?.removeEventListener('resize', setVars);
-      vv?.removeEventListener('scroll', setVars);
-      window.removeEventListener('resize', setVars);
-
-      // Clean up so other pages aren't affected
-      try {
-        document.documentElement.style.removeProperty('--eb-vvh');
-        document.documentElement.style.removeProperty('--eb-kb');
-      } catch {
-        // ignore
-      }
+      vv.removeEventListener('resize', setVars);
+      vv.removeEventListener('scroll', setVars);
     };
   }, []);
+
+  // When typing on mobile, hide the bottom nav to create space and avoid “jumping”.
+  useEffect(() => {
+    const cls = 'eb-chat-typing';
+    if (composerFocused && isMobileChat) document.body.classList.add(cls);
+    else document.body.classList.remove(cls);
+    return () => document.body.classList.remove(cls);
+  }, [composerFocused, isMobileChat]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -526,13 +550,18 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
     setIsTyping(true);
     setFollowUps(null);
 
+    // iOS can reshuffle layout during keyboard animations; a couple of scheduled scrolls is more reliable.
     requestAnimationFrame(() => scrollToBottom('auto'));
+    setTimeout(() => scrollToBottom('auto'), 80);
 
     (async () => {
       try {
         const data = await askEve(messageText);
         const aiId = `${Date.now().toString()}-ai`;
         addMessage({ sender: 'ai', text: data.answer, timestampISO: new Date().toISOString(), id: aiId });
+
+        requestAnimationFrame(() => scrollToBottom('auto'));
+        setTimeout(() => scrollToBottom('auto'), 80);
 
         const qs = Array.isArray(data.suggestions) && data.suggestions.length
           ? data.suggestions.slice(0, 3)
@@ -542,6 +571,9 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
         const aiId = `${Date.now().toString()}-ai`;
         const fallback = localCompanionReply(messageText, eveContext, cycleEnabled);
         addMessage({ sender: 'ai', text: fallback.answer, timestampISO: new Date().toISOString(), id: aiId });
+
+        requestAnimationFrame(() => scrollToBottom('auto'));
+        setTimeout(() => scrollToBottom('auto'), 80);
 
         const qs = Array.isArray(fallback.suggestions) && fallback.suggestions.length
           ? fallback.suggestions.slice(0, 3)
@@ -561,9 +593,10 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   };
 
   return (
-    <div className="bg-[rgb(var(--color-background))] h-[var(--eb-vvh,100svh)] overflow-hidden">
-      <div className="h-full flex flex-col px-3 sm:px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-6">
-        <div className="mx-auto w-full max-w-4xl flex flex-col flex-1 min-h-0">
+    <div className="eb-chat-screen bg-[rgb(var(--color-background))] overflow-hidden flex flex-col">
+      {/* Main chat area (fills available height). */}
+      <div className="flex-1 min-h-0 px-3 sm:px-4 md:px-6 pt-4 md:pt-6">
+        <div className="mx-auto w-full max-w-4xl flex flex-col h-full min-h-0">
           <div className="eb-card p-0 overflow-hidden flex flex-col flex-1 min-h-0">
             {/* Header */}
             <div className="px-6 py-4 border-b border-neutral-200 bg-white flex-shrink-0">
@@ -584,7 +617,7 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
             <div
               ref={scrollAreaRef}
               onScroll={handleScroll}
-              className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))] pb-[calc(env(safe-area-inset-bottom)+5.25rem+9rem)] md:pb-6"
+              className="eb-chat-messages flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
             >
               <div className="space-y-4">
                 {messages.map((message) => (
@@ -671,9 +704,47 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
                 <div ref={messagesEndRef} />
               </div>
             </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Desktop composer lives in-flow */}
-            <div className="hidden md:block bg-white border-t border-neutral-200 px-4 sm:px-6 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] flex-shrink-0">
+      {/* Composer is fixed on mobile so it never disappears under the iOS keyboard.
+          On desktop it stays in-flow. */}
+      <div className="eb-chat-composer md:hidden">
+        <div className="bg-white border-t border-neutral-200 px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setComposerFocused(true)}
+              onBlur={() => setComposerFocused(false)}
+              placeholder="Ask me anything about your symptoms..."
+              className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary))] focus:border-transparent"
+            />
+            <button
+              onClick={() => handleSendMessage()}
+              disabled={!inputText.trim()}
+              className="px-5 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center"
+              type="button"
+              aria-label="Send"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+
+          <p className="text-xs text-center mt-3 text-[rgb(var(--color-text-secondary))]">
+            Guidance is informational only. For medical advice, speak to a healthcare professional.
+          </p>
+        </div>
+      </div>
+
+      {/* Desktop composer */}
+      <div className="hidden md:block flex-shrink-0">
+        <div className="mx-auto w-full max-w-4xl px-3 sm:px-4 md:px-6 pb-6 pt-3">
+          <div className="eb-card p-0 overflow-hidden">
+            <div className="bg-white border-t border-neutral-200 px-6 pt-4 pb-5">
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -686,7 +757,7 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
                 <button
                   onClick={() => handleSendMessage()}
                   disabled={!inputText.trim()}
-                  className="px-5 sm:px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                  className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center"
                   type="button"
                   aria-label="Send"
                 >
@@ -698,40 +769,6 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
                 Guidance is informational only. For medical advice, speak to a healthcare professional.
               </p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile composer is fixed and lifted above the iOS keyboard */}
-      <div
-        className="md:hidden fixed left-0 right-0 z-50 px-3 sm:px-4"
-        style={{ bottom: 'calc(var(--eb-kb, 0px) + env(safe-area-inset-bottom) + 5.25rem)' }}
-      >
-        <div className="mx-auto w-full max-w-4xl">
-          <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask me anything about your symptoms..."
-                className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary))] focus:border-transparent"
-              />
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={!inputText.trim()}
-                className="px-5 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center"
-                type="button"
-                aria-label="Send"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-center mt-3 text-[rgb(var(--color-text-secondary))]">
-              Guidance is informational only. For medical advice, speak to a healthcare professional.
-            </p>
           </div>
         </div>
       </div>
