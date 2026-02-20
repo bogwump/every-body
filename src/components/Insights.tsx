@@ -489,14 +489,12 @@ export function Insights({ userData, onOpenCheckIn }: InsightsProps) {
   const entriesAllSorted = useMemo(() => sortByDateAsc(Array.isArray(entries) ? entries : []), [entries]);
 
   const [timeframe, setTimeframe] = useState<Timeframe>('month');
-    const [smoothTrends, setSmoothTrends] = useState<boolean>(false);
+  const [smoothTrends, setSmoothTrends] = useState<boolean>(false);
   const [sleepExploreOpen, setSleepExploreOpen] = useState<boolean>(false);
-  // Sleep explorer overlay (single overlay at a time to keep the chart readable on mobile).
-  // Stored so the choice feels consistent.
+  // Persist the user's last overlay choice (nice on mobile where you can't hover)
   const [sleepOverlayKey, setSleepOverlayKey] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem('sleepExplorer:overlay');
-      return typeof saved === 'string' ? saved : '';
+      return localStorage.getItem('eb_sleep_overlay') ?? '';
     } catch {
       return '';
     }
@@ -508,6 +506,14 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
 
   const sleepInsightsOn = Boolean(userData.sleepInsightsEnabled);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('eb_sleep_overlay', sleepOverlayKey);
+    } catch {
+      // ignore
+    }
+  }, [sleepOverlayKey]);
 
   const sleepSeries = useMemo(() => {
     return entriesSorted.map((e) => {
@@ -535,34 +541,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     });
   }, [entriesSorted]);
 
-  // Sleep explorer overlays should never re-index the data (Recharts will plot by index on a categorical X axis).
-  // Instead we keep the same full series and expose a single marker field that is null on non-matching days.
-  const sleepExplorerSeries = useMemo(() => {
-    return sleepSeries.map((r) => {
-      const sleepVal = typeof r.sleep === 'number' ? r.sleep : null;
-      const k = (sleepOverlayKey || '').trim();
-
-      let matches = false;
-      if (k === 'exercise') matches = Boolean(r.exercise);
-      else if (k === 'sex') matches = Boolean(r.sex);
-      else if (k) matches = Boolean((r as any).events?.[k]);
-
-      return {
-        ...r,
-        overlayMarker: matches ? sleepVal : null,
-      };
-    });
-  }, [sleepSeries, sleepOverlayKey]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('sleepExplorer:overlay', sleepOverlayKey);
-    } catch {
-      // ignore
-    }
-  }, [sleepOverlayKey]);
-
-
   const OTHER_INFLUENCE_KEYS = [
     'travel',
     'illness',
@@ -577,6 +555,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const otherInfluenceLabel = (k: string) => {
     switch (k) {
+      case 'exercise':
+        return 'Workout';
+      case 'sex':
+        return 'Intimacy';
       case 'travel':
         return 'Travel';
       case 'illness':
@@ -600,24 +582,25 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
   };
 
-  // Overlay options: only show influences the user has enabled.
-  // (We still allow "None" so the chart can be completely clean.)
-  const enabledInfluenceKeys = useMemo(() => {
-    const keys = Array.isArray(userData.enabledInfluences) ? (userData.enabledInfluences as string[]) : [];
-    // Keep order stable and predictable (workout + intimacy first).
-    const preferred = ['exercise', 'sex'];
-    const rest = keys.filter((k) => !preferred.includes(k));
-    const merged = [...preferred.filter((k) => keys.includes(k)), ...rest];
-    return Array.from(new Set(merged));
-  }, [userData.enabledInfluences]);
-
-  const influenceLabel = (k: string) => {
-    if (k === 'exercise') return 'Workout';
-    if (k === 'sex') return 'Intimacy';
-    return otherInfluenceLabel(k);
-  };
+  const sleepOverlayOptions = useMemo(() => {
+    const enabled = Array.isArray(userData.enabledInfluences) ? (userData.enabledInfluences as string[]) : [];
+    // Only show overlays that exist in the current timeframe, to avoid empty picks.
+    return enabled.filter((k) => sleepSeries.some((r) => Boolean((r as any).events?.[k])));
+  }, [sleepSeries, userData.enabledInfluences]);
 
   const sleepExtrasCount = useMemo(() => sleepSeries.filter((r) => r.extras).length, [sleepSeries]);
+
+  const sleepOverlayLabel = useMemo(() => (sleepOverlayKey ? otherInfluenceLabel(sleepOverlayKey) : ''), [sleepOverlayKey]);
+
+  const sleepOverlayPoints = useMemo(() => {
+    if (!sleepOverlayKey) return [] as Array<any>;
+    return sleepSeries
+      .filter((r) => typeof r.sleep === 'number' && Boolean((r as any).events?.[sleepOverlayKey]))
+      .map((r) => ({
+        ...r,
+        overlay: sleepOverlayLabel,
+      }));
+  }, [sleepSeries, sleepOverlayKey, sleepOverlayLabel]);
 
   const sleepGentleHint = useMemo(() => {
     const withSleep = sleepSeries.filter((r) => typeof r.sleep === 'number') as Array<{ sleep: number; exercise: boolean; sex: boolean; other: boolean; intensity?: any }>;
@@ -1512,8 +1495,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     );
   };
 
-return (
-    <div className="eb-container space-y-6 pt-8 pb-12">
+  return (
+    <div className="eb-container space-y-6 pt-8 pb-12 overflow-x-hidden">
       {/* Header */}
       <div className="pt-2">
         <h1 className="mb-1">Insights &amp; Patterns</h1>
@@ -1939,7 +1922,7 @@ return (
 
           <div className="mt-4 h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={sleepExplorerSeries} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+              <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
                 <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
@@ -1951,53 +1934,59 @@ return (
 
           {/* Explore modal */}
           <Dialog open={sleepExploreOpen} onOpenChange={setSleepExploreOpen}>
-            <EBDialogContent>
+            <EBDialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
               <DialogHeader>
                 <DialogTitle>Sleep explorer</DialogTitle>
                 <DialogDescription>
-                  A simple timeline view, with optional markers for what was going on that day.
+                  A simple timeline view, with an optional overlay marker for what was going on that day.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="mt-4 eb-inset rounded-2xl p-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="mt-4 eb-inset rounded-2xl p-4 overflow-hidden">
+                <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-medium">Influence overlay</div>
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 opacity-70" />
-                    <select
-                      className="eb-input !w-auto !py-2 !px-4 text-sm !rounded-full"
-                      value={sleepOverlayKey}
-                      onChange={(e) => setSleepOverlayKey(e.target.value)}
-                      aria-label="Influence overlay"
-                      title="Choose one influence to show as markers"
-                    >
-                      <option value="">None</option>
-                      {enabledInfluenceKeys.map((k) => (
-                        <option key={k} value={k}>
-                          {influenceLabel(k)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    className="eb-input !w-auto !py-2 text-sm"
+                    value={sleepOverlayKey}
+                    onChange={(e) => setSleepOverlayKey(e.target.value)}
+                    aria-label="Influence overlay"
+                  >
+                    <option value="">None</option>
+                    {sleepOverlayOptions.map((k) => (
+                      <option key={k} value={k}>
+                        {otherInfluenceLabel(k)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="mt-4 h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={sleepExplorerSeries} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+                    <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
                       <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
-                      <Tooltip />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload || payload.length === 0) return null;
+                          const p: any = payload[0]?.payload;
+                          const sleepVal = typeof p?.sleep === 'number' ? p.sleep : null;
+                          const overlay = p?.overlay;
+                          return (
+                            <div className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm shadow">
+                              <div className="font-medium">{label}</div>
+                              {sleepVal !== null && <div>Sleep: {sleepVal}/10</div>}
+                              {overlay && <div>{overlay}</div>}
+                            </div>
+                          );
+                        }}
+                      />
                       <Line type="monotone" dataKey="sleep" dot={false} stroke="rgb(var(--color-primary))" strokeWidth={2} />
 
                       {sleepOverlayKey ? (
-                        <Scatter
-                          dataKey="overlayMarker"
-                          name={influenceLabel(sleepOverlayKey)}
-                          fill="rgb(var(--color-text))"
-                        />
+                        <Scatter data={sleepOverlayPoints} dataKey="sleep" fill="rgb(var(--color-primary-dark))" />
                       ) : null}
-</ComposedChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
 
@@ -2007,7 +1996,12 @@ return (
               </div>
 
               <div className="mt-4 flex justify-end">
-                <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setSleepExploreOpen(false)}>
+                <button
+                  autoFocus
+                  type="button"
+                  className="eb-btn eb-btn-secondary"
+                  onClick={() => setSleepExploreOpen(false)}
+                >
                   Close
                 </button>
               </div>
@@ -2209,7 +2203,7 @@ return (
         <div className="mt-3 eb-chart">
           <div style={{ width: '100%', height: 280 }}>
             <ResponsiveContainer>
-              <LineChart data={seriesForChart} margin={{ left: -10, right: 8, top: 10, bottom: 6 }}>
+              <LineChart data={seriesForChart} margin={{ left: 0, right: 8, top: 10, bottom: 6 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
                 <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={28} />
@@ -2513,7 +2507,7 @@ return (
         <div className="mt-3 eb-chart">
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>
-              <BarChart data={weekdayBar} margin={{ left: -10, right: 8, top: 10, bottom: 6 }}>
+              <BarChart data={weekdayBar} margin={{ left: 0, right: 8, top: 10, bottom: 6 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                 <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={28} />

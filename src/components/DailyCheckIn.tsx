@@ -152,7 +152,7 @@ function SwitchRow({
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`w-12 h-6 rounded-full transition-all ${
+        className={`shrink-0 w-12 h-6 rounded-full transition-all ${
           checked ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
         }`}
         aria-pressed={checked}

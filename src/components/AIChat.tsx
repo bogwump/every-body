@@ -500,8 +500,8 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   };
 
   return (
-    <div className="eb-page flex flex-col py-4">
-      <div className="eb-page-inner flex-1 flex flex-col pb-6 space-y-0">
+    <div className="eb-page flex flex-col h-[100dvh] overflow-hidden py-0">
+      <div className="eb-page-inner flex-1 flex flex-col pb-24 space-y-0">
         <div className="eb-card p-0 overflow-hidden flex flex-col flex-1 min-h-0">
           {/* Header */}
           <div className="px-6 py-4 border-b border-neutral-200 bg-white flex-shrink-0">
@@ -520,7 +520,7 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
           <div
             ref={scrollAreaRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
+            className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-6 bg-[rgb(var(--color-background))]"
           >
             <div className="space-y-4">
               {messages.map((message) => (
