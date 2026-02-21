@@ -2079,7 +2079,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
           {!experimentStatus.done ? (
             <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px] !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
-              <div className="text-sm font-semibold">Step 4
               <div className="text-sm font-semibold">Step 4</div>
               <div className="mt-1 text-sm eb-muted">
                 Tell me if it helped. We'll save the result so your future insights can become more meaningful.
