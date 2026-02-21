@@ -11,28 +11,16 @@ import { Navigation } from './components/Navigation';
 
 import type { UserData } from './types';
 import { DEFAULT_USER } from './lib/defaultUser';
-import { APP_NAME, useUser, initSelfHealingStorage} from './lib/appStore';
+import { APP_NAME, useEntries, useUser, initSelfHealingStorage} from './lib/appStore';
 import { getGoalPreset } from './lib/goalPresets';
+import { isoTodayLocal } from './lib/date';
 
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [checkInDateISO, setCheckInDateISO] = useState<string | undefined>(undefined);
   const { user: userData, updateUser: setUserData } = useUser(DEFAULT_USER);
-
-  // Best-effort request for persistent storage (helps on some browsers; harmless if unsupported)
-  useEffect(() => {
-    (async () => {
-      try {
-        const nav: any = navigator;
-        if (nav?.storage?.persist) {
-          await nav.storage.persist();
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, []);
+  const { entries } = useEntries();
 
   const FORCE_ONBOARDING_KEY = 'eb_force_onboarding_preview';
   const [forceOnboarding, setForceOnboarding] = useState<boolean>(() => {
@@ -51,6 +39,57 @@ export default function App() {
     }
     setForceOnboarding(false);
   };
+
+
+  const getTodayISO = () => {
+    try {
+      return isoTodayLocal();
+    } catch {
+      return '';
+    }
+  };
+
+  // Daily nudge into Daily Check-in (post-onboarding only)
+  useEffect(() => {
+    if (!userData.onboardingComplete) return;
+    if (forceOnboarding) return;
+    // Don't override intentional navigation (eg onboarding completion already drops into check-in)
+    if (currentScreen !== 'dashboard') return;
+
+    const today = getTodayISO();
+    if (!today) return;
+
+    const DISMISSED_KEY = 'eb_checkin_dismissed_date';
+
+    const hasLoggedToday = (entries ?? []).some((e: any) => (e?.dateISO || e?.date) === today);
+
+    let dismissed: string | null = null;
+    try {
+      dismissed = localStorage.getItem(DISMISSED_KEY);
+    } catch {
+      // ignore
+    }
+
+    // Not checked-in yet + not dismissed today => start on check-in
+    if (!hasLoggedToday && dismissed !== today) {
+      setCheckInDateISO(today);
+      setCurrentScreen('check-in');
+    }
+  }, [userData.onboardingComplete, forceOnboarding, currentScreen, entries]);
+
+  // Best-effort request for persistent storage (helps on some browsers; harmless if unsupported)
+  useEffect(() => {
+    (async () => {
+      try {
+        const nav: any = navigator;
+        if (nav?.storage?.persist) {
+          await nav.storage.persist();
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
 
   // Apply theme to root
   useEffect(() => {
@@ -165,6 +204,15 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
             userData={userData}
             onUpdateUserData={setUserData}
             initialDateISO={checkInDateISO}
+            onDismiss={(dateISO) => {
+              const today = getTodayISO();
+              if (dateISO !== today) return;
+              try {
+                localStorage.setItem('eb_checkin_dismissed_date', today);
+              } catch {
+                // ignore
+              }
+            }}
             onDone={() => {
               try { (document.activeElement as HTMLElement | null)?.blur(); } catch {}
               try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch { window.scrollTo(0, 0); }

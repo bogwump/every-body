@@ -52,6 +52,8 @@ interface DailyCheckInProps {
   initialDateISO?: string;
   /** Optional navigation helper (e.g. open calendar / profile). */
   onNavigate?: (screen: string) => void;
+  /** Called when the user dismisses the check-in without saving (eg Cancel). */
+  onDismiss?: (dateISO: string) => void;
 }
 
 const moodIcons: Array<{ value: 1 | 2 | 3; icon: React.ElementType; label: string }> = [
@@ -309,7 +311,7 @@ function Slider10({
   );
 }
 
-export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateISO, onNavigate }: DailyCheckInProps) {
+export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateISO, onNavigate, onDismiss }: DailyCheckInProps) {
   const safeBlur = () => {
     try { (document.activeElement as HTMLElement | null)?.blur(); } catch {}
   };
@@ -651,6 +653,15 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     }
 
     upsertEntry(next as any);
+    // If they saved today, clear any prior dismissal for today (best-effort)
+    try {
+      const today = isoToday();
+      if (activeDateISO === today) {
+        localStorage.removeItem('eb_checkin_dismissed_date');
+      }
+    } catch {
+      // ignore
+    }
     safeBlur();
     onDone();
   };
@@ -754,28 +765,6 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           </div>
         )}
 
-        {experimentStatus && !experimentStatus.done && (
-          <div className="eb-inset rounded-2xl p-5 mb-6">
-            <div className="text-sm font-semibold flex items-center gap-2">
-              <FlaskConical className="w-4 h-4" />
-              Experiment in progress (Day {experimentStatus.day}/{experimentStatus.ex.durationDays})
-            </div>
-            <div className="mt-1 text-sm eb-muted">{experimentStatus.ex.title}</div>
-            {experimentStatus.ex.metrics?.length ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {experimentStatus.ex.metrics.slice(0, 6).map((k) => (
-                  <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
-                    {labelForMetric(k)}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            <div className="mt-2 text-sm eb-muted">
-              Tip: use yesterday as your anchor so today’s score is easier to judge.
-            </div>
-          </div>
-        )}
-
         {/* Mood */}
         <div className="eb-card eb-hero-surface mb-6 p-6">
           <h3 className="mb-1 eb-hero-on-dark">Overall mood</h3>
@@ -841,6 +830,28 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           </div>
 
         </div>
+
+        {experimentStatus && !experimentStatus.done && (
+          <div className="eb-inset rounded-2xl p-5 mb-6">
+            <div className="text-sm font-semibold flex items-center gap-2">
+              <FlaskConical className="w-4 h-4" />
+              Experiment in progress (Day {experimentStatus.day}/{experimentStatus.ex.durationDays})
+            </div>
+            <div className="mt-1 text-sm eb-muted">{experimentStatus.ex.title}</div>
+            {experimentStatus.ex.metrics?.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {experimentStatus.ex.metrics.slice(0, 6).map((k) => (
+                  <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                    {labelForMetric(k)}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-2 text-sm eb-muted">
+              Tip: use yesterday as your anchor so today’s score is easier to judge.
+            </div>
+          </div>
+        )}
 
         {/* Sliders */}
         <div className="eb-card p-6 mb-6">
@@ -1212,7 +1223,18 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
 
         <div className="flex items-center justify-end gap-3 pt-2">
-          <button type="button" className="eb-btn-secondary min-w-[96px]" onClick={onDone}>
+          <button
+            type="button"
+            className="eb-btn-secondary min-w-[96px]"
+            onClick={() => {
+              try {
+                onDismiss?.(activeDateISO);
+              } catch {
+                // ignore
+              }
+              onDone();
+            }}
+          >
             Cancel
           </button>
           <button type="button" className="eb-btn-primary min-w-[96px]" onClick={handleSubmit}>
