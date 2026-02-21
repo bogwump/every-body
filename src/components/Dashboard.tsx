@@ -812,7 +812,9 @@ export function Dashboard({
               <button
                 type="button"
                 onClick={() => setTipOffset((v) => v + 1)}
-                className="text-sm text-[rgb(var(--color-primary))] hover:underline absolute top-0 right-0"
+                // Chrome can sometimes let later-flowing text overlap and steal the click.
+                // Keep this above the header/text.
+                className="text-sm text-[rgb(var(--color-primary))] hover:underline absolute top-0 right-0 z-10"
               >
                 Another tip
               </button>
