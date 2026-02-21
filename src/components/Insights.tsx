@@ -69,6 +69,36 @@ function normalise10(v: unknown): number | undefined {
   return Math.max(0, Math.min(10, scaled));
 }
 
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map((s) => Number(s));
+  if (!y || !m || !d) return iso;
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return isoFromDateLocal(dt);
+}
+
+function mean(xs: number[]): number {
+  if (!xs.length) return 0;
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+
+function stdev(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const m = mean(xs);
+  const v = xs.reduce((acc, x) => acc + (x - m) * (x - m), 0) / (xs.length - 1);
+  return Math.sqrt(v);
+}
+
+// Shared helper: keep Insight metrics on the same 0–10-ish scale.
+function metricValue(entry: any | undefined, metric: MetricKey): number | undefined {
+  if (!entry) return undefined;
+  if ((metric as any) === 'mood') {
+    return moodTo10(entry?.mood as any);
+  }
+  const v = entry?.values?.[metric as any];
+  return typeof v === 'number' ? v : undefined;
+}
+
 
 function experimentSummarySentence(
   comparison: any,
@@ -1356,13 +1386,22 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const [isCustomExperiment, setIsCustomExperiment] = useState<boolean>(false);
   const [customExperimentTitle, setCustomExperimentTitle] = useState<string>('Your experiment');
   const [customExperimentChangeKey, setCustomExperimentChangeKey] = useState<string>('');
+  const [experimentChangeKey, setExperimentChangeKey] = useState<string>('');
   const [experimentMetricLimitFlash, setExperimentMetricLimitFlash] = useState<boolean>(false);
   const [replaceExperimentConfirm, setReplaceExperimentConfirm] = useState<null | ExperimentPlan>(null);
 
   const { experiment, setExperiment, clearExperiment } = useExperiment();
 
   const CUSTOM_EXPERIMENT_MAX_METRICS = 5;
-  const [preOpenExperimentConfirm, setPreOpenExperimentConfirm] = useState<null | { type: 'custom' | 'suggested'; metrics?: Array<MetricKey> }>(null);
+  const [preOpenExperimentConfirm, setPreOpenExperimentConfirm] = useState<
+    null | {
+      type: 'custom' | 'suggested';
+      metrics?: Array<MetricKey>;
+      plan?: { title: string; steps: string[]; note: string };
+      durationDays?: number;
+      changeKey?: string;
+    }
+  >(null);
   const openExperiment = (metrics?: Array<MetricKey>) => {
     if (experimentStatus && !experimentStatus.done) {
       setPreOpenExperimentConfirm({ type: 'suggested', metrics });
@@ -1373,6 +1412,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setExperimentMetrics(focus);
     setExperimentPlan(plan);
     setIsCustomExperiment(false);
+    setExperimentChangeKey('');
     setExperimentOpen(true);
   };
   const openCustomExperiment = () => {
@@ -1396,6 +1436,44 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setIsCustomExperiment(true);
     setCustomExperimentTitle('Your experiment');
     setCustomExperimentChangeKey('');
+    setExperimentChangeKey('');
+    setExperimentOpen(true);
+  };
+
+  const openTryNextPrompt = (p: { title: string; changeKey: string; metrics: MetricKey[]; durationDays?: number; why?: string[] }) => {
+    if (experimentStatus && !experimentStatus.done) {
+      // Stop/start confirmation happens before setup.
+      const plan = {
+        title: p.title,
+        steps: [
+          'Try ONE small change for the duration.',
+          'Keep everything else roughly the same, if you can.',
+          'Log your chosen measures each day, then review the before/after summary.',
+        ],
+        note: 'If something makes you feel worse, stop and switch to something gentler.',
+      };
+      setPreOpenExperimentConfirm({
+        type: 'suggested',
+        metrics: p.metrics,
+        plan,
+        durationDays: p.durationDays ?? 3,
+        changeKey: p.changeKey || '',
+      });
+      return;
+    }
+    setExperimentPlan({
+      title: p.title,
+      steps: [
+        'Try ONE small change for the duration.',
+        'Keep everything else roughly the same, if you can.',
+        'Log your chosen measures each day, then review the before/after summary.',
+      ],
+      note: 'If something makes you feel worse, stop and switch to something gentler.',
+    });
+    setExperimentMetrics((p.metrics || []).slice(0, 5));
+    setExperimentDurationDays(p.durationDays ?? 3);
+    setIsCustomExperiment(false);
+    setExperimentChangeKey(p.changeKey || '');
     setExperimentOpen(true);
   };
 
@@ -1412,7 +1490,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       startDateISO: todayISO,
       durationDays: experimentDurationDays,
       metrics: safeMetrics,
-      changeKey: isCustomExperiment && customExperimentChangeKey ? customExperimentChangeKey : undefined,
+      changeKey: experimentChangeKey
+        ? experimentChangeKey
+        : isCustomExperiment && customExperimentChangeKey
+          ? customExperimentChangeKey
+          : undefined,
       steps: experimentPlan.steps,
       note: experimentPlan.note,
     };
@@ -1599,8 +1681,164 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     return Array.from(uniq.values()).filter((it) => it.allow).slice(0, 10);
   }, [corrPairs, findings]);
 
+  // --- Option B: pattern-aware "Try next" prompts ---
+  type TryNextPrompt = {
+    id: string;
+    title: string;
+    changeKey: string;
+    metrics: MetricKey[];
+    durationDays: number;
+    why: string[];
+  };
+
+  const DISMISS_PROMPTS_KEY = 'eb_dismissed_experiment_prompts_v1';
+  const [dismissedPrompts, setDismissedPrompts] = useState<Record<string, string>>(() => {
+    try {
+      const raw = localStorage.getItem(DISMISS_PROMPTS_KEY);
+      return raw ? (JSON.parse(raw) as any) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DISMISS_PROMPTS_KEY, JSON.stringify(dismissedPrompts || {}));
+    } catch {
+      // ignore
+    }
+  }, [dismissedPrompts]);
+
+  const dismissPrompt = (id: string) => {
+    const until = addDaysISO(isoTodayLocal(), 7);
+    setDismissedPrompts((prev) => ({ ...(prev || {}), [id]: until }));
+  };
+
+  const tryNextPrompts = useMemo(() => {
+    const today = isoTodayLocal();
+    const recent = filterByDays(entriesAllSorted, 21);
+
+    // Need some baseline logging to avoid noisy nudges.
+    if (recent.length < 7) return [] as TryNextPrompt[];
+
+    const enabledModulesSet = new Set(userData.enabledModules || []);
+    const enabledInf = new Set(userData.enabledInfluences || []);
+
+    const valuesFor = (k: MetricKey): number[] => {
+      const xs: number[] = [];
+      recent.forEach((e) => {
+        const v = metricValue(e, k);
+        if (v != null) xs.push(v);
+      });
+      return xs;
+    };
+
+    const countInfluence = (key: string): number => {
+      let n = 0;
+      recent.forEach((e) => {
+        const anyE: any = e as any;
+        const flags = anyE?.influences || anyE?.influenceFlags || {};
+        if (flags && typeof flags === 'object' && Boolean(flags[key])) n += 1;
+      });
+      return n;
+    };
+
+    const prompts: TryNextPrompt[] = [];
+
+    // 1) Sleep up and down → earlier bedtime / fewer late nights
+    if (enabledModulesSet.has('sleep' as any) && enabledInf.has('lateNight')) {
+      const xs = valuesFor('sleep' as any);
+      if (xs.length >= 5 && stdev(xs) >= 2) {
+        prompts.push({
+          id: 'try-sleep-consistency',
+          title: 'Sleep consistency test',
+          changeKey: 'lateNight',
+          metrics: (['sleep', 'energy'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
+          durationDays: 3,
+          why: ['Sleep has been a bit up and down recently.', 'A steadier bedtime is a simple lever to test.'],
+        });
+      }
+    }
+
+    // 2) High stress → add a small buffer
+    if (enabledModulesSet.has('stress' as any) && enabledInf.has('stressfulDay')) {
+      const xs = valuesFor('stress' as any);
+      if (xs.length >= 5 && mean(xs) >= 6.5) {
+        prompts.push({
+          id: 'try-stress-buffer',
+          title: 'Stress buffer test',
+          changeKey: 'stressfulDay',
+          metrics: (['stress', 'sleep'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
+          durationDays: 3,
+          why: ['Stress has been running a bit high recently.', 'A tiny daily buffer can be enough to shift the pattern.'],
+        });
+      }
+    }
+
+    // 3) Anxiety + caffeine logged → caffeine timing
+    if (enabledModulesSet.has('anxiety' as any) && enabledInf.has('caffeine')) {
+      const xs = valuesFor('anxiety' as any);
+      const cafDays = countInfluence('caffeine');
+      if (xs.length >= 5 && mean(xs) >= 6 && cafDays >= 3) {
+        prompts.push({
+          id: 'try-caffeine-timing',
+          title: 'Caffeine timing test',
+          changeKey: 'caffeine',
+          metrics: (['anxiety', 'sleep'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
+          durationDays: 3,
+          why: ['You have logged caffeine on several recent days.', 'A simple timing tweak can sometimes reduce jittery days.'],
+        });
+      }
+    }
+
+    // 4) Headache + low hydration logged → hydration support
+    if (enabledModulesSet.has('headache' as any) && enabledInf.has('lowHydration')) {
+      const xs = valuesFor('headache' as any);
+      const lowHydDays = countInfluence('lowHydration');
+      if (xs.length >= 5 && mean(xs) >= 4.5 && lowHydDays >= 2) {
+        prompts.push({
+          id: 'try-hydration-support',
+          title: 'Hydration support test',
+          changeKey: 'lowHydration',
+          metrics: (['headache', 'dizziness'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
+          durationDays: 3,
+          why: ['Headaches have shown up a few times recently.', 'Hydration is an easy first lever to test.'],
+        });
+      }
+    }
+
+    // 5) Night sweats + alcohol logged → alcohol-free window
+    if (enabledModulesSet.has('nightSweats' as any) && enabledInf.has('alcohol')) {
+      const xs = valuesFor('nightSweats' as any);
+      const alcDays = countInfluence('alcohol');
+      if (xs.length >= 5 && mean(xs) >= 4.5 && alcDays >= 2) {
+        prompts.push({
+          id: 'try-alcohol-free',
+          title: 'Alcohol-free window',
+          changeKey: 'alcohol',
+          metrics: (['nightSweats', 'sleep'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
+          durationDays: 3,
+          why: ['Night sweats have been noticeable recently.', 'A short alcohol-free window can be a clear test.'],
+        });
+      }
+    }
+
+    // Remove dismissed prompts (local only) and prompts with no metrics.
+    const active = prompts
+      .map((p) => ({ ...p, metrics: (p.metrics || []).filter((k) => isMetricInScope(k as any, userData)) }))
+      .filter((p) => (p.metrics || []).length > 0)
+      .filter((p) => {
+        const until = dismissedPrompts?.[p.id];
+        if (!until) return true;
+        return until < today;
+      });
+
+    return active.slice(0, 6);
+  }, [entriesAllSorted, userData, dismissedPrompts]);
+
   const [outcomeNote, setOutcomeNote] = useState<string>('');
   const [showAllExperimentMetrics, setShowAllExperimentMetrics] = useState(false);
+  const [whyOpen, setWhyOpen] = useState<Record<string, boolean>>({});
 
   const buildExperimentDigest = (cmp: any) => {
     if (!cmp) return undefined;
@@ -1775,7 +2013,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const renderActiveExperimentCard = () => {
     if (!experimentStatus) return null;
     return (
-      <div id="eb-active-experiment" className="eb-inset rounded-2xl p-5">
+      <div id="eb-active-experiment" className="eb-inset rounded-2xl p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="text-sm font-semibold flex items-center gap-2">
@@ -1802,7 +2040,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="mt-3 sm:mt-0 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
             {!experimentStatus.done && onOpenCheckIn ? (
               <button
                 type="button"
@@ -1833,19 +2071,20 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
         <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
           {experimentStatus.ex.steps?.slice(0, 3)?.map((s: string, i: number) => (
-            <div key={i} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
+            <div key={i} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px] !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
               <div className="text-sm font-semibold">Step {i + 1}</div>
               <div className="mt-1 text-sm eb-muted">{s}</div>
             </div>
           ))}
 
           {!experimentStatus.done ? (
-            <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
+            <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px] !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
+              <div className="text-sm font-semibold">Step 4
               <div className="text-sm font-semibold">Step 4</div>
               <div className="mt-1 text-sm eb-muted">
                 Tell me if it helped. We'll save the result so your future insights can become more meaningful.
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2 justify-end">
                 <button
                   type="button"
                   className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
@@ -1862,12 +2101,14 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
-              <div className="text-sm font-semibold">Step 4</div>
-              <div className="mt-1 text-sm eb-muted">Experiment complete. Thanks for telling me what helped.</div>
-            </div>
-          )}
+                    ) : experimentStatus.ex.isComplete ? (
+              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px] !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
+                <div className="text-sm font-semibold">Step 4</div>
+                <div className="mt-1 text-sm eb-muted">
+                  Experiment complete. Thanks for telling me what helped.
+                </div>
+              </div>
+            ) : null}
         </div>
 
         {experimentStatus.ex.note ? <div className="mt-3 text-sm eb-muted">{experimentStatus.ex.note}</div> : null}
@@ -1897,7 +2138,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           <div className="mt-4 eb-inset rounded-2xl p-4">
             <div className="text-sm font-semibold">Did it help?</div>
             <div className="mt-1 text-sm eb-muted">Quick 5-point rating so we can turn this into a real conclusion.</div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2 justify-end">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
                   key={n}
@@ -1974,7 +2215,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         <h1 className="mb-1">Insights &amp; Patterns</h1>
         <p className="text-[rgb(var(--color-text-secondary))]">Discover connections between your symptoms and cycle.</p>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2 justify-end">
           <span className="eb-pill">
             Days logged • {entriesSorted.length}
           </span>
@@ -2088,7 +2329,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                   <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
 
 
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2 justify-end">
 
                     <button type="button" className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
 
@@ -2160,7 +2401,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                     <div className="text-sm font-semibold">{f.title}</div>
                     <div className="mt-1 text-sm eb-muted">{f.body}</div>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2 justify-end">
                       {f.metrics?.slice(0, 2).map((m) => (
                         <span key={String(m)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.04)' }}>
                           {labelFor(m, userData)}
@@ -2513,12 +2754,15 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                     setIsCustomExperiment(true);
                     setCustomExperimentTitle('Your experiment');
                     setCustomExperimentChangeKey('');
+                    setExperimentChangeKey('');
                     setExperimentOpen(true);
                   } else {
                     const focus = (next?.metrics && next.metrics.length ? next.metrics : selected).slice(0, 5);
-                    const plan = buildExperimentPlan(focus);
+                    const plan = next?.plan ? next.plan : buildExperimentPlan(focus);
                     setExperimentMetrics(focus);
                     setExperimentPlan(plan);
+                    setExperimentDurationDays(next?.durationDays ?? 3);
+                    setExperimentChangeKey(next?.changeKey || '');
                     setIsCustomExperiment(false);
                     setExperimentOpen(true);
                   }
@@ -2972,7 +3216,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             <div className="mt-1 text-sm eb-muted">Small edits make your insights cleaner.</div>
           </button>
 
-          <div id="eb-active-experiment" className="eb-inset rounded-2xl p-5">
+          <div id="eb-active-experiment" className="eb-inset rounded-2xl p-6">
             <div className="text-sm font-semibold">Keep it light</div>
             <div className="mt-1 text-sm eb-muted">If you feel overwhelmed, switch off a symptom or two in Profile. You can always switch them back on.</div>
           </div>
@@ -2991,36 +3235,61 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           <FlaskConical className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
         </div>
 
-        {renderActiveExperimentCard()}
+        {/* Gentle colour splash + context */}
+        <div className="mt-4 eb-inset rounded-2xl p-5 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+          <div className="text-sm font-semibold">Keep it simple</div>
+          <div className="mt-1 text-sm text-neutral-800">
+            Pick one small change, keep everything else roughly the same, and track a few measures for a short time.
+          </div>
+        </div>
+
+        <div className="mt-4">{renderActiveExperimentCard()}</div>
 
         <div className="mt-4">
           <div className="text-sm font-semibold">Suggested experiments</div>
-          <div className="mt-1 text-sm eb-muted">Suggested based on your data when the signal is strong enough.</div>
+          <div className="mt-1 text-sm eb-muted">Two lanes: quick "Try next" nudges from your recent patterns, and deeper ideas when the signal is strong.</div>
 
-          {suggestedExperiments.length === 0 ? (
-            <div className="mt-3 eb-inset rounded-2xl p-5 text-sm eb-muted">
-              Keep logging a few consistent metrics and this section will start to fill up.
-            </div>
-          ) : (
+          {/* Try next: pattern-aware prompts (Option B) */}
+          {tryNextPrompts.length > 0 && (
             <div className="mt-3">
-              <Carousel opts={{ align: 'start' }} className="w-full">
-                <CarouselContent>
-                  {suggestedExperiments.map((s) => {
-                    const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
-                    return (
-                      <CarouselItem key={s.id} className="basis-full md:basis-1/2">
-                        <div className="eb-inset rounded-2xl p-5 h-full flex flex-col">
+              <div className="text-sm font-semibold">Try next</div>
+              <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
+              <div className="mt-3">
+                <Carousel opts={{ align: 'start' }} className="w-full">
+                  <CarouselContent>
+                    {tryNextPrompts.map((p) => (
+                      <CarouselItem key={p.id} className="basis-full md:basis-1/2">
+                        <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
                           <div className="flex items-start justify-between gap-3">
-                            <div className="text-sm font-semibold">{s.title}</div>
-                            <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
-                              {conf}
-                            </span>
+                            <div className="text-sm font-semibold">{p.title}</div>
+                            <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
                           </div>
-                          <div className="mt-2 text-sm eb-muted">{s.body}</div>
 
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {s.metrics.slice(0, 3).map((k) => (
-                              <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                          <div className="mt-2 text-sm eb-muted">
+                            {p.why?.[0] || 'A small nudge based on what you have logged recently.'}
+                          </div>
+
+                          <button
+                            type="button"
+                            className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100"
+                            onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}
+                          >
+                            Why this suggestion?
+                          </button>
+
+                          {whyOpen?.[p.id] && (
+                            <div className="mt-2 text-sm eb-muted">
+                              <ul className="list-disc pl-5 space-y-1">
+                                {(p.why || []).slice(0, 3).map((w, idx) => (
+                                  <li key={`${p.id}-why-${idx}`}>{w}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                            {p.metrics.slice(0, 5).map((k) => (
+                              <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>
                                 {labelFor(k as any, userData)}
                               </span>
                             ))}
@@ -3028,37 +3297,102 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
                           <div className="flex-1" />
 
-                          <div className="mt-4 flex justify-end">
+                          <div className="mt-4 flex items-center justify-between gap-3">
+                            <button
+                              type="button"
+                              className="text-sm font-medium opacity-70 hover:opacity-100"
+                              onClick={() => dismissPrompt(p.id)}
+                            >
+                              Not now
+                            </button>
                             <button
                               type="button"
                               className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
-                              onClick={() => openExperiment(s.metrics)}
+                              onClick={() => openTryNextPrompt(p as any)}
                             >
                               <FlaskConical className="w-4 h-4" />
-                              Try a 3-day experiment
+                              Set up {p.durationDays || 3}-day experiment
                             </button>
                           </div>
                         </div>
                       </CarouselItem>
-                    );
-                  })}
-                </CarouselContent>
-                <CarouselPrevious className="flex opacity-70" />
-                <CarouselNext className="flex opacity-70" />
-              </Carousel>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="flex opacity-70" />
+                  <CarouselNext className="flex opacity-70" />
+                </Carousel>
+              </div>
             </div>
           )}
+
+          {/* Strong signal: existing confidence-gated suggestions */}
+          <div className={tryNextPrompts.length ? 'mt-6' : 'mt-3'}>
+            <div className="text-sm font-semibold">When the signal is strong</div>
+            <div className="mt-1 text-sm eb-muted">These start to appear as you log more days together.</div>
+
+            {suggestedExperiments.length === 0 ? (
+              <div className="mt-3 eb-inset rounded-2xl p-5 text-sm eb-muted !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
+                Keep logging a few consistent metrics and this section will start to fill up.
+              </div>
+            ) : (
+              <div className="mt-3">
+                <Carousel opts={{ align: 'start' }} className="w-full">
+                  <CarouselContent>
+                    {suggestedExperiments.map((s) => {
+                      const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
+                      return (
+                        <CarouselItem key={s.id} className="basis-full md:basis-1/2">
+                          <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="text-sm font-semibold">{s.title}</div>
+                              <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>
+                                {conf}
+                              </span>
+                            </div>
+                            <div className="mt-2 text-sm eb-muted">{s.body}</div>
+
+                            <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                              {s.metrics.slice(0, 3).map((k) => (
+                                <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>
+                                  {labelFor(k as any, userData)}
+                                </span>
+                              ))}
+                            </div>
+
+                            <div className="flex-1" />
+
+                            <div className="mt-4 flex justify-end">
+                              <button
+                                type="button"
+                                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
+                                onClick={() => openExperiment(s.metrics)}
+                              >
+                                <FlaskConical className="w-4 h-4" />
+                                Try a 3-day experiment
+                              </button>
+                            </div>
+                          </div>
+                        </CarouselItem>
+                      );
+                    })}
+                  </CarouselContent>
+                  <CarouselPrevious className="flex opacity-70" />
+                  <CarouselNext className="flex opacity-70" />
+                </Carousel>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-6 eb-inset rounded-2xl p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="min-w-0">
               <div className="text-sm font-semibold">Run your own experiment</div>
               <div className="mt-1 text-sm eb-muted">Name it first, then pick what you’re changing and what you’ll measure.</div>
             </div>
             <button
               type="button"
-              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 whitespace-nowrap"
+              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center sm:self-auto self-stretch"
               onClick={openCustomExperiment}
             >
               <FlaskConical className="w-4 h-4" />
