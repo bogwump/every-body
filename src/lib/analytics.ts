@@ -599,6 +599,19 @@ function inferPhaseKeyFromSignals(sorted: CheckInEntry[]): PhaseKey | null {
 
 type RhythmSource = "override" | "bleed" | "inferred" | "none";
 
+// Confidence for Rhythm messaging.
+// Reflects how much consistent logging we have, not whether the user is tracking a formal cycle.
+type ConfidenceLevel = "Learning" | "Emerging" | "Established";
+
+function confidenceFromDays(daysLogged: number): ConfidenceLevel {
+  // 0–29 days: Learning
+  // 30–59 days: Emerging
+  // 60+ days: Established
+  if (daysLogged >= 60) return "Established";
+  if (daysLogged >= 30) return "Emerging";
+  return "Learning";
+}
+
 export interface RhythmModel {
   refISO: string;
   phaseKey: PhaseKey | null;
@@ -752,9 +765,7 @@ export function getRhythmModel(
 
   // Confidence: based on number of distinct logged days.
   const distinctDays = new Set(sorted.map((e: any) => entryISO(e)).filter(Boolean)).size;
-  let confidence: ConfidenceLevel = pickTier(distinctDays) === "starter" ? "Learning" : confidenceLabel(distinctDays);
-  if (starts.length >= 2 && distinctDays >= 21) confidence = "Established";
-  else if (starts.length >= 1 && distinctDays >= 14) confidence = "Emerging";
+  const confidence: ConfidenceLevel = confidenceFromDays(distinctDays);
 
   void userData; // reserved (kept for future per-goal tuning)
 
