@@ -463,6 +463,9 @@ export function Dashboard({
               <div className="mt-1 text-lg font-semibold eb-hero-on-dark text-white">{heroModel.rhythmHeadline}</div>
             ) : null}
             <div className="mt-2 text-sm eb-hero-on-dark-muted text-white">{heroModel.rhythmBody}</div>
+          {heroModel.rhythmDebug ? (
+            <div className="mt-2 text-[11px] opacity-80 text-white/80">{heroModel.rhythmDebug}</div>
+          ) : null}
           </div>
 
           {/* How you've been */}

@@ -366,6 +366,7 @@ export type HomepageHeroModel = {
   rhythmTitle: string;
   rhythmHeadline?: string;
   rhythmBody: string;
+  rhythmDebug?: string;
   howTitle: string;
   howLines: string[];
   relationshipLine?: string;
@@ -603,6 +604,49 @@ function inferPhaseKeyFromSignals(sorted: CheckInEntry[]): PhaseKey | null {
   return best;
 }
 
+function countAvailableSignals(sorted: CheckInEntry[]): number {
+  const recent = sorted.slice(-10);
+  if (!recent.length) return 0;
+
+  const keys: SymptomKey[] = [
+    "energy",
+    "motivation",
+    "sleep",
+    "stress",
+    "anxiety",
+    "irritability",
+    "brainFog",
+    "fatigue",
+    "libido",
+    "digestion",
+    "bloating",
+    "cramps",
+    "headache",
+    "breastTenderness",
+    "nightSweats",
+    "hotFlushes",
+    "facialSpots",
+    "cysts",
+  ];
+
+  let available = 0;
+  for (const k of keys) {
+    const vals = recent
+      .map((e: any) =>
+        typeof e?.values?.[k] === "number"
+          ? e.values[k] > 10
+            ? Math.round(e.values[k] / 10)
+            : e.values[k]
+          : null
+      )
+      .filter((v: any): v is number => typeof v === "number");
+
+    if (vals.length) available += 1;
+  }
+  return available;
+}
+
+
 export function buildHomepageHeroModel(
   entriesRaw: CheckInEntry[] | unknown,
   userData: UserData
@@ -649,6 +693,10 @@ if (flowToday != null && flowToday > 0) {
   // Prefer symptom-signal inference (works even with cycle tracking off)
   key = inferPhaseKeyFromSignals(sorted);
 }
+
+
+const signalCount = countAvailableSignals(sorted);
+const rhythmDebug = `debug: daysLogged=${daysLogged} ref=${refISO} flowToday=${flowToday ?? "null"} signals=${signalCount} inferred=${key ?? "null"} mode=${userData.cycleTrackingMode ?? "?"} goal=${userData.goal ?? "?"}`;
 
 if (key) {
   const meta = softPhaseMetaFromKey(key);
@@ -807,6 +855,7 @@ if (key) {
     rhythmTitle,
     rhythmHeadline,
     rhythmBody,
+    rhythmDebug,
     howTitle,
     howLines,
     relationshipLine,
