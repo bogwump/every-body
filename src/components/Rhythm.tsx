@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
-import { useEntries, useUser } from '../lib/appStore';
+import { useEntries } from '../lib/appStore';
+import { computeCycleStats } from '../lib/analytics';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
 
@@ -481,6 +482,12 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
       nextPhase,
     };
   }, [entries, daysLogged]);
+
+    const cycleStats = useMemo(() => computeCycleStats(sorted), [sorted]);
+
+const [cycleModalOpen, setCycleModalOpen] = useState(false);
+  const avgCycleText = avgCycleLen ? `${avgCycleLen} days avg` : 'Not enough data yet';
+
   
   // Phase key for reminders (kept simple for v1; can be wired to your phase engine later)
   const phaseKey: PhaseKey = computed.phaseKey;
@@ -567,9 +574,24 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         {/* Phase timeline */}
         <div className="eb-card p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <IconBadge icon={<Compass className="w-5 h-5" />} />
-            <h3 className="font-semibold tracking-tight">Your cycle, at a glance</h3>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <IconBadge icon={<Compass className="w-5 h-5" />} />
+              <h3 className="font-semibold tracking-tight">Your cycle, at a glance</h3>
+            </div>
+
+            {userData?.cycleTrackingMode === 'cycle' ? (
+              <button
+                type="button"
+                onClick={() => setCycleModalOpen(true)}
+                className="rounded-full bg-[rgb(var(--color-accent)/0.12)] border border-[rgb(var(--color-accent)/0.22)] px-3 py-1 text-sm text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent)/0.18)] transition"
+                title="Cycle length"
+              >
+                <span className="font-medium">Cycle length</span>
+                <span className="mx-2 opacity-60">•</span>
+                <span className="font-semibold">{avgCycleText}</span>
+              </button>
+            ) : null}
           </div>
 
           {(() => {
@@ -722,6 +744,59 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             </div>
           </details>
         </div>
+
+        {cycleModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setCycleModalOpen(false)}
+              aria-label="Close cycle modal"
+            />
+            <div className="relative w-full max-w-lg eb-card p-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold mb-1">Cycle length</h2>
+                  <p className="text-sm text-[rgba(0,0,0,0.65)]">
+                    {userData?.cycleTrackingMode === 'cycle'
+                      ? 'Based on your logs and any overrides.'
+                      : 'Cycle tracking is off.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCycleModalOpen(false)}
+                  className="rounded-xl px-3 py-2 border border-[rgba(0,0,0,0.12)] hover:bg-neutral-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="eb-inset rounded-xl p-4">
+                  <div className="text-xs text-[rgba(0,0,0,0.60)]">Average</div>
+                  <div className="text-lg font-semibold">{avgCycleLen ? `${avgCycleLen} days` : '—'}</div>
+                </div>
+                <div className="eb-inset rounded-xl p-4">
+                  <div className="text-xs text-[rgba(0,0,0,0.60)]">Last cycle</div>
+                  <div className="text-lg font-semibold">{lastCycleLen ? `${lastCycleLen} days` : '—'}</div>
+                </div>
+                <div className="eb-inset rounded-xl p-4">
+                  <div className="text-xs text-[rgba(0,0,0,0.60)]">Prediction</div>
+                  <div className="text-lg font-semibold">{cycleStats?.predictedNextStartISO ? 'Next start' : '—'}</div>
+                  {cycleStats?.predictedNextStartISO ? (
+                    <div className="mt-1 text-sm text-[rgba(0,0,0,0.65)]">{cycleStats.predictedNextStartISO}</div>
+                  ) : null}
+                </div>
+              </div>
+
+              {cycleStats?.predictionNote ? (
+                <div className="mt-4 text-sm text-[rgba(0,0,0,0.70)]">{cycleStats.predictionNote}</div>
+              ) : null}
+            </div>
+          </div>
+        )}
+
     </div>
   );
 

@@ -20,9 +20,10 @@ import {
   X,
 } from 'lucide-react';
 import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, looksLikeInsightsExport, importBackupFile } from '../lib/backup';
-import type { ColorTheme, SymptomKey, SymptomKind, UserData, InfluenceKey } from '../types';
+import type { ColorTheme, SymptomKey, SymptomKind, UserData, InfluenceKey, UserGoal } from '../types';
 import { DEFAULT_USER } from '../lib/defaultUser';
 import { kindLabel } from '../lib/symptomMeta';
+import { getGoalPreset } from '../lib/goalPresets';
 import { downloadTextFile } from '../lib/storage';
 import {
   cloudPullAndApply,
@@ -215,6 +216,9 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
     }
   }, [view]);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [showGoalSelector, setShowGoalSelector] = useState(false);
+  const [pendingGoal, setPendingGoal] = useState<UserGoal | null>(null);
+  const [showGoalChangeModal, setShowGoalChangeModal] = useState(false);
   const [showPrivacyPanel, setShowPrivacyPanel] = useState(false);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [showHelpPanel, setShowHelpPanel] = useState(false);
@@ -436,6 +440,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
       title: 'Preferences',
       items: [
         { icon: Palette, label: 'Theme', onClick: () => setShowThemeSelector(!showThemeSelector) },
+        { icon: SparklesIcon, label: 'Goal', onClick: () => setShowGoalSelector(!showGoalSelector) },
       ],
     },
     {
@@ -1306,6 +1311,76 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                     </details>
                   );
                 }
+
+                if (item.label === 'Goal') {
+                  const currentGoal: UserGoal = (userData.goal ?? 'cycle-health') as UserGoal;
+                  const options: Array<{ id: UserGoal; label: string; desc: string }> = [
+                    { id: 'cycle-health', label: 'Cycle Health', desc: 'General cycle tracking and rhythm insights.' },
+                    { id: 'perimenopause', label: 'Perimenopause', desc: 'Trend-led insights for changing rhythms.' },
+                    { id: 'post-contraception', label: 'Post contraception', desc: 'Support while your body rebalances.' },
+                    { id: 'wellbeing', label: 'Wellbeing', desc: 'A lighter, symptom-first approach.' },
+                  ];
+
+                  return (
+                    <details
+                      key="goal"
+                      className="border-b border-neutral-100 last:border-b-0 group"
+                      open={showGoalSelector}
+                      onToggle={(e) => setShowGoalSelector((e.currentTarget as HTMLDetailsElement).open)}
+                    >
+                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
+                          <span>Goal</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-[rgb(var(--color-text-secondary))]">{options.find((o) => o.id === currentGoal)?.label ?? 'Cycle Health'}</span>
+                          <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
+                        </div>
+                      </summary>
+
+                      <div className="px-4 pb-4 pt-0">
+                        <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
+                          Choose what you’re focusing on right now. You can keep your tracking as-is, or switch to a recommended setup.
+                        </p>
+
+                        <div className="grid gap-2">
+                          {options.map((o) => {
+                            const selected = currentGoal === o.id;
+                            return (
+                              <button
+                                key={o.id}
+                                type="button"
+                                onClick={() => {
+                                  if (currentGoal === o.id) {
+                                    setShowGoalSelector(true);
+                                    return;
+                                  }
+                                  setPendingGoal(o.id);
+                                  setShowGoalChangeModal(true);
+                                }}
+                                className={[
+                                  'w-full rounded-xl border px-3 py-3 text-left transition-colors',
+                                  selected
+                                    ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.06)]'
+                                    : 'border-neutral-200 hover:bg-neutral-50',
+                                ].join(' ')}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <div className="text-sm font-medium leading-tight">{o.label}</div>
+                                    <div className="text-xs text-[rgb(var(--color-text-secondary))] mt-0.5">{o.desc}</div>
+                                  </div>
+                                  {selected ? <Check className="w-5 h-5 text-[rgb(var(--color-primary))]" /> : null}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </details>
+                  );
+                }
                 if (item.label === 'Privacy & Security') {
                   return (
                     <details
@@ -2054,6 +2129,91 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
               <div className="mt-4 flex justify-end">
                 <button type="button" className="eb-btn-secondary" onClick={() => setRetirePrompt(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Goal change modal */}
+        {showGoalChangeModal && pendingGoal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Switch goal">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40"
+              onClick={() => {
+                setShowGoalChangeModal(false);
+                setPendingGoal(null);
+              }}
+              aria-label="Close"
+            />
+
+            <div className="relative w-full max-w-lg eb-card p-5">
+              <div className="font-semibold">Switch goal?</div>
+              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
+                You can just change the goal label, or switch to the recommended tracking setup. If you’re pivoting, you can also start fresh for Insights without deleting your history.
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <button
+                  type="button"
+                  className="w-full eb-btn-secondary"
+                  onClick={() => {
+                    onUpdateUserData((prev) => ({ ...prev, goal: pendingGoal }));
+                    setShowGoalChangeModal(false);
+                    setPendingGoal(null);
+                  }}
+                >
+                  Keep my settings
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full eb-btn-secondary"
+                  onClick={() => {
+                    const preset = getGoalPreset(pendingGoal) ?? {};
+                    onUpdateUserData((prev) => ({
+                      ...prev,
+                      goal: pendingGoal,
+                      ...preset,
+                    }));
+                    setShowGoalChangeModal(false);
+                    setPendingGoal(null);
+                  }}
+                >
+                  Switch to recommended tracking
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full eb-btn-primary"
+                  onClick={() => {
+                    const preset = getGoalPreset(pendingGoal) ?? {};
+                    const todayISO = isoToday();
+                    onUpdateUserData((prev) => ({
+                      ...prev,
+                      goal: pendingGoal,
+                      ...preset,
+                      insightsFromISO: todayISO,
+                    }));
+                    setShowGoalChangeModal(false);
+                    setPendingGoal(null);
+                  }}
+                >
+                  Recommended + start fresh for Insights
+                </button>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  className="eb-btn-secondary"
+                  onClick={() => {
+                    setShowGoalChangeModal(false);
+                    setPendingGoal(null);
+                  }}
+                >
                   Cancel
                 </button>
               </div>

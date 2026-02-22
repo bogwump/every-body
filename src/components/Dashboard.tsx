@@ -13,11 +13,10 @@ import {
 
 import type { DashboardMetric, SymptomKey, UserData, UserGoal } from '../types';
 import { useEntries } from '../lib/appStore';
-import { computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
+import { buildHomepageHeroModel, computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
 import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
 import { importBackupFile, parseBackupJson, looksLikeInsightsExport } from '../lib/backup';
-import { getGoalPreset } from '../lib/goalPresets';
 
 interface DashboardProps {
   userName: string;
@@ -28,16 +27,6 @@ interface DashboardProps {
   onOpenCheckIn: (dateISO?: string) => void;
 }
 
-function prettyGoal(goal: UserGoal | null) {
-  if (!goal) return 'Cycle Health';
-  const map: Record<UserGoal, string> = {
-    'cycle-health': 'Cycle Health',
-    perimenopause: 'Perimenopause',
-    'post-contraception': 'Post contraception',
-    wellbeing: 'Wellbeing',
-  };
-  return map[goal] ?? 'Cycle Health';
-}
 
 function labelDayShort(iso: string): string {
   const d = new Date(iso + 'T00:00:00');
@@ -176,13 +165,28 @@ export function Dashboard({
   const insightsRemaining = Math.max(0, insightsMinDays - daysTracked);
   const insightsReady = daysTracked >= insightsMinDays;
 
-  const goalLabel = prettyGoal(userGoal);
-
-  const [showGoalPicker, setShowGoalPicker] = React.useState(false);
-  const [pendingGoal, setPendingGoal] = React.useState<UserGoal | null>(null);
-  const [showGoalChangeModal, setShowGoalChangeModal] = React.useState(false);
-
   const cycleStats = useMemo(() => computeCycleStats(entriesSorted), [entriesSorted]);
+
+  const heroModel = useMemo(() => {
+    const key = `eb:homeHero:${isoToday()}`;
+    try {
+      const cachedRaw = localStorage.getItem(key);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached && cached.dateISO === isoToday()) return cached;
+      }
+    } catch {
+      // ignore cache issues
+    }
+
+    const model = buildHomepageHeroModel(entriesSorted, userData);
+    try {
+      localStorage.setItem(key, JSON.stringify(model));
+    } catch {
+      // ignore storage issues
+    }
+    return model;
+  }, [entriesSorted, userData]);
 
   const todayPhase = useMemo(() => {
     if (userData.cycleTrackingMode !== 'cycle') return null;
@@ -400,16 +404,6 @@ export function Dashboard({
     return lines.slice(0, 4);
   }, [entriesSorted, chartMetrics, insightsReady, insightsRemaining, todayEntry, yesterdayEntry, userData.enabledModules]);
 
-  const showCycleBubble = userData.cycleTrackingMode === 'cycle' && (userData.showCycleBubble ?? true);
-  const [cycleModalOpen, setCycleModalOpen] = React.useState(false);
-
-  const avgCycleText = cycleStats.avgLength ? `${cycleStats.avgLength} days avg` : 'Not enough data yet';
-
-  // NOTE: You asked to move quick log items to Check-in.
-  // This modal remains informational only (stats + prediction).
-  // If you still want overrides here too, we can add them back cleanly later.
-  const closeGoalPicker = () => setShowGoalPicker(false);
-
   const setChartMetric = (index: 0 | 1 | 2, next: DashboardMetric) => {
     onUpdateUserData((prev) => {
       const current = (prev.dashboardChartMetrics && prev.dashboardChartMetrics.length === 3
@@ -438,7 +432,7 @@ export function Dashboard({
           <p>{todayLabel}</p>
         </div>
 
-        {/* HERO: Symptom tracking */}
+                {/* HERO: Symptom tracking */}
         <div className="eb-card eb-hero eb-hero-surface rounded-2xl p-6 relative">
           {/* Calendar icon */}
           <button
@@ -450,187 +444,43 @@ export function Dashboard({
             <Calendar className="w-5 h-5" />
           </button>
 
-          <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">Symptom tracking</h3>
+          {/* View full rhythm */}
+          <button
+            type="button"
+            onClick={() => onNavigate('rhythm')}
+            className="absolute top-4 right-12 text-sm eb-hero-on-dark-muted hover:eb-hero-on-dark transition"
+            title="View full rhythm"
+          >
+            View full rhythm
+          </button>
 
-          <p className="eb-hero-subtitle eb-hero-on-dark-muted mb-5 text-white">
-            {userData.cycleTrackingMode === 'no-cycle'
-              ? 'Cycle features are off, but you can still track symptoms and patterns.'
-              : 'Add bleeding or spotting (optional) to unlock cycle-phase insights.'}
-          </p>
+          <h3 className="mb-3 eb-hero-title eb-hero-on-dark text-white">Symptom tracking</h3>
 
-          {/* Cycle length bubble */}
-          {showCycleBubble && (
-            <button
-              type="button"
-              onClick={() => setCycleModalOpen(true)}
-              // On mobile, keep this in the normal flow so it never overlaps the hero text.
-              // On sm+ screens, we float it up near the calendar icon.
-              className="w-full sm:w-auto sm:absolute sm:left-auto sm:right-14 sm:top-4 rounded-full bg-[rgba(255,255,255,0.18)] border border-[rgba(255,255,255,0.25)] px-3 py-1 text-sm eb-hero-on-dark hover:bg-[rgba(255,255,255,0.24)] transition flex items-center justify-center mb-4 sm:mb-0"
-              title="Cycle length"
-            >
-              <span className="font-medium">Cycle length</span>
-              <span className="mx-2 opacity-70">•</span>
-              <span className="font-semibold">{avgCycleText}</span>
-            </button>
-          )}
-
-          {/* Today + Goal */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => onOpenCheckIn(todayISO)}
-              className="eb-inset rounded-xl p-4 text-left w-full hover:opacity-95 transition group cursor-pointer shadow-sm hover:shadow-md"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="eb-inset-label">Today</div>
-                  <div className="eb-inset-value">
-                    {checkedInToday ? 'Checked in' : 'Not checked in yet'}
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 opacity-70 group-hover:opacity-100 transition" />
-              </div>
-            </button>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowGoalPicker((v) => !v)}
-                className="eb-inset rounded-xl p-4 text-left w-full hover:opacity-95 transition group cursor-pointer shadow-sm hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="eb-inset-label">Goal</div>
-                    <div className="eb-inset-value">{goalLabel}</div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 opacity-70 group-hover:opacity-100 transition" />
-                </div>
-              </button>
-
-              {showGoalPicker && (
-                <div
-                  className="absolute left-0 right-0 mt-2 z-20 bg-white rounded-2xl shadow-lg border border-[rgba(0,0,0,0.08)] p-3"
-                  role="menu"
-                >
-                  <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">Change goal</div>
-                  <div className="grid gap-2">
-                    {([
-                      { id: 'cycle-health', label: 'Cycle Health' },
-                      { id: 'perimenopause', label: 'Perimenopause' },
-                      { id: 'post-contraception', label: 'Post contraception' },
-                      { id: 'wellbeing', label: 'Wellbeing' },
-                    ] as const).map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        className={`w-full text-left px-3 py-2 rounded-xl transition ${
-                          userData.goal === g.id
-                            ? 'bg-[rgb(var(--color-primary)/0.12)]'
-                            : 'hover:bg-[rgba(0,0,0,0.04)]'
-                        }`}
-                        onClick={() => {
-                          if (userData.goal === g.id) {
-                            closeGoalPicker();
-                            return;
-                          }
-                          setPendingGoal(g.id);
-                          setShowGoalChangeModal(true);
-                          closeGoalPicker();
-                        }}
-                      >
-                        {g.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Today in your rhythm */}
+          <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)]">
+            <div className="text-sm font-semibold eb-hero-on-dark text-white">{heroModel.rhythmTitle}</div>
+            {heroModel.rhythmHeadline ? (
+              <div className="mt-1 text-lg font-semibold eb-hero-on-dark text-white">{heroModel.rhythmHeadline}</div>
+            ) : null}
+            <div className="mt-2 text-sm eb-hero-on-dark-muted text-white">{heroModel.rhythmBody}</div>
           </div>
 
-          {/* Goal change modal */}
-          {showGoalChangeModal && pendingGoal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Change goal">
-              <button
-                type="button"
-                className="absolute inset-0 bg-black/40"
-                onClick={() => {
-                  setShowGoalChangeModal(false);
-                  setPendingGoal(null);
-                }}
-                aria-label="Close"
-              />
-
-              <div className="relative w-full max-w-lg eb-card p-5">
-                <div className="font-semibold">Switch goal?</div>
-                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
-                  You can just change the goal label, or switch to the recommended tracking setup. If you’re pivoting, you can also start fresh for Insights without deleting your history.
+          {/* How you've been */}
+          <div className="mt-4 eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.16)]">
+            <div className="text-sm font-semibold eb-hero-on-dark text-white">{heroModel.howTitle}</div>
+            <div className="mt-2 space-y-1">
+              {heroModel.howLines.map((line: string, i: number) => (
+                <div key={i} className="text-sm eb-hero-on-dark-muted text-white">
+                  {line}
                 </div>
-
-                <div className="mt-4 space-y-2">
-                  <button
-                    type="button"
-                    className="w-full eb-btn-secondary"
-                    onClick={() => {
-                      onUpdateUserData((prev) => ({ ...prev, goal: pendingGoal }));
-                      setShowGoalChangeModal(false);
-                      setPendingGoal(null);
-                    }}
-                  >
-                    Keep my settings
-                  </button>
-
-                  <button
-                    type="button"
-                    className="w-full eb-btn-secondary"
-                    onClick={() => {
-                      const preset = getGoalPreset(pendingGoal) ?? {};
-                      onUpdateUserData((prev) => ({
-                        ...prev,
-                        goal: pendingGoal,
-                        ...preset,
-                      }));
-                      setShowGoalChangeModal(false);
-                      setPendingGoal(null);
-                    }}
-                  >
-                    Switch to recommended tracking
-                  </button>
-
-                  <button
-                    type="button"
-                    className="w-full eb-btn-primary"
-                    onClick={() => {
-                      const preset = getGoalPreset(pendingGoal) ?? {};
-                      const todayISO = isoToday();
-                      onUpdateUserData((prev) => ({
-                        ...prev,
-                        goal: pendingGoal,
-                        ...preset,
-                        insightsFromISO: todayISO,
-                      }));
-                      setShowGoalChangeModal(false);
-                      setPendingGoal(null);
-                    }}
-                  >
-                    Recommended + start fresh for Insights
-                  </button>
-                </div>
-
-                <div className="mt-4 flex justify-end">
-                  <button
-                    type="button"
-                    className="eb-btn-secondary"
-                    onClick={() => {
-                      setShowGoalChangeModal(false);
-                      setPendingGoal(null);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
-          )}
+            {heroModel.relationshipLine ? (
+              <div className="mt-3 text-sm eb-hero-on-dark text-white">
+                {heroModel.relationshipLine}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Restore from backup nudge (only when there is no data yet) */}
@@ -839,104 +689,6 @@ export function Dashboard({
             </div>
           </div>
         </div>
-
-        {/* Nice work */}
-        
-
-
-        {/* Cycle length modal (stats only) */}
-        {cycleModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/50"
-              onClick={() => setCycleModalOpen(false)}
-              aria-label="Close cycle modal"
-            />
-            <div className="relative w-full max-w-lg eb-card p-6">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div className="min-w-0">
-                  <h2 className="text-xl font-semibold mb-1">Cycle length</h2>
-                  <p className="text-sm text-[rgba(0,0,0,0.65)]">
-                    {userData.cycleTrackingMode === 'cycle'
-                      ? 'Based on your logs and any overrides.'
-                      : 'Cycle tracking is off.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCycleModalOpen(false)}
-                  className="rounded-xl px-3 py-2 border border-[rgba(0,0,0,0.12)] hover:bg-neutral-50"
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mb-5">
-                <div className="eb-inset p-4">
-                  <div className="eb-inset-label">Average</div>
-                  <div className="eb-inset-value">
-                    {cycleStats.avgLength ? `${cycleStats.avgLength} days` : '–'}
-                  </div>
-                </div>
-                <div className="eb-inset p-4">
-                  <div className="eb-inset-label">Last cycle</div>
-                  <div className="eb-inset-value">
-                    {cycleStats.lastLength ? `${cycleStats.lastLength} days` : '–'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="eb-card p-4 mb-5 bg-white border border-[rgba(0,0,0,0.06)]">
-                <div className="text-sm font-semibold mb-1">Predicted next start</div>
-                <div className="text-base">
-                  {cycleStats.predictedNextStartISO ? cycleStats.predictedNextStartISO : 'Not enough data yet'}
-                </div>
-                {cycleStats.predictionNote && (
-                  <p className="text-sm text-[rgba(0,0,0,0.65)] mt-2">{cycleStats.predictionNote}</p>
-                )}
-              </div>
-
-              <div className="pt-1">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium mb-1">Start a new cycle today</p>
-                    <p className="text-sm text-[rgba(0,0,0,0.65)]">Use this if your cycle starts without bleeding (coil/pill). You can adjust it later in Calendar → Edit cycle.</p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const now = new Date().toISOString();
-                      const isOn = Boolean((todayEntry as any)?.cycleStartOverride);
-                      if (todayEntry) {
-                        upsertEntry({ ...(todayEntry as any), cycleStartOverride: isOn ? undefined : true, updatedAt: now } as any);
-                      } else {
-                        if (!isOn) {
-                          upsertEntry({
-                            id: `${Date.now()}`,
-                            dateISO: todayISO,
-                            values: {},
-                            cycleStartOverride: true,
-                            createdAt: now,
-                            updatedAt: now,
-                          } as any);
-                        }
-                      }
-                    }}
-                    className={`flex-shrink-0 w-12 h-6 rounded-full transition-all ${Boolean((todayEntry as any)?.cycleStartOverride) ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
-                    aria-label="Toggle cycle start today"
-                  >
-                    <div
-                      className={`w-5 h-5 bg-white rounded-full transition-transform ${Boolean((todayEntry as any)?.cycleStartOverride) ? 'translate-x-6' : 'translate-x-0.5'}`}
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );

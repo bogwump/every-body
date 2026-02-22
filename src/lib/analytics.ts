@@ -1,4 +1,4 @@
-import type { CheckInEntry, SymptomKey } from "../types";
+import type { CheckInEntry, SymptomKey, InfluenceKey, UserData } from "../types";
 import { isoFromDateLocal, isoTodayLocal } from "./date";
 
 function asArray<T>(value: unknown): T[] {
@@ -326,5 +326,348 @@ export function computeCycleStats(entries: CheckInEntry[] | unknown): CycleStats
     avgLength,
     predictedNextStartISO,
     predictionNote,
+  };
+}
+
+
+
+export type HomepageHeroTier = "starter" | "early" | "weekly" | "mature";
+
+export type HomepageHeroModel = {
+  dateISO: string;
+  tier: HomepageHeroTier;
+  rhythmTitle: string;
+  rhythmHeadline?: string;
+  rhythmBody: string;
+  howTitle: string;
+  howLines: string[];
+  relationshipLine?: string;
+};
+
+const HOMEPAGE_SYMPTOM_LABELS: Partial<Record<SymptomKey, string>> = {
+  energy: "Energy",
+  motivation: "Motivation",
+  sleep: "Sleep",
+  insomnia: "Trouble falling asleep",
+  pain: "Pain",
+  headache: "Headaches",
+  migraine: "Migraines",
+  backPain: "Back pain",
+  cramps: "Period pain",
+  jointPain: "Joint pain",
+  flow: "Bleeding",
+  stress: "Stress",
+  anxiety: "Anxiety",
+  irritability: "Irritability",
+  focus: "Focus",
+  bloating: "Bloating",
+  digestion: "Digestion",
+  nausea: "Nausea",
+  constipation: "Constipation",
+  diarrhoea: "Diarrhoea",
+  acidReflux: "Acid reflux",
+  hairShedding: "Hair shedding",
+  facialSpots: "Facial spots",
+  cysts: "Cysts",
+  skinDryness: "Skin dryness",
+  brainFog: "Brain fog",
+  fatigue: "Fatigue",
+  dizziness: "Dizziness",
+  appetite: "Appetite",
+  libido: "Libido",
+  breastTenderness: "Breast tenderness",
+  hotFlushes: "Hot flushes",
+  nightSweats: "Night sweats",
+  restlessLegs: "Restless legs",
+};
+
+const HOMEPAGE_INFLUENCE_LABELS: Record<InfluenceKey, string> = {
+  sex: "sex",
+  exercise: "exercise",
+  travel: "travel",
+  illness: "illness",
+  alcohol: "alcohol",
+  lateNight: "a late night",
+  stressfulDay: "a stressful day",
+  medication: "medication",
+  caffeine: "caffeine",
+  socialising: "socialising",
+  lowHydration: "low hydration",
+};
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function formatLocalDateISO(d: Date): string {
+  return isoFromDateLocal(d);
+}
+
+function getRecentWindow(entries: CheckInEntry[], days: number, endISO: string): CheckInEntry[] {
+  const end = new Date(endISO + "T00:00:00");
+  const start = new Date(end);
+  start.setDate(start.getDate() - (Math.max(1, days) - 1));
+  const startISO = formatLocalDateISO(start);
+  return entries.filter((e) => String(e?.dateISO ?? "") >= startISO && String(e?.dateISO ?? "") <= endISO);
+}
+
+function getNumericSymptom(e: any, key: SymptomKey): number | undefined {
+  const v = e?.values?.[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+function getMoodAs10(e: any): number | undefined {
+  const m = e?.mood as 1 | 2 | 3 | undefined;
+  if (m === 1) return 3;
+  if (m === 2) return 6;
+  if (m === 3) return 9;
+  return undefined;
+}
+
+type SymptomShift = { key: "mood" | SymptomKey; label: string; delta: number; logsA: number; logsB: number };
+
+function describeShift(label: string, delta: number): string {
+  // delta is last7 - prev7 (positive = higher)
+  const abs = Math.abs(delta);
+
+  // "clinical" language avoided, so we lean on gentle phrasing.
+  if (abs < 0.4) return `${label} has felt fairly steady`;
+  if (abs < 1.0) return delta > 0 ? `${label} has been a little higher` : `${label} has been a little lower`;
+  if (abs < 2.0) return delta > 0 ? `${label} has been noticeably higher` : `${label} has been noticeably lower`;
+  return delta > 0 ? `${label} has been much higher` : `${label} has been much lower`;
+}
+
+function safeLabelForSymptom(key: SymptomKey): string {
+  return HOMEPAGE_SYMPTOM_LABELS[key] ?? key;
+}
+
+function pickTier(daysLogged: number): HomepageHeroTier {
+  if (daysLogged < 4) return "starter";
+  if (daysLogged < 7) return "early";
+  if (daysLogged < 30) return "weekly";
+  return "mature";
+}
+
+type RelationshipCandidate = {
+  influence: InfluenceKey;
+  symptomKey: "mood" | SymptomKey;
+  symptomLabel: string;
+  influenceLabel: string;
+  effect: number; // mean(with) - mean(without)
+  withN: number;
+  withoutN: number;
+};
+
+function buildRelationshipLine(c: RelationshipCandidate): string {
+  const symptom = c.symptomLabel.toLowerCase();
+  const infl = c.influenceLabel;
+  const abs = Math.abs(c.effect);
+
+  let strength: "a bit" | "often" | "clearly" = "a bit";
+  if (abs >= 1.5) strength = "clearly";
+  else if (abs >= 0.8) strength = "often";
+
+  const dir = c.effect > 0 ? "higher" : "lower";
+
+  // Keep tone neutral, especially for alcohol.
+  return `It looks like ${symptom} is ${dir} ${strength} on days you log ${infl}.`;
+}
+
+/**
+ * Builds the content for the Dashboard hero.
+ * - Uses the user's enabled modules (plus mood) so we never pigeonhole.
+ * - Produces up to 3 "How you've been" lines.
+ * - Produces at most 1 relationship insight line (rotates daily if multiple qualify).
+ * - Locks outputs per day is handled by the caller (Dashboard) via localStorage cache.
+ */
+export function buildHomepageHeroModel(
+  entriesRaw: CheckInEntry[] | unknown,
+  userData: UserData
+): HomepageHeroModel {
+  const todayISO = isoTodayLocal();
+  const sorted = sortByDateAsc(entriesRaw);
+  const daysLogged = sorted.length;
+
+  const tier = pickTier(daysLogged);
+
+  // Rhythm block (softened for perimenopause users)
+  const isPeri = userData.goal === "perimenopause";
+  let rhythmTitle = "Today in your rhythm";
+  let rhythmHeadline: string | undefined;
+  let rhythmBody = "Log a few days and I’ll start reflecting your rhythm back to you.";
+
+  if (isPeri) rhythmTitle = "Your rhythm lately";
+
+  if (userData.cycleTrackingMode === "cycle") {
+    const stats = computeCycleStats(sorted);
+    // Use the phase estimator if we have enough context.
+    // We only show the phase name once we can place the user in a cycle day.
+    if (stats && (stats as any).avgLength) {
+      // estimatePhaseByFlow expects entries and a date, and returns phase meta in this app.
+      try {
+        const phase = estimatePhaseByFlow(sorted, todayISO, (stats as any).avgLength);
+        if (phase?.soft) {
+          rhythmHeadline = isPeri ? phase.soft.replace("Phase", "").trim() : `You’re in ${phase.soft.replace("Phase", "").trim()}`;
+          rhythmBody = isPeri
+            ? "Your cycle may feel less predictable. We’ll focus on trends over exact days."
+            : "This is a helpful backdrop for planning, but your logged symptoms matter most.";
+        }
+      } catch {
+        // fall back silently
+      }
+    }
+  } else {
+    rhythmBody = "Cycle features are off, but you can still track symptoms and patterns.";
+  }
+
+  // Eligible symptoms are whatever the user has enabled, plus mood.
+  const enabled = new Set<SymptomKey>(userData.enabledModules ?? []);
+  // Never use flow as an emotional summary line.
+  enabled.delete("flow");
+
+  // Build windows
+  const last7 = getRecentWindow(sorted, 7, todayISO);
+  const prev7 = getRecentWindow(sorted, 7, formatLocalDateISO(new Date(new Date(todayISO + "T00:00:00").getTime() - 7 * 86400000)));
+
+  const shifts: SymptomShift[] = [];
+
+  // Mood shift
+  {
+    const a = last7.map(getMoodAs10).filter((n): n is number => typeof n === "number");
+    const b = prev7.map(getMoodAs10).filter((n): n is number => typeof n === "number");
+    if (a.length >= 2 && b.length >= 2) {
+      shifts.push({ key: "mood", label: "Mood", delta: mean(a) - mean(b), logsA: a.length, logsB: b.length });
+    }
+  }
+
+  // Symptom shifts
+  for (const key of enabled) {
+    const a = last7.map((e) => getNumericSymptom(e, key)).filter((n): n is number => typeof n === "number");
+    const b = prev7.map((e) => getNumericSymptom(e, key)).filter((n): n is number => typeof n === "number");
+    if (tier === "early") {
+      // For 4-6 days total, compare within last7 only (no prev7 reliable).
+      // We'll handle this below with a simpler summary.
+      continue;
+    }
+    if (a.length >= 2 && b.length >= 2) {
+      shifts.push({ key, label: safeLabelForSymptom(key), delta: mean(a) - mean(b), logsA: a.length, logsB: b.length });
+    }
+  }
+
+  let howLines: string[] = [];
+  const howTitle = "How you’ve been recently";
+
+  if (tier === "starter") {
+    howLines = ["Start logging and I’ll summarise how you’ve been."];
+  } else if (tier === "early") {
+    // Use last 7 only: pick up to 2 symptoms with the widest range, based on what exists.
+    const candidates: Array<{ label: string; range: number }> = [];
+    const moodVals = last7.map(getMoodAs10).filter((n): n is number => typeof n === "number");
+    if (moodVals.length >= 2) candidates.push({ label: "Mood", range: Math.max(...moodVals) - Math.min(...moodVals) });
+    for (const key of enabled) {
+      const vals = last7.map((e) => getNumericSymptom(e, key)).filter((n): n is number => typeof n === "number");
+      if (vals.length >= 2) candidates.push({ label: safeLabelForSymptom(key), range: Math.max(...vals) - Math.min(...vals) });
+    }
+    candidates.sort((a, b) => b.range - a.range);
+    const pick = candidates.slice(0, 2);
+    howLines = pick.length
+      ? pick.map((p) => `${p.label} has varied a bit`)
+      : ["Keep logging and I’ll start reflecting patterns back to you."];
+  } else {
+    // Weekly/mature: pick up to 3 by weighted impact
+    const weighted = shifts
+      .map((s) => {
+        const consistency = clamp01(Math.min(s.logsA, s.logsB) / 5); // 0..1
+        const impact = Math.abs(s.delta) * (0.6 + 0.4 * consistency);
+        return { ...s, impact };
+      })
+      .sort((a, b) => b.impact - a.impact);
+
+    const top = weighted.filter((s) => Math.abs(s.delta) >= 0.35).slice(0, 3);
+    howLines = top.length ? top.map((s) => describeShift(s.label, s.delta)) : ["Things have felt fairly steady recently."];
+  }
+
+  // Relationship insight (from 7+ days)
+  let relationshipLine: string | undefined;
+  if (daysLogged >= 7) {
+    const enabledInfluences = (userData.enabledInfluences ?? []) as InfluenceKey[];
+    const influences = enabledInfluences.length ? enabledInfluences : [];
+    const usableInfluences = influences.filter((k) => k !== "sex");
+
+    const window14 = getRecentWindow(sorted, 14, todayISO);
+    const candidates: RelationshipCandidate[] = [];
+
+    // Choose symptoms to test against: mood + enabled symptoms (excluding flow)
+    const symptomKeys: Array<"mood" | SymptomKey> = ["mood", ...Array.from(enabled)];
+
+    for (const infl of usableInfluences) {
+      const withDays = window14.filter((e: any) => Boolean(e?.events?.[infl]));
+      const withoutDays = window14.filter((e: any) => !Boolean(e?.events?.[infl]));
+
+      // Require enough examples both ways
+      if (withDays.length < 4 || withoutDays.length < 4) continue;
+
+      for (const sk of symptomKeys) {
+        const withVals =
+          sk === "mood"
+            ? withDays.map(getMoodAs10).filter((n): n is number => typeof n === "number")
+            : withDays.map((e) => getNumericSymptom(e, sk)).filter((n): n is number => typeof n === "number");
+        const withoutVals =
+          sk === "mood"
+            ? withoutDays.map(getMoodAs10).filter((n): n is number => typeof n === "number")
+            : withoutDays.map((e) => getNumericSymptom(e, sk)).filter((n): n is number => typeof n === "number");
+
+        if (withVals.length < 3 || withoutVals.length < 3) continue;
+
+        const effect = mean(withVals) - mean(withoutVals);
+        if (Math.abs(effect) < 0.7) continue; // soft threshold to avoid noisy claims
+
+        candidates.push({
+          influence: infl,
+          symptomKey: sk,
+          symptomLabel: sk === "mood" ? "Mood" : safeLabelForSymptom(sk),
+          influenceLabel: HOMEPAGE_INFLUENCE_LABELS[infl] ?? infl,
+          effect,
+          withN: withVals.length,
+          withoutN: withoutVals.length,
+        });
+      }
+    }
+
+    if (candidates.length) {
+      // Sort strongest effect first
+      candidates.sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
+
+      // Rotate daily across the top few so it's not the same one forever.
+      const uniqueKeys: RelationshipCandidate[] = [];
+      const seen = new Set<string>();
+      for (const c of candidates) {
+        const k = `${c.influence}|${c.symptomKey}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        uniqueKeys.push(c);
+      }
+
+      const pickFrom = uniqueKeys.slice(0, 6); // keep rotation small + high quality
+      const seed = todayISO.split("-").join("");
+      const num = parseInt(seed, 10);
+      const idx = Number.isFinite(num) ? num % pickFrom.length : 0;
+      relationshipLine = buildRelationshipLine(pickFrom[idx]);
+    }
+  }
+
+  // If we don't have any enabled symptoms and no mood, always show something reassuring.
+  if (!enabled.size && howLines.length === 0) howLines = ["Choose a few things to track and I’ll reflect patterns back to you."];
+
+  return {
+    dateISO: todayISO,
+    tier,
+    rhythmTitle,
+    rhythmHeadline,
+    rhythmBody,
+    howTitle,
+    howLines,
+    relationshipLine,
   };
 }
