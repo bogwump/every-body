@@ -168,12 +168,17 @@ export function Dashboard({
   const cycleStats = useMemo(() => computeCycleStats(entriesSorted), [entriesSorted]);
 
   const heroModel = useMemo(() => {
-    const key = `eb:homeHero:${isoToday()}`;
+    // IMPORTANT: Version the cache key.
+    // We have iterated on the hero model shape/logic a lot, and stale cached JSON can
+    // make the UI look "stuck" even when the underlying logic has changed.
+    const HERO_CACHE_VERSION = 3;
+    const key = `eb:homeHero:v${HERO_CACHE_VERSION}:${isoToday()}`;
     try {
       const cachedRaw = localStorage.getItem(key);
       if (cachedRaw) {
         const cached = JSON.parse(cachedRaw);
-        if (cached && cached.dateISO === isoToday()) return cached;
+        // If the cached payload looks incomplete, ignore it and rebuild.
+        if (cached && cached.dateISO === isoToday() && (cached.rhythmBody || cached.howLines)) return cached;
       }
     } catch {
       // ignore cache issues
@@ -463,9 +468,6 @@ export function Dashboard({
               <div className="mt-1 text-lg font-semibold eb-hero-on-dark text-white">{heroModel.rhythmHeadline}</div>
             ) : null}
             <div className="mt-2 text-sm eb-hero-on-dark-muted text-white">{heroModel.rhythmBody}</div>
-          {heroModel.rhythmDebug ? (
-            <div className="mt-2 text-[11px] opacity-80 text-white/80">{heroModel.rhythmDebug}</div>
-          ) : null}
           </div>
 
           {/* How you've been */}

@@ -366,7 +366,6 @@ export type HomepageHeroModel = {
   rhythmTitle: string;
   rhythmHeadline?: string;
   rhythmBody: string;
-  rhythmDebug?: string;
   howTitle: string;
   howLines: string[];
   relationshipLine?: string;
@@ -528,10 +527,10 @@ function softPhaseMetaFromKey(key: PhaseKey) {
 }
 
 const genericPhaseProfiles: Record<PhaseKey, Partial<Record<SymptomKey, number>>> = {
-  reset: { fatigue: 7, cramps: 6, pain: 6, headache: 5, sleep: 4, stress: 5, libido: 2, digestion: 5, bloating: 6 },
-  rebuilding: { energy: 6, motivation: 6, sleep: 6, stress: 4, brainFog: 3, digestion: 4, bloating: 3, libido: 4 },
-  expressive: { energy: 7, motivation: 7, libido: 7, stress: 3, brainFog: 2, sleep: 6, digestion: 4 },
-  protective: { fatigue: 7, sleep: 4, irritability: 6, anxiety: 5, stress: 6, bloating: 6, digestion: 6, breastTenderness: 5, headache: 5, facialSpots: 5, cysts: 5 },
+  reset: { fatigue: 7, cramps: 6, pain: 6, headache: 5, sleep: 4, stress: 5, libido: 2, digestion: 5, bloating: 6, nightSweats: 4 },
+  rebuilding: { energy: 6, motivation: 6, sleep: 6, stress: 4, brainFog: 3, digestion: 4, bloating: 3, libido: 4, nightSweats: 2 },
+  expressive: { energy: 7, motivation: 7, libido: 7, stress: 3, brainFog: 2, sleep: 6, digestion: 4, nightSweats: 2 },
+  protective: { fatigue: 7, sleep: 4, irritability: 6, anxiety: 5, stress: 6, bloating: 6, digestion: 6, breastTenderness: 5, headache: 5, facialSpots: 5, cysts: 5, nightSweats: 5 },
 };
 
 function meanNums(vals: number[]): number | null {
@@ -543,26 +542,18 @@ function inferPhaseKeyFromSignals(sorted: CheckInEntry[]): PhaseKey | null {
   const recent = sorted.slice(-10);
   if (!recent.length) return null;
 
-  const keys: SymptomKey[] = [
-    "energy",
-    "motivation",
-    "sleep",
-    "stress",
-    "anxiety",
-    "irritability",
-    "brainFog",
-    "fatigue",
-    "libido",
-    "digestion",
-    "bloating",
-    "cramps",
-    "headache",
-    "breastTenderness",
-    "nightSweats",
-    "hotFlushes",
-    "facialSpots",
-    "cysts",
-  ];
+  // Use all numeric symptom signals the user is actually logging (from entry.values).
+  // - Exclude flow (bleeding is an anchor, not a symptom signal for inference)
+  // - Exclude influences (they live in entry.events, not values)
+  const keysSet = new Set<string>();
+  for (const e of recent as any[]) {
+    const v = (e as any)?.values;
+    if (v && typeof v === "object") {
+      for (const k of Object.keys(v)) keysSet.add(k);
+    }
+  }
+  keysSet.delete("flow");
+  const keys = Array.from(keysSet) as SymptomKey[];
 
   const means: Partial<Record<SymptomKey, number>> = {};
   for (const k of keys) {
@@ -573,8 +564,10 @@ function inferPhaseKeyFromSignals(sorted: CheckInEntry[]): PhaseKey | null {
     if (m != null) means[k] = m;
   }
 
+  // We want Rhythm to work even with a sparse tracking set.
+  // Two usable signals is enough to make a gentle best-guess.
   const available = Object.keys(means).length;
-  if (available < 3) return null;
+  if (available < 2) return null;
 
   const score = (phase: PhaseKey) => {
     const profile = genericPhaseProfiles[phase];
@@ -604,6 +597,179 @@ function inferPhaseKeyFromSignals(sorted: CheckInEntry[]): PhaseKey | null {
   return best;
 }
 
+type RhythmSource = "override" | "bleed" | "inferred" | "none";
+
+export interface RhythmModel {
+  refISO: string;
+  phaseKey: PhaseKey | null;
+  source: RhythmSource;
+  dayInCycle: number | null;
+  cycleLen: number;
+  starts: string[];
+  confidence: ConfidenceLevel;
+  reasons: string[];
+}
+
+function isIsoDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+
+function phaseFromDayInCycle(
+  dayInCycle: number,
+  cycleLen: number,
+  flowToday10: number | null
+): { key: PhaseKey; sci: CyclePhase; soft: string } {
+  // If bleeding today, always Reset.
+  if (flowToday10 != null && flowToday10 > 0) {
+    return { key: "reset", sci: "Menstrual", soft: "Reset Phase" };
+  }
+
+  const len = Number.isFinite(cycleLen) && cycleLen >= 18 && cycleLen <= 60 ? cycleLen : 28;
+  const d = Math.max(1, Math.min(60, Math.floor(dayInCycle)));
+
+  // Simple windows. We can tune later:
+  // - Reset: days 1–5
+  // - Rebuilding: day 6 up to ovulation window
+  // - Expressive: ovulation window (~3 days)
+  // - Protective: remainder
+  const ovStart = Math.max(12, Math.min(len - 12, Math.round(len * 0.5))); // rough midpoint clamp
+  const ovEnd = ovStart + 2;
+
+  if (d <= 5) return { key: "reset", sci: "Menstrual", soft: "Reset Phase" };
+  if (d >= ovStart && d <= ovEnd)
+    return { key: "expressive", sci: "Ovulation", soft: "Expressive Phase" };
+  if (d < ovStart) return { key: "rebuilding", sci: "Follicular", soft: "Rebuilding Phase" };
+  return { key: "protective", sci: "Luteal", soft: "Protective Phase" };
+}
+
+function pickInferredReasons(sorted: CheckInEntry[], phase: PhaseKey): string[] {
+  const recent = sorted.slice(-10);
+  if (!recent.length) return [];
+
+  const keysSet = new Set<string>();
+  for (const e of recent as any[]) {
+    const v = (e as any)?.values;
+    if (v && typeof v === "object") {
+      for (const k of Object.keys(v)) keysSet.add(k);
+    }
+  }
+  keysSet.delete("flow");
+  const keys = Array.from(keysSet) as SymptomKey[];
+
+  const means: Partial<Record<SymptomKey, number>> = {};
+  for (const k of keys) {
+    const vals = recent
+      .map((e: any) =>
+        typeof e?.values?.[k] === "number"
+          ? e.values[k] > 10
+            ? Math.round(e.values[k] / 10)
+            : e.values[k]
+          : null
+      )
+      .filter((v: any): v is number => typeof v === "number");
+    const m = meanNums(vals);
+    if (m != null) means[k] = m;
+  }
+
+  const profile = genericPhaseProfiles[phase];
+  const scored: Array<{ k: SymptomKey; closeness: number }> = [];
+  for (const k of Object.keys(profile) as SymptomKey[]) {
+    const target = (profile as any)[k];
+    const v = means[k];
+    if (target == null || v == null) continue;
+    const diff = Math.abs(v - target);
+    scored.push({ k, closeness: 10 - diff });
+  }
+  scored.sort((a, b) => b.closeness - a.closeness);
+  return scored.slice(0, 3).map((x) => safeLabelForSymptom(x.k));
+}
+
+export function getRhythmModel(
+  entriesRaw: CheckInEntry[] | unknown,
+  userData: UserData,
+  todayISO: string = isoTodayLocal()
+): RhythmModel {
+  const sorted = sortByDateAsc(entriesRaw);
+
+  // Use today if logged, otherwise most recent logged day.
+  const refISO = (() => {
+    const t = todayISO;
+    const hasToday = sorted.some((e: any) => entryISO(e) === t);
+    if (hasToday) return t;
+    const last = [...sorted].reverse().find((e: any) => entryISO(e));
+    return last ? entryISO(last) : t;
+  })();
+
+  const flowTo10 = (v: any): number | null => {
+    if (typeof v !== "number") return null;
+    const scaled = v > 10 ? Math.round(v / 10) : v;
+    return Math.max(0, Math.min(10, scaled));
+  };
+
+  const flowToday = (() => {
+    const e = sorted.find((x: any) => entryISO(x) === refISO);
+    return e ? flowTo10((e as any)?.values?.flow) : null;
+  })();
+
+  // Anchors: cycle starts (override or first bleed day after non-bleed)
+  const starts = getCycleStarts(sorted);
+
+  const stats = computeCycleStats(sorted);
+  const cycleLen = stats.avgLength ?? stats.lastLength ?? 28;
+
+  const lastStart = starts.length ? starts[starts.length - 1] : null;
+  const dayInCycle =
+    lastStart && isIsoDate(lastStart) && isIsoDate(refISO) ? daysBetweenISO(lastStart, refISO) + 1 : null;
+
+  let phaseKey: PhaseKey | null = null;
+  let source: RhythmSource = "none";
+  let reasons: string[] = [];
+
+  // If we have an explicit cycle anchor, use it (persistent). This is true regardless of cycle tracking mode.
+  if (dayInCycle != null && dayInCycle >= 1 && dayInCycle <= 60) {
+    const p = phaseFromDayInCycle(dayInCycle, cycleLen, flowToday);
+    phaseKey = p.key;
+    // Determine whether this anchor came from override or bleeding.
+    const isOverrideDay = sorted.some(
+      (e: any) => entryISO(e) === lastStart && Boolean((e as any)?.cycleStartOverride)
+    );
+    source = isOverrideDay ? "override" : "bleed";
+    reasons = isOverrideDay
+      ? ["Cycle start logged"]
+      : flowToday != null && flowToday > 0
+      ? ["Bleeding logged"]
+      : ["Recent cycle pattern"];
+  } else {
+    // Otherwise infer gently from symptom signals (no influences).
+    const inferred = inferPhaseKeyFromSignals(sorted);
+    if (inferred) {
+      phaseKey = inferred;
+      source = "inferred";
+      reasons = pickInferredReasons(sorted, inferred);
+    }
+  }
+
+  // Confidence: based on number of distinct logged days.
+  const distinctDays = new Set(sorted.map((e: any) => entryISO(e)).filter(Boolean)).size;
+  let confidence: ConfidenceLevel = pickTier(distinctDays) === "starter" ? "Learning" : confidenceLabel(distinctDays);
+  if (starts.length >= 2 && distinctDays >= 21) confidence = "Established";
+  else if (starts.length >= 1 && distinctDays >= 14) confidence = "Emerging";
+
+  void userData; // reserved (kept for future per-goal tuning)
+
+  return {
+    refISO,
+    phaseKey,
+    source,
+    dayInCycle,
+    cycleLen: Number.isFinite(cycleLen) ? cycleLen : 28,
+    starts,
+    confidence,
+    reasons,
+  };
+}
+
 function countAvailableSignals(sorted: CheckInEntry[]): number {
   const recent = sorted.slice(-10);
   if (!recent.length) return 0;
@@ -625,6 +791,7 @@ function countAvailableSignals(sorted: CheckInEntry[]): number {
     "breastTenderness",
     "nightSweats",
     "hotFlushes",
+    "hairShedding",
     "facialSpots",
     "cysts",
   ];
@@ -658,57 +825,38 @@ export function buildHomepageHeroModel(
   const tier = pickTier(daysLogged);
 
 
-// Rhythm block (phase estimate from recent signals; cycle tracking only affects predictions)
-const isPeri = userData.goal === "perimenopause";
-let rhythmTitle = isPeri ? "Your rhythm lately" : "Today in your rhythm";
-let rhythmHeadline: string | undefined;
-let rhythmBody = "Log a few days and I’ll start reflecting your rhythm back to you.";
+  // Rhythm block (phase estimate). This should work regardless of whether the user tracks a cycle.
+  const isPeri = userData.goal === "perimenopause";
+  let rhythmTitle = isPeri ? "Your rhythm lately" : "Today in your rhythm";
+  let rhythmHeadline: string | undefined;
+  let rhythmBody = "Log a few days and I’ll start reflecting your rhythm back to you.";
 
-// Use today if logged, otherwise the most recent logged day so we don’t stall.
-const refISO = (() => {
-  const t = todayISO;
-  const hasToday = sorted.some((e: any) => entryISO(e) === t);
-  if (hasToday) return t;
-  const last = [...sorted].reverse().find((e: any) => entryISO(e));
-  return last ? entryISO(last) : t;
-})();
+  const rm = getRhythmModel(sorted, userData, todayISO);
+  const key = rm.phaseKey;
 
-// If there’s flow today, we’re definitely in Reset.
-const flowTo10 = (v: any): number | null => {
-  if (typeof v !== "number") return null;
-  const scaled = v > 10 ? Math.round(v / 10) : v;
-  return Math.max(0, Math.min(10, scaled));
-};
+  if (key) {
+    const meta = softPhaseMetaFromKey(key);
+    rhythmHeadline = isPeri
+      ? meta.soft.replace("Phase", "").trim()
+      : `You’re in ${meta.soft.replace("Phase", "").trim()}`;
 
-const flowToday = (() => {
-  const e = sorted.find((x: any) => entryISO(x) === refISO);
-  return e ? flowTo10((e as any)?.values?.flow) : null;
-})();
-
-let key: PhaseKey | null = null;
-
-if (flowToday != null && flowToday > 0) {
-  key = "reset";
-} else {
-  // Prefer symptom-signal inference (works even with cycle tracking off)
-  key = inferPhaseKeyFromSignals(sorted);
-}
-
-
-const signalCount = countAvailableSignals(sorted);
-const rhythmDebug = `debug: daysLogged=${daysLogged} ref=${refISO} flowToday=${flowToday ?? "null"} signals=${signalCount} inferred=${key ?? "null"} mode=${userData.cycleTrackingMode ?? "?"} goal=${userData.goal ?? "?"}`;
-
-if (key) {
-  const meta = softPhaseMetaFromKey(key);
-  rhythmHeadline = isPeri ? meta.soft.replace("Phase", "").trim() : `You’re in ${meta.soft.replace("Phase", "").trim()}`;
-  rhythmBody = isPeri
-    ? "Based on your recent check-ins. We’ll focus on trends over exact days."
-    : userData.cycleTrackingMode === "cycle"
-    ? "Based on your recent check-ins. Cycle predictions improve when you log bleeding or use cycle start."
-    : "Based on your recent check-ins. Turn on cycle tracking if you want period predictions.";
-} else {
-  rhythmBody = "Log a few days and I’ll start reflecting your rhythm back to you.";
-}
+    // Source-aware explanation (no influences). Keep it short.
+    if (rm.source === "override") {
+      rhythmBody = isPeri
+        ? "Based on your cycle start. We’ll focus on trends over exact days."
+        : "Based on your cycle start.";
+    } else if (rm.source === "bleed") {
+      rhythmBody = isPeri
+        ? "Based on your logged bleeding. We’ll focus on trends over exact days."
+        : "Based on your logged bleeding.";
+    } else {
+      // Inferred
+      const because = rm.reasons.length ? ` (${rm.reasons.slice(0, 2).join(", ")})` : "";
+      rhythmBody = isPeri
+        ? `Based on your recent check-ins${because}. We’ll focus on trends over exact days.`
+        : `Based on your recent check-ins${because}.`;
+    }
+  }
 
 // Eligible symptoms are whatever the user has enabled, plus mood.  // Eligible symptoms are whatever the user has enabled, plus mood.
   const enabled = new Set<SymptomKey>(userData.enabledModules ?? []);
@@ -855,7 +1003,6 @@ if (key) {
     rhythmTitle,
     rhythmHeadline,
     rhythmBody,
-    rhythmDebug,
     howTitle,
     howLines,
     relationshipLine,

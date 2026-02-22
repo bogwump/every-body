@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
 import { useEntries } from '../lib/appStore';
-import { computeCycleStats } from '../lib/analytics';
+import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
 
@@ -390,13 +390,8 @@ export function Rhythm({ userData }: { userData?: UserData }) {
 
   const daysLogged = useMemo(() => {
     try {
-      if (!Array.isArray(entries) || entries.length === 0) return 0;
-      const dates = new Set<string>();
-      for (const e of entries) {
-        const d = (e as any)?.dateISO || (e as any)?.date;
-        if (typeof d === 'string' && d.length >= 10) dates.add(d.slice(0, 10));
-      }
-      return dates.size;
+      const sorted = sortByDateAsc(entries);
+      return new Set(sorted.map((e: any) => (e as any)?.dateISO).filter((d: any) => typeof d === 'string' && d.length === 10)).size;
     } catch {
       return 0;
     }
@@ -404,48 +399,23 @@ export function Rhythm({ userData }: { userData?: UserData }) {
 const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
   const computed = useMemo(() => {
-    const sorted = [...entries].filter((e) => (e as any)?.dateISO).sort((a, b) => ((a as any).dateISO).localeCompare((b as any).dateISO));
-    const todayISO = new Date().toISOString().slice(0, 10);
-    const flowToday = (() => {
-      const t = sorted.find((e) => (e as any).dateISO === todayISO);
-      return t ? flowTo10(getSymptom(t, 'flow')) : null;
-    })();
+    const sorted = sortByDateAsc(entries);
+    const todayISO = isoToday();
 
-    const starts = detectCycleStarts(sorted);
-    const { avg, last } = computeCycleLength(starts);
-    const cycleLen = avg ?? 28;
+    const ud = (userData ?? ({} as any)) as UserData;
+    const rm = getRhythmModel(sorted, ud, todayISO);
 
-    const lastStart = starts.length ? starts[starts.length - 1] : null;
-    const dayInCycle = lastStart ? daysBetween(lastStart, todayISO) + 1 : null;
+    const phaseKey: PhaseKey = (rm.phaseKey ?? 'protective') as PhaseKey;
+    const meta = softPhaseMeta(phaseKey);
+    const sci = meta.sci;
+    const soft = meta.soft;
 
-    let phaseKey: PhaseKey | null = null;
-    let sci = 'Luteal phase';
-    let soft = 'Protective Phase';
+    const starts = rm.starts;
+    const cycleLen = rm.cycleLen;
+    const dayInCycle = rm.dayInCycle;
+    const confidence: ConfidenceLevel = rm.confidence as any;
 
-    if (dayInCycle != null && dayInCycle > 0 && dayInCycle <= 60) {
-      const p = phaseFromDay(dayInCycle, cycleLen, flowToday);
-      phaseKey = p.key;
-      sci = p.sci;
-      soft = p.soft;
-    } else {
-      const inferred = inferPhaseKeyFromSignals(sorted);
-      if (inferred) {
-        phaseKey = inferred;
-        const meta = softPhaseMeta(inferred);
-        sci = meta.sci;
-        soft = meta.soft;
-      } else {
-        phaseKey = 'protective';
-        const meta = softPhaseMeta('protective');
-        sci = meta.sci;
-        soft = meta.soft;
-      }
-    }
-
-    // Confidence: anchored cycles -> higher, otherwise learning based on days logged
-    let confidence: ConfidenceLevel = confidenceLabel(daysLogged);
-    if (starts.length >= 2 && daysLogged >= 21) confidence = 'Established';
-    else if (starts.length >= 1 && daysLogged >= 14) confidence = 'Emerging';
+    const cycleStats = computeCycleStats(sorted);
 
     const daysToNext = estimateDaysToNext(phaseKey, dayInCycle, cycleLen);
     const nextPhaseKey = (() => {
@@ -469,8 +439,8 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
       todayISO,
       starts,
       cycleLen,
-      avgCycleLen: avg,
-      lastCycleLen: last,
+      avgCycleLen: cycleStats.avgLength,
+      lastCycleLen: cycleStats.lastLength,
       dayInCycle,
       phaseKey,
       sci,
@@ -481,7 +451,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
       nextSci,
       nextPhase,
     };
-  }, [entries, daysLogged]);
+  }, [entries, daysLogged, userData]);
 
   // Pull commonly used values out of the computed bundle.
   const sorted = computed.sorted;
