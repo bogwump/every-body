@@ -483,9 +483,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
     };
   }, [entries, daysLogged]);
 
-    const cycleStats = useMemo(() => computeCycleStats(sorted), [sorted]);
+  // Pull commonly used values out of the computed bundle.
+  const sorted = computed.sorted;
+  const avgCycleLen = computed.avgCycleLen;
+  const lastCycleLen = computed.lastCycleLen;
 
-const [cycleModalOpen, setCycleModalOpen] = useState(false);
+  const cycleStats = useMemo(() => computeCycleStats(sorted), [sorted]);
+
+  const [cycleModalOpen, setCycleModalOpen] = useState(false);
   const avgCycleText = avgCycleLen ? `${avgCycleLen} days avg` : 'Not enough data yet';
 
   

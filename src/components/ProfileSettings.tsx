@@ -1444,11 +1444,13 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               Export CSV
                             </button>
                           </div>
-                              <p className="mt-2 text-sm opacity-80">
-                                <strong>Backups</strong> restore your full app data (check-ins, settings and anything else stored on this device).
-                                Insights exports are separate and can’t be restored here.
-                              
-                              <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+						  <div className="mt-2 text-sm opacity-80">
+							<p>
+							  <strong>Backups</strong> restore your full app data (check-ins, settings and anything else stored on this device).
+							  Insights exports are separate and can’t be restored here.
+							</p>
+
+							<div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
                                 <p className="font-medium mb-1">Reset app data</p>
                                 <p className="text-sm text-[rgb(var(--color-text-secondary))]">
                                   Useful if you want to start fresh on this device. Resetting can’t be undone.
@@ -1469,7 +1471,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                   >
                                     Reset everything
                                   </button>
-                                </div>
+							</div>
+						  </div>
 
                                 {resetConfirm === 'logs' ? (
                                   <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
@@ -1522,7 +1525,6 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                 ) : null}
                               </div>
 
-</p>
 
                               <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
                                 <div className="min-w-0">

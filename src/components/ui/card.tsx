@@ -38,9 +38,12 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+// Note: we intentionally render a <div> here (not <p>) because descriptions in this app
+// sometimes contain rich content (icons, rows, etc.). Rendering a <p> would cause
+// validateDOMNesting warnings if a <div> is passed as a child.
 function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <p
+    <div
       data-slot="card-description"
       className={cn("text-muted-foreground", className)}
       {...props}
