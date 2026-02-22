@@ -9,19 +9,46 @@ export function isoToday(): string {
   return isoTodayLocal();
 }
 
-export function sortByDateAsc(entries: CheckInEntry[] | unknown): CheckInEntry[] {
-  const safe = asArray<CheckInEntry>(entries);
-  return [...safe].sort((a, b) => String(a?.dateISO ?? "").localeCompare(String(b?.dateISO ?? "")));
+function entryISO(e: any): string {
+  const d0 = typeof e?.dateISO === "string" ? e.dateISO : "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d0)) return d0;
+
+  const legacy = (e as any)?.date;
+  if (typeof legacy === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(legacy)) return legacy;
+    const dt = new Date(legacy);
+    if (!isNaN(dt.getTime())) return isoFromDateLocal(dt);
+  } else if (typeof legacy === "number") {
+    const dt = new Date(legacy);
+    if (!isNaN(dt.getTime())) return isoFromDateLocal(dt);
+  } else if (legacy instanceof Date) {
+    if (!isNaN(legacy.getTime())) return isoFromDateLocal(legacy);
+  }
+  return "";
 }
 
-export function filterByDays(entries: CheckInEntry[] | unknown, days: number): CheckInEntry[] {
+function normaliseEntriesDates(entries: CheckInEntry[] | unknown): CheckInEntry[] {
   const safe = asArray<CheckInEntry>(entries);
+  return safe.map((e: any) => {
+    const iso = entryISO(e);
+    if (!iso) return e;
+    if (typeof e?.dateISO === "string" && e.dateISO === iso) return e;
+    return { ...e, dateISO: iso };
+  });
+}
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - (Math.max(1, days) - 1));
-  const cutoffISO = isoFromDateLocal(cutoff);
+export function sortByDateAsc(entries: CheckInEntry[] | unknown): CheckInEntry[] {
+  const safe = normaliseEntriesDates(entries);
+  return [...safe].sort((a: any, b: any) => entryISO(a).localeCompare(entryISO(b)));
+}
 
-  return safe.filter((e) => String(e?.dateISO ?? "") >= cutoffISO);
+export function filterByDays(entries: CheckInEntry[] | unknown, days: number, todayISO: string = isoTodayLocal()): CheckInEntry[] {
+  const sorted = sortByDateAsc(entries);
+  const cutoff = addDaysISO(todayISO, -(Math.max(1, days) - 1));
+  return sorted.filter((e: any) => {
+    const d = entryISO(e);
+    return d >= cutoff && d <= todayISO;
+  });
 }
 
 export function mean(nums: number[]): number {
@@ -64,7 +91,7 @@ export function getSeries(
 
   return sorted
     .map((e) => ({
-      dateISO: String(e?.dateISO ?? ""),
+      dateISO: entryISO(e),
       value: (e as any)?.values?.[key],
     }))
     .filter(
@@ -154,7 +181,7 @@ export function estimatePhaseByFlow(
   entries: CheckInEntry[] | unknown
 ): CyclePhase | null {
   const sorted = sortByDateAsc(entries);
-  const idx = sorted.findIndex((e) => String(e?.dateISO ?? "") === dateISO);
+  const idx = sorted.findIndex((e: any) => entryISO(e) === dateISO);
   if (idx < 0) return null;
 
   const flowTo10 = (v: any): number | null => {
@@ -223,7 +250,7 @@ export function getCycleStarts(entries: CheckInEntry[] | unknown): string[] {
 
   for (let i = 0; i < sorted.length; i++) {
     const e: any = sorted[i];
-    const dateISO = String(e?.dateISO ?? '');
+    const dateISO = entryISO(e);
     if (!dateISO) continue;
 
     if (e?.cycleStartOverride === true) {
@@ -409,7 +436,10 @@ function getRecentWindow(entries: CheckInEntry[], days: number, endISO: string):
   const start = new Date(end);
   start.setDate(start.getDate() - (Math.max(1, days) - 1));
   const startISO = formatLocalDateISO(start);
-  return entries.filter((e) => String(e?.dateISO ?? "") >= startISO && String(e?.dateISO ?? "") <= endISO);
+  return entries.filter((e: any) => {
+    const d = entryISO(e);
+    return d >= startISO && d <= endISO;
+  });
 }
 
 function getNumericSymptom(e: any, key: SymptomKey): number | undefined {
@@ -481,6 +511,98 @@ function buildRelationshipLine(c: RelationshipCandidate): string {
  * - Produces at most 1 relationship insight line (rotates daily if multiple qualify).
  * - Locks outputs per day is handled by the caller (Dashboard) via localStorage cache.
  */
+type PhaseKey = "reset" | "rebuilding" | "expressive" | "protective";
+
+function softPhaseMetaFromKey(key: PhaseKey) {
+  switch (key) {
+    case "reset":
+      return { soft: "Reset Phase", sci: "Menstrual phase" };
+    case "rebuilding":
+      return { soft: "Rebuilding Phase", sci: "Follicular phase" };
+    case "expressive":
+      return { soft: "Expressive Phase", sci: "Ovulatory phase" };
+    default:
+      return { soft: "Protective Phase", sci: "Luteal phase" };
+  }
+}
+
+const genericPhaseProfiles: Record<PhaseKey, Partial<Record<SymptomKey, number>>> = {
+  reset: { fatigue: 7, cramps: 6, pain: 6, headache: 5, sleep: 4, stress: 5, libido: 2, digestion: 5, bloating: 6 },
+  rebuilding: { energy: 6, motivation: 6, sleep: 6, stress: 4, brainFog: 3, digestion: 4, bloating: 3, libido: 4 },
+  expressive: { energy: 7, motivation: 7, libido: 7, stress: 3, brainFog: 2, sleep: 6, digestion: 4 },
+  protective: { fatigue: 7, sleep: 4, irritability: 6, anxiety: 5, stress: 6, bloating: 6, digestion: 6, breastTenderness: 5, headache: 5, facialSpots: 5, cysts: 5 },
+};
+
+function meanNums(vals: number[]): number | null {
+  if (!vals.length) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function inferPhaseKeyFromSignals(sorted: CheckInEntry[]): PhaseKey | null {
+  const recent = sorted.slice(-10);
+  if (!recent.length) return null;
+
+  const keys: SymptomKey[] = [
+    "energy",
+    "motivation",
+    "sleep",
+    "stress",
+    "anxiety",
+    "irritability",
+    "brainFog",
+    "fatigue",
+    "libido",
+    "digestion",
+    "bloating",
+    "cramps",
+    "headache",
+    "breastTenderness",
+    "nightSweats",
+    "hotFlushes",
+    "facialSpots",
+    "cysts",
+  ];
+
+  const means: Partial<Record<SymptomKey, number>> = {};
+  for (const k of keys) {
+    const vals = recent
+      .map((e: any) => (typeof e?.values?.[k] === "number" ? (e.values[k] > 10 ? Math.round(e.values[k] / 10) : e.values[k]) : null))
+      .filter((v: any): v is number => typeof v === "number");
+    const m = meanNums(vals);
+    if (m != null) means[k] = m;
+  }
+
+  const available = Object.keys(means).length;
+  if (available < 3) return null;
+
+  const score = (phase: PhaseKey) => {
+    const profile = genericPhaseProfiles[phase];
+    let s = 0;
+    let w = 0;
+    for (const k of Object.keys(profile) as SymptomKey[]) {
+      const target = profile[k];
+      const v = means[k];
+      if (target == null || v == null) continue;
+      const diff = Math.abs(v - target);
+      s += 10 - diff;
+      w += 10;
+    }
+    return w ? s / w : -1;
+  };
+
+  const candidates: PhaseKey[] = ["reset", "rebuilding", "expressive", "protective"];
+  let best: PhaseKey = "protective";
+  let bestScore = -1;
+  for (const p of candidates) {
+    const sc = score(p);
+    if (sc > bestScore) {
+      bestScore = sc;
+      best = p;
+    }
+  }
+  return best;
+}
+
 export function buildHomepageHeroModel(
   entriesRaw: CheckInEntry[] | unknown,
   userData: UserData
@@ -491,37 +613,56 @@ export function buildHomepageHeroModel(
 
   const tier = pickTier(daysLogged);
 
-  // Rhythm block (softened for perimenopause users)
-  const isPeri = userData.goal === "perimenopause";
-  let rhythmTitle = "Today in your rhythm";
-  let rhythmHeadline: string | undefined;
-  let rhythmBody = "Log a few days and I’ll start reflecting your rhythm back to you.";
 
-  if (isPeri) rhythmTitle = "Your rhythm lately";
+// Rhythm block (phase estimate from recent signals; cycle tracking only affects predictions)
+const isPeri = userData.goal === "perimenopause";
+let rhythmTitle = isPeri ? "Your rhythm lately" : "Today in your rhythm";
+let rhythmHeadline: string | undefined;
+let rhythmBody = "Log a few days and I’ll start reflecting your rhythm back to you.";
 
-  if (userData.cycleTrackingMode === "cycle") {
-    const stats = computeCycleStats(sorted);
-    // Use the phase estimator if we have enough context.
-    // We only show the phase name once we can place the user in a cycle day.
-    if (stats && (stats as any).avgLength) {
-      // estimatePhaseByFlow expects entries and a date, and returns phase meta in this app.
-      try {
-        const phase = estimatePhaseByFlow(sorted, todayISO, (stats as any).avgLength);
-        if (phase?.soft) {
-          rhythmHeadline = isPeri ? phase.soft.replace("Phase", "").trim() : `You’re in ${phase.soft.replace("Phase", "").trim()}`;
-          rhythmBody = isPeri
-            ? "Your cycle may feel less predictable. We’ll focus on trends over exact days."
-            : "This is a helpful backdrop for planning, but your logged symptoms matter most.";
-        }
-      } catch {
-        // fall back silently
-      }
-    }
-  } else {
-    rhythmBody = "Cycle features are off, but you can still track symptoms and patterns.";
-  }
+// Use today if logged, otherwise the most recent logged day so we don’t stall.
+const refISO = (() => {
+  const t = todayISO;
+  const hasToday = sorted.some((e: any) => entryISO(e) === t);
+  if (hasToday) return t;
+  const last = [...sorted].reverse().find((e: any) => entryISO(e));
+  return last ? entryISO(last) : t;
+})();
 
-  // Eligible symptoms are whatever the user has enabled, plus mood.
+// If there’s flow today, we’re definitely in Reset.
+const flowTo10 = (v: any): number | null => {
+  if (typeof v !== "number") return null;
+  const scaled = v > 10 ? Math.round(v / 10) : v;
+  return Math.max(0, Math.min(10, scaled));
+};
+
+const flowToday = (() => {
+  const e = sorted.find((x: any) => entryISO(x) === refISO);
+  return e ? flowTo10((e as any)?.values?.flow) : null;
+})();
+
+let key: PhaseKey | null = null;
+
+if (flowToday != null && flowToday > 0) {
+  key = "reset";
+} else {
+  // Prefer symptom-signal inference (works even with cycle tracking off)
+  key = inferPhaseKeyFromSignals(sorted);
+}
+
+if (key) {
+  const meta = softPhaseMetaFromKey(key);
+  rhythmHeadline = isPeri ? meta.soft.replace("Phase", "").trim() : `You’re in ${meta.soft.replace("Phase", "").trim()}`;
+  rhythmBody = isPeri
+    ? "Based on your recent check-ins. We’ll focus on trends over exact days."
+    : userData.cycleTrackingMode === "cycle"
+    ? "Based on your recent check-ins. Cycle predictions improve when you log bleeding or use cycle start."
+    : "Based on your recent check-ins. Turn on cycle tracking if you want period predictions.";
+} else {
+  rhythmBody = "Log a few days and I’ll start reflecting your rhythm back to you.";
+}
+
+// Eligible symptoms are whatever the user has enabled, plus mood.  // Eligible symptoms are whatever the user has enabled, plus mood.
   const enabled = new Set<SymptomKey>(userData.enabledModules ?? []);
   // Never use flow as an emotional summary line.
   enabled.delete("flow");
