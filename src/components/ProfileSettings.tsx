@@ -362,7 +362,7 @@ const downscaleImageFileToDataUrl = async (file: File) => {
 
 
   const confirmCreateBackup = async () => {
-    const file = makeBackupFile();
+    const file = await makeBackupFile();
     await shareOrDownloadBackup(file);
     setShowBackupConfirm(false);
   };

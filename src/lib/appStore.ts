@@ -145,6 +145,25 @@ function writeCached<T>(key: string, value: T) {
   try { void idbSet(key, raw); } catch {}
 }
 
+
+export async function hydrateForBackup() {
+  // Ensure all backup-related keys are present in localStorage if they exist in the IDB mirror.
+  // This matters on iOS where localStorage can be cleared while IndexedDB survives.
+  try {
+    const restored = await hydrateFromIDB(Array.from(BACKUP_KEYS as readonly string[]));
+    if (restored) {
+      // Clear caches so hooks re-parse the restored raw JSON
+      for (const k of BACKUP_KEYS) parsedCache.delete(k);
+      for (const k of BACKUP_KEYS) {
+        rawCache.set(k, localStorage.getItem(k));
+        emitKey(k);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function applyBackupPayload(payload: BackupPayload) {
   for (const key of BACKUP_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(payload, key)) continue;

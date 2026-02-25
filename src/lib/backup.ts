@@ -1,4 +1,4 @@
-import { BACKUP_KEYS, applyBackupPayload, type BackupPayload } from "./appStore";
+import { BACKUP_KEYS, applyBackupPayload, hydrateForBackup, type BackupPayload } from "./appStore";
 
 export type BackupFileV1 = {
   type: "everybody-backup";
@@ -26,7 +26,8 @@ type LegacyBackupFile = {
 
 export type BackupFile = BackupFileV2 | BackupFileV1 | LegacyBackupFile;
 
-export function makeBackupFile(): BackupFileV2 {
+export async function makeBackupFile(): Promise<BackupFileV2> {
+  await hydrateForBackup();
   const data: BackupPayload = {};
   for (const key of BACKUP_KEYS) {
     data[key] = localStorage.getItem(key);
