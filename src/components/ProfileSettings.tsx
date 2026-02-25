@@ -19,7 +19,7 @@ import {
   Sun as SunIcon,
   X,
 } from 'lucide-react';
-import { makeBackupFileFromState, shareOrDownloadBackup, parseBackupJson, looksLikeInsightsExport, importBackupFile } from '../lib/backup';
+import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, looksLikeInsightsExport, importBackupFile } from '../lib/backup';
 import type { ColorTheme, SymptomKey, SymptomKind, UserData, InfluenceKey, UserGoal } from '../types';
 import { DEFAULT_USER } from '../lib/defaultUser';
 import { kindLabel } from '../lib/symptomMeta';
@@ -362,7 +362,7 @@ const downscaleImageFileToDataUrl = async (file: File) => {
 
 
   const confirmCreateBackup = async () => {
-    const file = await makeBackupFileFromState({ user: userData, entries });
+    const file = await makeBackupFile();
     await shareOrDownloadBackup(file);
     setShowBackupConfirm(false);
   };
@@ -1485,8 +1485,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                   </ul>
                                 </div>
 
-                                <div className="mt-4 flex flex-col sm:flex-row gap-3 sm:justify-end">
-<button
+								<div className="mt-4 flex flex-col sm:flex-row gap-3 sm:justify-end">
+								  <button
                                     type="button"
                                     onClick={confirmCreateBackup}
                                     className="eb-btn eb-btn-primary"

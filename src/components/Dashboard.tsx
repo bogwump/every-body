@@ -171,20 +171,45 @@ export function Dashboard({
     // IMPORTANT: Version the cache key.
     // We have iterated on the hero model shape/logic a lot, and stale cached JSON can
     // make the UI look "stuck" even when the underlying logic has changed.
-    const HERO_CACHE_VERSION = 3;
+    const HERO_CACHE_VERSION = 4;
+
+    // The hero model is derived from (entries + user). We cache per-day for lightness,
+    // but we MUST ensure the cache matches the current data. Otherwise after a
+    // restore-from-backup, users can see a stale "pre-restore" hero.
+    const latestUpdatedAt = (() => {
+      const last = [...entriesSorted].reverse().find((e: any) => e?.updatedAt);
+      return last?.updatedAt ?? '';
+    })();
+    const hasCycleOverride = entriesSorted.some((e: any) => (e as any)?.cycleStartOverride === true);
+    const fingerprint = [
+      entriesSorted.length,
+      latestUpdatedAt,
+      userData.goal ?? '',
+      userData.cycleTrackingMode ?? '',
+      hasCycleOverride ? '1' : '0',
+    ].join('|');
+
     const key = `eb:homeHero:v${HERO_CACHE_VERSION}:${isoToday()}`;
     try {
       const cachedRaw = localStorage.getItem(key);
       if (cachedRaw) {
         const cached = JSON.parse(cachedRaw);
-        // If the cached payload looks incomplete, ignore it and rebuild.
-        if (cached && cached.dateISO === isoToday() && (cached.rhythmBody || cached.howLines)) return cached;
+        // If the cached payload looks incomplete OR doesn't match current data, ignore it and rebuild.
+        if (
+          cached &&
+          cached.dateISO === isoToday() &&
+          cached._fp === fingerprint &&
+          (cached.rhythmBody || cached.howLines)
+        ) {
+          return cached;
+        }
       }
     } catch {
       // ignore cache issues
     }
 
-    const model = buildHomepageHeroModel(entriesSorted, userData);
+    const model: any = buildHomepageHeroModel(entriesSorted, userData);
+    model._fp = fingerprint;
     try {
       localStorage.setItem(key, JSON.stringify(model));
     } catch {

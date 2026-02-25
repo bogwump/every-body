@@ -7,13 +7,9 @@ export const COMPANION_NAME = "Eve";
 
 // Storage keys
 const USER_KEY = "everybody:v2:user";
-export const USER_STORAGE_KEY = USER_KEY;
 const ENTRIES_KEY = "everybody:v2:entries";
-export const ENTRIES_STORAGE_KEY = ENTRIES_KEY;
 const CHAT_KEY = "everybody:v2:chat";
-export const CHAT_STORAGE_KEY = CHAT_KEY;
 const EXPERIMENT_KEY = "everybody:v2:experiment";
-export const EXPERIMENT_STORAGE_KEY = EXPERIMENT_KEY;
 
 export const STORAGE_KEYS = [USER_KEY, ENTRIES_KEY, CHAT_KEY, EXPERIMENT_KEY] as const;
 

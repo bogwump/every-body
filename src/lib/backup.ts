@@ -1,4 +1,4 @@
-import { BACKUP_KEYS, applyBackupPayload, hydrateForBackup, type BackupPayload, USER_STORAGE_KEY, ENTRIES_STORAGE_KEY, CHAT_STORAGE_KEY, EXPERIMENT_STORAGE_KEY } from "./appStore";
+import { BACKUP_KEYS, applyBackupPayload, hydrateForBackup, type BackupPayload } from "./appStore";
 
 export type BackupFileV1 = {
   type: "everybody-backup";
@@ -26,30 +26,12 @@ type LegacyBackupFile = {
 
 export type BackupFile = BackupFileV2 | BackupFileV1 | LegacyBackupFile;
 
-/**
- * Build a full backup from the live in-memory state where possible.
- * This avoids edge cases on iOS where storage can differ between Safari tab and Home Screen app container.
- */
-export async function makeBackupFileFromState(state: {
-  user?: unknown;
-  entries?: unknown;
-  chat?: unknown;
-  experiment?: unknown;
-}): Promise<BackupFileV2> {
+export async function makeBackupFile(): Promise<BackupFileV2> {
   await hydrateForBackup();
   const data: BackupPayload = {};
-
-  // Prefer live state for core keys (these drive the homepage hero and rhythm logic)
-  if (state.user != null) data[USER_STORAGE_KEY] = JSON.stringify(state.user);
-  if (state.entries != null) data[ENTRIES_STORAGE_KEY] = JSON.stringify(state.entries);
-  if (state.chat != null) data[CHAT_STORAGE_KEY] = JSON.stringify(state.chat);
-  if (state.experiment != null) data[EXPERIMENT_STORAGE_KEY] = JSON.stringify(state.experiment);
-
-  // Fall back to storage for everything else (insights selections, UI prefs, etc)
   for (const key of BACKUP_KEYS) {
-    if (data[key] === undefined) data[key] = localStorage.getItem(key);
+    data[key] = localStorage.getItem(key);
   }
-
   return {
     type: "everybody-backup",
     version: 2,
@@ -58,10 +40,6 @@ export async function makeBackupFileFromState(state: {
     includesKeys: [...BACKUP_KEYS],
     data,
   };
-}
-
-export async function makeBackupFile(): Promise<BackupFileV2> {
-  return makeBackupFileFromState({});
 }
 
 function filenameForBackup(iso: string) {
@@ -141,4 +119,18 @@ export function looksLikeInsightsExport(raw: string): boolean {
 export function importBackupFile(file: BackupFile) {
   const payload = ("data" in file ? file.data : file.payload);
   applyBackupPayload(payload);
+
+  // Clear derived UI caches so the app immediately reflects restored data.
+  // (The home hero is cached per-day and can otherwise show a stale pre-restore model.)
+  try {
+    const keysToDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith('eb:homeHero:')) keysToDelete.push(k);
+    }
+    for (const k of keysToDelete) localStorage.removeItem(k);
+  } catch {
+    // ignore
+  }
 }
