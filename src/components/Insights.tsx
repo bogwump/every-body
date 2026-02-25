@@ -2223,7 +2223,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
         <div className="mt-3 flex flex-wrap gap-2 justify-start">
           <span className="eb-pill">
-            Check-ins • {entriesSorted.length}
+            Check-ins (last {days} days) • {entriesSorted.length}
           </span>
           <span className="eb-pill">
             Insights • {insightsUnlocked}
