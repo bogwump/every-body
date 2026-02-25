@@ -443,7 +443,7 @@ export function Dashboard({
           <button
             type="button"
             onClick={() => onNavigate('calendar')}
-            className="absolute top-4 right-4 opacity-80 hover:opacity-100 transition"
+            className="absolute top-4 right-4 z-10 opacity-80 hover:opacity-100 transition"
             title="Calendar"
           >
             <Calendar className="w-5 h-5" />
@@ -453,7 +453,7 @@ export function Dashboard({
           <button
             type="button"
             onClick={() => onNavigate('rhythm')}
-            className="absolute top-4 right-12 text-sm eb-hero-on-dark-muted hover:eb-hero-on-dark transition"
+            className="absolute top-4 right-12 z-10 text-sm eb-hero-on-dark-muted hover:eb-hero-on-dark transition"
             title="View full rhythm"
           >
             View full rhythm
@@ -463,25 +463,25 @@ export function Dashboard({
 
           {/* Today in your rhythm */}
           <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)]">
-            <div className="text-sm font-semibold eb-hero-on-dark text-white">{heroModel.rhythmTitle}</div>
+            <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{heroModel.rhythmTitle}</div>
             {heroModel.rhythmHeadline ? (
-              <div className="mt-1 text-lg font-semibold eb-hero-on-dark text-white">{heroModel.rhythmHeadline}</div>
+              <div className="mt-1 text-lg font-semibold text-black">{heroModel.rhythmHeadline}</div>
             ) : null}
-            <div className="mt-2 text-sm eb-hero-on-dark-muted text-white">{heroModel.rhythmBody}</div>
+            <div className="mt-2 text-sm text-[rgba(0,0,0,0.65)]">{heroModel.rhythmBody}</div>
           </div>
 
           {/* How you've been */}
           <div className="mt-4 eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.16)]">
-            <div className="text-sm font-semibold eb-hero-on-dark text-white">{heroModel.howTitle}</div>
+            <div className="text-sm font-semibold text-black">{heroModel.howTitle}</div>
             <div className="mt-2 space-y-1">
               {heroModel.howLines.map((line: string, i: number) => (
-                <div key={i} className="text-sm eb-hero-on-dark-muted text-white">
+                <div key={i} className="text-sm text-[rgba(0,0,0,0.65)]">
                   {line}
                 </div>
               ))}
             </div>
             {heroModel.relationshipLine ? (
-              <div className="mt-3 text-sm eb-hero-on-dark text-white">
+              <div className="mt-3 text-sm text-[rgba(0,0,0,0.65)]">
                 {heroModel.relationshipLine}
               </div>
             ) : null}
