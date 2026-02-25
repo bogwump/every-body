@@ -2953,9 +2953,15 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                     paddingAngle={4}
                     isAnimationActive={false}
                   >
-                    {distributionData.map((_, i) => (
-                      <Cell key={i} fill={linePalette[i % linePalette.length]} />
-                    ))}
+                    {distributionData.map((_, i) => {
+                      // Keep mid bucket colour, but swap low/high so 7-10 is darkest and 0-3 is lightest.
+                      const palette = linePalette;
+                      const fill =
+                        i === 0 ? palette[2 % palette.length] : // 0-3 (lightest)
+                        i === 1 ? palette[1 % palette.length] : // 4-6 (unchanged)
+                        palette[0 % palette.length];            // 7-10 (darkest)
+                      return <Cell key={i} fill={fill} />;
+                    })}
                   </Pie>
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}

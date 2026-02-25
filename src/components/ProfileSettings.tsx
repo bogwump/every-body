@@ -1198,48 +1198,6 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 	          </details>
 	        </div>
 
-<div className="eb-card mb-6">
-          <h3 className="mb-4">Notifications</h3>
-          <div className="space-y-4">
-            {(
-              [
-                {
-                  key: 'dailyReminder' as const,
-                  title: 'Daily check-in reminder',
-                  desc: 'Get reminded to log your symptoms',
-                },
-                {
-                  key: 'insights' as const,
-                  title: 'Insights',
-                  desc: 'Receive gentle nudges when patterns appear',
-                },
-                {
-                  key: 'periodPrediction' as const,
-                  title: 'Period predictions',
-                  desc: 'Only relevant if you track a cycle',
-                },
-              ]
-            ).map((row) => (
-              <div key={row.key} className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium mb-1">{row.title}</p>
-                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">{row.desc}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setNotifications((prev) => ({ ...prev, [row.key]: !prev[row.key] }))}
-                  className={`shrink-0 w-12 h-6 rounded-full transition-all ${notifications[row.key] ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'}`}
-                >
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                      notifications[row.key] ? 'translate-x-6' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* Settings list */}
         {settingsSections.map((section) => (
