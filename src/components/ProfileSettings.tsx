@@ -354,9 +354,17 @@ const downscaleImageFileToDataUrl = async (file: File) => {
     periodPrediction: true,
   });
 
+  const [showBackupConfirm, setShowBackupConfirm] = useState(false);
+
   const exportBackup = async () => {
+    setShowBackupConfirm(true);
+  };
+
+
+  const confirmCreateBackup = async () => {
     const file = makeBackupFile();
     await shareOrDownloadBackup(file);
+    setShowBackupConfirm(false);
   };
 
   const backupInputRef = useRef<HTMLInputElement | null>(null);
@@ -1444,6 +1452,59 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               Export CSV
                             </button>
                           </div>
+                          {showBackupConfirm ? (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                              <div className="absolute inset-0 bg-black/40" onClick={() => setShowBackupConfirm(false)} />
+                              <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-xl border border-neutral-200 p-5">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <div className="text-lg font-semibold">Create full backup</div>
+                                    <div className="mt-1 text-sm eb-muted">
+                                      This creates a single file you can save to Files/Drive and restore later.
+                                      <span className="ml-1">Backup format: v2</span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="eb-btn eb-btn-secondary"
+                                    onClick={() => setShowBackupConfirm(false)}
+                                    aria-label="Close"
+                                  >
+                                    Close
+                                  </button>
+                                </div>
+
+                                <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                                  <div className="text-sm font-medium mb-2">Included in this backup</div>
+                                  <ul className="text-sm eb-muted space-y-1 list-disc pl-5">
+                                    <li>Your profile: name, goal, theme, and profile picture</li>
+                                    <li>Your check-ins: symptoms, influences, notes, and sleep details</li>
+                                    <li>Your cycle and rhythm settings (including manual cycle start)</li>
+                                    <li>Insights settings (selected metrics and phase options)</li>
+                                    <li>Chat history and preferences (if you have used chat)</li>
+                                  </ul>
+                                </div>
+
+                                <div className="mt-4 flex flex-col sm:flex-row gap-3 sm:justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowBackupConfirm(false)}
+                                    className="eb-btn eb-btn-secondary"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={confirmCreateBackup}
+                                    className="eb-btn eb-btn-primary"
+                                  >
+                                    Create backup file
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+
 						  <div className="mt-2 text-sm opacity-80">
 							<p>
 							  <strong>Backups</strong> restore your full app data (check-ins, settings and anything else stored on this device).

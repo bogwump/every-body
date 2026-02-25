@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+
+import { importBackupFile, looksLikeInsightsExport, parseBackupJson } from '../../lib/backup';
 
 import appLogo from '../../assets/everybody-logo-512.png';
 
@@ -8,6 +10,28 @@ interface WelcomeScreenProps {
 
 export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
   const [name, setName] = useState('');
+  const backupInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleRestoreClick = () => {
+    backupInputRef.current?.click();
+  };
+
+  const handleRestoreFile = async (file: File) => {
+    const raw = await file.text();
+    const parsed = parseBackupJson(raw);
+    if (!parsed) {
+      alert(
+        looksLikeInsightsExport(raw)
+          ? `That file is an Insights export. It cannot be restored as a full backup.\n\nTo restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
+          : `That backup file does not look valid.\n\nTo restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
+      );
+      return;
+    }
+    importBackupFile(parsed);
+    // Reload so the app starts with the restored state (skips onboarding)
+    window.location.reload();
+  };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +77,28 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
           >
             Continue
           </button>
+
+          <button
+            type="button"
+            onClick={handleRestoreClick}
+            className="w-full py-4 rounded-xl border border-neutral-200 bg-white text-[rgb(var(--color-text))] hover:bg-neutral-50 transition-all duration-200 font-medium"
+          >
+            Restore from backup
+          </button>
+
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              void handleRestoreFile(f);
+              // allow choosing the same file again
+              e.currentTarget.value = '';
+            }}
+          />
         </div>
         <p className="text-sm text-center mt-8 text-[rgb(var(--color-text-secondary))]">
           Your data is private and secure

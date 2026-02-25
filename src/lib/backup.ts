@@ -7,6 +7,15 @@ export type BackupFileV1 = {
   data: BackupPayload;
 };
 
+export type BackupFileV2 = {
+  type: "everybody-backup";
+  version: 2;
+  generatedAtISO: string;
+  app: "EveryBody";
+  includesKeys: string[];
+  data: BackupPayload;
+};
+
 // Backward compat with earlier builds that used { app: "EveryBody", version: 1, exportedAtISO, payload }
 type LegacyBackupFile = {
   app: "EveryBody";
@@ -15,17 +24,19 @@ type LegacyBackupFile = {
   payload: BackupPayload;
 };
 
-export type BackupFile = BackupFileV1 | LegacyBackupFile;
+export type BackupFile = BackupFileV2 | BackupFileV1 | LegacyBackupFile;
 
-export function makeBackupFile(): BackupFileV1 {
+export function makeBackupFile(): BackupFileV2 {
   const data: BackupPayload = {};
   for (const key of BACKUP_KEYS) {
     data[key] = localStorage.getItem(key);
   }
   return {
     type: "everybody-backup",
-    version: 1,
+    version: 2,
     generatedAtISO: new Date().toISOString(),
+    app: "EveryBody",
+    includesKeys: [...BACKUP_KEYS],
     data,
   };
 }
@@ -66,13 +77,13 @@ export async function shareOrDownloadBackup(file: BackupFile) {
   downloadBackupFile(file);
 }
 
-export function parseBackupJson(raw: string): BackupFileV1 | LegacyBackupFile | null {
+export function parseBackupJson(raw: string): BackupFileV2 | BackupFileV1 | LegacyBackupFile | null {
   try {
     const obj: any = JSON.parse(raw);
 
     // Preferred, explicit backup format
-    if (obj?.type === "everybody-backup" && obj?.version === 1 && obj?.data && typeof obj.data === "object") {
-      return obj as BackupFileV1;
+    if (obj?.type === "everybody-backup" && (obj?.version === 2 || obj?.version === 1) && obj?.data && typeof obj.data === "object") {
+      return obj as BackupFileV2 | BackupFileV1;
     }
 
     // Legacy format (keep supporting older user backups)
