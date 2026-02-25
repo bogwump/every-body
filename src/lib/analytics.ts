@@ -781,6 +781,45 @@ export function getRhythmModel(
   };
 }
 
+
+function phaseOneLiner(key: PhaseKey, goal: UserGoal | null): string {
+  // Keep these short. Home uses one line, Rhythm page has the longer content.
+  const peri = goal === "perimenopause";
+  switch (key) {
+    case "reset":
+      return peri
+        ? "Lower energy and more body sensitivity is common right now."
+        : "Lower energy and more body sensitivity is common.";
+    case "rebuilding":
+      return peri
+        ? "Energy often starts to lift and motivation comes back in small waves."
+        : "Energy often starts to lift and momentum returns.";
+    case "expressive":
+      return peri
+        ? "You may feel more outward, social, and mentally sharp."
+        : "You may feel more outward and energised.";
+    case "protective":
+      return peri
+        ? "Sleep need and sensitivity can rise, and emotions may feel closer to the surface."
+        : "Sleep need and sensitivity can rise.";
+    default:
+      return "";
+  }
+}
+
+function confidenceOneLiner(conf: ConfidenceLevel, days: number): string {
+  if (days < 5) return "Early days. This will get clearer as you log.";
+  if (conf === "Learning") return "Still learning your baseline. Keep logging for a sharper signal.";
+  if (conf === "Emerging") return "Getting clearer. Patterns will become more personal over time.";
+  return "Confidence is stronger now. We’ll keep refining as you log.";
+}
+
+function formatSourceLine(source: RhythmSource): string {
+  if (source === "override") return "Based on your cycle start.";
+  if (source === "bleed") return "Based on your logged bleeding.";
+  return "Based on your recent check-ins.";
+}
+
 function countAvailableSignals(sorted: CheckInEntry[]): number {
   const recent = sorted.slice(-10);
   if (!recent.length) return 0;
@@ -851,21 +890,23 @@ export function buildHomepageHeroModel(
       ? meta.soft.replace("Phase", "").trim()
       : `You’re in ${meta.soft.replace("Phase", "").trim()}`;
 
-    // Source-aware explanation (no influences). Keep it short.
-    if (rm.source === "override") {
-      rhythmBody = isPeri
-        ? "Based on your cycle start. We’ll focus on trends over exact days."
-        : "Based on your cycle start.";
-    } else if (rm.source === "bleed") {
-      rhythmBody = isPeri
-        ? "Based on your logged bleeding. We’ll focus on trends over exact days."
-        : "Based on your logged bleeding.";
+    // Source-aware explanation (no influences). Keep it short but useful.
+    const distinctDays = new Set(sorted.map((e: any) => entryISO(e)).filter(Boolean)).size;
+    const sourceLine = formatSourceLine(rm.source);
+    const phaseLine = phaseOneLiner(key, userData.goal ?? null);
+
+    // Reasons are helpful even when anchored, as long as we don’t imply they *caused* the phase.
+    const reasonList = (rm.source === "inferred" ? rm.reasons : pickInferredReasons(sorted, key))
+      .filter(Boolean)
+      .slice(0, 2);
+    const because = reasonList.length ? ` (${reasonList.join(", ")})` : "";
+    const confidenceLine = confidenceOneLiner(rm.confidence, distinctDays);
+
+    // Compose a friendly 1–2 sentence summary.
+    if (isPeri) {
+      rhythmBody = `${sourceLine}${because} ${phaseLine} ${confidenceLine}`;
     } else {
-      // Inferred
-      const because = rm.reasons.length ? ` (${rm.reasons.slice(0, 2).join(", ")})` : "";
-      rhythmBody = isPeri
-        ? `Based on your recent check-ins${because}. We’ll focus on trends over exact days.`
-        : `Based on your recent check-ins${because}.`;
+      rhythmBody = `${sourceLine}${because} ${phaseLine}`;
     }
   }
 
