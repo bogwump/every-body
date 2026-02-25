@@ -564,6 +564,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const entriesSorted = useMemo(() => filterByDays(entriesAllSorted, days), [entriesAllSorted, days]);
   const streak = useMemo(() => calculateStreak(entriesAllSorted), [entriesAllSorted]);
+  const insightsUnlocked = useMemo(() => {
+    const daysTracked = entriesSorted.length;
+    if (daysTracked < 3) return 0;
+    if (daysTracked < 7) return 1;
+    if (daysTracked < 14) return 3;
+    return 6;
+  }, [entriesSorted.length]);
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
 
   const sleepInsightsOn = Boolean(userData.sleepInsightsEnabled);
@@ -2214,15 +2221,12 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         <h1 className="mb-1">Insights &amp; Patterns</h1>
         <p className="text-[rgb(var(--color-text-secondary))]">Discover connections between your symptoms and cycle.</p>
 
-        <div className="mt-3 flex flex-wrap gap-2 justify-end">
+        <div className="mt-3 flex flex-wrap gap-2 justify-start">
           <span className="eb-pill">
-            Days logged • {entriesSorted.length}
+            Check-ins • {entriesSorted.length}
           </span>
           <span className="eb-pill">
-            Current streak • {streak}
-          </span>
-          <span className="eb-pill">
-            View • {TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? timeframe}
+            Insights • {insightsUnlocked}
           </span>
         </div>
       </div>
