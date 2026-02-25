@@ -334,7 +334,7 @@ const downscaleImageFileToDataUrl = async (file: File) => {
   const { entries, clearEntries } = useEntries();
   const { clearChat } = useChat();
   const { clearExperiment } = useExperiment();
-  const daysTracked = entries.length;
+  const daysTracked = calculateStreak(entries);
   const streak = calculateStreak(entries);
 
   const insightsUnlocked = useMemo(() => {
