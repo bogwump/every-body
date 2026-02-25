@@ -1,4 +1,4 @@
-import { STORAGE_KEYS, applyBackupPayload, type BackupPayload } from "./appStore";
+import { BACKUP_KEYS, applyBackupPayload, type BackupPayload } from "./appStore";
 
 export type BackupFileV1 = {
   type: "everybody-backup";
@@ -19,7 +19,7 @@ export type BackupFile = BackupFileV1 | LegacyBackupFile;
 
 export function makeBackupFile(): BackupFileV1 {
   const data: BackupPayload = {};
-  for (const key of STORAGE_KEYS) {
+  for (const key of BACKUP_KEYS) {
     data[key] = localStorage.getItem(key);
   }
   return {

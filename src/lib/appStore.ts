@@ -12,7 +12,16 @@ const CHAT_KEY = "everybody:v2:chat";
 const EXPERIMENT_KEY = "everybody:v2:experiment";
 
 export const STORAGE_KEYS = [USER_KEY, ENTRIES_KEY, CHAT_KEY, EXPERIMENT_KEY] as const;
-export type BackupPayload = Partial<Record<(typeof STORAGE_KEYS)[number], string | null>>;
+
+export const BACKUP_KEYS = [
+  ...STORAGE_KEYS,
+  "insights:selected",
+  "insights:phaseMetrics",
+  "eb_sleep_overlay",
+  "eb_checkin_dismissed_date",
+] as const;
+
+export type BackupPayload = Partial<Record<(typeof BACKUP_KEYS)[number], string | null>>;
 
 // One-time migration: if a user previously ran a legacy build that stored values on
 // different scales (eg 0–100) we prefer a clean slate over guessing.
@@ -137,7 +146,7 @@ function writeCached<T>(key: string, value: T) {
 }
 
 export function applyBackupPayload(payload: BackupPayload) {
-  for (const key of STORAGE_KEYS) {
+  for (const key of BACKUP_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(payload, key)) continue;
     const v = payload[key];
 
