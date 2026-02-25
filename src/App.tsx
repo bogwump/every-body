@@ -229,6 +229,7 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
       case 'chat':
         return <AIChat userName={userData.name || 'there'} userData={userData} />;
 
+      case 'rhythm':
       case 'resources':
         return <Rhythm userData={userData} />;
 
