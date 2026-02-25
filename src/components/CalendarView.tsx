@@ -271,8 +271,51 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
 
   const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
   type OverlayKey = SymptomKey | 'mood';
+
+const CALENDAR_OVERLAY_STORAGE_KEY = 'eb:calendar:overlayKey';
+
+const CALENDAR_OVERLAY_ALLOWED: OverlayKey[] = [
+  'mood',
+  'stress',
+  'energy',
+  'sleep',
+  'pain',
+  'bloating',
+  'focus',
+  'fatigue',
+  'brainFog',
+  'nightSweats',
+  'hairShedding',
+  'facialSpots',
+  'cysts',
+  'flow',
+];
+
+function isAllowedOverlayKey(v: any): v is OverlayKey {
+  return typeof v === 'string' && (CALENDAR_OVERLAY_ALLOWED as string[]).includes(v);
+}
   const [overlayKey, setOverlayKey] = useState<OverlayKey>('stress');
 
+
+
+  // Remember the user's last overlay choice for this device/container (Safari vs Home Screen).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CALENDAR_OVERLAY_STORAGE_KEY);
+      if (isAllowedOverlayKey(raw)) setOverlayKey(raw);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CALENDAR_OVERLAY_STORAGE_KEY, overlayKey);
+    } catch {
+      // ignore
+    }
+  }, [overlayKey]);
   const [editMode, setEditMode] = useState(false);
   const [editISO, setEditISO] = useState<string | null>(null);
   const [summaryISO, setSummaryISO] = useState<string | null>(null);
