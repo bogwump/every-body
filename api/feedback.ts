@@ -23,7 +23,7 @@ export default async function handler(req: any, res: any) {
 
     await resend.emails.send({
       from: 'EveryBody <onboarding@resend.dev>', // safe default
-      to: 'b0gwump@outlook.com',
+      to: 'ooh.la.lara@gmail.com',
       subject: `EveryBody feedback: ${subject}`,
       text: `
 ${message}
