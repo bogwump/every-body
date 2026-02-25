@@ -2874,36 +2874,46 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         </div>
 
         <div className="mt-3 eb-chart">
-          <div style={{ width: '100%', height: 280 }}>
-            <ResponsiveContainer>
-              <LineChart data={seriesForChart} margin={{ left: 0, right: 8, top: 10, bottom: 6 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={28} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-                  formatter={(value: any, name: any) => [value == null ? '-' : Number(value).toFixed(0), labelFor(String(name) as any, userData)]}
-                />
-                <Legend
-                  verticalAlign="bottom"
-                  height={36}
-                  formatter={(value: any) => <span style={{ fontSize: 12 }}>{labelFor(String(value) as any, userData)}</span>}
-                />
-                {selected.map((k, i) => (
-                  <Line
-                    key={String(k)}
-                    type="monotone"
-                    dataKey={String(k)}
-                    dot={{ r: 2 }}
-                    connectNulls
-                    strokeWidth={2}
-                    stroke={linePalette[i % linePalette.length]}
-                    isAnimationActive={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {(() => {
+            // Recharts' Legend is rendered inside the SVG. If it wraps onto multiple lines (eg 6 long labels),
+            // the extra lines can get clipped. Reserve enough height for 1–3 legend rows.
+            const legendRows = selected.length <= 3 ? 1 : selected.length <= 5 ? 2 : 3;
+            const legendHeight = legendRows * 24; // ~1 line per 24px
+            const chartHeight = 280 + Math.max(0, legendHeight - 36);
+
+            return (
+              <div style={{ width: '100%', height: chartHeight }}>
+                <ResponsiveContainer>
+                  <LineChart data={seriesForChart} margin={{ left: 0, right: 8, top: 10, bottom: 6 }}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                    <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
+                    <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={28} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
+                      formatter={(value: any, name: any) => [value == null ? '-' : Number(value).toFixed(0), labelFor(String(name) as any, userData)]}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={legendHeight}
+                      formatter={(value: any) => <span style={{ fontSize: 12 }}>{labelFor(String(value) as any, userData)}</span>}
+                    />
+                    {selected.map((k, i) => (
+                      <Line
+                        key={String(k)}
+                        type="monotone"
+                        dataKey={String(k)}
+                        dot={{ r: 2 }}
+                        connectNulls
+                        strokeWidth={2}
+                        stroke={linePalette[i % linePalette.length]}
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          })()}
           <div className="mt-2 text-sm eb-muted">We connect across missed days so you still see the story.</div>
         </div>
       {/* Distribution + high symptom days */}
