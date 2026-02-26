@@ -686,16 +686,30 @@ function pickInferredReasons(sorted: CheckInEntry[], phase: PhaseKey): string[] 
   }
 
   const profile = genericPhaseProfiles[phase];
-  const scored: Array<{ k: SymptomKey; closeness: number }> = [];
+  const scored: Array<{ k: SymptomKey; closeness: number; dir: 'higher' | 'lower' | 'about the same' }> = [];
   for (const k of Object.keys(profile) as SymptomKey[]) {
     const target = (profile as any)[k];
     const v = means[k];
     if (target == null || v == null) continue;
     const diff = Math.abs(v - target);
-    scored.push({ k, closeness: 10 - diff });
+    const dir: 'higher' | 'lower' | 'about the same' =
+      v >= target + 1 ? 'higher' : v <= target - 1 ? 'lower' : 'about the same';
+    scored.push({ k, closeness: 10 - diff, dir });
   }
   scored.sort((a, b) => b.closeness - a.closeness);
-  return scored.slice(0, 3).map((x) => safeLabelForSymptom(x.k));
+
+  // Convert to natural phrasing that matches the tone of the Home insights.
+  // We prefer directional reasons; skip "about the same" if we have other options.
+  const picked = scored
+    .filter((x) => x.dir !== 'about the same')
+    .slice(0, 3);
+  const fallback = picked.length ? picked : scored.slice(0, 3);
+
+  return fallback.map((x) => {
+    const label = safeLabelForSymptom(x.k);
+    if (x.dir === 'about the same') return `${label} has been steadier`;
+    return `${label} has been ${x.dir}`;
+  });
 }
 
 export function getRhythmModel(
@@ -886,9 +900,8 @@ export function buildHomepageHeroModel(
 
   if (key) {
     const meta = softPhaseMetaFromKey(key);
-    rhythmHeadline = isPeri
-      ? meta.soft.replace("Phase", "").trim()
-      : `You’re in ${meta.soft.replace("Phase", "").trim()}`;
+    // Avoid a lonely one-word headline. Keep it consistent across goals.
+    rhythmHeadline = `You’re in ${meta.soft.replace("Phase", "").trim()}`;
 
     // Source-aware explanation (no influences). Keep it short but useful.
     const distinctDays = new Set(sorted.map((e: any) => entryISO(e)).filter(Boolean)).size;
@@ -899,7 +912,7 @@ export function buildHomepageHeroModel(
     const reasonList = (rm.source === "inferred" ? rm.reasons : pickInferredReasons(sorted, key))
       .filter(Boolean)
       .slice(0, 2);
-    const because = reasonList.length ? ` (${reasonList.join(", ")})` : "";
+    const because = reasonList.length ? ` (Recently, ${reasonList.join(" and ")})` : "";
     const confidenceLine = confidenceOneLiner(rm.confidence, distinctDays);
 
     // Compose a friendly 1–2 sentence summary.

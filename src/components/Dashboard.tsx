@@ -171,7 +171,8 @@ export function Dashboard({
     // IMPORTANT: Version the cache key.
     // We have iterated on the hero model shape/logic a lot, and stale cached JSON can
     // make the UI look "stuck" even when the underlying logic has changed.
-    const HERO_CACHE_VERSION = 4;
+    // Bump when hero copy/logic changes, to avoid users seeing stale cached text.
+    const HERO_CACHE_VERSION = 5;
 
     // The hero model is derived from (entries + user). We cache per-day for lightness,
     // but we MUST ensure the cache matches the current data. Otherwise after a

@@ -382,6 +382,42 @@ function estimateDaysToNext(key: PhaseKey, dayInCycle: number | null, cycleLen: 
   return defaults[key] ?? 5;
 }
 
+function formatSourceLine(source: any): string {
+  if (source === 'override') return 'Based on your cycle start.';
+  if (source === 'bleed') return 'Based on your logged bleeding.';
+  return 'Based on your recent check-ins.';
+}
+
+function phaseOneLiner(key: PhaseKey, goal: UserGoal | null): string {
+  const peri = goal === 'perimenopause';
+  switch (key) {
+    case 'reset':
+      return peri
+        ? 'Lower energy and more body sensitivity is common right now.'
+        : 'Lower energy and more body sensitivity is common.';
+    case 'rebuilding':
+      return peri
+        ? 'Energy often starts to lift and motivation comes back in small waves.'
+        : 'Energy often starts to lift and momentum returns.';
+    case 'expressive':
+      return peri
+        ? 'You may feel more outward, social, and mentally sharp.'
+        : 'You may feel more outward and energised.';
+    case 'protective':
+    default:
+      return peri
+        ? 'Sleep need and sensitivity can rise, and emotions may feel closer to the surface.'
+        : 'Sleep need and sensitivity can rise.';
+  }
+}
+
+function confidenceOneLiner(conf: any, days: number): string {
+  if (days < 5) return 'Early days. This will get clearer as you log.';
+  if (conf === 'Learning') return 'Still learning your baseline. Keep logging for a sharper signal.';
+  if (conf === 'Emerging') return 'Getting clearer. Patterns will become more personal over time.';
+  return 'Confidence is stronger now. We’ll keep refining as you log.';
+}
+
 
 export function Rhythm({ userData }: { userData?: UserData }) {
   const { entries: storeEntries } = useEntries();
@@ -415,6 +451,9 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
     const dayInCycle = rm.dayInCycle;
     const confidence: ConfidenceLevel = rm.confidence as any;
 
+    const source = rm.source;
+    const reasons = rm.reasons ?? [];
+
     const cycleStats = computeCycleStats(sorted);
 
     const daysToNext = estimateDaysToNext(phaseKey, dayInCycle, cycleLen);
@@ -446,6 +485,8 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
       sci,
       soft,
       confidence,
+      source,
+      reasons,
       daysToNext,
       nextPhaseKey,
       nextSci,
@@ -515,7 +556,24 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">{computed.soft}</h3>
               </div>
               <div className="eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{computed.sci}</div>
-              <div className="text-xs text-white/80 mt-1">Based on your recent check-ins.</div>
+              {(() => {
+                const ud = (userData ?? ({} as any)) as UserData;
+                const distinctDays = new Set(computed.sorted.map((e: any) => (e as any)?.dateISO).filter(Boolean)).size;
+                const sourceLine = formatSourceLine((computed as any).source);
+                const reasons = Array.isArray((computed as any).reasons) ? ((computed as any).reasons as string[]) : [];
+                const reasonList = reasons.filter(Boolean).slice(0, 2);
+                const because = reasonList.length ? ` (Recently, ${reasonList.join(' and ')})` : '';
+                const phaseLine = phaseOneLiner(phaseKey, (ud.goal ?? null) as any);
+                const confLine = ud.goal === 'perimenopause' ? confidenceOneLiner((computed as any).confidence, distinctDays) : '';
+
+                return (
+                  <>
+                    <div className="text-xs text-white/80 mt-1">{sourceLine}{because}</div>
+                    <div className="text-sm text-white/90 mt-3">{phaseLine}</div>
+                    {confLine ? <div className="text-xs text-white/80 mt-2">{confLine}</div> : null}
+                  </>
+                );
+              })()}
             </div>
             <div className="text-right">
               <div className="text-xs text-white/80">Confidence</div>
