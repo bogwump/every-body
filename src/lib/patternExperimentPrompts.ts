@@ -160,6 +160,55 @@ export function computePatternExperimentPrompts(entriesAll: CheckInEntry[], user
     }
   }
 
+  // If nothing triggered yet, offer ONE gentle starter experiment so this section never feels broken.
+  if (prompts.length === 0) {
+    if (enabled.has('sleep' as any)) {
+      prompts.push({
+        id: 'starter-sleep',
+        title: 'Starter: 3-day sleep consistency test',
+        reason: 'A simple starter experiment that often improves energy and mood, even without a strong pattern yet.',
+        durationDays: 3,
+        metrics: ['sleep', 'energy', 'mood'].filter((k) => enabled.has(k as any)) as any,
+        changeKey: (userData.enabledInfluences ?? []).includes('lateNight') ? 'lateNight' : undefined,
+        steps: [
+          'Pick a realistic bedtime and wake time for the next 3 days (within a 60-minute window).',
+          'Keep caffeine and alcohol roughly the same as usual, if you can.',
+          'Log sleep + energy each day, then compare to your baseline.',
+        ],
+        note: 'If you have already logged today, start from tomorrow. If life happens, still log it.',
+      });
+    } else if (enabled.has('stress' as any)) {
+      prompts.push({
+        id: 'starter-stress',
+        title: 'Starter: 3-day wind-down buffer test',
+        reason: 'A low-effort starter experiment to see if a small buffer helps stress and sleep.',
+        durationDays: 3,
+        metrics: ['stress', 'sleep', 'mood'].filter((k) => enabled.has(k as any)) as any,
+        changeKey: (userData.enabledInfluences ?? []).includes('stressfulDay') ? 'stressfulDay' : undefined,
+        steps: [
+          'Choose one small wind-down habit (10 minutes): stretching, reading, breathwork, or a shower.',
+          'Do it at roughly the same time each evening for 3 days.',
+          'Log stress and sleep, then compare to baseline.',
+        ],
+        note: 'If you do not track stress yet, switch it on in Profile first (you can switch it back off later).',
+      });
+    } else {
+      prompts.push({
+        id: 'starter-enable',
+        title: 'Starter: switch on one behaviour metric',
+        reason: 'To generate personalised suggestions, the app needs at least one “behaviour” metric (like sleep or stress) logged across several days.',
+        durationDays: 3,
+        metrics: ['mood'] as any,
+        steps: [
+          'In Profile, switch on Sleep or Stress (just one is fine).',
+          'Log it for a few days alongside Mood.',
+          'Then come back here for more personalised suggestions.',
+        ],
+        note: 'Keep it lightweight. You can always switch it back off.',
+      });
+    }
+  }
+
   // Keep the list short and non-overwhelming.
   return prompts.slice(0, 2);
 }

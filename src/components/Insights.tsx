@@ -1502,15 +1502,25 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const startExperiment = () => {
     const todayISO = isoTodayLocal();
+    const addDaysISO = (iso: string, days: number): string => {
+      const d = new Date(iso + 'T00:00:00');
+      d.setDate(d.getDate() + days);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const hasLoggedToday = Array.isArray(entriesAllSorted) && entriesAllSorted.some((e: any) => e?.dateISO === todayISO);
+    const startISO = hasLoggedToday ? addDaysISO(todayISO, 1) : todayISO;
     if (!experimentPlan) return;
     const baseMetrics = (experimentMetrics.length ? experimentMetrics : selected).slice(0, isCustomExperiment ? CUSTOM_EXPERIMENT_MAX_METRICS : 6) as any;
     const trimmedMetrics = isCustomExperiment ? baseMetrics.slice(0, CUSTOM_EXPERIMENT_MAX_METRICS) : baseMetrics;
     const safeMetrics = isCustomExperiment && (!trimmedMetrics || trimmedMetrics.length === 0) ? (['mood'] as any) : trimmedMetrics;
 
     const plan: ExperimentPlan = {
-      id: `${todayISO}-${Math.random().toString(16).slice(2)}`,
+      id: `${startISO}-${Math.random().toString(16).slice(2)}`,
       title: isCustomExperiment ? (customExperimentTitle.trim() || 'Your experiment') : experimentPlan.title,
-      startDateISO: todayISO,
+      startDateISO: startISO,
       durationDays: experimentDurationDays,
       metrics: safeMetrics,
       changeKey: experimentChangeKey
@@ -3547,7 +3557,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
             {suggestedExperiments.length === 0 ? (
               <div className="mt-3 eb-inset rounded-2xl p-5 text-sm eb-muted !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
-                Keep logging a few consistent metrics and this section will start to fill up.
+                To generate these, the app needs overlap between a behaviour (like sleep, caffeine, late nights) and how you feel. If you are mainly logging body symptoms, try switching on Sleep or Stress for a few days and this section will start to fill up.
               </div>
             ) : (
               <div className="mt-3">
