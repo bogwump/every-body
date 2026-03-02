@@ -1710,7 +1710,95 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         });
       });
 
-    const uniq = new Map<string, (typeof items)[number]>();
+    
+    // 21+ days: if the user is mainly logging body symptoms, corrPairs can legitimately be empty.
+    // Here we generate "bridge" experiment ideas from body<->body co-movement by suggesting a simple behaviour lever to test.
+    if (entriesAllSorted.length >= 21) {
+      const bodyKinds = new Set<SymptomKind>(['physio', 'hormonal']);
+      const candidateKeys = (allMetricKeys as InsightMetricKey[]).filter((k) => {
+        const kind = getKindForMetric(k, userData);
+        return bodyKinds.has(kind);
+      });
+
+      const pickLever = (aKey: InsightMetricKey, bKey: InsightMetricKey) => {
+        const ks = [String(aKey), String(bKey)].join('|').toLowerCase();
+
+        // Head / dizzy / migraine → hydration or caffeine
+        if (ks.includes('headache') || ks.includes('migraine') || ks.includes('dizziness')) {
+          return { changeKey: 'lowHydration', title: 'Hydration support test' };
+        }
+
+        // Night symptoms → alcohol or late night
+        if (ks.includes('night') || ks.includes('sweat') || ks.includes('flush')) {
+          return { changeKey: 'alcohol', title: 'Alcohol-free window' };
+        }
+
+        // Gut symptoms → caffeine or alcohol
+        if (ks.includes('bloating') || ks.includes('digestion') || ks.includes('acid')) {
+          return { changeKey: 'caffeine', title: 'Caffeine swap test' };
+        }
+
+        // Stress-adjacent → buffer
+        if (ks.includes('anxiety') || ks.includes('irritability') || ks.includes('stress')) {
+          return { changeKey: 'stressfulDay', title: 'Stress buffer test' };
+        }
+
+        // Default lever: earlier bedtime / fewer late nights
+        return { changeKey: 'lateNight', title: 'Sleep consistency test' };
+      };
+
+      const bodyPairs: Array<{ aKey: InsightMetricKey; bKey: InsightMetricKey; r: number; n: number; quality: number }> = [];
+
+      for (let i = 0; i < candidateKeys.length; i++) {
+        for (let j = i + 1; j < candidateKeys.length; j++) {
+          const aKey = candidateKeys[i];
+          const bKey = candidateKeys[j];
+
+          const xs: number[] = [];
+          const ys: number[] = [];
+          for (const e of entriesSorted) {
+            const av = valueForMetric(e, aKey as any);
+            const bv = valueForMetric(e, bKey as any);
+            if (typeof av === 'number' && typeof bv === 'number') {
+              xs.push(av);
+              ys.push(bv);
+            }
+          }
+
+          const n = xs.length;
+          if (n < 10) continue;
+
+          const vA = variance(xs);
+          const vB = variance(ys);
+          if (vA < 0.2 || vB < 0.2) continue;
+
+          const r = pearsonCorrelation(xs, ys);
+          if (!Number.isFinite(r)) continue;
+          if (Math.abs(r) < 0.45) continue;
+
+          const quality = Math.abs(r) * (Math.min(n, 14) / 14);
+
+          bodyPairs.push({ aKey, bKey, r, n, quality });
+        }
+      }
+
+      bodyPairs
+        .sort((p, q) => q.quality - p.quality)
+        .slice(0, 4)
+        .forEach((p, idx) => {
+          const lever = pickLever(p.aKey, p.bKey);
+          items.push({
+            id: `bodybridge-${idx}`,
+            title: `${labelFor(p.aKey, userData)} + ${labelFor(p.bKey, userData)}`,
+            body: `These have tended to move together across ${p.n} days. A good next experiment is: ${lever.title.toLowerCase()}.`,
+            confidence: 'medium',
+            metrics: [p.aKey, p.bKey].filter(Boolean) as any,
+            allow: true,
+          });
+        });
+    }
+
+const uniq = new Map<string, (typeof items)[number]>();
     items.forEach((it) => {
       const key = it.metrics.join('|');
       if (!uniq.has(key)) uniq.set(key, it);
@@ -1755,8 +1843,24 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const today = isoTodayLocal();
     const recent = filterByDays(entriesAllSorted, 21);
 
-    // Need some baseline logging to avoid noisy nudges.
-    if (recent.length < 7) return [] as TryNextPrompt[];
+    const makeStarter = (): TryNextPrompt => ({
+      id: 'starter-simple-experiment',
+      title: 'A simple 3-day experiment',
+      changeKey: 'lateNight',
+      metrics: (['mood', 'sleep', 'energy'] as any).filter((k: any) => isMetricInScope(k as any, userData)) as any,
+      durationDays: 3,
+      why: [
+        'Pick one small, easy change you can actually do.',
+        'You will start to see what shifts your week quicker than waiting for perfect data.',
+      ],
+    });
+
+    // Day 1+: always offer at least one idea so the feature never feels empty.
+    if (recent.length < 7) {
+      const s = makeStarter();
+      return (s.metrics || []).length ? [s] : [];
+    }
+
 
     const enabledModulesSet = new Set(userData.enabledModules || []);
     const enabledInf = new Set(userData.enabledInfluences || []);
@@ -1783,7 +1887,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const prompts: TryNextPrompt[] = [];
 
     // 1) Sleep up and down → earlier bedtime / fewer late nights
-    if (enabledModulesSet.has('sleep' as any) && enabledInf.has('lateNight')) {
+    if (recent.length >= 14 && enabledModulesSet.has('sleep' as any) && enabledInf.has('lateNight')) {
       const xs = valuesFor('sleep' as any);
       if (xs.length >= 5 && stdev(xs) >= 2) {
         prompts.push({
@@ -1798,7 +1902,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
 
     // 2) High stress → add a small buffer
-    if (enabledModulesSet.has('stress' as any) && enabledInf.has('stressfulDay')) {
+    if (recent.length >= 14 && enabledModulesSet.has('stress' as any) && enabledInf.has('stressfulDay')) {
       const xs = valuesFor('stress' as any);
       if (xs.length >= 5 && mean(xs) >= 6.5) {
         prompts.push({
@@ -1813,7 +1917,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
 
     // 3) Anxiety + caffeine logged → caffeine timing
-    if (enabledModulesSet.has('anxiety' as any) && enabledInf.has('caffeine')) {
+    if (recent.length >= 14 && enabledModulesSet.has('anxiety' as any) && enabledInf.has('caffeine')) {
       const xs = valuesFor('anxiety' as any);
       const cafDays = countInfluence('caffeine');
       if (xs.length >= 5 && mean(xs) >= 6 && cafDays >= 3) {
@@ -1829,7 +1933,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
 
     // 4) Headache + low hydration logged → hydration support
-    if (enabledModulesSet.has('headache' as any) && enabledInf.has('lowHydration')) {
+    if (recent.length >= 14 && enabledModulesSet.has('headache' as any) && enabledInf.has('lowHydration')) {
       const xs = valuesFor('headache' as any);
       const lowHydDays = countInfluence('lowHydration');
       if (xs.length >= 5 && mean(xs) >= 4.5 && lowHydDays >= 2) {
@@ -1845,7 +1949,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
 
     // 5) Night sweats + alcohol logged → alcohol-free window
-    if (enabledModulesSet.has('nightSweats' as any) && enabledInf.has('alcohol')) {
+    if (recent.length >= 14 && enabledModulesSet.has('nightSweats' as any) && enabledInf.has('alcohol')) {
       const xs = valuesFor('nightSweats' as any);
       const alcDays = countInfluence('alcohol');
       if (xs.length >= 5 && mean(xs) >= 4.5 && alcDays >= 2) {
@@ -1860,6 +1964,31 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       }
     }
 
+
+    // 6) Sleep details: trouble falling asleep → late nights / caffeine timing
+    // This works even if the main Sleep score looks "fine" because the detail can still be disruptive.
+    if (recent.length >= 14 && enabledInf.has('lateNight')) {
+      const detailVals: number[] = [];
+      recent.forEach((e) => {
+        const d: any = (e as any)?.sleepDetails;
+        const v = d?.troubleFallingAsleep;
+        if (typeof v === 'number') detailVals.push(v);
+      });
+      if (detailVals.length >= 5) {
+        const avg = mean(detailVals);
+        if (avg >= 1.6) {
+          prompts.push({
+            id: 'try-sleep-details',
+            title: 'Wind-down test',
+            changeKey: 'lateNight',
+            metrics: (['sleep', 'energy'] as any).filter((k: any) => isMetricInScope(k as any, userData)) as any,
+            durationDays: 3,
+            why: ['Falling asleep has been a bit harder on several days.', 'A short wind-down window is a clean experiment to try.'],
+          });
+        }
+      }
+    }
+
     // Remove dismissed prompts (local only) and prompts with no metrics.
     const active = prompts
       .map((p) => ({ ...p, metrics: (p.metrics || []).filter((k) => isMetricInScope(k as any, userData)) }))
@@ -1869,6 +1998,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         if (!until) return true;
         return until < today;
       });
+
+    if (active.length === 0) {
+      const s = makeStarter();
+      return (s.metrics || []).length ? [s] : [];
+    }
 
     return active.slice(0, 6);
   }, [entriesAllSorted, userData, dismissedPrompts]);
@@ -2330,7 +2464,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
         <div className="mt-3 flex flex-wrap gap-2 justify-start">
           <span className="eb-pill">
-            Check-ins (last {days} days) • {entriesSorted.length}
+            Check-ins (last {days} days) • {entriesSorted.length} · Total • {entriesAllSorted.length}
           </span>
           <span className="eb-pill">
             Insights • {insightsUnlocked}
