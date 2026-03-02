@@ -35,6 +35,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 interface InsightsProps {
   userData: UserData;
   onOpenCheckIn?: (dateISO: string) => void;
+  onUpdateUserData?: React.Dispatch<React.SetStateAction<UserData>>;
 }
 
 type Timeframe = 'week' | 'month' | '3months';
@@ -545,7 +546,7 @@ function buildHtmlReport(args: {
   return html;
 }
 
-export function Insights({ userData, onOpenCheckIn }: InsightsProps) {
+export function Insights({ userData, onOpenCheckIn, onUpdateUserData }: InsightsProps) {
   const { entries } = useEntries();
   const entriesAllSorted = useMemo(() => sortByDateAsc(Array.isArray(entries) ? entries : []), [entries]);
 
@@ -1386,7 +1387,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   // Experiment dialog state
   const [experimentOpen, setExperimentOpen] = useState(false);
-  const [finishExperimentConfirm, setFinishExperimentConfirm] = useState<null | { worked: boolean }>(null);
+  const [finishExperimentConfirm, setFinishExperimentConfirm] = useState<null | { outcome: 'helped' | 'notReally' | 'abandoned' }>(null);
   const [experimentPlan, setExperimentPlan] = useState<{ title: string; steps: string[]; note: string } | null>(null);
   const [experimentMetrics, setExperimentMetrics] = useState<Array<MetricKey>>([]);
   const [experimentDurationDays, setExperimentDurationDays] = useState<number>(3);
@@ -1395,6 +1396,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const [customExperimentChangeKey, setCustomExperimentChangeKey] = useState<string>('');
   const [experimentChangeKey, setExperimentChangeKey] = useState<string>('');
   const [experimentMetricLimitFlash, setExperimentMetricLimitFlash] = useState<boolean>(false);
+
+  // If user selects an influence they are not currently tracking, offer to enable it.
+  const [enableInfluencePrompt, setEnableInfluencePrompt] = useState<null | { key: string }>(null);
 
   // When stopping an experiment early, let the user add notes before it fully wraps up.
   const [stopExperimentConfirmOpen, setStopExperimentConfirmOpen] = useState<boolean>(false);
@@ -1487,6 +1491,15 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setExperimentOpen(true);
   };
 
+  const enableInfluenceKey = (k: string) => {
+    if (!onUpdateUserData) return;
+    onUpdateUserData((prev) => {
+      const curr = Array.isArray((prev as any).enabledInfluences) ? ((prev as any).enabledInfluences as string[]) : [];
+      const next = Array.from(new Set(curr.concat([k])));
+      return { ...(prev as any), enabledInfluences: next } as any;
+    });
+  };
+
   const startExperiment = () => {
     const todayISO = isoTodayLocal();
     if (!experimentPlan) return;
@@ -1538,22 +1551,26 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setExperiment({ ...ex, durationDays: nextDays });
   };
 
-  const markExperimentOutcome = (worked: boolean) => {
+  const markExperimentOutcome = (outcome: 'helped' | 'notReally' | 'abandoned') => {
     if (!experiment) return;
-    setFinishExperimentConfirm({ worked });
+    setFinishExperimentConfirm({ outcome });
   };
 
   const confirmFinishExperiment = () => {
     if (!experiment || !finishExperimentConfirm) return;
     const ex = experiment as ExperimentPlan;
-    const worked = finishExperimentConfirm.worked;
+    const outcome = finishExperimentConfirm.outcome;
+    const rating = outcome === 'helped' ? 5 : outcome === 'notReally' ? 2 : undefined;
 
     setExperiment({
       ...ex,
       outcome: {
         ...(ex.outcome ?? {}),
-        rating: worked ? 5 : 2,
+        status: outcome === 'abandoned' ? ('abandoned' as any) : ('completed' as any),
+        rating: rating as any,
         completedAtISO: new Date().toISOString(),
+        // Preserve whatever the user has typed so far.
+        note: outcomeNote.trim() ? outcomeNote.trim() : undefined,
         digest: buildExperimentDigest(experimentComparison),
       },
     });
@@ -2144,16 +2161,23 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                 <button
                   type="button"
                   className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
-                  onClick={() => markExperimentOutcome(true)}
+                  onClick={() => markExperimentOutcome('helped')}
                 >
                   Yes, it helped
                 </button>
                 <button
                   type="button"
                   className="px-4 py-2 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
-                  onClick={() => markExperimentOutcome(false)}
+                  onClick={() => markExperimentOutcome('notReally')}
                 >
                   Not really
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl bg-white border border-black/10 text-[rgb(var(--color-text))] hover:bg-black/5 transition-all font-medium"
+                  onClick={() => markExperimentOutcome('abandoned')}
+                >
+                  I didn’t manage to run it
                 </button>
               </div>
             </div>
@@ -2188,9 +2212,32 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           </div>
         ) : null}
 
+        {experimentStatus.done && (experimentStatus.ex as any)?.outcome?.status === 'abandoned' ? (
+          <div className="mt-4 eb-inset rounded-2xl p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold">Conclusion</div>
+                <div className="mt-1 text-sm eb-muted">
+                  <span className="inline-flex items-center gap-2 font-medium text-[rgb(var(--color-text))]">
+                    <HelpCircle size={18} className="text-[rgb(var(--color-text))]" />
+                    Not completed
+                  </span>
+                  <span> · That’s totally normal. You can retry later when life is calmer.</span>
+                </div>
+                {(experimentStatus.ex as any)?.outcome?.note ? (
+                  <div className="mt-2 text-sm">
+                    <span className="font-medium">Note:</span> {(experimentStatus.ex as any).outcome.note}
+                  </div>
+                ) : null}
+              </div>
+              <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>Saved</span>
+            </div>
+          </div>
+        ) : null}
+
         {!experimentStatus.done && experimentStatus.day >= 2 ? renderExperimentComparisonBlock('progress') : null}
 
-        {experimentStatus.done && !(experimentStatus.ex as any)?.outcome?.rating ? (
+        {experimentStatus.done && !(experimentStatus.ex as any)?.outcome?.rating && (experimentStatus.ex as any)?.outcome?.status !== 'abandoned' ? (
           <div className="mt-4 eb-inset rounded-2xl p-4">
             <div className="text-sm font-semibold">Did it help?</div>
             <div className="mt-1 text-sm eb-muted">Quick 5-point rating so we can turn this into a real conclusion.</div>
@@ -2634,8 +2681,17 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(() => {
                     const enabled = Array.isArray(userData.enabledInfluences) ? (userData.enabledInfluences as string[]) : [];
-                    const opts = Array.from(new Set(enabled.concat(Array.from(OTHER_INFLUENCE_KEYS as any)))).slice(0, 14);
-                    const toggle = (k: string) => setCustomExperimentChangeKey((prev) => (prev === k ? '' : k));
+                    const base = ['exercise', 'sex'];
+                    const opts = Array.from(new Set(base.concat(enabled).concat(Array.from(OTHER_INFLUENCE_KEYS as any))));
+                    const toggle = (k: string) => {
+                      setCustomExperimentChangeKey((prev) => (prev === k ? '' : k));
+
+                      // Offer to enable if the user isn't tracking it yet.
+                      const isEnabled = enabled.includes(k);
+                      if (!isEnabled && k !== 'exercise' && k !== 'sex') {
+                        setEnableInfluencePrompt({ key: k });
+                      }
+                    };
                     return opts.map((k) => (
                       <button
                         key={k}
@@ -2828,6 +2884,42 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         </EBDialogContent>
       </Dialog>
 
+      {/* Enable influence tracking prompt */}
+      <Dialog
+        open={Boolean(enableInfluencePrompt)}
+        onOpenChange={(open) => {
+          if (!open) setEnableInfluencePrompt(null);
+        }}
+      >
+        <EBDialogContent
+          title="Turn on tracking"
+          description="If you want to run an experiment against this, it helps to track it in your check-ins."
+          className="max-w-md rounded-2xl"
+        >
+          <DialogHeader>
+            <DialogTitle>Turn on tracking for {enableInfluencePrompt ? otherInfluenceLabel(enableInfluencePrompt.key) : 'this'}?</DialogTitle>
+            <DialogDescription>
+              This will add it to your quick log so you can switch it on for the days you need.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="pt-2 flex justify-end gap-2">
+            <button type="button" className="eb-btn-secondary" onClick={() => setEnableInfluencePrompt(null)}>
+              Not now
+            </button>
+            <button
+              type="button"
+              className="eb-btn-primary"
+              onClick={() => {
+                if (enableInfluencePrompt) enableInfluenceKey(enableInfluencePrompt.key);
+                setEnableInfluencePrompt(null);
+              }}
+            >
+              Turn on
+            </button>
+          </div>
+        </EBDialogContent>
+      </Dialog>
+
       {/* Stop experiment confirm dialog */}
       <Dialog
         open={Boolean(stopExperimentConfirmOpen)}
@@ -2894,13 +2986,21 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           </DialogHeader>
           <div className="space-y-3">
             <div className="text-sm eb-muted">
-              {finishExperimentConfirm?.worked
-                ? 'Mark this experiment as helpful and finish it now?'
-                : 'Finish this experiment now and mark it as not really helpful?'}
+              {finishExperimentConfirm?.outcome === 'helped'
+                ? 'Finish now and mark it as helpful?'
+                : finishExperimentConfirm?.outcome === 'notReally'
+                  ? 'Finish now and mark it as not really helpful?'
+                  : 'Finish now and mark it as not completed?'}
             </div>
-            <div className="text-sm eb-muted">
-              We will save the result so your future insights can become more meaningful.
-            </div>
+            <div className="text-sm eb-muted">Optional: add a quick note so Future You knows what happened.</div>
+
+            <textarea
+              className="eb-input"
+              placeholder="For example: couldn’t stick to it, travel got in the way, stress spiked, forgot to log…"
+              rows={3}
+              value={outcomeNote}
+              onChange={(e) => setOutcomeNote(e.target.value)}
+            />
 
             <div className="pt-2 flex justify-end gap-2">
               <button type="button" className="eb-btn-secondary" onClick={() => setFinishExperimentConfirm(null)}>

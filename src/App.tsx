@@ -224,7 +224,7 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
         );
 
         case 'insights':
-          return <Insights userData={userData} onOpenCheckIn={navigateToCheckIn} />;
+          return <Insights userData={userData} onOpenCheckIn={navigateToCheckIn} onUpdateUserData={setUserData} />;
 
       case 'chat':
         return <AIChat userName={userData.name || 'there'} userData={userData} />;
