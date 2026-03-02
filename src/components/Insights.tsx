@@ -1416,12 +1416,36 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       changeKey?: string;
     }
   >(null);
-  const openExperiment = (metrics?: Array<MetricKey>) => {
+  const openExperiment = (
+    metrics?: Array<MetricKey>,
+    opts?: { mode?: 'change' | 'track'; durationDays?: number }
+  ) => {
     if (experimentStatus && !experimentStatus.done) {
       setPreOpenExperimentConfirm({ type: 'suggested', metrics });
       return;
     }
     const focus = (metrics && metrics.length ? metrics : selected).slice(0, 5);
+
+    const mode = opts?.mode || 'change';
+    if (typeof opts?.durationDays === 'number') setExperimentDurationDays(opts.durationDays);
+
+    if (mode === 'track') {
+      setExperimentMetrics(focus);
+      setExperimentPlan({
+        title: 'Tracking experiment',
+        steps: [
+          'Keep logging these measures each day (no changes needed).',
+          'If you notice one tends to start first, add a quick note.',
+          'After 7 days, review whether they truly move together.',
+        ],
+        note: 'This helps you spot reliable patterns across your cycle without trying to “fix” a symptom.',
+      });
+      setIsCustomExperiment(false);
+      setExperimentChangeKey('');
+      setExperimentOpen(true);
+      return;
+    }
+
     const plan = buildExperimentPlan(focus);
     setExperimentMetrics(focus);
     setExperimentPlan(plan);
@@ -1620,6 +1644,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     return { ex, day: Math.max(1, day), done };
   }, [experiment]);
 
+
+  const todayISO = isoTodayLocal();
+  const hasLoggedToday = Array.isArray(entriesAllSorted) && entriesAllSorted.some((e: any) => e?.dateISO === todayISO);
+  const experimentHasStarted = Boolean(experimentStatus && (experimentStatus.ex as any)?.startDateISO && (experimentStatus.ex as any).startDateISO <= todayISO);
+
   // Palette for multi-line charts.
   // IMPORTANT: for 6 lines we want clearly distinct colours.
   // We intentionally pull colours from *all* theme palettes (not just the current theme)
@@ -1683,6 +1712,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       confidence: 'low' | 'medium' | 'high';
       metrics: MetricKey[];
       allow: boolean;
+      kind?: 'change' | 'track';
+      durationDays?: number;
     }> = [];
 
     corrPairs.slice(0, 8).forEach((p, idx) => {
@@ -1693,6 +1724,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         confidence: p.confidence,
         metrics: [p.aKey, p.bKey].filter(Boolean) as any,
         allow: Boolean(p.allowSuggestedExperiment),
+        kind: 'change',
       });
     });
 
@@ -1707,6 +1739,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           confidence: (f.confidence as any) || 'medium',
           metrics: (f.metrics as any[]).slice(0, 3) as any,
           allow: true,
+          kind: 'change',
         });
       });
 
@@ -1786,17 +1819,18 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         .sort((p, q) => q.quality - p.quality)
         .slice(0, 4)
         .forEach((p, idx) => {
-          const lever = pickLever(p.aKey, p.bKey);
           items.push({
             id: `bodybridge-${idx}`,
             title: `${labelFor(p.aKey, userData)} + ${labelFor(p.bKey, userData)}`,
-            body: `These have tended to move together across ${p.n} days. A good next experiment is: ${lever.title.toLowerCase()}.`,
+            body: `These have tended to rise and fall together across ${p.n} days. A meaningful next step is a tracking experiment: keep logging both for the next 7 days and note which one tends to arrive first.`,
             confidence: 'medium',
             metrics: [p.aKey, p.bKey].filter(Boolean) as any,
             allow: true,
+            kind: 'track',
+            durationDays: 7,
           });
         });
-    }
+}
 
 const uniq = new Map<string, (typeof items)[number]>();
     items.forEach((it) => {
@@ -1849,10 +1883,7 @@ const uniq = new Map<string, (typeof items)[number]>();
       changeKey: 'lateNight',
       metrics: (['mood', 'sleep', 'energy'] as any).filter((k: any) => isMetricInScope(k as any, userData)) as any,
       durationDays: 3,
-      why: [
-        'Pick one small, easy change you can actually do.',
-        'You will start to see what shifts your week quicker than waiting for perfect data.',
-      ],
+      why: [],
     });
 
     // Day 1+: always offer at least one idea so the feature never feels empty.
@@ -2096,6 +2127,107 @@ const uniq = new Map<string, (typeof items)[number]>();
     });
   };
 
+  // Active experiment card (shown near the top of the Experiments section)
+  // Note: this helper must exist because the Experiments section calls it.
+  const renderActiveExperimentCard = () => {
+    // No experiment yet
+    if (!experimentStatus) {
+      return (
+        <div className="eb-inset rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">No active experiment</div>
+              <div className="mt-1 text-sm eb-muted">Start small. You can always change it later.</div>
+            </div>
+            <button type="button" className="eb-btn eb-btn-primary" onClick={openCustomExperiment}>
+              Set up 3-day experiment
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const ex = experimentStatus.ex as ExperimentPlan;
+    const done = Boolean((ex as any)?.outcome?.completedAtISO) || Boolean(experimentStatus.done);
+    const started = Boolean(ex.startDateISO && ex.startDateISO <= todayISO);
+
+    const metricPills = (ex.metrics ?? []).slice(0, 6).map((k) => (
+      <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+        {labelFor(k as any, userData)}
+      </span>
+    ));
+
+    return (
+      <div className="eb-inset rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold">{ex.title || 'Your experiment'}</div>
+            <div className="mt-1 text-sm eb-muted">
+              {done
+                ? 'Finished'
+                : started
+                  ? `Day ${experimentStatus.day} of ${ex.durationDays ?? 3}`
+                  : `Starts ${ex.startDateISO}`}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">{metricPills}</div>
+          </div>
+
+          {!done ? (
+            <div className="flex items-center gap-2">
+              {/* Only show when it is useful */}
+              {started && !hasLoggedToday && onOpenCheckIn ? (
+                <button type="button" className="eb-btn eb-btn-primary" onClick={() => onOpenCheckIn(todayISO)}>
+                  Log today
+                </button>
+              ) : null}
+              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => extendExperiment(2)}>
+                Extend 2 days
+              </button>
+              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setStopExperimentConfirmOpen(true)}>
+                Stop
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => clearExperiment()}>
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Comparison / progress block */}
+        {done ? renderExperimentComparisonBlock('conclusion') : renderExperimentComparisonBlock('progress')}
+
+        {/* Outcome actions (shown once the experiment is done) */}
+        {done ? (
+          <div className="mt-4">
+            <div className="text-sm font-semibold">How did it go?</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" className="eb-btn eb-btn-primary" onClick={() => markExperimentOutcome('helped')}>
+                Yes, it helped
+              </button>
+              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => markExperimentOutcome('notReally')}>
+                Not really
+              </button>
+              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => markExperimentOutcome('abandoned')}>
+                I didn’t manage to run it
+              </button>
+            </div>
+            <div className="mt-3 text-sm eb-muted">Optional note (you can edit this any time):</div>
+            <textarea
+              className="eb-input mt-2"
+              rows={3}
+              value={outcomeNote}
+              onChange={(e) => setOutcomeNote(e.target.value)}
+              placeholder="Anything you want to remember about this experiment"
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
   const renderExperimentComparisonBlock = (mode: 'progress' | 'conclusion') => {
     if (!experimentStatus) return null;
     const digest = (experimentStatus.ex as any)?.outcome?.digest;
@@ -2178,21 +2310,22 @@ const uniq = new Map<string, (typeof items)[number]>();
         </div>
 
         {cmp.metrics.length > 3 && (
-          <div className="mt-3">
+          <div className="mt-3 flex items-center justify-end">
             <button
               type="button"
-              className="text-sm font-semibold underline"
+              className="text-sm eb-muted underline hover:opacity-80"
               onClick={() => setShowAllExperimentMetrics((v) => !v)}
             >
-              {showAllExperimentMetrics
-                ? 'Show fewer measures'
-                : `Show all ${Math.min(5, cmp.metrics.length)} measures`}
+              {showAllExperimentMetrics ? 'Show fewer' : `Show all (${cmp.metrics.length})`}
             </button>
           </div>
         )}
-      </div>
-    );
+	
+	</div>
+	);
   };
+
+
 
   const renderExperimentCTA = (ms: any) => {
     if (!ms) return null;
@@ -2222,238 +2355,6 @@ const uniq = new Map<string, (typeof items)[number]>();
     );
   };
 
-  const renderActiveExperimentCard = () => {
-    if (!experimentStatus) return null;
-    return (
-      <div id="eb-active-experiment" className="eb-inset rounded-2xl p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold flex items-center gap-2">
-              <FlaskConical className="w-4 h-4" />
-              {experimentStatus.done
-                ? 'Experiment complete'
-                : `Experiment in progress (Day ${experimentStatus.day}/${experimentStatus.ex.durationDays ?? 3})`}
-            </div>
-            <div className="mt-1 text-sm eb-muted">
-              {experimentStatus.ex.title}
-              {experimentStatus.ex.changeKey ? (
-                <span> • Changing: {otherInfluenceLabel(String(experimentStatus.ex.changeKey))}</span>
-              ) : null}
-              {Array.isArray(experimentStatus.ex.metrics) && experimentStatus.ex.metrics.length ? (
-                <span>
-                  {' '}
-                  • Measuring:{' '}
-                  {(experimentStatus.ex.metrics as any[])
-                    .slice(0, 5)
-                    .map((k) => labelFor(k as any, userData))
-                    .join(' • ')}
-                </span>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-3 sm:mt-0 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
-            {!experimentStatus.done && onOpenCheckIn ? (
-              <button
-                type="button"
-                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
-                onClick={() => onOpenCheckIn(isoTodayLocal())}
-              >
-                Log today
-              </button>
-            ) : null}
-            {!experimentStatus.done ? (
-              <button
-                type="button"
-                className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium whitespace-nowrap"
-                onClick={() => extendExperiment(2)}
-              >
-                Extend 2 days
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
-              onClick={() => {
-                if (experimentStatus.done) {
-                  clearExperiment();
-                } else {
-                  setStopExperimentConfirmOpen(true);
-                }
-              }}
-            >
-              {experimentStatus.done ? 'Clear' : 'Stop'}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-          {experimentStatus.ex.steps?.slice(0, 3)?.map((s: string, i: number) => (
-            <div key={i} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px] !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
-              <div className="text-sm font-semibold">Step {i + 1}</div>
-              <div className="mt-1 text-sm eb-muted">{s}</div>
-            </div>
-          ))}
-
-          {!experimentStatus.done ? (
-            <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px] !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
-              <div className="text-sm font-semibold">Step 4</div>
-              <div className="mt-1 text-sm eb-muted">
-                Tell me if it helped. We'll save the result so your future insights can become more meaningful.
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 justify-end">
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
-                  onClick={() => markExperimentOutcome('helped')}
-                >
-                  Yes, it helped
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
-                  onClick={() => markExperimentOutcome('notReally')}
-                >
-                  Not really
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded-xl bg-white border border-black/10 text-[rgb(var(--color-text))] hover:bg-black/5 transition-all font-medium"
-                  onClick={() => markExperimentOutcome('abandoned')}
-                >
-                  I didn’t manage to run it
-                </button>
-              </div>
-            </div>
-                    ) : experimentStatus.ex.isComplete ? (
-              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px] !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
-                <div className="text-sm font-semibold">Step 4</div>
-                <div className="mt-1 text-sm eb-muted">
-                  Experiment complete. Thanks for telling me what helped.
-                </div>
-              </div>
-            ) : null}
-        </div>
-
-        {experimentStatus.ex.note ? <div className="mt-3 text-sm eb-muted">{experimentStatus.ex.note}</div> : null}
-
-        {experimentWindow && experimentStatus.day >= 2 ? (
-          <div className="mt-4 eb-inset rounded-2xl p-4">
-            <div className="text-sm font-semibold">Experiment mini chart</div>
-            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {experimentWindow.series.slice(0, 3).map((s) => (
-                <div key={String(s.key)} className="rounded-2xl border border-black/5 bg-white p-3">
-                  <div className="text-xs text-[rgb(var(--color-text-secondary))]">{labelFor(s.key, userData)}</div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <Sparkline values={s.values} />
-                    <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">
-                      Day {Math.min(experimentStatus.day, experimentStatus.ex.durationDays ?? 3)}/{experimentStatus.ex.durationDays ?? 3}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {experimentStatus.done && (experimentStatus.ex as any)?.outcome?.status === 'abandoned' ? (
-          <div className="mt-4 eb-inset rounded-2xl p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="text-sm font-semibold">Conclusion</div>
-                <div className="mt-1 text-sm eb-muted">
-                  <span className="inline-flex items-center gap-2 font-medium text-[rgb(var(--color-text))]">
-                    <HelpCircle size={18} className="text-[rgb(var(--color-text))]" />
-                    Not completed
-                  </span>
-                  <span> · That’s totally normal. You can retry later when life is calmer.</span>
-                </div>
-                {(experimentStatus.ex as any)?.outcome?.note ? (
-                  <div className="mt-2 text-sm">
-                    <span className="font-medium">Note:</span> {(experimentStatus.ex as any).outcome.note}
-                  </div>
-                ) : null}
-              </div>
-              <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>Saved</span>
-            </div>
-          </div>
-        ) : null}
-
-        {!experimentStatus.done && experimentStatus.day >= 2 ? renderExperimentComparisonBlock('progress') : null}
-
-        {experimentStatus.done && !(experimentStatus.ex as any)?.outcome?.rating && (experimentStatus.ex as any)?.outcome?.status !== 'abandoned' ? (
-          <div className="mt-4 eb-inset rounded-2xl p-4">
-            <div className="text-sm font-semibold">Did it help?</div>
-            <div className="mt-1 text-sm eb-muted">Quick 5-point rating so we can turn this into a real conclusion.</div>
-            <div className="mt-3 flex flex-wrap gap-2 justify-end">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={chipClass((experimentStatus.ex as any)?.outcome?.rating === n)}
-                  onClick={() => setOutcomeRating(n as any)}
-                  aria-label={`Rate ${n} out of 5`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3">
-              <textarea
-                className="eb-input"
-                placeholder="Optional: what changed (sleep, food, stress, meds, ...)?"
-                rows={2}
-                value={outcomeNote}
-                onChange={(e) => setOutcomeNote(e.target.value)}
-              />
-            </div>
-          </div>
-        ) : null}
-
-        {(experimentStatus.ex as any)?.outcome?.rating ? (
-          <div className="mt-4 eb-inset rounded-2xl p-4">
-            {(() => {
-              const rating = Number((experimentStatus.ex as any)?.outcome?.rating ?? 0);
-              const label = rating >= 4 ? 'Successful' : rating <= 2 ? 'Unsuccessful' : 'Mixed';
-              const Icon = rating >= 4 ? CheckCircle2 : rating <= 2 ? XCircle : HelpCircle;
-              const digest = (experimentStatus.ex as any)?.outcome?.digest;
-              const summary =
-                digest?.summarySentence ||
-                experimentSummarySentence(experimentComparison, userData) ||
-                (experimentComparison?.enoughData
-                  ? null
-                  : 'Not enough baseline data for a clean comparison yet, so your rating matters most.');
-              return (
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold">Conclusion</div>
-                    <div className="mt-1 text-sm eb-muted">
-                      <span className="inline-flex items-center gap-2 font-medium text-[rgb(var(--color-text))]">
-                        <Icon size={18} className="text-[rgb(var(--color-text))]" />
-                        {label}
-                      </span>
-                      {summary ? <span> · {summary}</span> : null}
-                      {experimentComparison?.enoughData && !summary ? (
-                        <span> · Here is what changed, on average.</span>
-                      ) : null}
-                    </div>
-                    {(experimentStatus.ex as any)?.outcome?.note ? (
-                      <div className="mt-2 text-sm">
-                        <span className="font-medium">Note:</span> {(experimentStatus.ex as any).outcome.note}
-                      </div>
-                    ) : null}
-                  </div>
-                  <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>Result saved</span>
-                </div>
-              );
-            })()}
-          </div>
-        ) : null}
-
-        {(experimentStatus.ex as any)?.outcome?.rating ? renderExperimentComparisonBlock('conclusion') : null}
-      </div>
-    );
-  };
 
   return (
     <div className="eb-container space-y-6 pt-8 pb-12 overflow-x-hidden">
