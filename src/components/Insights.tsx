@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -1395,6 +1395,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const [customExperimentChangeKey, setCustomExperimentChangeKey] = useState<string>('');
   const [experimentChangeKey, setExperimentChangeKey] = useState<string>('');
   const [experimentMetricLimitFlash, setExperimentMetricLimitFlash] = useState<boolean>(false);
+
+  // When stopping an experiment early, let the user add notes before it fully wraps up.
+  const [stopExperimentConfirmOpen, setStopExperimentConfirmOpen] = useState<boolean>(false);
   const [replaceExperimentConfirm, setReplaceExperimentConfirm] = useState<null | ExperimentPlan>(null);
 
   const { experiment, setExperiment, clearExperiment } = useExperiment();
@@ -1844,6 +1847,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [entriesAllSorted, userData, dismissedPrompts]);
 
   const [outcomeNote, setOutcomeNote] = useState<string>('');
+  const lastOutcomeNoteExperimentIdRef = useRef<string | null>(null);
   const [showAllExperimentMetrics, setShowAllExperimentMetrics] = useState(false);
   const [whyOpen, setWhyOpen] = useState<Record<string, boolean>>({});
 
@@ -1875,6 +1879,22 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
   };
 
+  // Keep the outcome note box in sync when switching experiments,
+  // but do not overwrite while the user is typing for the same experiment.
+  React.useEffect(() => {
+    if (!experiment) {
+      lastOutcomeNoteExperimentIdRef.current = null;
+      setOutcomeNote('');
+      return;
+    }
+    const ex = experiment as ExperimentPlan;
+    if (lastOutcomeNoteExperimentIdRef.current !== ex.id) {
+      lastOutcomeNoteExperimentIdRef.current = ex.id;
+      const existing = (ex as any)?.outcome?.note;
+      setOutcomeNote(typeof existing === 'string' ? existing : '');
+    }
+  }, [experiment]);
+
   const setOutcomeRating = (rating: 1 | 2 | 3 | 4 | 5) => {
     if (!experiment) return;
     const ex = experiment as ExperimentPlan;
@@ -1889,6 +1909,30 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       },
     };
     setExperiment(next);
+  };
+
+  const stopExperimentEarly = () => {
+    if (!experiment) return;
+    const ex = experiment as ExperimentPlan;
+    const todayISO = isoTodayLocal();
+    const start = new Date(ex.startDateISO + 'T00:00:00');
+    const today = new Date(todayISO + 'T00:00:00');
+    const dayIndex = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    const day = Math.max(1, dayIndex + 1);
+    const nextDays = Math.min(ex.durationDays ?? 3, day);
+
+    // Mark as complete without forcing a rating yet.
+    setExperiment({
+      ...ex,
+      durationDays: nextDays,
+      outcome: {
+        ...(ex.outcome ?? {}),
+        completedAtISO: new Date().toISOString(),
+        // Preserve whatever the user has typed so far.
+        note: outcomeNote.trim() ? outcomeNote.trim() : undefined,
+        stoppedEarly: true as any,
+      },
+    });
   };
 
   const renderExperimentComparisonBlock = (mode: 'progress' | 'conclusion') => {
@@ -2069,7 +2113,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             <button
               type="button"
               className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
-              onClick={() => clearExperiment()}
+              onClick={() => {
+                if (experimentStatus.done) {
+                  clearExperiment();
+                } else {
+                  setStopExperimentConfirmOpen(true);
+                }
+              }}
             >
               {experimentStatus.done ? 'Clear' : 'Stop'}
             </button>
@@ -2140,7 +2190,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
         {!experimentStatus.done && experimentStatus.day >= 2 ? renderExperimentComparisonBlock('progress') : null}
 
-        {experimentStatus.day >= (experimentStatus.ex.durationDays ?? 3) && !(experimentStatus.ex as any)?.outcome?.rating ? (
+        {experimentStatus.done && !(experimentStatus.ex as any)?.outcome?.rating ? (
           <div className="mt-4 eb-inset rounded-2xl p-4">
             <div className="text-sm font-semibold">Did it help?</div>
             <div className="mt-1 text-sm eb-muted">Quick 5-point rating so we can turn this into a real conclusion.</div>
@@ -2774,6 +2824,52 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             >
               Stop and start a new one
             </button>
+          </div>
+        </EBDialogContent>
+      </Dialog>
+
+      {/* Stop experiment confirm dialog */}
+      <Dialog
+        open={Boolean(stopExperimentConfirmOpen)}
+        onOpenChange={(open) => {
+          if (!open) setStopExperimentConfirmOpen(false);
+        }}
+      >
+        <EBDialogContent
+          title="Stop experiment"
+          description="End this experiment now. You can add a quick note before saving."
+          className="max-w-md rounded-2xl"
+        >
+          <DialogHeader>
+            <DialogTitle>Stop this experiment?</DialogTitle>
+            <DialogDescription>
+              This will end the experiment today. You can still add a rating afterwards.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm eb-muted">Optional: add a quick note so Future You knows what was going on.</div>
+            <textarea
+              className="eb-input"
+              placeholder="For example: poor sleep, stressful week, changed caffeine, travel, meds…"
+              rows={3}
+              value={outcomeNote}
+              onChange={(e) => setOutcomeNote(e.target.value)}
+            />
+            <div className="pt-2 flex justify-end gap-2">
+              <button type="button" className="eb-btn-secondary" onClick={() => setStopExperimentConfirmOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="eb-btn-primary"
+                onClick={() => {
+                  stopExperimentEarly();
+                  setStopExperimentConfirmOpen(false);
+                }}
+              >
+                Stop now
+              </button>
+            </div>
           </div>
         </EBDialogContent>
       </Dialog>
