@@ -2382,7 +2382,9 @@ const uniq = new Map<string, (typeof items)[number]>();
     const quick = mode === 'conclusion' ? quickFromDigest : quickLive;
     const usual = mode === 'conclusion' ? usualFromDigest : usualLive;
 
-    const hasUsual = Boolean(usual && (usual as any).baselineDaysUsed >= 10);
+    const usualNeed = 10;
+    const usualUsed = Number(((usual as any)?.baselineDaysUsed ?? 0));
+    const hasUsual = Boolean(usual) && usualUsed >= usualNeed;
 
     // Choose which baseline is currently shown
     const cmp = experimentCompareMode === 'usual' && hasUsual ? (usual as any) : (quick as any);
@@ -2436,14 +2438,14 @@ if (!cmp) return null;
             onClick={() => {
               if (hasUsual) setExperimentCompareMode('usual');
             }}
-            title={hasUsual ? 'Compare with your usual pattern' : 'Keep logging a few more days to unlock this'}
+            title={hasUsual ? 'Compare with your usual pattern' : `Needs ${usualNeed} baseline days before you started (you have ${usualUsed}).`}
           >
             Usual month
           </button>
           <span className="text-xs eb-muted">{compareLabel}</span>
         </div>
           <div className="mt-3 text-sm eb-muted">
-            {experimentCompareMode === 'usual' && !hasUsual ? 'Still early days. We’ll unlock the “usual month” comparison after a few more logs.' : 'Still early days. Keep logging and we’ll firm this up after a few more days.'}
+            {experimentCompareMode === 'usual' && !hasUsual ? `Still early days. Usual month unlocks after ${usualNeed} baseline day(s) before you started (you have ${usualUsed}).` : 'Still early days. Keep logging and we’ll firm this up after a few more days.'}
           </div>
         </div>
       );
@@ -2486,7 +2488,7 @@ if (!cmp) return null;
             onClick={() => {
               if (hasUsual) setExperimentCompareMode('usual');
             }}
-            title={hasUsual ? 'Compare with your usual pattern' : 'Keep logging a few more days to unlock this'}
+            title={hasUsual ? 'Compare with your usual pattern' : `Needs ${usualNeed} baseline days before you started (you have ${usualUsed}).`}
           >
             Usual month
           </button>
