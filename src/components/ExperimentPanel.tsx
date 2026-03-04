@@ -403,7 +403,7 @@ const comparisonHasUsual = !!experimentComparison?.metrics?.some((m: any) => m.h
 
         {experimentComparison ? (
           <div className="mt-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-medium">So far</div>
                 <div className="mt-1 text-sm eb-muted">
@@ -411,7 +411,7 @@ const comparisonHasUsual = !!experimentComparison?.metrics?.some((m: any) => m.h
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="mt-3 sm:mt-0 flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   className={compareBaseline === 'recent' ? 'eb-btn eb-btn-primary whitespace-nowrap' : 'eb-btn eb-btn-secondary whitespace-nowrap'}
@@ -523,22 +523,14 @@ const comparisonHasUsual = !!experimentComparison?.metrics?.some((m: any) => m.h
                 {tryNextPrompts.map((p) => (
                   <CarouselItem key={p.id} className="basis-full">
                     <div className="rounded-2xl eb-inset p-4">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-semibold">{p.title}</div>
                           <div className="mt-1 text-sm eb-muted">
-                            Try a {p.durationDays}-day {labelForInfluence(p.changeKey).toLowerCase()} tweak.
-                            {p.why?.[0] ? ` ${p.why[0]}` : ''}
-                            {p.why?.[1] ? ` ${p.why[1]}` : ''}
+                            Try a {p.durationDays}-day {labelForInfluence(p.changeKey).toLowerCase()} tweak and watch {p.metrics.map((k) => labelForMetric(k as any, userData)).join(", ")}.
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          className="eb-btn eb-btn-secondary whitespace-nowrap shrink-0"
-                          onClick={() => openSetup(p.metrics, { mode: 'change', durationDays: p.durationDays, changeKey: p.changeKey, title: p.title })}
-                        >
-                          Try next
-                        </button>
+
                       </div>
 
                       {p.why && p.why.length ? (
