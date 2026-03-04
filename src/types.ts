@@ -1,19 +1,4 @@
-e
-export type ExperimentOutcomeStatus = 'helped' | 'notReally' | 'abandoned';
-
-export interface ExperimentHistoryItem {
-  experimentId: string;
-  kind: 'change' | 'track';
-  startDateISO: string; // YYYY-MM-DD
-  durationDays: number;
-  metrics: InsightMetricKey[];
-  changeKey?: string;
-  completedAtISO: string; // YYYY-MM-DD
-  outcomeStatus: ExperimentOutcomeStatus;
-  note?: string;
-  rating?: 1 | 2 | 3 | 4 | 5;
-}
-xport type UserGoal = 'cycle-health' | 'perimenopause' | 'post-contraception' | 'wellbeing';
+export type UserGoal = 'cycle-health' | 'perimenopause' | 'post-contraception' | 'wellbeing';
 export type ColorTheme = 'sage' | 'lavender' | 'ocean' | 'terracotta';
 
 export type CycleTrackingMode = 'cycle' | 'no-cycle';
@@ -215,8 +200,6 @@ export interface ExperimentPlan {
   title: string;
   startDateISO: string; // YYYY-MM-DD
   durationDays: number;
-  /** change = trying to modify an influence, track = confirming co-movement/timing */
-  kind?: \'change\' | \'track\';
   /** Which metrics to focus on logging during the experiment */
   metrics: InsightMetricKey[];
   /** What the user is changing (influence tag), e.g. caffeine, medication, lateNight */
@@ -234,7 +217,5 @@ export interface ExperimentPlan {
     note?: string;
     /** When the user completed the experiment */
     completedAtISO?: string;
-    /** helped | notReally | abandoned */
-    status?: 'helped' | 'notReally' | 'abandoned';
   };
 }
