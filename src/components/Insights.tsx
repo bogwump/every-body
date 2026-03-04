@@ -1912,7 +1912,28 @@ const uniq = new Map<string, (typeof items)[number]>();
     setDismissedPrompts((prev) => ({ ...(prev || {}), [id]: until }));
   };
 
-  const tryNextPrompts = useMemo(() => {
+  
+
+  const leverLabel = (changeKey: string) => {
+    switch (changeKey) {
+      case 'lateNight':
+        return 'steadier bedtime';
+      case 'alcohol':
+        return 'alcohol-free window';
+      case 'caffeine':
+        return 'caffeine timing';
+      case 'exercise':
+        return 'gentle movement';
+      case 'stressfulDay':
+        return 'tiny stress buffer';
+      case 'lowHydration':
+        return 'hydration support';
+      default:
+        return 'one small change';
+    }
+  };
+
+const tryNextPrompts = useMemo(() => {
     const today = isoTodayLocal();
     const recent = filterByDays(entriesAllSorted, 21);
 
@@ -2063,6 +2084,7 @@ const uniq = new Map<string, (typeof items)[number]>();
       };
     };
 
+
     // Pick 1–2 symptom-led, behaviour-linked prompts if the data supports it.
     const symptomLevers: Array<{ metric: MetricKey; changeKey: string; titleTpl: (label: string) => string }> = [
       { metric: 'acidReflux' as any, changeKey: 'caffeine', titleTpl: (l) => `A steadier routine for ${l.toLowerCase()}` },
@@ -2115,6 +2137,120 @@ const uniq = new Map<string, (typeof items)[number]>();
       .sort((a, b) => b.score - a.score)
       .slice(0, 2)
       .forEach((c) => addDataPrompt(c.prompt));
+
+    // Symptom-led prompts (even when we can't cleanly attribute to an influence yet).
+    // This keeps "Try next" feeling personal, without over-claiming causality.
+    const symptomRules: Array<{
+      metric: MetricKey;
+      minMedian: number;
+      changeKey: string;
+      title: (label: string) => string;
+      suggestion: (lever: string) => string;
+      description: (label: string, lever: string) => string;
+      why: (label: string, lever: string, m: number) => string[];
+      preferIfEnabled?: string[];
+    }> = [
+      {
+        metric: 'nightSweats' as any,
+        minMedian: 5,
+        changeKey: 'alcohol',
+        title: (l) => `A calmer night for ${l.toLowerCase()}`,
+        suggestion: (lever) => `Try an ${lever} for 3 days`,
+        description: (l, lever) => `${l} can be sensitive to small lifestyle shifts. An ${lever} is a simple, reversible test.`,
+        why: (l, lever, m) => [
+          `What I noticed: your recent ${l.toLowerCase()} has been running around ${m.toFixed(1)}/10.`,
+          `Why this is sensible: an ${lever} is easy to try for a few days and easy to undo.`,
+          `What you'll learn: whether ${l.toLowerCase()} settles even 1–2 points with this change.`,
+        ],
+        preferIfEnabled: ['alcohol'],
+      },
+      {
+        metric: 'brainFog' as any,
+        minMedian: 4.5,
+        changeKey: 'lateNight',
+        title: (l) => `A clearer head for ${l.toLowerCase()}`,
+        suggestion: (lever) => `Try a ${lever} for 3 days`,
+        description: (l, lever) => `${l} often responds to routine. A ${lever} is a small, realistic test.`,
+        why: (l, lever, m) => [
+          `What I noticed: your recent ${l.toLowerCase()} has been around ${m.toFixed(1)}/10.`,
+          `Why this is sensible: sleep routine is one of the fastest levers to test.`,
+          `What you'll learn: whether ${l.toLowerCase()} shifts with steadier rest.`,
+        ],
+        preferIfEnabled: ['lateNight'],
+      },
+      {
+        metric: 'stress' as any,
+        minMedian: 5.5,
+        changeKey: 'stressfulDay',
+        title: (l) => `A steadier day for ${l.toLowerCase()}`,
+        suggestion: () => `Try a tiny daily buffer for 3 days`,
+        description: () => `Stress can spill into sleep and symptoms. A tiny buffer is a quick test you can actually do.`,
+        why: (l, _lever, m) => [
+          `What I noticed: your recent ${l.toLowerCase()} has been around ${m.toFixed(1)}/10.`,
+          `Why this is sensible: a 10-minute downshift is small enough to stick with.`,
+          `What you'll learn: whether stress eases even slightly with a daily buffer.`,
+        ],
+      },
+      {
+        metric: 'fatigue' as any,
+        minMedian: 5,
+        changeKey: 'lateNight',
+        title: (l) => `A gentler week for ${l.toLowerCase()}`,
+        suggestion: (lever) => `Try a ${lever} for 3 days`,
+        description: (l, lever) => `${l} often improves with consistency. A ${lever} is a small, reversible test.`,
+        why: (l, lever, m) => [
+          `What I noticed: your recent ${l.toLowerCase()} has been around ${m.toFixed(1)}/10.`,
+          `Why this is sensible: steadier sleep can move fatigue quickly.`,
+          `What you'll learn: whether ${l.toLowerCase()} shifts with a small routine tweak.`,
+        ],
+        preferIfEnabled: ['lateNight'],
+      },
+    ];
+
+    const symptomCandidates: Array<{ score: number; prompt: TryNextPrompt }> = [];
+    const safeMedian = (xs: number[]) => {
+      const m = median(xs);
+      return Number.isFinite(m) ? m : NaN;
+    };
+
+    symptomRules.forEach((r) => {
+      if (!isMetricInScope(r.metric as any, userData)) return;
+      const xs = valuesFor(r.metric as any);
+      if (xs.length < 6) return;
+      const m = safeMedian(xs);
+      if (!Number.isFinite(m)) return;
+      if (m < r.minMedian) return;
+
+      // If the rule prefers a lever the user actually tracks, honour that.
+      if (r.preferIfEnabled && r.preferIfEnabled.length) {
+        const ok = r.preferIfEnabled.some((k) => enabledInf.has(k));
+        if (!ok) return;
+      }
+
+      const label = labelFor(r.metric as any, userData);
+      const lever = leverLabel(r.changeKey);
+      const p: TryNextPrompt = {
+        id: `symptom-${String(r.metric)}-${r.changeKey}`,
+        title: r.title(label),
+        suggestion: r.suggestion(lever),
+        description: r.description(label, lever),
+        changeKey: r.changeKey,
+        metrics: ([r.metric, 'sleep', 'energy', 'mood'] as any)
+          .filter((k: any) => isMetricInScope(k as any, userData))
+          .slice(0, 5) as any,
+        durationDays: 3,
+        why: r.why(label, lever, m),
+      };
+
+      const score = m * 10 + xs.length;
+      symptomCandidates.push({ score, prompt: p });
+    });
+
+    symptomCandidates
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .forEach((c) => addDataPrompt(c.prompt));
+
 
 
 
@@ -3998,7 +4134,19 @@ if (!cmp) return null;
 
                           <div className="mt-2 text-sm eb-muted">
                             {p.description}
+                          
+
+                          <div className="mt-3 text-sm">
+                            <span className="font-medium text-neutral-900">Suggested tweak:</span>{' '}
+                            <span className="eb-muted">{leverLabel(p.changeKey)}</span>
                           </div>
+
+                          {p.why?.length ? (
+                            <div className="mt-2 text-sm eb-muted">
+                              {p.why[0]}
+                            </div>
+                          ) : null}
+</div>
 
                           <button
                             type="button"
