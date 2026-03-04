@@ -117,3 +117,94 @@ export function getRhythmExperimentLearnings(
 
   return out.slice(0, 2);
 }
+
+
+type WhatsComingPrediction = {
+  text: string;
+  confidence: 'Learning' | 'Emerging' | 'Established';
+};
+
+/**
+ * Predictive, user-friendly "what might be coming next" lines.
+ * Conservative: only triggers when a recently observed "lead" symptom suggests a likely follow-on symptom soon.
+ */
+export function getWhatsComingPredictions(
+  entriesSorted: CheckInEntry[],
+  history: ExperimentHistoryItem[],
+  userData: UserData,
+  todayISO: string
+): string[] {
+  if (!Array.isArray(entriesSorted) || entriesSorted.length < 10) return [];
+  if (!Array.isArray(history) || history.length === 0) return [];
+
+  // Focus on recent entries (up to 90 days) for stability
+  const recent = entriesSorted.slice(-90);
+  const byISO = new Map<string, CheckInEntry>();
+  for (const e of recent) {
+    if (e && typeof e === 'object' && typeof (e as any).dateISO === 'string') {
+      byISO.set((e as any).dateISO, e);
+    }
+  }
+
+  const predictions: WhatsComingPrediction[] = [];
+
+  const tracked = history.filter((h) => h && typeof h === 'object' && (h as any).kind === 'track');
+  for (const h of tracked.slice(0, 12)) {
+    const metrics = Array.isArray((h as any).metrics) ? ((h as any).metrics as InsightMetricKey[]) : [];
+    if (metrics.length < 2) continue;
+
+    const a = metrics[0];
+    const b = metrics[1];
+
+    // Only do this for symptom-to-symptom style metrics (avoid custom: for now)
+    if (String(a).startsWith('custom:') || String(b).startsWith('custom:')) continue;
+
+    const seriesA = buildSeries(recent, a);
+    const seriesB = buildSeries(recent, b);
+    const best = bestLagCorrelation(seriesA, seriesB, 3);
+
+    // Conservative thresholds
+    if (best.n < 10) continue;
+    if (Math.abs(best.r) < 0.35) continue;
+
+    // Determine lead/follow
+    // best.lag > 0 means A aligns best with B shifted later => A tends to lead B by lag days.
+    const lead = best.lag > 0 ? a : best.lag < 0 ? b : a;
+    const follow = best.lag > 0 ? b : best.lag < 0 ? a : b;
+    const lagDays = Math.abs(best.lag);
+
+    // Trigger only if lead symptom is high in the last 2 logged days.
+    const lastTwo = recent.slice(-2);
+    const leadRecentHigh = lastTwo.some((e) => {
+      const v = valueForMetric(e, lead as any);
+      return typeof v === 'number' && v >= 7;
+    });
+
+    if (!leadRecentHigh) continue;
+
+    const leadLabel = labelForMetric(lead as any, userData);
+    const followLabel = labelForMetric(follow as any, userData);
+
+    let windowText = '';
+    if (lagDays === 0) {
+      windowText = 'today or tomorrow';
+    } else if (lagDays === 1) {
+      windowText = 'in the next day or two';
+    } else {
+      windowText = `in the next ${Math.max(1, lagDays - 1)}–${lagDays + 1} days`;
+    }
+
+    predictions.push({
+      text: `Heads up: when ${leadLabel.toLowerCase()} is high, ${followLabel.toLowerCase()} often follows ${windowText}.`,
+      confidence: 'Emerging',
+    });
+  }
+
+  // If nothing triggered, return empty (avoid filler predictions)
+  const uniq: string[] = [];
+  for (const p of predictions) {
+    if (!uniq.includes(p.text)) uniq.push(p.text);
+  }
+  return uniq.slice(0, 2);
+}
+

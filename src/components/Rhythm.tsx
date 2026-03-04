@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
 import { useEntries, useExperimentHistory } from '../lib/appStore';
 import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
-import { getRhythmExperimentLearnings } from '../lib/rhythmPredictions';
+import { getRhythmExperimentLearnings, getWhatsComingPredictions } from '../lib/rhythmPredictions';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
 
@@ -502,6 +502,15 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
   const experimentLearnings = useMemo(() => {
     const ud = (userData ?? ({} as any)) as UserData;
     return getRhythmExperimentLearnings(sorted, (history as any) ?? [], ud);
+
+  const whatsComing = useMemo(() => {
+    try {
+      return getWhatsComingPredictions(entriesSorted, history, userData, todayISO);
+    } catch {
+      return [];
+    }
+  }, [entriesSorted, history, userData, todayISO]);
+
   }, [sorted, history, userData]);
   const avgCycleLen = computed.avgCycleLen;
   const lastCycleLen = computed.lastCycleLen;
@@ -607,6 +616,18 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
               </ul>
             </div>
           ) : null}
+
+          {whatsComing.length ? (
+            <div className="eb-inset rounded-xl p-4 bg-[rgb(var(--color-primary)/0.08)] border border-[rgb(var(--color-primary)/0.16)]">
+              <div className="text-base font-medium text-neutral-800">What might be coming next</div>
+              <ul className="mt-2 space-y-1 text-base text-neutral-800">
+                {whatsComing.slice(0, 2).map((t, i) => (
+                  <li key={i}>• {t}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
         </div>
 
         {/* It grows with you (reassurance) */}

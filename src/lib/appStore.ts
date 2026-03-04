@@ -10,8 +10,9 @@ const USER_KEY = "everybody:v2:user";
 const ENTRIES_KEY = "everybody:v2:entries";
 const CHAT_KEY = "everybody:v2:chat";
 const EXPERIMENT_KEY = "everybody:v2:experiment";
+const EXPERIMENT_HISTORY_KEY = "everybody:v2:experiment_history";
 
-export const STORAGE_KEYS = [USER_KEY, ENTRIES_KEY, CHAT_KEY, EXPERIMENT_KEY] as const;
+export const STORAGE_KEYS = [USER_KEY, ENTRIES_KEY, CHAT_KEY, EXPERIMENT_KEY, EXPERIMENT_HISTORY_KEY] as const;
 
 export const BACKUP_KEYS = [
   ...STORAGE_KEYS,
@@ -322,6 +323,42 @@ export function useExperiment() {
   };
 
   return { experiment, setExperiment, clearExperiment };
+
+}
+
+// ---- Experiment history (completed experiments) ----
+
+export function useExperimentHistory() {
+  const raw = useSyncExternalStore(
+    (listener) => subscribeKey(EXPERIMENT_HISTORY_KEY, listener),
+    () => readCached<unknown>(EXPERIMENT_HISTORY_KEY, []),
+    () => []
+  );
+
+  const history = Array.isArray(raw) ? (raw as any[]) : [];
+
+  const setHistory = (next: any[]) => {
+    writeCached(EXPERIMENT_HISTORY_KEY, Array.isArray(next) ? next : []);
+  };
+
+  const addHistoryItem = (item: any) => {
+    const safe = item && typeof item === 'object' ? item : null;
+    if (!safe) return;
+    const cur = readCached<any[]>(EXPERIMENT_HISTORY_KEY, []);
+    const arr = Array.isArray(cur) ? cur.slice() : [];
+    // de-dupe by experimentId + completedAtISO
+    const id = String((safe as any).experimentId || '');
+    const done = String((safe as any).completedAtISO || '');
+    const exists = arr.some((x) => x && typeof x === 'object' && String((x as any).experimentId || '') === id && String((x as any).completedAtISO || '') === done);
+    if (!exists) arr.unshift(safe);
+    setHistory(arr);
+  };
+
+  const clearHistory = () => {
+    writeCached(EXPERIMENT_HISTORY_KEY, []);
+  };
+
+  return { history, setHistory, addHistoryItem, clearHistory };
 }
 
 export function useChat() {
