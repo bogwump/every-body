@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
-import { useEntries } from '../lib/appStore';
+import { useEntries, useExperimentHistory } from '../lib/appStore';
 import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
+import { getRhythmExperimentLearnings } from '../lib/rhythmPredictions';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
 
@@ -421,6 +422,7 @@ function confidenceOneLiner(conf: any, days: number): string {
 
 export function Rhythm({ userData }: { userData?: UserData }) {
   const { entries: storeEntries } = useEntries();
+  const { history } = useExperimentHistory();
   // Back-compat: some older wiring passed entries via userData. Prefer store entries.
   const entries: CheckInEntry[] = (Array.isArray((userData as any)?.entries) ? ((userData as any).entries as any[]) : storeEntries) as any;
 
@@ -496,6 +498,11 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
   // Pull commonly used values out of the computed bundle.
   const sorted = computed.sorted;
+
+  const experimentLearnings = useMemo(() => {
+    const ud = (userData ?? ({} as any)) as UserData;
+    return getRhythmExperimentLearnings(sorted, (history as any) ?? [], ud);
+  }, [sorted, history, userData]);
   const avgCycleLen = computed.avgCycleLen;
   const lastCycleLen = computed.lastCycleLen;
 
@@ -589,6 +596,17 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             <div className="text-base font-medium text-neutral-800">Gentle reminder</div>
             <div className="text-base text-neutral-800 font-normal">{gentleReminder}</div>
           </div>
+
+          {experimentLearnings.length ? (
+            <div className="eb-inset rounded-xl p-4 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
+              <div className="text-base font-medium text-neutral-800">From your experiments</div>
+              <ul className="mt-2 space-y-1 text-base text-neutral-800">
+                {experimentLearnings.slice(0, 2).map((t, i) => (
+                  <li key={i}>• {t}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         {/* It grows with you (reassurance) */}

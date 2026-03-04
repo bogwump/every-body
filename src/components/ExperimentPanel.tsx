@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
 
-import type { CheckInEntry, ExperimentPlan, InsightMetricKey, UserData } from '../types';
-import { useExperiment } from '../lib/appStore';
+import type { CheckInEntry, ExperimentPlan, InsightMetricKey, UserData, ExperimentHistoryItem } from '../types';
+import { useExperiment, useExperimentHistory } from '../lib/appStore';
 import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { computeExperimentComparison } from '../lib/experimentAnalysis';
 
@@ -84,6 +84,7 @@ export default function ExperimentPanel(props: ExperimentPanelProps) {
   } = props;
 
   const { experiment, setExperiment } = useExperiment();
+  const { addHistoryItem } = useExperimentHistory();
 
   const todayISO = isoTodayLocal();
   const hasLoggedToday = Array.isArray(entriesAllSorted) && entriesAllSorted.some((e: any) => e?.dateISO === todayISO);
@@ -270,6 +271,27 @@ export default function ExperimentPanel(props: ExperimentPanelProps) {
       },
     };
     setExperiment(next);
+
+    // Append to experiment history (used for Rhythm predictions and future learning)
+    try {
+      const completedAtISO = isoTodayLocal();
+      const item: ExperimentHistoryItem = {
+        experimentId: String(ex.id || next.id || `exp_${Date.now()}`),
+        kind: (ex.kind === 'track' ? 'track' : 'change'),
+        startDateISO: String(ex.startDateISO || next.startDateISO || completedAtISO),
+        durationDays: Number(ex.durationDays ?? next.durationDays ?? 3),
+        metrics: Array.isArray(ex.metrics) ? ex.metrics : Array.isArray(next.metrics) ? next.metrics : [],
+        changeKey: typeof ex.changeKey === 'string' ? ex.changeKey : typeof next.changeKey === 'string' ? next.changeKey : undefined,
+        completedAtISO,
+        outcomeStatus: outcome,
+        note: outcomeNote || undefined,
+        rating: (next.outcome?.rating ?? undefined) as any,
+      };
+      addHistoryItem(item);
+    } catch {
+      // ignore
+    }
+
     setFinishOpen(null);
   };
 
