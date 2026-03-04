@@ -1748,176 +1748,7 @@ onClick={() => { const metrics = Array.isArray(ms?.metrics) && ms.metrics.length
 
       
 
-{/* Experiment dialog */}
-      <Dialog open={experimentOpen} onOpenChange={setExperimentOpen}>
-        <EBDialogContent
-          title={experimentPlan?.title ?? 'Experiment'}
-          description="Set up a tiny experiment and keep logging a few metrics so you can spot what changes."
-          className="w-[88vw] max-w-[380px] sm:max-w-lg rounded-2xl max-h-[90vh] overflow-hidden flex flex-col"
-        >
-          <DialogHeader>
-            <DialogTitle>{experimentPlan?.title ?? 'Experiment'}</DialogTitle>
-            <DialogDescription>
-              Set up a tiny experiment and keep logging a few metrics so you can spot what changes.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3 pb-4">
-            <div className="text-sm eb-muted">
-              Tiny, realistic actions. You are testing what helps your body, not trying to "fix everything".
-            </div>
 
-            {isCustomExperiment && (
-              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
-                <div className="text-sm font-semibold">Name your experiment</div>
-                <input
-                  className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-black/20"
-                  value={customExperimentTitle}
-                  onChange={(e) => setCustomExperimentTitle(e.target.value)}
-                  placeholder="e.g. Magnesium trial"
-                />
-                <div className="mt-2 text-sm eb-muted">
-                  Keep it simple. You can always tweak it later.
-                </div>
-              </div>
-            )}
-
-            {isCustomExperiment && (
-              <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
-                <div className="text-sm font-semibold">What are you changing?</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(() => {
-                    const enabled = Array.isArray(userData.enabledInfluences) ? (userData.enabledInfluences as string[]) : [];
-                    const base = ['exercise', 'sex'];
-                    const opts = Array.from(new Set(base.concat(enabled).concat(Array.from(OTHER_INFLUENCE_KEYS as any))));
-                    const toggle = (k: string) => {
-                      setCustomExperimentChangeKey((prev) => (prev === k ? '' : k));
-
-                      // Offer to enable if the user isn't tracking it yet.
-                      const isEnabled = enabled.includes(k);
-                      if (!isEnabled && k !== 'exercise' && k !== 'sex') {
-                        setEnableInfluencePrompt({ key: k });
-                      }
-                    };
-                    return opts.map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        className={chipClass(customExperimentChangeKey === k)}
-                        onClick={() => toggle(k)}
-                        aria-pressed={customExperimentChangeKey === k}
-                      >
-                        {otherInfluenceLabel(k)}
-                      </button>
-                    ));
-                  })()}
-                </div>
-                <div className="mt-2 text-sm eb-muted">Pick one thing to change, if you can.</div>
-              </div>
-            )}
-
-            {/* What to log */}
-            <div className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
-              <div className="text-sm font-semibold flex items-center justify-between gap-2">
-                <span>What to measure (daily)</span>
-                {isCustomExperiment ? (
-                  <span className="text-xs eb-muted">Selected {experimentMetrics.length}/{CUSTOM_EXPERIMENT_MAX_METRICS}</span>
-                ) : null}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {isCustomExperiment ? (
-                  (() => {
-                    const options: MetricKey[] = Array.from(new Set((['mood' as any] as MetricKey[]).concat(selectableKeys)));
-                    const toggle = (k: MetricKey) => {
-                      setExperimentMetrics((prev) => {
-                        if (prev.includes(k)) return prev.filter((x) => x !== k);
-
-                        if (prev.length >= CUSTOM_EXPERIMENT_MAX_METRICS) {
-                          setExperimentMetricLimitFlash(true);
-                          window.setTimeout(() => setExperimentMetricLimitFlash(false), 1800);
-                          return prev;
-                        }
-
-                        return [...prev, k];
-                      });
-                    };
-                    return options.map((k) => {
-                      const on = experimentMetrics.includes(k);
-                      return (
-                        <button
-                          key={String(k)}
-                          type="button"
-                          className={chipClass(on)}
-                          onClick={() => toggle(k)}
-                          aria-pressed={on}
-                        >
-                          {labelFor(k as any, userData)}
-                        </button>
-                      );
-                    });
-                  })()
-                ) : (
-                  (experimentMetrics.length ? experimentMetrics : selected)
-                    .slice(0, 6)
-                    .map((k) => (
-                      <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
-                        {labelFor(k as any, userData)}
-                      </span>
-                    ))
-                )}
-              </div>
-              <div className="mt-2 text-sm eb-muted">
-                Pick up to 5 measures. Consistency beats completeness.
-                {experimentMetricLimitFlash ? (
-                  <span className="ml-2 font-medium">Max 5 selected.</span>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Steps */}
-            <ul className="list-disc pl-5 text-sm">
-              {(experimentPlan?.steps ?? []).map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-
-            {experimentPlan?.note && <div className="text-sm eb-muted">{experimentPlan.note}</div>}
-            <div className="pt-2">
-              <div className="text-sm font-semibold">How long?</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[3, 7, 30].map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    className={chipClass(d === experimentDurationDays)}
-                    onClick={() => setExperimentDurationDays(d)}
-                    aria-label={`Set experiment length to ${d} days`}
-                  >
-                    {d} days
-                  </button>
-                ))}
-              </div>
-            </div>
-
-          </div>
-
-          <div className="pt-3 shrink-0 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
-            <button
-              type="button"
-              className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
-              onClick={() => setExperimentOpen(false)}
-            >
-              Not now
-            </button>
-            <button
-              type="button"
-              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
-              onClick={startExperiment}
-            >
-              {`Start ${experimentDurationDays}-day experiment`}
-            </button>
-          </div>
-        </EBDialogContent>
-      </Dialog>
 
 
 
@@ -1970,7 +1801,7 @@ onClick={() => { const metrics = Array.isArray(ms?.metrics) && ms.metrics.length
                     setCustomExperimentTitle('Your experiment');
                     setCustomExperimentChangeKey('');
                     setExperimentChangeKey('');
-                    setExperimentOpen(true);
+                    setExperimentRequest({ metrics: focus, mode: (next as any)?.kind ?? 'change', durationDays: (next as any)?.durationDays ?? 3 });
                   } else {
                     const focus = (next?.metrics && next.metrics.length ? next.metrics : selected).slice(0, 5);
                     const plan = next?.plan ? next.plan : buildExperimentPlan(focus);
@@ -1979,7 +1810,7 @@ onClick={() => { const metrics = Array.isArray(ms?.metrics) && ms.metrics.length
                     setExperimentDurationDays(next?.durationDays ?? 3);
                     setExperimentChangeKey(next?.changeKey || '');
                     setIsCustomExperiment(false);
-                    setExperimentOpen(true);
+                    setExperimentRequest({ metrics: focus, mode: (next as any)?.kind ?? 'change', durationDays: (next as any)?.durationDays ?? 3 });
                   }
                 }, 0);
               }}

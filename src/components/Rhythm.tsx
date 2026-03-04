@@ -502,6 +502,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
   const experimentLearnings = useMemo(() => {
     const ud = (userData ?? ({} as any)) as UserData;
     return getRhythmExperimentLearnings(sorted, (history as any) ?? [], ud);
+  }, [sorted, history, userData]);
 
   const whatsComing = useMemo(() => {
     try {
@@ -511,7 +512,6 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
     }
   }, [entriesSorted, history, userData, todayISO]);
 
-  }, [sorted, history, userData]);
   const avgCycleLen = computed.avgCycleLen;
   const lastCycleLen = computed.lastCycleLen;
 
