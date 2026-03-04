@@ -27,7 +27,6 @@ import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
 import { isMetricInScope } from '../lib/insightsScope';
-import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
 import { EBDialogContent } from './EBDialog';

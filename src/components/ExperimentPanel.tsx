@@ -37,6 +37,11 @@ const INFLUENCE_DEFS: Array<{ key: string; label: string }> = [
   { key: 'sex', label: 'Intimacy' },
 ];
 
+
+function labelForInfluence(key: string): string {
+  return INFLUENCE_DEFS.find((d) => d.key === key)?.label ?? key;
+}
+
 function addDaysISO(iso: string, days: number): string {
   const d = new Date(iso + 'T00:00:00');
   d.setDate(d.getDate() + days);
@@ -119,11 +124,17 @@ export default function ExperimentPanel(props: ExperimentPanelProps) {
         experiment: experimentStatus.ex as ExperimentPlan,
         user: userData,
         maxMetrics: 5,
+        minPointsPerWindow: 3,
       });
     } catch {
       return null;
     }
   }, [experimentStatus, entriesAllSorted, userData]);
+
+const comparisonHasRecent = !!experimentComparison?.metrics?.some((m: any) => m.hasEnoughRecent);
+const comparisonHasUsual = !!experimentComparison?.metrics?.some((m: any) => m.hasEnoughUsual);
+
+
 
   // Suggestions
   const tryNextPrompts: TryNextPrompt[] = useMemo(() => generateTryNextPrompts(entriesAllSorted, userData), [entriesAllSorted, userData]);
@@ -146,6 +157,8 @@ export default function ExperimentPanel(props: ExperimentPanelProps) {
   const [stopOpen, setStopOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState<null | { outcome: 'helped' | 'notReally' | 'abandoned' }>(null);
   const [enableInfluencePrompt, setEnableInfluencePrompt] = useState<null | { key: string }>(null);
+  const [compareBaseline, setCompareBaseline] = useState<'recent' | 'usual'>('recent');
+
 
   const [mode, setMode] = useState<'change' | 'track'>('change');
   const [durationDays, setDurationDays] = useState<number>(3);
@@ -355,10 +368,17 @@ export default function ExperimentPanel(props: ExperimentPanelProps) {
 
             {!done ? (
               <>
-                <button type="button" className="eb-btn eb-btn-secondary" onClick={() => extendExperiment(2)}>
+                <button type="button" className="eb-btn eb-btn-secondary whitespace-nowrap" onClick={() => extendExperiment(2)}>
                   Extend 2 days
                 </button>
-                <button type="button" className="eb-btn eb-btn-primary" onClick={() => setStopOpen(true)}>
+                <button
+                  type="button"
+                  className="eb-btn eb-btn-secondary whitespace-nowrap"
+                  onClick={() => {
+                    setStopOpen(true);
+                    setOutcomeNote('');
+                  }}
+                >
                   Stop
                 </button>
               </>
@@ -366,19 +386,78 @@ export default function ExperimentPanel(props: ExperimentPanelProps) {
           </div>
         </div>
 
+        {/* Tiny hint (like the old UI) */}
+        {!done ? (
+          <div className="mt-3 text-sm eb-muted">
+            We’ll compare your experiment days with your usual pattern, so you can see what (if anything) is shifting.
+          </div>
+        ) : null}
+
         {experimentComparison ? (
           <div className="mt-4">
-            <div className="text-sm eb-muted">Before vs during</div>
-            <div className="mt-2 grid gap-2">
-              {experimentComparison.metrics?.slice(0, 5).map((m: any) => (
-                <div key={m.key} className="flex items-center justify-between rounded-xl eb-inset px-3 py-2">
-                  <div className="text-sm font-medium">{labelForMetric(m.key as any, userData)}</div>
-                  <div className="text-sm eb-muted">
-                    {m.beforeAvg != null ? m.beforeAvg.toFixed(1) : '–'} → {m.duringAvg != null ? m.duringAvg.toFixed(1) : '–'}
-                  </div>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">So far</div>
+                <div className="mt-1 text-sm eb-muted">
+                  Pick a baseline to compare against. “Just before” is a quick check. “Usual month” is steadier.
                 </div>
-              ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className={compareBaseline === 'recent' ? 'eb-btn eb-btn-primary whitespace-nowrap' : 'eb-btn eb-btn-secondary whitespace-nowrap'}
+                  onClick={() => setCompareBaseline('recent')}
+                >
+                  Just before
+                </button>
+                <button
+                  type="button"
+                  className={compareBaseline === 'usual' ? 'eb-btn eb-btn-primary whitespace-nowrap' : 'eb-btn eb-btn-secondary whitespace-nowrap'}
+                  disabled={!comparisonHasUsual}
+                  onClick={() => {
+                    if (comparisonHasUsual) setCompareBaseline('usual');
+                  }}
+                  title={!comparisonHasUsual ? 'Keep logging to unlock your usual-month baseline' : undefined}
+                >
+                  Usual month
+                </button>
+              </div>
             </div>
+
+            {((compareBaseline === 'recent' && comparisonHasRecent) || (compareBaseline === 'usual' && comparisonHasUsual)) ? (
+              <>
+                <div className="mt-3 grid gap-2">
+                  {experimentComparison.metrics?.slice(0, 5).map((m: any) => {
+                    const baseLabel = compareBaseline === 'recent' ? 'Just before' : 'Usual';
+                    const baseVal = compareBaseline === 'recent' ? m.recentBefore?.avg : m.usual?.median;
+                    const duringVal = m.during?.avg;
+
+                    return (
+                      <div key={m.key} className="flex items-center justify-between rounded-xl eb-inset px-3 py-2">
+                        <div className="text-sm font-medium">{labelForMetric(m.key as any, userData)}</div>
+                        <div className="text-sm eb-muted whitespace-nowrap">
+                          {baseLabel}: {typeof baseVal === 'number' ? baseVal.toFixed(1) : '–'} → During:{' '}
+                          {typeof duringVal === 'number' ? duringVal.toFixed(1) : '–'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-2 text-xs eb-muted">
+                  {compareBaseline === 'recent' ? (
+                    <>Confidence: based on {experimentComparison.recentBeforeDaysWithAny} day(s) just before and {experimentComparison.duringDaysWithAny} experiment day(s).</>
+                  ) : (
+                    <>Confidence: based on {experimentComparison.usualDaysWithAny} day(s) of your usual pattern and {experimentComparison.duringDaysWithAny} experiment day(s).</>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="mt-3 text-sm eb-muted">
+                Still early days. Keep logging and we’ll start to see what’s shifting.
+              </div>
+            )}
           </div>
         ) : null}
 
@@ -419,11 +498,13 @@ export default function ExperimentPanel(props: ExperimentPanelProps) {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold">{p.title}</div>
-                        <div className="mt-1 text-sm eb-muted">Pick one small, easy change you can actually do.</div>
+                        <div className="mt-1 text-sm eb-muted">
+                          Try a {p.durationDays}-day {labelForInfluence(p.changeKey).toLowerCase()} tweak. {p.why?.[0] ? p.why[0] : ''}
+                        </div>
                       </div>
                       <button
                         type="button"
-                        className="eb-btn eb-btn-secondary"
+                        className="eb-btn eb-btn-secondary whitespace-nowrap shrink-0"
                         onClick={() => openSetup(p.metrics, { mode: 'change', durationDays: p.durationDays, changeKey: p.changeKey, title: p.title })}
                       >
                         Try next
@@ -624,7 +705,7 @@ export default function ExperimentPanel(props: ExperimentPanelProps) {
           </div>
           <div className="mt-5 flex items-center justify-end gap-2">
             <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setEnableInfluencePrompt(null)}>
-              Not now
+              Close
             </button>
             <button
               type="button"

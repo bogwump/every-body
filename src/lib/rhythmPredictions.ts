@@ -195,7 +195,7 @@ export function getWhatsComingPredictions(
     }
 
     predictions.push({
-      text: `Heads up: when ${leadLabel.toLowerCase()} is high, ${followLabel.toLowerCase()} often follows ${windowText}.`,
+      text: `Heads up: when ${leadLabel.toLowerCase()} is high, ${followLabel.toLowerCase()} often follows ${windowText}. (Seen ${best.n} times in your logs.)`,
       confidence: 'Emerging',
     });
   }

@@ -194,7 +194,7 @@ export function generateTryNextPrompts(entriesAllSorted: CheckInEntry[], userDat
     changeKey: 'lateNight',
     metrics: (['mood', 'sleep', 'energy'] as MetricKey[]).filter((k) => isMetricInScope(k as any, userData)),
     durationDays: 3,
-    why: [],
+    why: ['Start simple: try going to bed a little earlier for 3 days.', 'It’s tiny and reversible, and helps you see what shifts fast.'],
   });
 
   // Day 1+: always offer at least one idea.
