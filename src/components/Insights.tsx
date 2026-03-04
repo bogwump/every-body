@@ -1880,9 +1880,12 @@ const uniq = new Map<string, (typeof items)[number]>();
   type TryNextPrompt = {
     id: string;
     title: string;
+    suggestion: string;
+    description: string;
     changeKey: string;
     metrics: MetricKey[];
     durationDays: number;
+    // Expanded logic bullets (shown under “Why this suggestion?”)
     why: string[];
   };
 
@@ -1916,10 +1919,16 @@ const uniq = new Map<string, (typeof items)[number]>();
     const makeStarter = (): TryNextPrompt => ({
       id: 'starter-simple-experiment',
       title: 'A simple 3-day experiment',
+      suggestion: 'Pick one small thing to change',
+      description: 'Start tiny: choose one change you can actually do, and keep everything else roughly the same.',
       changeKey: 'lateNight',
       metrics: (['mood', 'sleep', 'energy'] as any).filter((k: any) => isMetricInScope(k as any, userData)) as any,
       durationDays: 3,
-      why: [],
+      why: [
+        'What I noticed: you have enough recent logs to start learning quickly.',
+        'Why this is sensible: a small, reversible change is easier to stick with for a few days.',
+        'What you will learn: whether this change nudges your mood, sleep or energy in the direction you want.',
+      ],
     });
 
     // Day 1+: always offer at least one idea so the feature never feels empty.
@@ -1995,6 +2004,28 @@ const uniq = new Map<string, (typeof items)[number]>();
           metrics: (['anxiety', 'sleep'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
           durationDays: 3,
           why: ['You have logged caffeine on several recent days.', 'A simple timing tweak can sometimes reduce jittery days.'],
+        });
+      }
+    }
+
+    // 3b) Digestive symptoms + caffeine → caffeine tweak (easy reversible test)
+    if (recent.length >= 14 && enabledModulesSet.has('acidReflux' as any) && enabledInf.has('caffeine')) {
+      const xs = valuesFor('acidReflux' as any);
+      const cafDays = countInfluence('caffeine');
+      if (xs.length >= 5 && mean(xs) >= 4 && cafDays >= 2) {
+        prompts.push({
+          id: 'try-reflux-caffeine',
+          title: 'A steadier routine for acid reflux',
+          suggestion: 'Try a 3-day caffeine experiment',
+          description: 'Digestive symptoms can be sensitive to routine. A small caffeine tweak for a few days is an easy, reversible test.',
+          changeKey: 'caffeine',
+          metrics: (['acidReflux', 'mood', 'energy'] as any).filter((k: any) => isMetricInScope(k as any, userData)) as any,
+          durationDays: 3,
+          why: [
+            'What I noticed: digestive symptoms tend to rise on days where caffeine is logged.',
+            'Why this is sensible: reducing caffeine briefly is low risk and easy to undo.',
+            'What you will learn: whether caffeine seems to play a role in your reflux days.',
+          ],
         });
       }
     }
@@ -2291,8 +2322,8 @@ const uniq = new Map<string, (typeof items)[number]>();
 
     const title = mode === 'progress' ? 'So far' : 'Before vs during';
     const subtitle = mode === 'progress'
-      ? `Logged ${cmp.duringDaysWithAny}/${cmp.durationDays} experiment days · ${cmp.beforeDaysWithAny}/${cmp.durationDays} baseline days`
-      : `Baseline: ${cmp.window.beforeStartISO} to ${cmp.window.beforeEndISO} · During: ${cmp.window.duringStartISO} to ${cmp.window.duringEndISO}`;
+      ? `You have logged ${cmp.duringDaysWithAny}/${cmp.durationDays} experiment day(s) so far · Baseline uses ${cmp.beforeDaysWithAny} recent day(s)`
+      : `Before: ${cmp.window.beforeStartISO} → ${cmp.window.beforeEndISO} · During: ${cmp.window.duringStartISO} → ${cmp.window.duringEndISO}`;
 
     if (!cmp.metrics.length) return null;
 
@@ -2303,7 +2334,7 @@ const uniq = new Map<string, (typeof items)[number]>();
           <div className="text-sm font-semibold">{title}</div>
           <div className="mt-1 text-sm eb-muted">{subtitle}</div>
           <div className="mt-3 text-sm eb-muted">
-            Not enough data yet for a meaningful before/after comparison. Aim for at least 2 logged days in both windows.
+            Still early days. Keep logging and we’ll compare this with your usual pattern soon.
           </div>
         </div>
       );
@@ -2330,8 +2361,18 @@ const uniq = new Map<string, (typeof items)[number]>();
               {m.hasEnoughData ? (
                 <>
                   <div className="mt-2 text-sm eb-muted">
-                    Baseline <b>{fmt(m.before.avg)}</b> · During <b>{fmt(m.during.avg)}</b> · Change <b>{fmtDelta(m.delta)}</b>
+                    Before: <b>{fmt(m.before.avg)}</b>/10 · During: <b>{fmt(m.during.avg)}</b>/10
                   </div>
+
+                  {m.delta != null ? (
+                    <div className="mt-1 text-xs eb-muted">
+                      {Math.abs(m.delta) < 0.4
+                        ? 'So far, this looks steady.'
+                        : m.delta > 0
+                          ? 'So far, it is trending a bit higher.'
+                          : 'So far, it is trending a bit lower.'}
+                    </div>
+                  ) : null}
                   <div className="mt-2 text-xs eb-muted">
                     Data: {m.before.count} baseline points · {m.during.count} during points
                   </div>
@@ -3565,8 +3606,12 @@ const uniq = new Map<string, (typeof items)[number]>();
                             <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
                           </div>
 
+                          <div className="mt-2 text-sm font-medium text-neutral-900">
+                            {p.suggestion}
+                          </div>
+
                           <div className="mt-2 text-sm eb-muted">
-                            {p.why?.[0] || 'A small nudge based on what you have logged recently.'}
+                            {p.description}
                           </div>
 
                           <button
@@ -3729,3 +3774,5 @@ const uniq = new Map<string, (typeof items)[number]>();
     </div>
   );
 }
+
+//testwrite

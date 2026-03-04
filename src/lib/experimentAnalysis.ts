@@ -82,7 +82,7 @@ export function computeExperimentComparison(args: {
   maxMetrics?: number;
   minPointsPerWindow?: number;
 }): ExperimentComparisonResult {
-  const { entries, experiment, maxMetrics = 5, minPointsPerWindow = 2 } = args;
+  const { entries, experiment, maxMetrics = 5, minPointsPerWindow = 3 } = args;
 
   const startISO = experiment.startDateISO;
   const durationDays = Math.max(1, Number(experiment.durationDays ?? 3));
