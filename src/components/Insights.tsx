@@ -2839,22 +2839,15 @@ const uniq = new Map<string, (typeof items)[number]>();
 
           </div>
 
-          <div className="pt-3 shrink-0 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
-            <button
-              type="button"
-              className="px-6 py-3 rounded-xl bg-white border border-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-dark))] hover:bg-white/80 transition-all font-medium"
-              onClick={() => setExperimentOpen(false)}
-            >
-              Not now
-            </button>
-            <button
-              type="button"
-              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
-              onClick={startExperiment}
-            >
-              {`Start ${experimentDurationDays}-day experiment`}
-            </button>
-          </div>
+	          <div className="pt-3 shrink-0 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+	            <button
+	              type="button"
+	              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+	              onClick={startExperiment}
+	            >
+	              {`Start ${experimentDurationDays}-day experiment`}
+	            </button>
+	          </div>
         </EBDialogContent>
       </Dialog>
 
@@ -2948,9 +2941,9 @@ const uniq = new Map<string, (typeof items)[number]>();
             </DialogDescription>
           </DialogHeader>
           <div className="pt-2 flex justify-end gap-2">
-            <button type="button" className="eb-btn-secondary" onClick={() => setEnableInfluencePrompt(null)}>
-              Not now
-            </button>
+	            <button type="button" className="eb-btn-secondary" onClick={() => setEnableInfluencePrompt(null)}>
+	              Cancel
+	            </button>
             <button
               type="button"
               className="eb-btn-primary"
@@ -2985,13 +2978,13 @@ const uniq = new Map<string, (typeof items)[number]>();
           </DialogHeader>
           <div className="space-y-3">
             <div className="text-sm eb-muted">Optional: add a quick note so Future You knows what was going on.</div>
-            <textarea
-              className="eb-input"
-              placeholder="For example: poor sleep, stressful week, changed caffeine, travel, meds…"
-              rows={3}
-              value={outcomeNote}
-              onChange={(e) => setOutcomeNote(e.target.value)}
-            />
+	            <textarea
+	              className="eb-input"
+	              placeholder="For example: couldn’t keep it up, travel got in the way, symptoms changed, forgot to log…"
+	              rows={3}
+	              value={outcomeNote}
+	              onChange={(e) => setOutcomeNote(e.target.value)}
+	            />
             <div className="pt-2 flex justify-end gap-2">
               <button type="button" className="eb-btn-secondary" onClick={() => setStopExperimentConfirmOpen(false)}>
                 Cancel
@@ -3039,13 +3032,19 @@ const uniq = new Map<string, (typeof items)[number]>();
             </div>
             <div className="text-sm eb-muted">Optional: add a quick note so Future You knows what happened.</div>
 
-            <textarea
-              className="eb-input"
-              placeholder="For example: couldn’t stick to it, travel got in the way, stress spiked, forgot to log…"
-              rows={3}
-              value={outcomeNote}
-              onChange={(e) => setOutcomeNote(e.target.value)}
-            />
+	            <textarea
+	              className="eb-input"
+	              placeholder={
+	                finishExperimentConfirm?.outcome === 'helped'
+	                  ? 'For example: reflux eased, fewer flare ups, felt steadier, slept better…'
+	                  : finishExperimentConfirm?.outcome === 'notReally'
+	                    ? 'For example: no real change, hard to tell, symptoms were the same…'
+	                    : 'For example: couldn’t stick to it, travel got in the way, forgot to log…'
+	              }
+	              rows={3}
+	              value={outcomeNote}
+	              onChange={(e) => setOutcomeNote(e.target.value)}
+	            />
 
             <div className="pt-2 flex justify-end gap-2">
               <button type="button" className="eb-btn-secondary" onClick={() => setFinishExperimentConfirm(null)}>
@@ -3557,15 +3556,8 @@ const uniq = new Map<string, (typeof items)[number]>();
 
                           <div className="flex-1" />
 
-                          <div className="mt-4 flex items-center justify-between gap-3">
-                            <button
-                              type="button"
-                              className="text-sm font-medium opacity-70 hover:opacity-100"
-                              onClick={() => dismissPrompt(p.id)}
-                            >
-                              Not now
-                            </button>
-                            <button
+	                          <div className="mt-4 flex items-center justify-end gap-3">
+	                            <button
                               type="button"
                               className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
                               onClick={() => openTryNextPrompt(p as any)}
