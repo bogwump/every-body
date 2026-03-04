@@ -209,8 +209,13 @@ export interface ExperimentPlan {
   /** A short coaching note */
   note: string;
 
+  /** Experiment type */
+  kind?: ExperimentKind;
+
   /** Optional outcome captured at the end of the experiment */
   outcome?: {
+    /** Outcome status */
+    status?: ExperimentOutcomeStatus;
     /** 1–5 quick rating */
     rating?: 1 | 2 | 3 | 4 | 5;
     /** Freeform note */
@@ -219,3 +224,25 @@ export interface ExperimentPlan {
     completedAtISO?: string;
   };
 }
+
+
+export type ExperimentOutcomeStatus = 'helped' | 'notReally' | 'abandoned' | 'stopped';
+
+export type ExperimentKind = 'change' | 'track';
+
+export interface ExperimentHistoryItem {
+  experimentId: string;
+  title: string;
+  kind: ExperimentKind;
+  startDateISO: string; // YYYY-MM-DD
+  durationDays: number;
+  metrics: InsightMetricKey[];
+  changeKey?: string;
+  outcome: {
+    status: ExperimentOutcomeStatus;
+    completedAtISO: string; // ISO datetime
+    rating?: 1 | 2 | 3 | 4 | 5;
+    note?: string;
+  };
+}
+

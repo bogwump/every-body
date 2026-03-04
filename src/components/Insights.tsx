@@ -20,7 +20,7 @@ import {
 } from 'recharts';
 import { ArrowRight, Download, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
-import { useEntries, useExperiment } from '../lib/appStore';
+import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
 import { downloadTextFile } from '../lib/storage';
 import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
 import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
@@ -1405,6 +1405,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const [replaceExperimentConfirm, setReplaceExperimentConfirm] = useState<null | ExperimentPlan>(null);
 
   const { experiment, setExperiment, clearExperiment } = useExperiment();
+  const { history: experimentHistory, upsertHistoryItem } = useExperimentHistory();
+
 
   const CUSTOM_EXPERIMENT_MAX_METRICS = 5;
   const [preOpenExperimentConfirm, setPreOpenExperimentConfirm] = useState<
@@ -1554,6 +1556,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           : undefined,
       steps: experimentPlan.steps,
       note: experimentPlan.note,
+      kind: (typeof experimentPlan.title === 'string' && experimentPlan.title.toLowerCase().includes('tracking')) ? ('track' as any) : ('change' as any),
     };
 
     // Single-active-experiment guardrail
@@ -1590,24 +1593,57 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setFinishExperimentConfirm({ outcome });
   };
 
-  const confirmFinishExperiment = () => {
+  
+  const recordExperimentToHistory = (plan: ExperimentPlan, outcomeStatus: 'helped' | 'notReally' | 'abandoned' | 'stopped') => {
+    try {
+      const kind: any =
+        (plan as any).kind ||
+        ((typeof plan.title === 'string' && plan.title.toLowerCase().includes('tracking')) ? 'track' : 'change');
+
+      const completedAtISO = (plan as any)?.outcome?.completedAtISO || new Date().toISOString();
+      upsertHistoryItem({
+        experimentId: plan.id,
+        title: plan.title,
+        kind,
+        startDateISO: plan.startDateISO,
+        durationDays: Number(plan.durationDays ?? 3),
+        metrics: Array.isArray(plan.metrics) ? plan.metrics : [],
+        changeKey: plan.changeKey,
+        outcome: {
+          status: outcomeStatus,
+          completedAtISO,
+          rating: (plan as any)?.outcome?.rating,
+          note: (plan as any)?.outcome?.note,
+        },
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+const confirmFinishExperiment = () => {
     if (!experiment || !finishExperimentConfirm) return;
     const ex = experiment as ExperimentPlan;
     const outcome = finishExperimentConfirm.outcome;
     const rating = outcome === 'helped' ? 5 : outcome === 'notReally' ? 2 : undefined;
 
-    setExperiment({
+    const next: ExperimentPlan = {
       ...ex,
+      kind:
+        (ex as any).kind ||
+        ((typeof ex.title === 'string' && ex.title.toLowerCase().includes('tracking')) ? ('track' as any) : ('change' as any)),
       outcome: {
         ...(ex.outcome ?? {}),
-        status: outcome === 'abandoned' ? ('abandoned' as any) : ('completed' as any),
+        status: outcome as any,
         rating: rating as any,
         completedAtISO: new Date().toISOString(),
-        // Preserve whatever the user has typed so far.
         note: outcomeNote.trim() ? outcomeNote.trim() : undefined,
         digest: buildExperimentDigest(experimentComparison),
-      },
-    });
+      } as any,
+    };
+
+    setExperiment(next);
+    recordExperimentToHistory(next, outcome);
 
     setFinishExperimentConfirm(null);
   };
@@ -2113,18 +2149,23 @@ const uniq = new Map<string, (typeof items)[number]>();
     const day = Math.max(1, dayIndex + 1);
     const nextDays = Math.min(ex.durationDays ?? 3, day);
 
-    // Mark as complete without forcing a rating yet.
-    setExperiment({
+    const next: ExperimentPlan = {
       ...ex,
+      kind:
+        (ex as any).kind ||
+        ((typeof ex.title === 'string' && ex.title.toLowerCase().includes('tracking')) ? ('track' as any) : ('change' as any)),
       durationDays: nextDays,
       outcome: {
         ...(ex.outcome ?? {}),
+        status: ((ex.outcome as any)?.status ?? 'stopped') as any,
         completedAtISO: new Date().toISOString(),
-        // Preserve whatever the user has typed so far.
         note: outcomeNote.trim() ? outcomeNote.trim() : undefined,
         stoppedEarly: true as any,
-      },
-    });
+      } as any,
+    };
+
+    setExperiment(next);
+    recordExperimentToHistory(next, 'stopped');
   };
 
   // Active experiment card (shown near the top of the Experiments section)

@@ -10,8 +10,9 @@ const USER_KEY = "everybody:v2:user";
 const ENTRIES_KEY = "everybody:v2:entries";
 const CHAT_KEY = "everybody:v2:chat";
 const EXPERIMENT_KEY = "everybody:v2:experiment";
+const EXPERIMENT_HISTORY_KEY = "everybody:v2:experiment_history";
 
-export const STORAGE_KEYS = [USER_KEY, ENTRIES_KEY, CHAT_KEY, EXPERIMENT_KEY] as const;
+export const STORAGE_KEYS = [USER_KEY, ENTRIES_KEY, CHAT_KEY, EXPERIMENT_KEY, EXPERIMENT_HISTORY_KEY] as const;
 
 export const BACKUP_KEYS = [
   ...STORAGE_KEYS,
@@ -217,7 +218,7 @@ function normaliseChat(value: unknown): ChatMessage[] {
 window.addEventListener("storage", (e) => {
   if (!e.key) return;
 
-  if (e.key === USER_KEY || e.key === ENTRIES_KEY || e.key === CHAT_KEY || e.key === EXPERIMENT_KEY) {
+  if (e.key === USER_KEY || e.key === ENTRIES_KEY || e.key === CHAT_KEY || e.key === EXPERIMENT_KEY || e.key === EXPERIMENT_HISTORY_KEY) {
     rawCache.delete(e.key);
     parsedCache.delete(e.key);
     emitKey(e.key);
@@ -322,7 +323,43 @@ export function useExperiment() {
   };
 
   return { experiment, setExperiment, clearExperiment };
+
 }
+
+// ---- Experiment history (append-only-ish, de-duped by experimentId) ----
+export function useExperimentHistory() {
+  const raw = useSyncExternalStore(
+    (listener) => subscribeKey(EXPERIMENT_HISTORY_KEY, listener),
+    () => readCached<unknown>(EXPERIMENT_HISTORY_KEY, []),
+    () => []
+  );
+
+  const history = Array.isArray(raw) ? (raw as any[]) : [];
+
+  const setHistory = (next: any[]) => {
+    writeCached(EXPERIMENT_HISTORY_KEY, Array.isArray(next) ? next : []);
+  };
+
+  const upsertHistoryItem = (item: any) => {
+    if (!item || typeof item !== 'object') return;
+    const id = (item as any).experimentId;
+    if (!id) return;
+    const next = [...history];
+    const idx = next.findIndex((h) => (h as any)?.experimentId === id);
+    if (idx >= 0) {
+      next[idx] = { ...(next[idx] as any), ...(item as any) };
+    } else {
+      next.unshift(item);
+    }
+    // Keep it reasonably small
+    setHistory(next.slice(0, 200));
+  };
+
+  const clearHistory = () => setHistory([]);
+
+  return { history, setHistory, upsertHistoryItem, clearHistory };
+}
+
 
 export function useChat() {
   const raw = useSyncExternalStore(

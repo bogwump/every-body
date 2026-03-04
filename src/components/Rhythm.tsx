@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
-import { useEntries } from '../lib/appStore';
+import { useEntries, useExperimentHistory } from '../lib/appStore';
 import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
+import { getExperimentLearnings, getWhatsComingPredictions } from '../lib/rhythmPredictions';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
 
@@ -421,6 +422,7 @@ function confidenceOneLiner(conf: any, days: number): string {
 
 export function Rhythm({ userData }: { userData?: UserData }) {
   const { entries: storeEntries } = useEntries();
+  const { history: experimentHistory } = useExperimentHistory();
   // Back-compat: some older wiring passed entries via userData. Prefer store entries.
   const entries: CheckInEntry[] = (Array.isArray((userData as any)?.entries) ? ((userData as any).entries as any[]) : storeEntries) as any;
 
@@ -494,7 +496,24 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
     };
   }, [entries, daysLogged, userData]);
 
-  // Pull commonly used values out of the computed bundle.
+  
+  const experimentLearnings = useMemo(() => {
+    try {
+      return getExperimentLearnings(computed.sorted as any, (experimentHistory as any) || []);
+    } catch {
+      return [];
+    }
+  }, [computed.sorted, experimentHistory]);
+
+  const whatsComing = useMemo(() => {
+    try {
+      return getWhatsComingPredictions({ entries: computed.sorted as any, learnings: experimentLearnings as any });
+    } catch {
+      return [];
+    }
+  }, [computed.sorted, experimentLearnings]);
+
+// Pull commonly used values out of the computed bundle.
   const sorted = computed.sorted;
   const avgCycleLen = computed.avgCycleLen;
   const lastCycleLen = computed.lastCycleLen;
@@ -571,6 +590,34 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                     <div className="text-xs text-white/80 mt-1">{sourceLine}{because}</div>
                     <div className="text-sm text-white/90 mt-3">{phaseLine}</div>
                     {confLine ? <div className="text-xs text-white/80 mt-2">{confLine}</div> : null}
+                    {experimentLearnings && (experimentLearnings as any).length ? (
+                      <div className="mt-4 rounded-2xl bg-white/10 p-4">
+                        <div className="text-xs text-white/80 font-semibold">From your experiments</div>
+                        <div className="mt-2 space-y-2">
+                          {(experimentLearnings as any).slice(0, 2).map((l: any, i: number) => (
+                            <div key={i} className="text-sm text-white/90">
+                              {l.body}
+                              {l.confidenceHint ? <div className="text-xs text-white/70 mt-1">{l.confidenceHint}</div> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {whatsComing && (whatsComing as any).length ? (
+                      <div className="mt-3 rounded-2xl bg-white/10 p-4">
+                        <div className="text-xs text-white/80 font-semibold">What might be coming next</div>
+                        <ul className="mt-2 space-y-2">
+                          {(whatsComing as any).slice(0, 2).map((p: any, i: number) => (
+                            <li key={i} className="text-sm text-white/90">
+                              {p.text}
+                              {p.confidenceHint ? <div className="text-xs text-white/70 mt-1">{p.confidenceHint}</div> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
                   </>
                 );
               })()}
