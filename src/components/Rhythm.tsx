@@ -498,6 +498,8 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
   // Pull commonly used values out of the computed bundle.
   const sorted = computed.sorted;
+  const todayISO = computed.todayISO;
+
 
   const experimentLearnings = useMemo(() => {
     const ud = (userData ?? ({} as any)) as UserData;
