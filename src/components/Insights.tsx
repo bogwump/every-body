@@ -1969,6 +1969,154 @@ const uniq = new Map<string, (typeof items)[number]>();
     };
 
     const prompts: TryNextPrompt[] = [];
+    // Data-driven "Try next" ideas: compare how a symptom looks on days when a behaviour was present vs not.
+    // This helps keep the cards feeling alive when you have enough logs.
+    const median = (arr: number[]): number => {
+      const xs = arr.filter((n) => typeof n === 'number' && Number.isFinite(n)).slice().sort((a, b) => a - b);
+      if (!xs.length) return NaN;
+      const mid = Math.floor(xs.length / 2);
+      return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
+    };
+
+    const influenceEffect = (infKey: string, metricKey: MetricKey) => {
+      const on: number[] = [];
+      const off: number[] = [];
+      let seen = 0;
+
+      recent.forEach((e) => {
+        const anyE: any = e as any;
+        const flags = anyE?.influences || anyE?.influenceFlags || {};
+        const events = anyE?.events || {};
+        const hit =
+          (flags && typeof flags === 'object' && Boolean(flags[infKey])) ||
+          (events && typeof events === 'object' && Boolean(events[infKey]));
+
+        const v = metricValue(e, metricKey);
+        if (v == null) return;
+
+        if (hit) {
+          on.push(v);
+          seen += 1;
+        } else {
+          off.push(v);
+        }
+      });
+
+      // Need enough contrast to say anything.
+      if (on.length < 3 || off.length < 3) return null;
+
+      const medOn = median(on);
+      const medOff = median(off);
+      if (!Number.isFinite(medOn) || !Number.isFinite(medOff)) return null;
+
+      const delta = medOn - medOff; // + means higher on influence days
+      return { on: medOn, off: medOff, delta, seen, onN: on.length, offN: off.length };
+    };
+
+    const addDataPrompt = (p: TryNextPrompt) => {
+      // Avoid duplicates by id
+      if (!p?.id) return;
+      if (prompts.some((x) => x.id === p.id)) return;
+      prompts.push(p);
+    };
+
+    const buildLeverCopy = (changeKey: string) => {
+      if (changeKey === 'caffeine') {
+        return {
+          suggestion: 'Try a small caffeine tweak for 3 days',
+          description: 'Digestive symptoms can be sensitive to routine. A small caffeine tweak is an easy, reversible test.',
+          whyExtra: ['Try: no caffeine after lunch (swap to decaf or herbal).'],
+        };
+      }
+      if (changeKey === 'alcohol') {
+        return {
+          suggestion: 'Try an alcohol-free window for 3 days',
+          description: 'Night symptoms can be sensitive to alcohol. A short alcohol-free window is an easy, reversible test.',
+          whyExtra: ['Try: 3 evenings alcohol-free (or swap to low-alcohol).'],
+        };
+      }
+      if (changeKey === 'lateNight') {
+        return {
+          suggestion: 'Try a steadier bedtime for 3 days',
+          description: 'Sleep and stress can be sensitive to late nights. A steadier bedtime is a small, realistic test.',
+          whyExtra: ['Try: set a “lights out” target and start wind-down 30 minutes earlier.'],
+        };
+      }
+      if (changeKey === 'lowHydration') {
+        return {
+          suggestion: 'Try a hydration support test for 3 days',
+          description: 'Head and dizzy symptoms can be sensitive to hydration. A hydration check is simple and reversible.',
+          whyExtra: ['Try: add one extra glass of water mid-morning and mid-afternoon.'],
+        };
+      }
+      if (changeKey === 'stressfulDay') {
+        return {
+          suggestion: 'Try a stress buffer test for 3 days',
+          description: 'Stress can spill into sleep and symptoms. A tiny buffer is a quick test you can actually do.',
+          whyExtra: ['Try: 10 minutes of downshift (walk, stretch, shower) before dinner.'],
+        };
+      }
+      return {
+        suggestion: 'Try one small change for 3 days',
+        description: 'Start tiny: choose one change you can actually do, and keep everything else roughly the same.',
+        whyExtra: [],
+      };
+    };
+
+    // Pick 1–2 symptom-led, behaviour-linked prompts if the data supports it.
+    const symptomLevers: Array<{ metric: MetricKey; changeKey: string; titleTpl: (label: string) => string }> = [
+      { metric: 'acidReflux' as any, changeKey: 'caffeine', titleTpl: (l) => `A steadier routine for ${l.toLowerCase()}` },
+      { metric: 'digestion' as any, changeKey: 'caffeine', titleTpl: (l) => `A gentler day for ${l.toLowerCase()}` },
+      { metric: 'bloating' as any, changeKey: 'caffeine', titleTpl: (l) => `A steadier routine for ${l.toLowerCase()}` },
+      { metric: 'nightSweats' as any, changeKey: 'alcohol', titleTpl: (l) => `A calmer night for ${l.toLowerCase()}` },
+      { metric: 'hotFlushes' as any, changeKey: 'alcohol', titleTpl: (l) => `A calmer night for ${l.toLowerCase()}` },
+      { metric: 'headache' as any, changeKey: 'lowHydration', titleTpl: (l) => `A steadier day for ${l.toLowerCase()}` },
+      { metric: 'dizziness' as any, changeKey: 'lowHydration', titleTpl: (l) => `A steadier day for ${l.toLowerCase()}` },
+    ];
+
+    const dataCandidates: Array<{ score: number; prompt: TryNextPrompt }> = [];
+
+    symptomLevers.forEach(({ metric, changeKey, titleTpl }) => {
+      if (!isMetricInScope(metric as any, userData)) return;
+      if (!enabledInf.has(changeKey)) return;
+
+      const eff = influenceEffect(changeKey, metric);
+      if (!eff) return;
+
+      // We want the lever where symptom is higher on influence days (delta > 0.6-ish on 0-10 scale).
+      if (eff.delta < 0.6) return;
+
+      const label = labelFor(metric as any, userData);
+      const leverCopy = buildLeverCopy(changeKey);
+
+      const p: TryNextPrompt = {
+        id: `data-${String(metric)}-${changeKey}`,
+        title: titleTpl(label),
+        suggestion: leverCopy.suggestion,
+        description: leverCopy.description,
+        changeKey,
+        metrics: ([metric, 'mood', 'energy'] as any)
+          .filter((k: any) => isMetricInScope(k as any, userData))
+          .slice(0, 5) as any,
+        durationDays: 3,
+        why: [
+          `What I noticed: when ${changeKey === 'caffeine' ? 'caffeine was logged' : changeKey.replace(/([A-Z])/g, ' $1').toLowerCase()} your ${label.toLowerCase()} was typically higher.`,
+          `Seen ${eff.seen} time(s) in your recent logs.`,
+          `Baseline check: ${label} was ~${eff.off.toFixed(1)}/10 without it, and ~${eff.on.toFixed(1)}/10 with it.`,
+          ...(leverCopy.whyExtra || []),
+        ],
+      };
+
+      const score = eff.delta * 10 + Math.min(10, eff.seen);
+      dataCandidates.push({ score, prompt: p });
+    });
+
+    dataCandidates
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .forEach((c) => addDataPrompt(c.prompt));
+
+
 
     // 1) Sleep up and down → earlier bedtime / fewer late nights
     if (recent.length >= 14 && enabledModulesSet.has('sleep' as any) && enabledInf.has('lateNight')) {
