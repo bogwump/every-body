@@ -506,11 +506,11 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
   const whatsComing = useMemo(() => {
     try {
-      return getWhatsComingPredictions(entriesSorted, history, userData, todayISO);
+      return getWhatsComingPredictions(sorted, history, userData, todayISO);
     } catch {
       return [];
     }
-  }, [entriesSorted, history, userData, todayISO]);
+  }, [sorted, history, userData, todayISO]);
 
   const avgCycleLen = computed.avgCycleLen;
   const lastCycleLen = computed.lastCycleLen;
