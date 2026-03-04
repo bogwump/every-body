@@ -1954,8 +1954,16 @@ const uniq = new Map<string, (typeof items)[number]>();
       let n = 0;
       recent.forEach((e) => {
         const anyE: any = e as any;
+
+        // Older builds used `events` (boolean flags), newer ones may use `influences` / `influenceFlags`.
         const flags = anyE?.influences || anyE?.influenceFlags || {};
-        if (flags && typeof flags === 'object' && Boolean(flags[key])) n += 1;
+        const events = anyE?.events || {};
+
+        const hit =
+          (flags && typeof flags === 'object' && Boolean(flags[key])) ||
+          (events && typeof events === 'object' && Boolean(events[key]));
+
+        if (hit) n += 1;
       });
       return n;
     };
@@ -2087,9 +2095,85 @@ const uniq = new Map<string, (typeof items)[number]>();
       }
     }
 
+
+
+    // If the signal rules didn't trigger many prompts, still offer a few "tiny tests"
+    // based on what the user has actually enabled, so this lane feels alive.
+    if (prompts.length < 3) {
+      const hasId = (id: string) => prompts.some((p) => p.id === id);
+
+      const addIf = (p: TryNextPrompt) => {
+        if (hasId(p.id)) return;
+        const ms = (p.metrics || []).filter((k: any) => isMetricInScope(k as any, userData));
+        if (!ms.length) return;
+        prompts.push({ ...p, metrics: ms });
+      };
+
+      if (enabledModulesSet.has('sleep' as any) && enabledInf.has('lateNight') && !hasId('try-sleep-consistency-lite')) {
+        addIf({
+          id: 'try-sleep-consistency-lite',
+          title: 'Sleep consistency test',
+          suggestion: 'Suggested tweak: fewer late nights for 3 days',
+          description: 'Sleep can be sensitive to routine. A small bedtime consistency tweak is easy to try and easy to undo.',
+          changeKey: 'lateNight',
+          metrics: (['sleep', 'energy'] as any),
+          durationDays: 3,
+          why: ['Sleep can be sensitive to routine.', 'A small bedtime tweak is a clean, reversible test.'],
+        });
+      }
+
+      if (enabledModulesSet.has('stress' as any) && enabledInf.has('stressfulDay') && !hasId('try-stress-buffer-lite')) {
+        addIf({
+          id: 'try-stress-buffer-lite',
+          title: 'Stress buffer test',
+          suggestion: 'Suggested tweak: add a small daily buffer',
+          description: 'Even 10 minutes of decompression can shift how a day feels. Try the smallest buffer you can actually stick with.',
+          changeKey: 'stressfulDay',
+          metrics: (['stress', 'sleep'] as any),
+          durationDays: 3,
+          why: ['Stress often moves fastest with tiny, consistent changes.', 'A small daily buffer is low effort and informative.'],
+        });
+      }
+
+      if (enabledModulesSet.has('nightSweats' as any) && enabledInf.has('alcohol') && !hasId('try-alcohol-free-lite')) {
+        addIf({
+          id: 'try-alcohol-free-lite',
+          title: 'Alcohol-free window',
+          suggestion: 'Suggested tweak: alcohol-free for 3 days',
+          description: 'Night symptoms can be sensitive to alcohol and late nights. A short alcohol-free window is a clear, reversible test.',
+          changeKey: 'alcohol',
+          metrics: (['nightSweats', 'sleep'] as any),
+          durationDays: 3,
+          why: ['A short alcohol-free window is a clean test.', 'If it helps, you will feel it quickly.'],
+        });
+      }
+    }
+
     // Remove dismissed prompts (local only) and prompts with no metrics.
+
+    const changeLabel = (key: string | undefined) => {
+      if (!key) return 'one small change';
+      const k = String(key);
+      if (k === 'lateNight') return 'fewer late nights';
+      if (k === 'stressfulDay') return 'a small daily buffer';
+      if (k === 'alcohol') return 'an alcohol-free window';
+      if (k === 'caffeine') return 'a caffeine tweak';
+      if (k === 'lowHydration') return 'hydration support';
+      if (k === 'socialising') return 'a quieter evening';
+      if (k === 'exercise') return 'light movement';
+      return k;
+    };
+
     const active = prompts
-      .map((p) => ({ ...p, metrics: (p.metrics || []).filter((k) => isMetricInScope(k as any, userData)) }))
+      .map((p) => {
+        const suggestion = p.suggestion || `Suggested tweak: ${changeLabel((p as any).changeKey)}`;
+        const description =
+          p.description ||
+          (Array.isArray(p.why) && p.why.length
+            ? String(p.why[0]).replace(/^What I noticed:\s*/i, '').replace(/^Why this is sensible:\s*/i, '')
+            : 'Tiny, reversible test based on your recent logs.');
+        return { ...p, suggestion, description, metrics: (p.metrics || []).filter((k) => isMetricInScope(k as any, userData)) };
+      })
       .filter((p) => (p.metrics || []).length > 0)
       .filter((p) => {
         const until = dismissedPrompts?.[p.id];
@@ -2431,8 +2515,11 @@ if (!cmp) return null;
           <button
             type="button"
             className={
-              experimentCompareMode === 'usual' && hasUsual
-                ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
+              hasUsual
+                ? (experimentCompareMode === 'usual'
+                    ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
+                    : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white'
+                  )
                 : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/40 opacity-60 cursor-not-allowed'
             }
             onClick={() => {
@@ -2481,8 +2568,11 @@ if (!cmp) return null;
           <button
             type="button"
             className={
-              experimentCompareMode === 'usual' && hasUsual
-                ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
+              hasUsual
+                ? (experimentCompareMode === 'usual'
+                    ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
+                    : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white'
+                  )
                 : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/40 opacity-60 cursor-not-allowed'
             }
             onClick={() => {
