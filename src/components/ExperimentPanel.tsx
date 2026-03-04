@@ -152,6 +152,14 @@ const comparisonHasUsual = !!experimentComparison?.metrics?.some((m: any) => m.h
     [corrPairs, findings, entriesAllSorted, entriesSorted, allMetricKeys, userData]
   );
 
+  const maturity = useMemo(() => {
+    const n = Array.isArray(entriesAllSorted) ? entriesAllSorted.length : 0;
+    if (n < 7) return { label: 'Getting started', sub: 'A few logs is enough to begin tiny tests.' };
+    if (n < 30) return { label: 'Learning', sub: 'Patterns are starting to form.' };
+    if (n < 60) return { label: 'Emerging', sub: 'Your patterns are getting clearer.' };
+    return { label: 'Strong', sub: 'You have enough history for sharper suggestions.' };
+  }, [entriesAllSorted]);
+
   // Dialog state
   const [setupOpen, setSetupOpen] = useState(false);
   const [stopOpen, setStopOpen] = useState(false);
@@ -332,7 +340,7 @@ const comparisonHasUsual = !!experimentComparison?.metrics?.some((m: any) => m.h
             </div>
             <div>
               <div className="font-semibold">Run a small experiment</div>
-              <div className="text-sm eb-muted">Tiny, reversible tests that help you learn faster.</div>
+              <div className="text-sm eb-muted">Tiny, reversible tests to learn what helps your body.</div>
             </div>
           </div>
           <div className="mt-4">
@@ -485,98 +493,67 @@ const comparisonHasUsual = !!experimentComparison?.metrics?.some((m: any) => m.h
     <div className="space-y-4" id="experiments">
       {renderActiveCard()}
 
+      {/* Experiments section wrapper (old-style layout: header + guidance + cards) */}
       <div className="eb-card">
-        <div className="font-semibold">Try next</div>
-        <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-full eb-inset flex items-center justify-center">
+            <FlaskConical className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-semibold">Experiments</div>
+            <div className="text-sm eb-muted">Tiny tests to learn what helps.</div>
+            <div className="mt-1 text-xs eb-muted">Maturity: {maturity.label}. {maturity.sub}</div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl eb-inset p-4">
+          <div className="font-medium">Keep it simple</div>
+          <div className="mt-1 text-sm eb-muted">
+            Pick one small change. Keep everything else roughly the same. Track a few measures for a short time.
+          </div>
+        </div>
 
         <div className="mt-4">
-          <Carousel>
-            <CarouselContent>
-              {tryNextPrompts.map((p) => (
-                <CarouselItem key={p.id} className="basis-full">
-                  <div className="rounded-2xl eb-inset p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-semibold">{p.title}</div>
-                        <div className="mt-1 text-sm eb-muted">
-                          Try a {p.durationDays}-day {labelForInfluence(p.changeKey).toLowerCase()} tweak. {p.why?.[0] ? p.why[0] : ''}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="eb-btn eb-btn-secondary whitespace-nowrap shrink-0"
-                        onClick={() => openSetup(p.metrics, { mode: 'change', durationDays: p.durationDays, changeKey: p.changeKey, title: p.title })}
-                      >
-                        Try next
-                      </button>
-                    </div>
+          <div className="font-semibold">Try next</div>
+          <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
 
-                    {p.why && p.why.length ? (
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-sm font-medium">Why this suggestion?</summary>
-                        <ul className="mt-2 space-y-1 text-sm eb-muted list-disc pl-5">
-                          {p.why.map((w, idx) => (
-                            <li key={idx}>{w}</li>
-                          ))}
-                        </ul>
-                      </details>
-                    ) : null}
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {p.metrics.slice(0, 5).map((k) => (
-                        <span key={String(k)} className="eb-pill">
-                          {labelForMetric(k as any, userData)}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-4">
-                      <button
-                        type="button"
-                        className="eb-btn eb-btn-primary"
-                        onClick={() => openSetup(p.metrics, { mode: 'change', durationDays: p.durationDays, changeKey: p.changeKey, title: p.title })}
-                      >
-                        <FlaskConical className="h-4 w-4" />
-                        <span className="ml-2">Set up {p.durationDays}-day experiment</span>
-                      </button>
-                    </div>
-                  </div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselPrevious />
-            <CarouselNext />
-          </Carousel>
-        </div>
-      </div>
-
-      <div className="eb-card">
-        <div className="font-semibold">When the signal is strong</div>
-        <div className="mt-1 text-sm eb-muted">Evidence-backed ideas, and tracking experiments for symptom pairs.</div>
-
-        {strongSignal.length ? (
           <div className="mt-4">
             <Carousel>
               <CarouselContent>
-                {strongSignal.map((it) => (
-                  <CarouselItem key={it.id} className="basis-full">
+                {tryNextPrompts.map((p) => (
+                  <CarouselItem key={p.id} className="basis-full">
                     <div className="rounded-2xl eb-inset p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold">{it.title}</div>
-                          <div className="mt-1 text-sm eb-muted">{it.body}</div>
+                        <div className="min-w-0">
+                          <div className="font-semibold">{p.title}</div>
+                          <div className="mt-1 text-sm eb-muted">
+                            Try a {p.durationDays}-day {labelForInfluence(p.changeKey).toLowerCase()} tweak.
+                            {p.why?.[0] ? ` ${p.why[0]}` : ''}
+                            {p.why?.[1] ? ` ${p.why[1]}` : ''}
+                          </div>
                         </div>
                         <button
                           type="button"
-                          className="eb-btn eb-btn-secondary"
-                          onClick={() => openSetup(it.metrics, { mode: it.kind ?? 'change', durationDays: it.durationDays })}
+                          className="eb-btn eb-btn-secondary whitespace-nowrap shrink-0"
+                          onClick={() => openSetup(p.metrics, { mode: 'change', durationDays: p.durationDays, changeKey: p.changeKey, title: p.title })}
                         >
-                          Try it
+                          Try next
                         </button>
                       </div>
 
+                      {p.why && p.why.length ? (
+                        <details className="mt-3">
+                          <summary className="cursor-pointer text-sm font-medium">Why this suggestion?</summary>
+                          <ul className="mt-2 space-y-1 text-sm eb-muted list-disc pl-5">
+                            {p.why.map((w, idx) => (
+                              <li key={idx}>{w}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {(it.metrics || []).slice(0, 5).map((k) => (
+                        {p.metrics.slice(0, 5).map((k) => (
                           <span key={String(k)} className="eb-pill">
                             {labelForMetric(k as any, userData)}
                           </span>
@@ -587,27 +564,82 @@ const comparisonHasUsual = !!experimentComparison?.metrics?.some((m: any) => m.h
                         <button
                           type="button"
                           className="eb-btn eb-btn-primary"
-                          onClick={() => openSetup(it.metrics, { mode: it.kind ?? 'change', durationDays: it.durationDays })}
+                          onClick={() => openSetup(p.metrics, { mode: 'change', durationDays: p.durationDays, changeKey: p.changeKey, title: p.title })}
                         >
                           <FlaskConical className="h-4 w-4" />
-                          <span className="ml-2">
-                            Set up {it.durationDays ?? (it.kind === 'track' ? 7 : 3)}-day {it.kind === 'track' ? 'tracking' : 'experiment'}
-                          </span>
+                          <span className="ml-2">Set up {p.durationDays}-day experiment</span>
                         </button>
                       </div>
                     </div>
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious />
-              <CarouselNext />
+              {tryNextPrompts.length > 1 ? <CarouselPrevious /> : null}
+              {tryNextPrompts.length > 1 ? <CarouselNext /> : null}
             </Carousel>
           </div>
-        ) : (
-          <div className="mt-4 text-sm eb-muted">
-            Keep logging a mix of how you feel and what is happening (sleep, stress, late nights, caffeine). As overlap builds, stronger experiment ideas show up here.
+        </div>
+
+        <div className="mt-6">
+          <div className="font-semibold">When the signal is strong</div>
+          <div className="mt-1 text-sm eb-muted">Evidence-backed ideas, and tracking experiments for symptom pairs.</div>
+
+          {strongSignal.length ? (
+            <div className="mt-4">
+              <Carousel>
+                <CarouselContent>
+                  {strongSignal.map((it) => (
+                    <CarouselItem key={it.id} className="basis-full">
+                      <div className="rounded-2xl eb-inset p-4">
+                        <div>
+                          <div className="font-semibold">{it.title}</div>
+                          <div className="mt-1 text-sm eb-muted">{it.body}</div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {(it.metrics || []).slice(0, 5).map((k) => (
+                            <span key={String(k)} className="eb-pill">
+                              {labelForMetric(k as any, userData)}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="mt-4">
+                          <button
+                            type="button"
+                            className="eb-btn eb-btn-primary"
+                            onClick={() => openSetup(it.metrics, { mode: it.kind ?? 'change', durationDays: it.durationDays })}
+                          >
+                            <FlaskConical className="h-4 w-4" />
+                            <span className="ml-2">
+                              Set up {it.durationDays ?? (it.kind === 'track' ? 7 : 3)}-day {it.kind === 'track' ? 'tracking' : 'experiment'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                {strongSignal.length > 1 ? <CarouselPrevious /> : null}
+                {strongSignal.length > 1 ? <CarouselNext /> : null}
+              </Carousel>
+            </div>
+          ) : (
+            <div className="mt-4 text-sm eb-muted">
+              Keep logging a mix of how you feel and what is happening (sleep, stress, late nights, caffeine). As overlap builds, stronger experiment ideas show up here.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 rounded-2xl eb-inset p-4">
+          <div className="font-medium">Run your own experiment</div>
+          <div className="mt-1 text-sm eb-muted">Name it first, then pick what you are changing and what you will measure.</div>
+          <div className="mt-3">
+            <button type="button" className="eb-btn eb-btn-primary" onClick={() => openSetup(selected)}>
+              Set up a 3-day experiment
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Setup dialog */}

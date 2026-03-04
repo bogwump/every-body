@@ -210,7 +210,10 @@ export function generateTryNextPrompts(entriesAllSorted: CheckInEntry[], userDat
     .concat(userData.sleepInsightsEnabled ? (['sleep'] as any) : [])
     .concat(['mood' as any]);
 
-  const uniq = Array.from(new Set(candidates)).filter((k) => isMetricInScope(k as any, userData));
+  // Stabilise ordering so suggestions don't "flip" between sessions.
+  const uniq = Array.from(new Set(candidates))
+    .filter((k) => isMetricInScope(k as any, userData))
+    .sort((a, b) => String(a).localeCompare(String(b)));
 
   const scored = uniq
     .map((k) => {
@@ -222,44 +225,68 @@ export function generateTryNextPrompts(entriesAllSorted: CheckInEntry[], userDat
       return { k, n: xs.length, v: variance(xs) };
     })
     .filter((s) => s.n >= 7 && s.v >= 0.6)
-    .sort((a, b) => b.v - a.v);
+    .sort((a, b) => {
+      const dv = b.v - a.v;
+      if (Math.abs(dv) > 1e-9) return dv;
+      return String(a.k).localeCompare(String(b.k));
+    });
 
   if (!scored.length) {
     const s = makeStarter();
     return s.metrics.length ? [s] : [];
   }
 
-  const focus = scored[0].k;
-  const title = `A steadier routine for ${labelForMetric(focus, userData).toLowerCase()}`;
+  const makePromptForFocus = (focus: MetricKey): TryNextPrompt => {
+    const metricLabel = labelForMetric(focus, userData).toLowerCase();
+    const title = `A steadier routine for ${metricLabel}`;
 
-  // Pick a gentle lever based on the focus metric.
-  let changeKey = 'lateNight';
-  let why: string[] = [];
+    // Pick a gentle lever based on the focus metric.
+    let changeKey = 'lateNight';
+    let why: string[] = [];
 
-  if (String(focus).includes('sleep')) {
-    changeKey = 'lateNight';
-    why = ['Your sleep has moved around recently. A consistent bedtime can make the next week easier to read.'];
-  } else if (String(focus).includes('stress') || String(focus).includes('anxiety') || String(focus).includes('irritability')) {
-    changeKey = 'stressfulDay';
-    why = ['Stress has been a bit spiky recently. A tiny buffer can help you see whether your baseline shifts.'];
-  } else if (String(focus).includes('digestion') || String(focus).includes('bloating') || String(focus).includes('acid')) {
-    changeKey = 'caffeine';
-    why = ['Digestive symptoms can be sensitive to routine. A small caffeine tweak is an easy, reversible test.'];
-  } else {
-    changeKey = 'lateNight';
-    why = ['A steadier routine is a good first lever when patterns feel noisy.'];
-  }
+    if (String(focus).includes('sleep')) {
+      changeKey = 'lateNight';
+      why = [
+        'Your sleep has moved around recently.',
+        'Try a small bedtime tweak. It is easy to reverse, and often calms the noise.',
+      ];
+    } else if (String(focus).includes('stress') || String(focus).includes('anxiety') || String(focus).includes('irritability')) {
+      changeKey = 'stressfulDay';
+      why = [
+        'Stress has been a bit spiky recently.',
+        'Try one small buffer (short walk, breathing, earlier finish). Tiny changes can shift your baseline.',
+      ];
+    } else if (String(focus).includes('digestion') || String(focus).includes('bloating') || String(focus).includes('acid')) {
+      changeKey = 'caffeine';
+      why = [
+        'Digestive symptoms can be sensitive to routine.',
+        'A small caffeine tweak is an easy, reversible test to see if it plays a part.',
+      ];
+    } else {
+      changeKey = 'lateNight';
+      why = ['A steadier routine is a good first lever when patterns feel noisy.'];
+    }
 
-  return [
-    {
+    return {
       id: `try-next-${String(focus)}`,
       title,
       changeKey,
-      metrics: ([focus, 'mood', 'energy'] as MetricKey[]).filter((k) => isMetricInScope(k as any, userData)).slice(0, 5),
+      metrics: ([focus, 'mood', 'energy'] as MetricKey[])
+        .filter((k) => isMetricInScope(k as any, userData))
+        .slice(0, 5),
       durationDays: 3,
       why,
-    },
-  ];
+    };
+  };
+
+  // Offer a few options so the carousel/arrows make sense.
+  const prompts: TryNextPrompt[] = scored.slice(0, 3).map((s) => makePromptForFocus(s.k));
+
+  // Add the starter at the end if it is not already represented.
+  const starter = makeStarter();
+  if (!prompts.some((p) => p.id === starter.id) && starter.metrics.length) prompts.push(starter);
+
+  return prompts;
 }
 
 export function generateStrongSignalSuggestions(args: {
