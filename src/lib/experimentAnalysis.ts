@@ -12,6 +12,7 @@ export type ExperimentMetricComparison = {
 };
 
 export type ExperimentComparisonResult = {
+  // Baseline A: immediate pre-window (quick check)
   window: {
     beforeStartISO: string;
     beforeEndISO: string;
@@ -26,6 +27,30 @@ export type ExperimentComparisonResult = {
   /** Count of unique days (not points) with any selected metric logged */
   beforeDaysWithAny: number;
   duringDaysWithAny: number;
+
+  // Baseline B: rolling personal baseline (more meaningful)
+  // Present only when there is enough history to be trustworthy.
+  usual?: {
+    window: {
+      /** Earliest included baseline day (from the rolling set) */
+      beforeStartISO: string;
+      /** Latest included baseline day (from the rolling set) */
+      beforeEndISO: string;
+      duringStartISO: string;
+      duringEndISO: string;
+    };
+    metrics: ExperimentMetricComparison[];
+    enoughData: boolean;
+    durationDays: number;
+    beforeDaysWithAny: number;
+    duringDaysWithAny: number;
+    /** Target window length in days (rolling) */
+    baselineDaysTarget: number;
+    /** Unique baseline days actually used */
+    baselineDaysUsed: number;
+    /** Summary of how the baseline is computed */
+    method: 'median' | 'trimmedMean';
+  };
 };
 
 function parseISO(iso: string): Date | null {
@@ -55,6 +80,13 @@ function avg(nums: number[]): number | null {
   return nums.reduce((a, b) => a + b, 0) / nums.length;
 }
 
+function median(nums: number[]): number | null {
+  if (!nums.length) return null;
+  const a = nums.slice().sort((x, y) => x - y);
+  const mid = Math.floor(a.length / 2);
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+}
+
 function getMetricValue(entry: CheckInEntry, key: InsightMetricKey): number | null {
   if (!entry) return null;
   if (key === 'mood') {
@@ -81,14 +113,27 @@ export function computeExperimentComparison(args: {
   user: UserData;
   maxMetrics?: number;
   minPointsPerWindow?: number;
+  // Baseline B settings
+  usualBaselineDays?: number; // default 30
+  minDaysForUsualBaseline?: number; // default 10
+  usualMethod?: 'median' | 'trimmedMean'; // default 'median'
 }): ExperimentComparisonResult {
-  const { entries, experiment, maxMetrics = 5, minPointsPerWindow = 3 } = args;
+  const {
+    entries,
+    experiment,
+    maxMetrics = 5,
+    minPointsPerWindow = 3,
+    usualBaselineDays = 30,
+    minDaysForUsualBaseline = 10,
+    usualMethod = 'median',
+  } = args;
 
   const startISO = experiment.startDateISO;
   const durationDays = Math.max(1, Number(experiment.durationDays ?? 3));
   const duringStart = startISO;
   const duringEnd = addDaysISO(startISO, durationDays - 1);
 
+  // Baseline A (quick check): immediately before the window, same length as the experiment.
   const baselineEnd = addDaysISO(startISO, -1);
   const baselineStart = addDaysISO(startISO, -durationDays);
 
@@ -118,7 +163,7 @@ export function computeExperimentComparison(args: {
 
     const beforeAvg = avg(beforeVals);
     const duringAvg = avg(duringVals);
-    const delta = (beforeAvg != null && duringAvg != null) ? (duringAvg - beforeAvg) : null;
+    const delta = beforeAvg != null && duringAvg != null ? duringAvg - beforeAvg : null;
 
     const beforeCount = beforeVals.length;
     const duringCount = duringVals.length;
@@ -135,7 +180,7 @@ export function computeExperimentComparison(args: {
 
   const enoughData = metrics.some((m) => m.hasEnoughData);
 
-  return {
+  const result: ExperimentComparisonResult = {
     window: {
       beforeStartISO: baselineStart,
       beforeEndISO: baselineEnd,
@@ -148,8 +193,115 @@ export function computeExperimentComparison(args: {
     beforeDaysWithAny: beforeDays.size,
     duringDaysWithAny: duringDays.size,
   };
-}
 
+  // Baseline B (usual pattern): last N *logged* days before the experiment, excluding experiment days.
+  // Only shown when there is enough history to be meaningful.
+  try {
+    const sorted = (Array.isArray(entries) ? entries : [])
+      .filter((e) => typeof e?.dateISO === 'string')
+      .slice()
+      .sort((a, b) => String(a.dateISO).localeCompare(String(b.dateISO)));
+
+    // Collect unique candidate days BEFORE the experiment start that have at least one selected metric point.
+    const candidateDays: string[] = [];
+    const seen = new Set<string>();
+
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const e = sorted[i];
+      const d = String(e.dateISO);
+      if (d >= duringStart) continue; // only before
+      if (seen.has(d)) continue;
+
+      let hasAny = false;
+      for (const key of metricKeys) {
+        const v = getMetricValue(e, key);
+        if (typeof v === 'number') {
+          hasAny = true;
+          break;
+        }
+      }
+
+      if (hasAny) {
+        candidateDays.push(d);
+        seen.add(d);
+      }
+
+      if (candidateDays.length >= usualBaselineDays) break;
+    }
+
+    const baselineDaysUsed = candidateDays.length;
+
+    if (baselineDaysUsed >= minDaysForUsualBaseline && metricKeys.length) {
+      const daySet = new Set(candidateDays);
+      const baselineFromISO = candidateDays[candidateDays.length - 1]; // oldest in the collected list
+      const baselineToISO = candidateDays[0]; // newest
+
+      const usualBeforeDays = new Set<string>();
+      const usualDuringDays = new Set<string>();
+
+      const usualMetrics: ExperimentMetricComparison[] = metricKeys.map((key) => {
+        const beforeVals: number[] = [];
+        const duringVals: number[] = [];
+
+        for (const e of sorted) {
+          const d = String(e.dateISO);
+          const v = getMetricValue(e, key);
+          if (typeof v !== 'number') continue;
+
+          if (daySet.has(d)) {
+            beforeVals.push(v);
+            usualBeforeDays.add(d);
+          }
+          if (inRange(d, duringStart, duringEnd)) {
+            duringVals.push(v);
+            usualDuringDays.add(d);
+          }
+        }
+
+        const beforeAvg = (usualMethod === 'median') ? median(beforeVals) : avg(beforeVals);
+        const duringAvg = avg(duringVals);
+        const delta = beforeAvg != null && duringAvg != null ? duringAvg - beforeAvg : null;
+
+        const beforeCount = beforeVals.length;
+        const duringCount = duringVals.length;
+
+        // For the usual baseline, require enough baseline points AND enough during points.
+        const hasEnoughData = beforeCount >= minPointsPerWindow && duringCount >= minPointsPerWindow;
+
+        return {
+          key,
+          before: { avg: beforeAvg, count: beforeCount },
+          during: { avg: duringAvg, count: duringCount },
+          delta,
+          hasEnoughData,
+        };
+      });
+
+      const usualEnough = usualMetrics.some((m) => m.hasEnoughData);
+
+      result.usual = {
+        window: {
+          beforeStartISO: baselineFromISO,
+          beforeEndISO: baselineToISO,
+          duringStartISO: duringStart,
+          duringEndISO: duringEnd,
+        },
+        metrics: usualMetrics,
+        enoughData: usualEnough,
+        durationDays,
+        beforeDaysWithAny: usualBeforeDays.size,
+        duringDaysWithAny: usualDuringDays.size,
+        baselineDaysTarget: usualBaselineDays,
+        baselineDaysUsed,
+        method: usualMethod,
+      };
+    }
+  } catch {
+    // ignore
+  }
+
+  return result;
+}
 export function formatDelta(delta: number, decimals = 1): string {
   const abs = Math.abs(delta);
   const fixed = abs.toFixed(decimals);

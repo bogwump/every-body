@@ -2108,6 +2108,7 @@ const uniq = new Map<string, (typeof items)[number]>();
   const [outcomeNote, setOutcomeNote] = useState<string>('');
   const lastOutcomeNoteExperimentIdRef = useRef<string | null>(null);
   const [showAllExperimentMetrics, setShowAllExperimentMetrics] = useState(false);
+  const [experimentCompareMode, setExperimentCompareMode] = useState<'quick' | 'usual'>('quick');
   const [whyOpen, setWhyOpen] = useState<Record<string, boolean>>({});
 
   const buildExperimentDigest = (cmp: any) => {
@@ -2123,8 +2124,21 @@ const uniq = new Map<string, (typeof items)[number]>();
         delta: m.delta ?? null,
         enough: Boolean(m.hasEnoughData),
       }));
+
+      const topUsual = (cmp.usual?.metrics ?? []).slice(0, 5).map((m: any) => ({
+        key: m.key,
+        label: m.label,
+        beforeAvg: m.before?.avg ?? null,
+        beforeCount: m.before?.count ?? 0,
+        duringAvg: m.during?.avg ?? null,
+        duringCount: m.during?.count ?? 0,
+        delta: m.delta ?? null,
+        enough: Boolean(m.hasEnoughData),
+      }));
+
       return {
         createdAtISO: new Date().toISOString(),
+        // Backwards-compatible fields (quick baseline)
         enoughData: Boolean(cmp.enoughData),
         window: cmp.window,
         durationDays: cmp.durationDays,
@@ -2132,6 +2146,29 @@ const uniq = new Map<string, (typeof items)[number]>();
         duringDaysWithAny: cmp.duringDaysWithAny,
         summarySentence: experimentSummarySentence(cmp, userData) || undefined,
         metrics: top,
+
+        // New shape for two baselines
+        quick: {
+          enoughData: Boolean(cmp.enoughData),
+          window: cmp.window,
+          durationDays: cmp.durationDays,
+          beforeDaysWithAny: cmp.beforeDaysWithAny,
+          duringDaysWithAny: cmp.duringDaysWithAny,
+          metrics: top,
+        },
+        usual: cmp.usual
+          ? {
+              enoughData: Boolean(cmp.usual.enoughData),
+              window: cmp.usual.window,
+              durationDays: cmp.usual.durationDays,
+              beforeDaysWithAny: cmp.usual.beforeDaysWithAny,
+              duringDaysWithAny: cmp.usual.duringDaysWithAny,
+              baselineDaysTarget: cmp.usual.baselineDaysTarget,
+              baselineDaysUsed: cmp.usual.baselineDaysUsed,
+              method: cmp.usual.method,
+              metrics: topUsual,
+            }
+          : undefined,
       };
     } catch {
       return undefined;
@@ -2303,27 +2340,69 @@ const uniq = new Map<string, (typeof items)[number]>();
   const renderExperimentComparisonBlock = (mode: 'progress' | 'conclusion') => {
     if (!experimentStatus) return null;
     const digest = (experimentStatus.ex as any)?.outcome?.digest;
-    const cmp =
-      mode === 'conclusion' && digest
-        ? {
-            ...digest,
-            metrics: (digest.metrics ?? []).map((m: any) => ({
-              key: m.key,
-              label: m.label,
-              before: { avg: m.beforeAvg, count: m.beforeCount },
-              during: { avg: m.duringAvg, count: m.duringCount },
-              delta: m.delta,
-              hasEnoughData: Boolean(m.enough),
-            })),
-          }
-        : experimentComparison;
 
-    if (!cmp) return null;
+    // Normalise digest (supports old + new shapes)
+    const digestQuickRaw = digest?.quick ? digest.quick : digest;
+    const digestUsualRaw = digest?.usual;
+
+    const normaliseDigest = (d: any) => {
+      if (!d) return null;
+      return {
+        ...d,
+        window: d.window,
+        durationDays: d.durationDays,
+        beforeDaysWithAny: d.beforeDaysWithAny,
+        duringDaysWithAny: d.duringDaysWithAny,
+        enoughData: Boolean(d.enoughData),
+        metrics: (d.metrics ?? []).map((m: any) => ({
+          key: m.key,
+          label: m.label,
+          before: { avg: m.beforeAvg, count: m.beforeCount },
+          during: { avg: m.duringAvg, count: m.duringCount },
+          delta: m.delta,
+          hasEnoughData: Boolean(m.enough),
+        })),
+      };
+    };
+
+    const quickFromDigest = mode === 'conclusion' ? normaliseDigest(digestQuickRaw) : null;
+    const usualFromDigest =
+      mode === 'conclusion' && digestUsualRaw
+        ? {
+            ...normaliseDigest(digestUsualRaw),
+            baselineDaysTarget: digestUsualRaw.baselineDaysTarget,
+            baselineDaysUsed: digestUsualRaw.baselineDaysUsed,
+            method: digestUsualRaw.method,
+          }
+        : null;
+
+    const quickLive = experimentComparison;
+    const usualLive = experimentComparison?.usual ? { ...experimentComparison.usual } : null;
+
+    const quick = mode === 'conclusion' ? quickFromDigest : quickLive;
+    const usual = mode === 'conclusion' ? usualFromDigest : usualLive;
+
+    const hasUsual = Boolean(usual && (usual as any).baselineDaysUsed >= 10);
+
+    // Choose which baseline is currently shown
+    const cmp = experimentCompareMode === 'usual' && hasUsual ? (usual as any) : (quick as any);
+if (!cmp) return null;
 
     const title = mode === 'progress' ? 'So far' : 'Before vs during';
-    const subtitle = mode === 'progress'
-      ? `You have logged ${cmp.duringDaysWithAny}/${cmp.durationDays} experiment day(s) so far · Baseline uses ${cmp.beforeDaysWithAny} recent day(s)`
-      : `Before: ${cmp.window.beforeStartISO} → ${cmp.window.beforeEndISO} · During: ${cmp.window.duringStartISO} → ${cmp.window.duringEndISO}`;
+
+    const compareLabel =
+      experimentCompareMode === 'usual' && hasUsual
+        ? `Compared with your usual pattern (last ${Number((cmp as any).baselineDaysTarget ?? 30)} days)`
+        : 'Compared with the days just before you started';
+
+    const subtitle =
+      mode === 'progress'
+        ? experimentCompareMode === 'usual' && hasUsual
+          ? `You have logged ${cmp.duringDaysWithAny}/${cmp.durationDays} experiment day(s) so far · Usual baseline uses ${Number((cmp as any).baselineDaysUsed ?? cmp.beforeDaysWithAny)} day(s)`
+          : `You have logged ${cmp.duringDaysWithAny}/${cmp.durationDays} experiment day(s) so far · Baseline uses ${cmp.beforeDaysWithAny} recent day(s)`
+        : experimentCompareMode === 'usual' && hasUsual
+          ? `Usual baseline: ${cmp.window.beforeStartISO} → ${cmp.window.beforeEndISO} (${Number((cmp as any).baselineDaysUsed ?? cmp.beforeDaysWithAny)} day(s)) · During: ${cmp.window.duringStartISO} → ${cmp.window.duringEndISO}`
+          : `Before: ${cmp.window.beforeStartISO} → ${cmp.window.beforeEndISO} · During: ${cmp.window.duringStartISO} → ${cmp.window.duringEndISO}`;
 
     if (!cmp.metrics.length) return null;
 
@@ -2333,8 +2412,38 @@ const uniq = new Map<string, (typeof items)[number]>();
         <div className="mt-4 eb-inset rounded-2xl p-4">
           <div className="text-sm font-semibold">{title}</div>
           <div className="mt-1 text-sm eb-muted">{subtitle}</div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs eb-muted">Compared with:</span>
+          <button
+            type="button"
+            className={
+              experimentCompareMode === 'quick'
+                ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
+                : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/60 hover:bg-white'
+            }
+            onClick={() => setExperimentCompareMode('quick')}
+          >
+            Just before
+          </button>
+          <button
+            type="button"
+            className={
+              experimentCompareMode === 'usual' && hasUsual
+                ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
+                : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/40 opacity-60 cursor-not-allowed'
+            }
+            onClick={() => {
+              if (hasUsual) setExperimentCompareMode('usual');
+            }}
+            title={hasUsual ? 'Compare with your usual pattern' : 'Keep logging a few more days to unlock this'}
+          >
+            Usual month
+          </button>
+          <span className="text-xs eb-muted">{compareLabel}</span>
+        </div>
           <div className="mt-3 text-sm eb-muted">
-            Still early days. Keep logging and we’ll compare this with your usual pattern soon.
+            {experimentCompareMode === 'usual' && !hasUsual ? 'Still early days. We’ll unlock the “usual month” comparison after a few more logs.' : 'Still early days. Keep logging and we’ll firm this up after a few more days.'}
           </div>
         </div>
       );
@@ -2353,6 +2462,43 @@ const uniq = new Map<string, (typeof items)[number]>();
       <div className="mt-4 eb-inset rounded-2xl p-4">
         <div className="text-sm font-semibold">{title}</div>
         <div className="mt-1 text-sm eb-muted">{subtitle}</div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs eb-muted">Compared with:</span>
+          <button
+            type="button"
+            className={
+              experimentCompareMode === 'quick'
+                ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
+                : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/60 hover:bg-white'
+            }
+            onClick={() => setExperimentCompareMode('quick')}
+          >
+            Just before
+          </button>
+          <button
+            type="button"
+            className={
+              experimentCompareMode === 'usual' && hasUsual
+                ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
+                : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/40 opacity-60 cursor-not-allowed'
+            }
+            onClick={() => {
+              if (hasUsual) setExperimentCompareMode('usual');
+            }}
+            title={hasUsual ? 'Compare with your usual pattern' : 'Keep logging a few more days to unlock this'}
+          >
+            Usual month
+          </button>
+          <span className="text-xs eb-muted">{compareLabel}</span>
+        </div>
+        <div className="mt-2 text-xs eb-muted">
+          {cmp.duringDaysWithAny < 3
+            ? `Low confidence (only ${cmp.duringDaysWithAny} day(s) logged so far)`
+            : cmp.duringDaysWithAny < 5
+              ? `Medium confidence (only ${cmp.duringDaysWithAny} day(s) logged so far)`
+              : 'Confidence improves as you log more days.'}
+        </div>
 
         <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
           {visibleMetrics.slice(0, 5).map((m) => (
