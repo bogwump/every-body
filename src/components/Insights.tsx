@@ -18,10 +18,9 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { ArrowRight, Download, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
+import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
-import { downloadTextFile } from '../lib/storage';
 import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
 import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
@@ -1369,35 +1368,102 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const phaseMetricColor = (i: 0 | 1 | 2) =>
     i === 0 ? 'rgb(var(--color-primary))' : i === 1 ? 'rgb(var(--color-accent))' : 'rgb(var(--color-primary-dark))';
 
-  // --- downloads ---
-  const downloadReportHtml = () => {
-    const html = buildHtmlReport({
-      userData,
-      timeframeLabel: TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? '30 days',
-      entries: entriesSorted,
-      selected,
-      highlights: findings,
-      topCorr: corrPairs,
-    });
-    downloadTextFile(`everybody-report-${isoTodayLocal()}.html`, html, 'text/html');
-  };
-
-  const downloadRawJson = () => {
-    const payload = {
-      type: 'everybody-insights-export',
-      version: 1,
-      generatedAtISO: new Date().toISOString(),
-      timeframe: TIMEFRAMES.find((t) => t.key === timeframe)?.label ?? timeframe,
-      days: entriesSorted.length,
-      selectedMetrics: selected,
-      entries: entriesSorted,
-    };
-    downloadTextFile(`everybody-insights-report-${isoTodayLocal()}.json`, JSON.stringify(payload, null, 2), 'application/json');
-  };
-
   // --- UI helpers ---
   const metricsSummary = selected.map((k) => labelFor(k, userData)).join(' • ');
-  const reportCardTitle = 'Export Insights report';
+
+  const currentInsightsPhase = useMemo(() => {
+    if (userData.cycleTrackingMode !== 'cycle' || !entriesAllSorted.length) return null;
+    try {
+      return estimatePhaseByFlow(isoTodayLocal(), entriesAllSorted) as CyclePhase | null;
+    } catch {
+      return null;
+    }
+  }, [entriesAllSorted, userData.cycleTrackingMode]);
+
+  type HeroInsightItem = {
+    id: string;
+    kind: 'pattern' | 'discovery' | 'phase';
+    text: string;
+    phaseWeight?: number;
+  };
+
+  const insightHeroItems = useMemo<HeroInsightItem[]>(() => {
+    const items: HeroInsightItem[] = [];
+    const phasePriorities: Record<string, string[]> = {
+      Menstrual: ['sleep', 'fatigue', 'energy', 'pain', 'cramps'],
+      Follicular: ['energy', 'mood', 'focus', 'motivation'],
+      Ovulatory: ['energy', 'mood', 'libido', 'sleep'],
+      Luteal: ['sleep', 'irritability', 'stress', 'appetite', 'energy'],
+    };
+    const preferred = currentInsightsPhase ? (phasePriorities[String(currentInsightsPhase)] || []) : [];
+
+    const weightForMetrics = (metrics?: MetricKey[]) => {
+      if (!metrics?.length || !preferred.length) return 0;
+      return metrics.reduce((score, metric) => score + (preferred.includes(String(metric)) ? 2 : 0), 0);
+    };
+
+    const cleanSentence = (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) return trimmed;
+      const sentence = trimmed.endsWith('.') ? trimmed : `${trimmed}.`;
+      return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+    };
+
+    const discoverySource = findings.find((f: any) => (f as any)?.confidence === 'high' || (f as any)?.confidence === 'medium');
+    if (discoverySource) {
+      items.push({
+        id: 'discovery',
+        kind: 'discovery',
+        text: `✨ New pattern spotted: ${cleanSentence(discoverySource.title)}`,
+        phaseWeight: 4 + weightForMetrics((discoverySource as any).metrics),
+      });
+    }
+
+    findings.forEach((finding, idx) => {
+      [finding.title, finding.body]
+        .filter(Boolean)
+        .map((line) => cleanSentence(String(line)))
+        .forEach((line, lineIdx) => {
+          items.push({
+            id: `finding-${idx}-${lineIdx}`,
+            kind: 'pattern',
+            text: line,
+            phaseWeight: weightForMetrics((finding as any).metrics),
+          });
+        });
+    });
+
+    items.push({
+      id: currentInsightsPhase ? 'phase-context' : 'learning',
+      kind: 'phase',
+      text: currentInsightsPhase
+        ? `Still learning your ${String(currentInsightsPhase).toLowerCase()} phase patterns.`
+        : 'Still learning your patterns.',
+      phaseWeight: 0,
+    });
+
+    const deduped: HeroInsightItem[] = [];
+    const seen = new Set<string>();
+    items
+      .sort((a, b) => (b.phaseWeight ?? 0) - (a.phaseWeight ?? 0))
+      .forEach((item) => {
+        const key = item.text.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        deduped.push(item);
+      });
+
+    return deduped.slice(0, 3);
+  }, [currentInsightsPhase, findings]);
+
+  const scrollToInsightsSection = (id: string) => {
+    try {
+      const el = document.getElementById(id);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+      // ignore
+    }
+  };
 
   // Experiment dialog state
   const [experimentOpen, setExperimentOpen] = useState(false);
@@ -2953,156 +3019,63 @@ const tryNextPrompts = useMemo(() => {
         </div>
       </div>
 
-      {/* Your settings */}
-      <div className="eb-card eb-hero-surface">
+      {/* Personalised insight hero */}
+      <div className="eb-hero eb-hero-surface rounded-[28px] p-6 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h3 className="eb-hero-title eb-hero-on-dark">Your settings</h3>
+            <h3 className="eb-hero-title eb-hero-on-dark">Your body lately</h3>
             <p className="eb-hero-subtitle mt-1 eb-hero-on-dark-muted">
-              Keep it simple: 3-5 metrics gives you the cleanest signals.
+              A softer read on the patterns your recent check-ins are starting to show.
             </p>
           </div>
-
-          
+          <Sparkles className="w-5 h-5 shrink-0 text-white/80" />
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2 items-center">
-          {TIMEFRAMES.map((t) => (
-            <button key={t.key} className={chipClass(timeframe === t.key)} onClick={() => setTimeframe(t.key)}>
-              {t.label}
-            </button>
-          ))}</div>
-
-        <div className="mt-5 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-          <div className="text-xs eb-hero-on-dark-muted">Selected metrics</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {selected.length ? (
-              selected.map((m) => (
-                <span
-                  key={String(m)}
-                  className="inline-flex items-center rounded-full px-3 py-1 text-sm"
-                  style={{
-                    background: 'rgba(255,255,255,0.14)',
-                    border: '1px solid rgba(255,255,255,0.18)',
-                    color: 'rgba(255,255,255,0.92)',
-                  }}
-                >
-                  {labelFor(m, userData)}
-                </span>
-              ))
-            ) : (
-              <div className="text-sm mt-1 eb-hero-on-dark-muted">Pick a few metrics to get started.</div>
-            )}
-          </div>
+        <div className="mt-4 space-y-3">
+          <div className="eb-inset rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div className="text-sm font-semibold eb-hero-on-dark">Your body lately</div>
+            <div className="mt-2 space-y-2 text-sm eb-hero-on-dark-muted">
+              {insightHeroItems.length ? (
+                insightHeroItems.map((item) => (
+                  <p key={item.id} className="leading-6 text-white/92">{item.text}</p>
+                ))
+              ) : (
+                <p className="leading-6 text-white/92">Still learning your patterns.</p>
+              )}
+            </div>
           </div>
 
-          <div className="shrink-0">
-            <Dialog>
-            <DialogTrigger asChild>
+          <div className="eb-inset rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <div className="text-sm font-semibold eb-hero-on-dark">Explore deeper insights</div>
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                className="px-5 py-2 rounded-xl bg-white/10 border border-white/15 text-sm text-white hover:bg-white/15 transition-all font-medium"
+                className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 text-sm text-white hover:bg-white/15 transition-all font-medium"
+                onClick={() => scrollToInsightsSection('eb-sleep-trend')}
               >
-                Change metrics
+                See sleep trend
               </button>
-            </DialogTrigger>
-            <EBDialogContent
-
-              title="Choose metrics to analyse"
-
-              description="Select up to 6 metrics to personalise your insights."
-
-              className="w-[92vw] max-w-[420px] sm:max-w-lg rounded-2xl p-0 overflow-hidden max-h-[80vh]"
-
-            >
-
-              <div className="flex max-h-[80vh] flex-col">
-
-                <div className="flex items-start justify-between gap-3 border-b border-black/10 p-4">
-
-                  <div className="min-w-0">
-
-                    <div className="text-lg font-semibold">Choose metrics to analyse (max 6)</div>
-
-                    <div className="mt-1 text-sm eb-muted">Select up to 6 metrics to personalise your insights.</div>
-
-                  </div>
-
-
-                  <DialogClose asChild>
-
-                    <button
-
-                      type="button"
-
-                      className="shrink-0 rounded-full border border-black/10 px-3 py-1 text-sm eb-muted hover:bg-black/5"
-
-                    >
-
-                      Close
-
-                    </button>
-
-                  </DialogClose>
-
-                </div>
-
-
-                <div className="min-h-0 overflow-y-auto p-4">
-
-                  <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
-
-
-                  <div className="mt-3 flex flex-wrap gap-2 justify-end">
-
-                    <button type="button" className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
-
-                      Mood
-
-                    </button>
-
-
-                    {selectableKeys.map((k) => (
-
-                      <button
-
-                        type="button"
-
-                        key={k}
-
-                        className={chipClass(selected.includes(k))}
-
-                        onClick={() => toggleMetric(k)}
-
-                        title={labelFor(k, userData)}
-
-                      >
-
-                        {labelFor(k, userData)}
-
-                      </button>
-
-                    ))}
-
-                  </div>
-
-
-                  <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your &quot;top 3&quot; and stick with them for a week.</div>
-
-                </div>
-
-              </div>
-
-            </EBDialogContent>
-          </Dialog>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 text-sm text-white hover:bg-white/15 transition-all font-medium"
+                onClick={() => scrollToInsightsSection('eb-experiments')}
+              >
+                Run experiment
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 text-sm text-white hover:bg-white/15 transition-all font-medium"
+                onClick={() => scrollToInsightsSection('eb-full-insights')}
+              >
+                View full insights
+              </button>
+            </div>
           </div>
         </div>
-
       </div>
 
       {/* Highlights + Top findings carousel */}
-      <div className="eb-card">
+      <div id="eb-full-insights" className="eb-card">
         <div className="eb-card-header">
           <div>
             <div className="eb-card-title">Top findings</div>
@@ -3149,7 +3122,7 @@ const tryNextPrompts = useMemo(() => {
 
       {/* Sleep Insights (optional) */}
       {sleepInsightsOn ? (
-        <div className="eb-card p-6">
+        <div id="eb-sleep-trend" className="eb-card p-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0 self-start">
               <Moon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />
@@ -4330,36 +4303,155 @@ const tryNextPrompts = useMemo(() => {
         </div>
       </div>
 
-      {/* Export report */}
-      <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="min-w-0 w-full">
-            <h2 className="text-xl font-semibold tracking-tight">{reportCardTitle}</h2>
-            <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
-              Download a readable <b>.html</b> report for you. The JSON export is the "machine" version, but it can't be restored as an in-app backup.
-            </p>
-            <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
-              To open: tap the file in your downloads and choose Chrome/Safari.
+      {/* Your settings */}
+      <div className="eb-card eb-hero-surface">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="eb-hero-title eb-hero-on-dark">Your settings</h3>
+            <p className="eb-hero-subtitle mt-1 eb-hero-on-dark-muted">
+              Keep it simple: 3-5 metrics gives you the cleanest signals.
             </p>
           </div>
 
-          <div className="flex flex-col gap-2 w-full sm:w-auto">
-            <button
-              className="w-full sm:min-w-[240px] px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center justify-center gap-2 whitespace-nowrap"
-              onClick={downloadReportHtml}
-            >
-              <Download className="w-4 h-4" />
-              Download report
+          
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2 items-center">
+          {TIMEFRAMES.map((t) => (
+            <button key={t.key} className={chipClass(timeframe === t.key)} onClick={() => setTimeframe(t.key)}>
+              {t.label}
             </button>
-            <button
-              className="w-full sm:min-w-[240px] px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium whitespace-nowrap"
-              onClick={downloadRawJson}
+          ))}</div>
+
+        <div className="mt-5 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+          <div className="text-xs eb-hero-on-dark-muted">Selected metrics</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {selected.length ? (
+              selected.map((m) => (
+                <span
+                  key={String(m)}
+                  className="inline-flex items-center rounded-full px-3 py-1 text-sm"
+                  style={{
+                    background: 'rgba(255,255,255,0.14)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    color: 'rgba(255,255,255,0.92)',
+                  }}
+                >
+                  {labelFor(m, userData)}
+                </span>
+              ))
+            ) : (
+              <div className="text-sm mt-1 eb-hero-on-dark-muted">Pick a few metrics to get started.</div>
+            )}
+          </div>
+          </div>
+
+          <div className="shrink-0">
+            <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="px-5 py-2 rounded-xl bg-white/10 border border-white/15 text-sm text-white hover:bg-white/15 transition-all font-medium"
+              >
+                Change metrics
+              </button>
+            </DialogTrigger>
+            <EBDialogContent
+
+              title="Choose metrics to analyse"
+
+              description="Select up to 6 metrics to personalise your insights."
+
+              className="w-[92vw] max-w-[420px] sm:max-w-lg rounded-2xl p-0 overflow-hidden max-h-[80vh]"
+
             >
-              Export Insights data (.json)
-            </button>
+
+              <div className="flex max-h-[80vh] flex-col">
+
+                <div className="flex items-start justify-between gap-3 border-b border-black/10 p-4">
+
+                  <div className="min-w-0">
+
+                    <div className="text-lg font-semibold">Choose metrics to analyse (max 6)</div>
+
+                    <div className="mt-1 text-sm eb-muted">Select up to 6 metrics to personalise your insights.</div>
+
+                  </div>
+
+
+                  <DialogClose asChild>
+
+                    <button
+
+                      type="button"
+
+                      className="shrink-0 rounded-full border border-black/10 px-3 py-1 text-sm eb-muted hover:bg-black/5"
+
+                    >
+
+                      Close
+
+                    </button>
+
+                  </DialogClose>
+
+                </div>
+
+
+                <div className="min-h-0 overflow-y-auto p-4">
+
+                  <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
+
+
+                  <div className="mt-3 flex flex-wrap gap-2 justify-end">
+
+                    <button type="button" className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
+
+                      Mood
+
+                    </button>
+
+
+                    {selectableKeys.map((k) => (
+
+                      <button
+
+                        type="button"
+
+                        key={k}
+
+                        className={chipClass(selected.includes(k))}
+
+                        onClick={() => toggleMetric(k)}
+
+                        title={labelFor(k, userData)}
+
+                      >
+
+                        {labelFor(k, userData)}
+
+                      </button>
+
+                    ))}
+
+                  </div>
+
+
+                  <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your &quot;top 3&quot; and stick with them for a week.</div>
+
+                </div>
+
+              </div>
+
+            </EBDialogContent>
+          </Dialog>
           </div>
         </div>
+
       </div>
+
+
 
     </div>
   );

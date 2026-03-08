@@ -45,6 +45,101 @@ interface ProfileSettingsProps {
   onPreviewOnboarding?: () => void;
 }
 
+
+function insightMetricLabel(key: string): string {
+  const map: Record<string, string> = {
+    mood: 'Overall mood',
+    energy: 'Energy',
+    sleep: 'Sleep',
+    stress: 'Stress',
+    focus: 'Focus',
+    pain: 'Pain',
+    bloating: 'Bloating',
+    flow: 'Bleeding / spotting',
+    fatigue: 'Fatigue',
+    anxiety: 'Anxiety',
+    irritability: 'Irritability',
+    digestion: 'Digestion',
+    headache: 'Headache',
+    cramps: 'Cramps',
+  };
+  return map[key] || key;
+}
+
+function getInsightsExportSelection(): string[] {
+  try {
+    const raw = localStorage.getItem('insights:selected');
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length) return parsed.map((v) => String(v));
+  } catch {
+    // ignore
+  }
+  return ['mood', 'sleep', 'energy'];
+}
+
+function buildInsightsReportHtml(args: { userData: UserData; entries: any[]; selectedMetrics: string[] }) {
+  const { userData, entries, selectedMetrics } = args;
+  const rows = entries
+    .slice()
+    .sort((a, b) => String(a?.dateISO || '').localeCompare(String(b?.dateISO || '')))
+    .map((entry) => {
+      const values = selectedMetrics
+        .map((metric) => {
+          const raw = metric === 'mood' ? entry?.mood : entry?.values?.[metric];
+          return `<td>${raw ?? '–'}</td>`;
+        })
+        .join('');
+      return `<tr><td>${entry?.dateISO || ''}</td>${values}</tr>`;
+    })
+    .join('');
+
+  const metricHeadings = selectedMetrics.map((metric) => `<th>${insightMetricLabel(metric)}</th>`).join('');
+  const metricList = selectedMetrics.map(insightMetricLabel).join(' • ');
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EveryBody insights report</title>
+    <style>
+      body { font-family: Inter, Arial, sans-serif; margin: 0; padding: 24px; color: #1f2937; background: #faf7f5; }
+      .card { background: white; border: 1px solid #eadfd8; border-radius: 20px; padding: 20px; margin-bottom: 16px; box-shadow: 0 10px 24px rgba(0,0,0,0.04); }
+      h1, h2 { margin: 0 0 8px; }
+      p { margin: 6px 0; line-height: 1.5; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+      th, td { border-bottom: 1px solid #eee4de; padding: 10px 8px; text-align: left; }
+      th { background: #f6efeb; }
+      .muted { color: #6b7280; }
+      .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #f4ebe6; margin: 6px 6px 0 0; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>EveryBody insights report</h1>
+      <p class="muted">Generated ${new Date().toLocaleString()}</p>
+      <p>${userData?.name ? `${userData.name}'s` : 'Your'} selected insight metrics: ${metricList}</p>
+      <div>
+        <span class="pill">Entries included: ${entries.length}</span>
+        <span class="pill">Cycle tracking: ${userData?.cycleTrackingMode === 'cycle' ? 'On' : 'Off or flexible'}</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Logged data</h2>
+      <p class="muted">This export is a readable snapshot for you. It is separate from full app backups.</p>
+      <table>
+        <thead>
+          <tr><th>Date</th>${metricHeadings}</tr>
+        </thead>
+        <tbody>
+          ${rows || '<tr><td colspan="99">No entries yet.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>`;
+}
+
 const themes = [
   { id: 'sage' as ColorTheme, name: 'Sage', description: 'Calm and grounding', colors: ['rgb(132, 155, 130)', 'rgb(169, 189, 167)', 'rgb(203, 186, 159)'] },
   { id: 'lavender' as ColorTheme, name: 'Lavender', description: 'Gentle and soothing', colors: ['rgb(156, 136, 177)', 'rgb(190, 175, 207)', 'rgb(217, 186, 203)'] },
@@ -411,6 +506,29 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
         ].join(',');
       });
     downloadTextFile('everybody-data.csv', [header.join(','), ...rows].join('\n'), 'text/csv');
+  };
+
+
+  const exportInsightsReport = () => {
+    const selectedMetrics = getInsightsExportSelection();
+    const html = buildInsightsReportHtml({
+      userData,
+      entries,
+      selectedMetrics,
+    });
+    downloadTextFile(`everybody-insights-report-${isoToday()}.html`, html, 'text/html');
+  };
+
+  const exportInsightsJson = () => {
+    const selectedMetrics = getInsightsExportSelection();
+    const payload = {
+      type: 'everybody-insights-export',
+      version: 2,
+      generatedAtISO: new Date().toISOString(),
+      selectedMetrics,
+      entries: entries.slice().sort((a, b) => String(a?.dateISO || '').localeCompare(String(b?.dateISO || ''))),
+    };
+    downloadTextFile(`everybody-insights-report-${isoToday()}.json`, JSON.stringify(payload, null, 2), 'application/json');
   };
 
   const resetLogsOnly = () => {
@@ -1409,6 +1527,22 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               <Download className="w-4 h-4" />
                               Export CSV
                             </button>
+                            <button
+                              type="button"
+                              onClick={exportInsightsReport}
+                              className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                            >
+                              <Download className="w-4 h-4" />
+                              Download Insights report (.html)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={exportInsightsJson}
+                              className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+                            >
+                              <Download className="w-4 h-4" />
+                              Export Insights data (.json)
+                            </button>
                           </div>
                           {showBackupConfirm ? (
                             <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -1440,6 +1574,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                     <li>Your cycle and rhythm settings (including manual cycle start)</li>
                                     <li>Insights settings (selected metrics and phase options)</li>
                                     <li>Chat history and preferences (if you have used chat)</li>
+                                    <li>Experiments, past experiment history, and dismissed experiment prompts</li>
                                   </ul>
                                 </div>
 
@@ -1459,7 +1594,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 						  <div className="mt-2 text-sm opacity-80">
 							<p>
 							  <strong>Backups</strong> restore your full app data (check-ins, settings and anything else stored on this device).
-							  Insights exports are separate and can’t be restored here.
+							  Insights exports are separate and can’t be restored here. You can download them anytime from this Privacy & Security section.
 							</p>
 
 							<div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">

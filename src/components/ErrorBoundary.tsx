@@ -29,7 +29,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             <div className="eb-card">
               <div className="text-lg font-semibold">Something went wrong</div>
               <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
-                Try closing and reopening the app. If this keeps happening, exporting your data (Insights page) can help you keep a backup while we fix it.
+                Try closing and reopening the app. If this keeps happening, creating a backup or exporting insights from Profile → Privacy & Security can help you keep a copy while we fix it.
               </p>
               <button
                 type="button"
