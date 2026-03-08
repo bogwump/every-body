@@ -1636,11 +1636,25 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
   };
 
+  useEffect(() => {
+    if (!experiment || typeof (experiment as any)?.id !== 'string') return;
+    const ex = experiment as ExperimentPlan;
+    const completedAtISO = (ex as any)?.outcome?.completedAtISO;
+    if (!completedAtISO) return;
+    const alreadySaved = Array.isArray(experimentHistory) && experimentHistory.some((item: any) => String(item?.experimentId || '') === String(ex.id));
+    if (alreadySaved) return;
+    const status = (((ex as any)?.outcome?.status as any) || 'stopped') as 'helped' | 'notReally' | 'abandoned' | 'stopped';
+    recordExperimentToHistory(ex, status);
+  }, [experiment, experimentHistory]);
+
+
 const confirmFinishExperiment = () => {
     if (!experiment || !finishExperimentConfirm) return;
     const ex = experiment as ExperimentPlan;
     const outcome = finishExperimentConfirm.outcome;
     const rating = outcome === 'helped' ? 5 : outcome === 'notReally' ? 2 : undefined;
+    const completedAtISO = new Date().toISOString();
+    const digest = buildExperimentDigest(experimentComparison);
 
     const next: ExperimentPlan = {
       ...ex,
@@ -1651,14 +1665,14 @@ const confirmFinishExperiment = () => {
         ...(ex.outcome ?? {}),
         status: outcome as any,
         rating: rating as any,
-        completedAtISO: new Date().toISOString(),
+        completedAtISO,
         note: outcomeNote.trim() ? outcomeNote.trim() : undefined,
-        digest: buildExperimentDigest(experimentComparison),
+        digest,
       } as any,
     };
 
-    setExperiment(next);
     recordExperimentToHistory(next, outcome);
+    setExperiment(next);
 
     setFinishExperimentConfirm(null);
     setOutcomeNote('');

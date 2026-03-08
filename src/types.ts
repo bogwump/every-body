@@ -222,8 +222,11 @@ export interface ExperimentPlan {
     note?: string;
     /** When the user completed the experiment */
     completedAtISO?: string;
+    /** Saved comparison snapshot for later review */
+    digest?: any;
   };
 }
+
 
 
 export type ExperimentOutcomeStatus = 'helped' | 'notReally' | 'abandoned' | 'stopped';
@@ -243,6 +246,8 @@ export interface ExperimentHistoryItem {
     completedAtISO: string; // ISO datetime
     rating?: 1 | 2 | 3 | 4 | 5;
     note?: string;
+    digest?: any;
   };
 }
+
 

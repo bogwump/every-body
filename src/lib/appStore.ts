@@ -20,6 +20,7 @@ export const BACKUP_KEYS = [
   "insights:phaseMetrics",
   "eb_sleep_overlay",
   "eb_checkin_dismissed_date",
+  "eb_dismissed_experiment_prompts_v1",
 ] as const;
 
 export type BackupPayload = Partial<Record<(typeof BACKUP_KEYS)[number], string | null>>;
@@ -214,6 +215,80 @@ function normaliseChat(value: unknown): ChatMessage[] {
   return [];
 }
 
+function normaliseExperiment(value: unknown): any | null {
+  if (!value || typeof value !== "object") return null;
+  const ex = value as any;
+  const id = typeof ex.id === "string" && ex.id.trim() ? ex.id.trim() : null;
+  if (!id) return null;
+  return {
+    ...ex,
+    id,
+    title: typeof ex.title === "string" && ex.title.trim() ? ex.title.trim() : "Your experiment",
+    startDateISO: typeof ex.startDateISO === "string" ? ex.startDateISO : "",
+    durationDays: Number.isFinite(Number(ex.durationDays)) ? Math.max(1, Number(ex.durationDays)) : 3,
+    metrics: Array.isArray(ex.metrics) ? ex.metrics.filter((k: any) => typeof k === "string") : [],
+    steps: Array.isArray(ex.steps) ? ex.steps.filter((x: any) => typeof x === "string") : [],
+    note: typeof ex.note === "string" ? ex.note : "",
+    changeKey: typeof ex.changeKey === "string" && ex.changeKey ? ex.changeKey : undefined,
+    kind: ex.kind === "track" ? "track" : "change",
+    outcome: ex.outcome && typeof ex.outcome === "object" ? {
+      ...(ex.outcome as any),
+      status: typeof (ex.outcome as any).status === "string" ? (ex.outcome as any).status : undefined,
+      completedAtISO: typeof (ex.outcome as any).completedAtISO === "string" ? (ex.outcome as any).completedAtISO : undefined,
+      note: typeof (ex.outcome as any).note === "string" ? (ex.outcome as any).note : undefined,
+      rating: Number.isFinite(Number((ex.outcome as any).rating)) ? Number((ex.outcome as any).rating) : undefined,
+      digest: (ex.outcome as any).digest,
+    } : undefined,
+  };
+}
+
+function normaliseHistoryItem(value: unknown): any | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as any;
+  const experimentId = typeof item.experimentId === "string" && item.experimentId.trim()
+    ? item.experimentId.trim()
+    : (typeof item.id === "string" && item.id.trim() ? item.id.trim() : "");
+  if (!experimentId) return null;
+  const outcomeRaw = item.outcome && typeof item.outcome === "object" ? item.outcome as any : {};
+  const completedAtISO = typeof outcomeRaw.completedAtISO === "string" && outcomeRaw.completedAtISO
+    ? outcomeRaw.completedAtISO
+    : (typeof item.completedAtISO === "string" ? item.completedAtISO : "");
+  return {
+    experimentId,
+    title: typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Past experiment",
+    kind: item.kind === "track" ? "track" : "change",
+    startDateISO: typeof item.startDateISO === "string" ? item.startDateISO : "",
+    durationDays: Number.isFinite(Number(item.durationDays)) ? Math.max(1, Number(item.durationDays)) : 3,
+    metrics: Array.isArray(item.metrics) ? item.metrics.filter((k: any) => typeof k === "string") : [],
+    changeKey: typeof item.changeKey === "string" && item.changeKey ? item.changeKey : undefined,
+    outcome: {
+      status: typeof outcomeRaw.status === "string" ? outcomeRaw.status : "stopped",
+      completedAtISO,
+      rating: Number.isFinite(Number(outcomeRaw.rating)) ? Number(outcomeRaw.rating) : undefined,
+      note: typeof outcomeRaw.note === "string" ? outcomeRaw.note : undefined,
+      digest: outcomeRaw.digest,
+    },
+  };
+}
+
+function normaliseExperimentHistory(value: unknown): any[] {
+  const source = Array.isArray(value)
+    ? value
+    : (value && typeof value === "object" && Array.isArray((value as any).history) ? (value as any).history : []);
+  const out: any[] = [];
+  const seen = new Set<string>();
+  for (const rawItem of source) {
+    const item = normaliseHistoryItem(rawItem);
+    if (!item) continue;
+    const key = item.experimentId;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  out.sort((a, b) => String(b?.outcome?.completedAtISO || b?.startDateISO || "").localeCompare(String(a?.outcome?.completedAtISO || a?.startDateISO || "")));
+  return out;
+}
+
 // ---- Cross-tab updates ----
 window.addEventListener("storage", (e) => {
   if (!e.key) return;
@@ -312,10 +387,10 @@ export function useExperiment() {
     () => null
   );
 
-  const experiment = (raw && typeof raw === 'object') ? (raw as any) : null;
+  const experiment = normaliseExperiment(raw);
 
   const setExperiment = (next: any) => {
-    writeCached(EXPERIMENT_KEY, next);
+    writeCached(EXPERIMENT_KEY, next ? normaliseExperiment(next) : null);
   };
 
   const clearExperiment = () => {
@@ -334,24 +409,22 @@ export function useExperimentHistory() {
     () => []
   );
 
-  const history = Array.isArray(raw) ? (raw as any[]) : [];
+  const history = normaliseExperimentHistory(raw);
 
   const setHistory = (next: any[]) => {
-    writeCached(EXPERIMENT_HISTORY_KEY, Array.isArray(next) ? next : []);
+    writeCached(EXPERIMENT_HISTORY_KEY, normaliseExperimentHistory(next));
   };
 
   const upsertHistoryItem = (item: any) => {
-    if (!item || typeof item !== 'object') return;
-    const id = (item as any).experimentId;
-    if (!id) return;
+    const normalised = normaliseHistoryItem(item);
+    if (!normalised) return;
     const next = [...history];
-    const idx = next.findIndex((h) => (h as any)?.experimentId === id);
+    const idx = next.findIndex((h) => (h as any)?.experimentId === normalised.experimentId);
     if (idx >= 0) {
-      next[idx] = { ...(next[idx] as any), ...(item as any) };
+      next[idx] = { ...(next[idx] as any), ...normalised, outcome: { ...((next[idx] as any)?.outcome || {}), ...(normalised.outcome || {}) } };
     } else {
-      next.unshift(item);
+      next.unshift(normalised);
     }
-    // Keep it reasonably small
     setHistory(next.slice(0, 200));
   };
 
