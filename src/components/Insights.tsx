@@ -1646,6 +1646,7 @@ const confirmFinishExperiment = () => {
     recordExperimentToHistory(next, outcome);
 
     setFinishExperimentConfirm(null);
+    setOutcomeNote('');
   };
 
   const confirmReplaceExperiment = () => {
@@ -2440,6 +2441,18 @@ const tryNextPrompts = useMemo(() => {
 
     const ex = experimentStatus.ex as ExperimentPlan;
     const done = Boolean((ex as any)?.outcome?.completedAtISO) || Boolean(experimentStatus.done);
+    const savedOutcome = ((ex as any)?.outcome?.status ?? null) as null | 'helped' | 'notReally' | 'abandoned' | 'stopped';
+    const savedOutcomeLabel =
+      savedOutcome === 'helped'
+        ? 'Yes, it helped'
+        : savedOutcome === 'notReally'
+          ? 'Not really'
+          : savedOutcome === 'abandoned'
+            ? 'I didn’t manage to run it'
+            : savedOutcome === 'stopped'
+              ? 'Stopped early'
+              : null;
+    const savedOutcomeNote = typeof (ex as any)?.outcome?.note === 'string' ? String((ex as any).outcome.note) : '';
     const started = Boolean(ex.startDateISO && ex.startDateISO <= todayISO);
 
     const metricPills = (ex.metrics ?? []).slice(0, 6).map((k) => (
@@ -2490,30 +2503,39 @@ const tryNextPrompts = useMemo(() => {
         {/* Comparison / progress block */}
         {done ? renderExperimentComparisonBlock('conclusion') : renderExperimentComparisonBlock('progress')}
 
-        {/* Outcome actions (shown once the experiment is done) */}
+        {/* Outcome actions / saved outcome */}
         {done ? (
-          <div className="mt-4">
-            <div className="text-sm font-semibold">How did it go?</div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" className="eb-btn eb-btn-primary" onClick={() => markExperimentOutcome('helped')}>
-                Yes, it helped
-              </button>
-              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => markExperimentOutcome('notReally')}>
-                Not really
-              </button>
-              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => markExperimentOutcome('abandoned')}>
-                I didn’t manage to run it
-              </button>
+          savedOutcome ? (
+            <div className="mt-4">
+              <div className="text-sm font-semibold">How it went</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>{savedOutcomeLabel}</span>
+              </div>
+              {savedOutcomeNote ? (
+                <>
+                  <div className="mt-3 text-sm eb-muted">Saved note:</div>
+                  <div className="mt-2 rounded-2xl border border-black/8 bg-white p-4 text-sm whitespace-pre-wrap">
+                    {savedOutcomeNote}
+                  </div>
+                </>
+              ) : null}
             </div>
-            <div className="mt-3 text-sm eb-muted">Optional note (you can edit this any time):</div>
-            <textarea
-              className="eb-input mt-2"
-              rows={3}
-              value={outcomeNote}
-              onChange={(e) => setOutcomeNote(e.target.value)}
-              placeholder="Anything you want to remember about this experiment"
-            />
-          </div>
+          ) : (
+            <div className="mt-4">
+              <div className="text-sm font-semibold">How did it go?</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className="eb-btn eb-btn-primary" onClick={() => markExperimentOutcome('helped')}>
+                  Yes, it helped
+                </button>
+                <button type="button" className="eb-btn eb-btn-secondary" onClick={() => markExperimentOutcome('notReally')}>
+                  Not really
+                </button>
+                <button type="button" className="eb-btn eb-btn-secondary" onClick={() => markExperimentOutcome('abandoned')}>
+                  I didn’t manage to run it
+                </button>
+              </div>
+            </div>
+          )
         ) : null}
       </div>
     );
@@ -2570,9 +2592,13 @@ const tryNextPrompts = useMemo(() => {
 
     // Choose which baseline is currently shown
     const cmp = experimentCompareMode === 'usual' && hasUsual ? (usual as any) : (quick as any);
-if (!cmp) return null;
+    if (!cmp) return null;
 
     const title = mode === 'progress' ? 'So far' : 'Before vs during';
+    const metricsWithAnyData = Array.isArray(cmp.metrics)
+      ? cmp.metrics.filter((m: any) => (Number(m?.before?.count ?? 0) > 0) || (Number(m?.during?.count ?? 0) > 0))
+      : [];
+    const canShowConclusionSummary = mode === 'conclusion' && metricsWithAnyData.length > 0;
 
     const compareLabel =
       experimentCompareMode === 'usual' && hasUsual
@@ -2590,8 +2616,8 @@ if (!cmp) return null;
 
     if (!cmp.metrics.length) return null;
 
-    // If there isn't enough data, we still show a gentle coverage hint.
-    if (!cmp.enoughData) {
+    // If there isn't enough data, still show a conclusion summary once the experiment is finished.
+    if (!cmp.enoughData && !canShowConclusionSummary) {
       return (
         <div className="mt-4 eb-inset rounded-2xl p-4">
           <div className="text-sm font-semibold">{title}</div>
@@ -2644,6 +2670,12 @@ if (!cmp) return null;
     };
 
     const visibleMetrics = showAllExperimentMetrics ? cmp.metrics : cmp.metrics.slice(0, 3);
+    const confidenceText =
+      cmp.duringDaysWithAny < 3
+        ? `Low confidence (only ${cmp.duringDaysWithAny} day(s) logged so far)`
+        : cmp.duringDaysWithAny < 5
+          ? `Medium confidence (only ${cmp.duringDaysWithAny} day(s) logged so far)`
+          : 'Confidence improves as you log more days.';
 
     return (
       <div className="mt-4 eb-inset rounded-2xl p-4">
@@ -2683,32 +2715,72 @@ if (!cmp) return null;
           <span className="text-xs eb-muted">{compareLabel}</span>
         </div>
         <div className="mt-2 text-xs eb-muted">
-          {cmp.duringDaysWithAny < 3
-            ? `Low confidence (only ${cmp.duringDaysWithAny} day(s) logged so far)`
-            : cmp.duringDaysWithAny < 5
-              ? `Medium confidence (only ${cmp.duringDaysWithAny} day(s) logged so far)`
-              : 'Confidence improves as you log more days.'}
+          {canShowConclusionSummary && !cmp.enoughData
+            ? `A light read only. ${confidenceText}`
+            : confidenceText}
         </div>
 
         <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-          {visibleMetrics.slice(0, 5).map((m) => (
+          {visibleMetrics.slice(0, 5).map((m) => {
+            const hasAnyData = Number(m.before.count) > 0 || Number(m.during.count) > 0;
+            const hasComparableData = (Number(m.before.count) > 0 && Number(m.during.count) > 0);
+            const beforeValue = typeof m.before.avg === 'number' ? Math.max(0, Math.min(10, m.before.avg)) : null;
+            const duringValue = typeof m.during.avg === 'number' ? Math.max(0, Math.min(10, m.during.avg)) : null;
+            return (
             <div key={String(m.key)} className="rounded-2xl border border-black/5 bg-white p-4">
               <div className="text-sm font-semibold">{labelFor(m.key as any, userData)}</div>
-              {m.hasEnoughData ? (
+              {hasComparableData ? (
                 <>
                   <div className="mt-2 text-sm eb-muted">
                     Before: <b>{fmt(m.before.avg)}</b>/10 · During: <b>{fmt(m.during.avg)}</b>/10
                   </div>
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] eb-muted"><span>Before</span><span>{fmt(m.before.avg)}/10</span></div>
+                      <div className="mt-1 h-2 rounded-full bg-black/6 overflow-hidden">
+                        <div className="h-full rounded-full bg-black/20" style={{ width: `${((beforeValue ?? 0) / 10) * 100}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] eb-muted"><span>During</span><span>{fmt(m.during.avg)}/10</span></div>
+                      <div className="mt-1 h-2 rounded-full bg-black/6 overflow-hidden">
+                        <div className="h-full rounded-full bg-[rgb(var(--color-primary))]" style={{ width: `${((duringValue ?? 0) / 10) * 100}%` }} />
+                      </div>
+                    </div>
+                  </div>
 
                   {m.delta != null ? (
-                    <div className="mt-1 text-xs eb-muted">
+                    <div className="mt-2 text-xs eb-muted">
                       {Math.abs(m.delta) < 0.4
-                        ? 'So far, this looks steady.'
+                        ? 'This stayed fairly steady across the experiment.'
                         : m.delta > 0
-                          ? 'So far, it is trending a bit higher.'
-                          : 'So far, it is trending a bit lower.'}
+                          ? `During was ${fmtDelta(m.delta)} points higher.`
+                          : `During was ${fmtDelta(m.delta)} points lower.`}
                     </div>
                   ) : null}
+                  <div className="mt-2 text-xs eb-muted">
+                    Data: {m.before.count} baseline points · {m.during.count} during points
+                  </div>
+                </>
+              ) : hasAnyData ? (
+                <>
+                  <div className="mt-2 text-sm eb-muted">
+                    We only caught a light read for this one, so treat it as directional rather than firm.
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] eb-muted"><span>Before</span><span>{fmt(m.before.avg)}/10</span></div>
+                      <div className="mt-1 h-2 rounded-full bg-black/6 overflow-hidden">
+                        <div className="h-full rounded-full bg-black/20" style={{ width: `${((beforeValue ?? 0) / 10) * 100}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] eb-muted"><span>During</span><span>{fmt(m.during.avg)}/10</span></div>
+                      <div className="mt-1 h-2 rounded-full bg-black/6 overflow-hidden">
+                        <div className="h-full rounded-full bg-[rgb(var(--color-primary))]" style={{ width: `${((duringValue ?? 0) / 10) * 100}%` }} />
+                      </div>
+                    </div>
+                  </div>
                   <div className="mt-2 text-xs eb-muted">
                     Data: {m.before.count} baseline points · {m.during.count} during points
                   </div>
@@ -2724,7 +2796,7 @@ if (!cmp) return null;
                 </>
               )}
             </div>
-          ))}
+          );})}
         </div>
 
         {cmp.metrics.length > 3 && (
