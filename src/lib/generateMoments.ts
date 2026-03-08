@@ -3,7 +3,7 @@ import { isoTodayLocal } from './date';
 import type { InsightSignal } from './insightEngine';
 import { getDiscoveredPatterns, getTopInsights } from './insightEngine';
 import { createMoment, getActiveMoments, getCompanionMoments, getHighestPriorityMoment } from './companionMoments';
-import { generateExperimentSuggestions, rankExperimentSuggestions } from './experimentSuggestions';
+import { generateExperimentSuggestions, getExperimentForSignal, rankExperimentSuggestions } from './experimentSuggestions';
 import { detectLongCycle, detectShortCycle, detectUnusualPhaseLength } from './rhythmDiagnostics';
 import { phaseLabelFromKey } from './phaseChange';
 
@@ -77,6 +77,12 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
         data: {
           title: 'Experiment result ready',
           body: 'Your latest experiment now has enough data to look back on.',
+          experimentId: String(latestCompleted?.experimentId || ''),
+          experimentName: String(latestCompleted?.title || 'Your experiment'),
+          experimentDescription: 'Open Insights to review how this one felt.',
+          metrics: Array.isArray(latestCompleted?.metrics) ? latestCompleted.metrics : [],
+          durationDays: typeof latestCompleted?.durationDays === 'number' ? latestCompleted.durationDays : 3,
+          changeKey: typeof latestCompleted?.changeKey === 'string' ? latestCompleted.changeKey : undefined,
         },
       });
       return;
@@ -109,6 +115,8 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
   const strongestSignal = getTopInsights(entries, userData, 6).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low');
   const topSuggestion = rankExperimentSuggestions(generateExperimentSuggestions(strongestSignal))[0] ?? null;
   if (topSuggestion && !active.some((moment) => moment.type === 'experiment_suggestion')) {
+    const sourceSignal = strongestSignal.find((signal) => `experiment:${signal.id}` === topSuggestion.id) ?? null;
+    const linkedExperiment = sourceSignal ? getExperimentForSignal(sourceSignal) : null;
     createMoment({
       id: `experiment:${topSuggestion.id}`,
       type: 'experiment_suggestion',
@@ -116,6 +124,13 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
       data: {
         title: topSuggestion.title,
         body: topSuggestion.note,
+        signalId: sourceSignal?.id,
+        experimentId: linkedExperiment?.experimentId ?? topSuggestion.experimentId,
+        experimentName: linkedExperiment?.experimentName ?? topSuggestion.experimentName,
+        experimentDescription: linkedExperiment?.experimentDescription ?? topSuggestion.experimentDescription,
+        metrics: linkedExperiment?.metrics ?? topSuggestion.metrics,
+        durationDays: linkedExperiment?.durationDays ?? topSuggestion.durationDays,
+        changeKey: linkedExperiment?.changeKey ?? topSuggestion.changeKey,
       },
     });
     return;

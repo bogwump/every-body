@@ -35,6 +35,7 @@ import { getSupportSuggestion } from '../lib/patternSupport';
 import { getExperimentForSignal } from '../lib/experimentSuggestions';
 import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, saveAction } from '../lib/savedActions';
 import { recordExperimentOutcome } from '../lib/experimentOutcomes';
+import { consumePendingExperimentLaunch, inferPendingExperimentLaunchFromText } from '../lib/experimentLaunch';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
@@ -1570,6 +1571,81 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const companionMomentHistory = useMemo(() => getMomentHistory(6), [entriesAllSorted.length]);
 
+  const openPrefilledExperiment = (payload: {
+    experimentId: string;
+    experimentName: string;
+    experimentDescription: string;
+    metrics?: string[];
+    durationDays?: number;
+    changeKey?: string;
+  }) => {
+    const nextMetrics = (Array.isArray(payload.metrics) ? payload.metrics : []).slice(0, 5) as MetricKey[];
+    const nextPlan = {
+      title: payload.experimentName,
+      steps: [
+        'Try one small version of this for the next few days.',
+        'Keep the rest of your routine as steady as you can.',
+        'Log the same measures each day, then look back at the shift.',
+      ],
+      note: payload.experimentDescription,
+    };
+
+    if (experimentStatus && !experimentStatus.done) {
+      setPreOpenExperimentConfirm({
+        type: 'suggested',
+        metrics: nextMetrics,
+        plan: nextPlan,
+        durationDays: payload.durationDays ?? 3,
+        changeKey: payload.changeKey || '',
+      });
+      scrollToInsightsSection('eb-experiments');
+      return;
+    }
+
+    setExperimentPlan(nextPlan);
+    setExperimentMetrics(nextMetrics);
+    setExperimentDurationDays(payload.durationDays ?? 3);
+    setIsCustomExperiment(false);
+    setExperimentChangeKey(payload.changeKey || '');
+    setExperimentOpen(true);
+    removeSavedAction(payload.experimentId, 'dismissed');
+    refreshSavedActions();
+    try {
+      window.setTimeout(() => scrollToInsightsSection('eb-experiments'), 80);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCompanionMomentSelect = (moment: any) => {
+    const data = moment?.data ?? {};
+    if (moment?.type === 'experiment_suggestion') {
+      const inferred = inferPendingExperimentLaunchFromText(
+        typeof data.title === 'string' ? data.title : undefined,
+        typeof data.body === 'string' ? data.body : undefined,
+      );
+      if ((typeof data.experimentId === 'string' && typeof data.experimentName === 'string') || inferred) {
+        openPrefilledExperiment({
+          experimentId: typeof data.experimentId === 'string' ? data.experimentId : String(inferred?.experimentId || 'suggested_experiment'),
+          experimentName: typeof data.experimentName === 'string' ? data.experimentName : String(inferred?.experimentName || 'Suggested experiment'),
+          experimentDescription: typeof data.experimentDescription === 'string'
+            ? data.experimentDescription
+            : String(inferred?.experimentDescription || (typeof data.body === 'string' ? data.body : 'A short experiment can help you test this gently.')),
+          metrics: Array.isArray(data.metrics)
+            ? data.metrics.map((item: unknown) => String(item))
+            : (inferred?.metrics || []),
+          durationDays: typeof data.durationDays === 'number' ? data.durationDays : (inferred?.durationDays ?? 3),
+          changeKey: typeof data.changeKey === 'string' ? data.changeKey : inferred?.changeKey,
+        });
+        return;
+      }
+    }
+
+    if (moment?.type === 'experiment_result_ready') {
+      scrollToInsightsSection('eb-experiments');
+    }
+  };
+
   const scrollToInsightsSection = (id: string) => {
     try {
       const el = document.getElementById(id);
@@ -1931,6 +2007,12 @@ const confirmFinishExperiment = () => {
       endISO,
     };
   }, [experimentStatus, entriesAllSorted]);
+
+  useEffect(() => {
+    const pending = consumePendingExperimentLaunch();
+    if (!pending) return;
+    openPrefilledExperiment(pending);
+  }, []);
 
   const experimentComparison = useMemo(() => {
     if (!experimentStatus) return null;
@@ -3094,22 +3176,14 @@ const tryNextPrompts = useMemo(() => {
   const startSignalExperiment = (experimentId: string) => {
     const action = tryNextActions.find((item) => item.id === experimentId);
     if (!action) return;
-    setExperimentPlan({
-      title: action.experiment.experimentName,
-      steps: [
-        'Try one small version of this for the next few days.',
-        'Keep the rest of your routine as steady as you can.',
-        'Log the same measures each day, then look back at the shift.',
-      ],
-      note: action.experiment.experimentDescription,
+    openPrefilledExperiment({
+      experimentId,
+      experimentName: action.experiment.experimentName,
+      experimentDescription: action.experiment.experimentDescription,
+      metrics: action.experiment.metrics,
+      durationDays: action.experiment.durationDays,
+      changeKey: action.experiment.changeKey,
     });
-    setExperimentMetrics((action.experiment.metrics || []).slice(0, 5) as MetricKey[]);
-    setExperimentDurationDays(action.experiment.durationDays ?? 3);
-    setIsCustomExperiment(false);
-    setExperimentChangeKey(action.experiment.changeKey || '');
-    setExperimentOpen(true);
-    removeSavedAction(experimentId, 'dismissed');
-    refreshSavedActions();
   };
 
   const saveSignalExperiment = (experimentId: string) => {
@@ -3242,7 +3316,7 @@ const tryNextPrompts = useMemo(() => {
         </div>
       </div>
 
-      <CompanionMomentHistory moments={companionMomentHistory} />
+      <CompanionMomentHistory moments={companionMomentHistory} onSelectMoment={handleCompanionMomentSelect} />
 
       {/* Highlights + Top findings carousel */}
       <div id="eb-full-insights" className="eb-card">

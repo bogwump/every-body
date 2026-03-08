@@ -39,7 +39,7 @@ function lineForMoment(moment: CompanionMoment): string {
   }
 }
 
-export function CompanionMomentHistory(props: { moments: CompanionMoment[] }) {
+export function CompanionMomentHistory(props: { moments: CompanionMoment[]; onSelectMoment?: (moment: CompanionMoment) => void }) {
   if (!props.moments.length) return null;
 
   return (
@@ -51,17 +51,26 @@ export function CompanionMomentHistory(props: { moments: CompanionMoment[] }) {
         </div>
       </div>
       <div className="space-y-3">
-        {props.moments.map((moment) => (
-          <div key={moment.id} className="flex items-start gap-3 rounded-2xl border border-[rgba(0,0,0,0.06)] bg-[rgba(255,255,255,0.6)] p-3">
+        {props.moments.map((moment) => {
+          const clickable = Boolean(props.onSelectMoment) && (moment.type === 'experiment_suggestion' || moment.type === 'experiment_result_ready');
+          return (
+          <button
+            key={moment.id}
+            type="button"
+            onClick={() => clickable ? props.onSelectMoment?.(moment) : undefined}
+            className={`w-full text-left flex items-start gap-3 rounded-2xl border border-[rgba(0,0,0,0.06)] bg-[rgba(255,255,255,0.6)] p-3 ${clickable ? 'hover:bg-white transition-colors cursor-pointer' : ''}`}
+            disabled={!clickable}
+          >
             <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-accent)/0.18)] text-[rgb(var(--color-primary))]">
               {iconForType(moment.type)}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-[rgb(var(--color-text))]">{lineForMoment(moment)}</div>
               <div className="mt-0.5 text-xs text-[rgb(var(--color-text-secondary))]">{moment.date}</div>
+              {clickable ? <div className="mt-2 text-xs font-medium text-[rgb(var(--color-primary))]">Tap to open</div> : null}
             </div>
-          </div>
-        ))}
+          </button>
+        );})}
       </div>
     </div>
   );

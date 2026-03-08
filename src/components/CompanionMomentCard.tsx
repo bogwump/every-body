@@ -2,6 +2,7 @@ import React from 'react';
 import { Activity, FlaskConical, RefreshCw, Sparkles, Star, X } from 'lucide-react';
 import type { CompanionMoment } from '../lib/companionMoments';
 import { dismissMoment } from '../lib/companionMoments';
+import { inferPendingExperimentLaunchFromText, queuePendingExperimentLaunch } from '../lib/experimentLaunch';
 import { phaseLabelFromKey } from '../lib/phaseChange';
 
 function iconForType(type: CompanionMoment['type']) {
@@ -88,6 +89,36 @@ function copyForMoment(moment: CompanionMoment): { eyebrow?: string; title: stri
 export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate: (screen: string) => void; onDismiss?: () => void }) {
   const copy = copyForMoment(props.moment);
 
+  const handlePrimaryAction = () => {
+    const data = props.moment.data ?? {};
+    if (props.moment.type === 'experiment_suggestion') {
+      const inferred = inferPendingExperimentLaunchFromText(
+        typeof data.title === 'string' ? data.title : copy.title,
+        typeof data.body === 'string' ? data.body : copy.body,
+      );
+      const payload = (typeof data.experimentId === 'string' && typeof data.experimentName === 'string')
+        ? {
+            experimentId: data.experimentId,
+            experimentName: data.experimentName,
+            experimentDescription: typeof data.experimentDescription === 'string' ? data.experimentDescription : copy.body,
+            metrics: Array.isArray(data.metrics) ? data.metrics.map((item) => String(item)) : [],
+            durationDays: typeof data.durationDays === 'number' ? data.durationDays : 3,
+            changeKey: typeof data.changeKey === 'string' ? data.changeKey : undefined,
+            signalId: typeof data.signalId === 'string' ? data.signalId : undefined,
+            source: 'companion' as const,
+          }
+        : (inferred ? { ...inferred, source: 'companion' as const } : null);
+
+      if (payload) {
+        queuePendingExperimentLaunch(payload);
+        props.onNavigate('insights');
+        return;
+      }
+    }
+
+    props.onNavigate(copy.screen);
+  };
+
   return (
     <div className="eb-card mb-6">
       <div className="flex items-start gap-4">
@@ -99,7 +130,7 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
           <h3 className="mt-1 mb-1">{copy.title}</h3>
           <p className="text-sm text-[rgba(0,0,0,0.68)]">{copy.body}</p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" className="eb-btn-primary" onClick={() => props.onNavigate(copy.screen)}>{copy.button}</button>
+            <button type="button" className="eb-btn-primary" onClick={handlePrimaryAction}>{copy.button}</button>
             <button
               type="button"
               className="eb-btn-secondary inline-flex items-center gap-2"
