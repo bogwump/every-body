@@ -182,7 +182,9 @@ export function getRhythmSupportNudge(args: {
 }): string {
   const signalMetric = args.strongestSignal?.metrics?.[0];
   if (signalMetric) {
-    return metricSupportPhrase(signalMetric, args.userData);
+    const phrase = metricSupportPhrase(signalMetric, args.userData);
+    if (phrase === 'Give yourself a little more breathing room today, if you can.') return 'Give yourself a little more breathing room today, if you can.';
+    return phrase;
   }
 
   const phaseFallback: Record<RhythmPhaseKey, string> = {

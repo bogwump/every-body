@@ -152,6 +152,33 @@ const phaseContent: Record<PhaseKey, PhaseContent> = {
   },
 };
 
+
+function getNextPhasePlanningCopy(nextPhaseKey: PhaseKey): { title: string; body: string } {
+  switch (nextPhaseKey) {
+    case 'rebuilding':
+      return {
+        title: 'Leave room for a gentle lift',
+        body: 'Energy often starts to rebuild soon. Keeping one small, easy win ready can help you ease into it.',
+      };
+    case 'expressive':
+      return {
+        title: 'Plan for a little more spark',
+        body: 'You may feel more outward soon. If you have something social, collaborative or creative to do, this can be a lovely lead-in window.',
+      };
+    case 'protective':
+      return {
+        title: 'Keep a little softness in the diary',
+        body: 'A quieter stretch may be coming next. Lighter evenings and a bit of breathing room can make that shift feel easier.',
+      };
+    case 'reset':
+    default:
+      return {
+        title: 'Keep comfort close',
+        body: 'A more inward phase may be approaching. Warmth, simpler plans and a gentler pace can help you land more softly there.',
+      };
+  }
+}
+
 const gentleReminders: Record<PhaseKey, string[]> = {
   reset: [
     'Rest is productive here. Your body is resetting.',
@@ -528,6 +555,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
   // Phase key for reminders (kept simple for v1; can be wired to your phase engine later)
   const phaseKey: PhaseKey = computed.phaseKey;
   const content = phaseContent[phaseKey] ?? phaseContent.protective;
+  const nextPhasePlanning = getNextPhasePlanningCopy(computed.nextPhaseKey);
   const softMeta = softPhaseMeta(phaseKey);
 
   function IconBadge({ icon }: { icon: React.ReactNode }) {
@@ -737,8 +765,8 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
           </p>
 
               <div className="eb-inset rounded-xl p-4 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
-                <div className="text-base font-medium text-neutral-800">{content.nextPlanTitle}</div>
-                <div className="mt-1 text-base text-neutral-800 font-normal">{content.nextPlanBody}</div>
+                <div className="text-base font-medium text-neutral-800">{nextPhasePlanning.title}</div>
+                <div className="mt-1 text-base text-neutral-800 font-normal">{nextPhasePlanning.body}</div>
               </div>
             </div>
           </div>

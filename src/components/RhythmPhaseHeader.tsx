@@ -27,10 +27,10 @@ export function RhythmPhaseHeader(props: {
         ) : null}
         <div className="mt-3">
           <div className="mb-1 text-[11px] uppercase tracking-[0.18em] text-white/65">Phase progress</div>
-          <div className="h-2 rounded-full bg-white/20 overflow-hidden">
+          <div className="h-2 rounded-full bg-white/28 overflow-hidden border border-white/10">
             <div
-              className="h-full rounded-full bg-[rgb(var(--color-primary-dark))] transition-all duration-500"
-              style={{ width: `${Math.max(8, Math.min(100, props.progressPercent ?? 36))}%` }}
+              className="h-full rounded-full bg-[rgb(var(--color-accent))] transition-all duration-500"
+              style={{ width: `${Math.max(8, Math.min(100, props.progressPercent ?? 36))}%`, boxShadow: '0 0 0 1px rgba(255,255,255,0.12) inset' }}
             />
           </div>
         </div>
