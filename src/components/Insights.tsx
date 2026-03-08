@@ -26,6 +26,7 @@ import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
 import { isMetricInScope } from '../lib/insightsScope';
+import { type InsightSignal, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
 import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
@@ -1382,309 +1383,127 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   type HeroInsightItem = {
     id: string;
-    kind: 'pattern' | 'discovery' | 'progress';
     text: string;
-    score: number;
-    metric?: MetricKey;
-    metrics?: MetricKey[];
+    confidence: 'low' | 'medium' | 'high';
+    isNewPattern: boolean;
   };
 
-  const heroInsightState = useMemo(() => {
-    const phasePriorities: Record<string, string[]> = {
-      Menstrual: ['pain', 'cramps', 'fatigue', 'sleep', 'flow', 'energy'],
-      Follicular: ['energy', 'mood', 'focus', 'fatigue'],
-      Ovulatory: ['energy', 'mood', 'libido', 'sleep'],
-      Luteal: ['sleep', 'stress', 'irritability', 'appetite', 'breastTenderness', 'nightSweats', 'energy'],
+  const confidenceLabel = (confidence: 'low' | 'medium' | 'high') =>
+    confidence === 'high' ? 'High confidence' : confidence === 'medium' ? 'Medium confidence' : 'Low confidence';
+
+  const copyForInsightSignal = (signal: InsightSignal): string => {
+    const labels = metricLabelsForSignal(signal, userData);
+    const primary = labels[0] ?? 'This pattern';
+    const secondary = labels[1] ?? 'another metric';
+    const phaseName = signal.phase ? String(signal.phase).toLowerCase() : null;
+    const dayMap: Record<string, string> = {
+      Mon: 'on Mondays',
+      Tue: 'on Tuesdays',
+      Wed: 'mid-week',
+      Thu: 'later in the week',
+      Fri: 'towards the weekend',
+      Sat: 'at weekends',
+      Sun: 'on Sundays',
     };
 
-    const candidateMetrics: MetricKey[] = Array.from(new Set<MetricKey>([
-      ...selected,
-      'sleep',
-      'energy',
-      'stress',
-      'fatigue',
-      'brainFog',
-      'pain',
-      'nightSweats',
-      'mood',
-    ]));
-
-    const preferred = currentInsightsPhase ? (phasePriorities[String(currentInsightsPhase)] || []) : [];
-    const metricCounts = new Map<MetricKey, number>();
-    candidateMetrics.forEach((metric) => {
-      let count = 0;
-      entriesAllSorted.forEach((entry) => {
-        if (getMetricValue(entry, metric, userData) != null) count += 1;
-      });
-      metricCounts.set(metric, count);
-    });
-
-    const metricLabelLower = (metric: MetricKey) => labelFor(metric, userData).toLowerCase();
-    const phaseName = currentInsightsPhase ? String(currentInsightsPhase).toLowerCase() : null;
-    const phaseWeight = (metrics?: MetricKey[]) => {
-      if (!metrics?.length || !preferred.length) return 0;
-      return metrics.reduce((score, metric) => score + (preferred.includes(String(metric)) ? 14 : 0), 0);
-    };
-
-    const pushCandidate = (list: HeroInsightItem[], item: HeroInsightItem | null) => {
-      if (!item?.text) return;
-      const clean = item.text.trim();
-      if (!clean) return;
-      list.push({ ...item, text: clean.endsWith('.') ? clean : `${clean}.` });
-    };
-
-    const candidateItems: HeroInsightItem[] = [];
-
-    // Phase-aware patterns so Insights feels connected to Rhythm without becoming forecast copy.
-    if (phaseBuckets && currentInsightsPhase && phaseName && entriesAllSorted.length >= 8) {
-      const overallAvg = (metric: MetricKey) => {
-        const vals = entriesAllSorted
-          .map((entry) => getMetricValue(entry, metric, userData))
-          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-        return vals.length ? mean(vals) : null;
-      };
-
-      const list = phaseBuckets[currentInsightsPhase] ?? [];
-      candidateMetrics.forEach((metric) => {
-        const phaseAvg = avgForMetric(list, metric as PhaseMetric);
-        const overall = overallAvg(metric);
-        const phaseCount = metricCounts.get(metric) ?? 0;
-        if (phaseAvg == null || overall == null || phaseCount < 6 || list.length < 3) return;
-        const delta = phaseAvg - overall;
-        if (Math.abs(delta) < 0.8) return;
-
-        const label = labelFor(metric, userData);
-        let text = '';
-        if (metric === 'sleep') {
-          text = delta > 0
-            ? `Sleep has tended to feel more unsettled in your ${phaseName} phase`
-            : `Sleep has tended to feel steadier in your ${phaseName} phase`;
-        } else if (metric === 'energy') {
-          text = delta > 0
-            ? `Energy has tended to run lower in your ${phaseName} phase`
-            : `Energy has tended to feel steadier in your ${phaseName} phase`;
-        } else if (metric === 'mood') {
-          text = delta > 0
-            ? `Mood has tended to lift in your ${phaseName} phase`
-            : `Mood has tended to dip in your ${phaseName} phase`;
-        } else {
-          text = delta > 0
-            ? `${label} has tended to run higher in your ${phaseName} phase`
-            : `${label} has tended to ease in your ${phaseName} phase`;
+    switch (signal.type) {
+      case 'phase_shift': {
+        if (primary === 'Sleep') {
+          return signal.direction === 'higher'
+            ? `Sleep has tended to feel more unsettled in your ${phaseName} phase.`
+            : `Sleep has tended to feel steadier in your ${phaseName} phase.`;
         }
-
-        pushCandidate(candidateItems, {
-          id: `phase-${metric}`,
-          kind: Math.abs(delta) >= 1.25 ? 'discovery' : 'pattern',
-          text,
-          score: 58 + Math.round(Math.abs(delta) * 18) + phaseWeight([metric]),
-          metric,
-          metrics: [metric],
-        });
-      });
-    }
-
-    // Trend patterns from recent logs.
-    const trendStats = candidateMetrics
-      .map((metric) => {
-        const pts: Array<{ x: number; y: number }> = [];
-        entriesSorted.forEach((entry, idx) => {
-          const value = getMetricValue(entry, metric, userData);
-          if (value != null) pts.push({ x: idx, y: value });
-        });
-        return { metric, pts, slope: slope(pts), avg: pts.length ? mean(pts.map((p) => p.y)) : null };
-      })
-      .filter((item) => item.pts.length >= 4 && Number.isFinite(item.slope));
-
-    trendStats.forEach(({ metric, slope: metricSlope }) => {
-      if (Math.abs(metricSlope) < 0.18) return;
-      const label = labelFor(metric, userData);
-      let text = '';
-      if (metric === 'sleep') {
-        text = metricSlope > 0 ? 'Sleep has been a bit more broken lately' : 'Sleep has been steadier lately';
-      } else if (metric === 'energy') {
-        text = metricSlope > 0 ? 'Energy has been a little lower lately' : 'Energy has been steadier lately';
-      } else if (metric === 'mood') {
-        text = metricSlope > 0 ? 'Mood has been a little brighter lately' : 'Mood has been a little lower lately';
-      } else {
-        text = metricSlope > 0 ? `${label} has been a little higher lately` : `${label} has eased a little lately`;
+        if (primary === 'Energy') {
+          return signal.direction === 'higher'
+            ? `Energy has tended to run lower in your ${phaseName} phase.`
+            : `Energy has tended to feel steadier in your ${phaseName} phase.`;
+        }
+        if (primary === 'Overall mood') {
+          return signal.direction === 'higher'
+            ? `Mood has tended to lift in your ${phaseName} phase.`
+            : `Mood has tended to dip in your ${phaseName} phase.`;
+        }
+        return signal.direction === 'higher'
+          ? `${primary} has tended to run higher in your ${phaseName} phase.`
+          : `${primary} has tended to ease in your ${phaseName} phase.`;
       }
-      pushCandidate(candidateItems, {
-        id: `trend-${metric}`,
-        kind: Math.abs(metricSlope) >= 0.3 ? 'discovery' : 'pattern',
-        text,
-        score: 45 + Math.round(Math.abs(metricSlope) * 40) + phaseWeight([metric]),
-        metric,
-        metrics: [metric],
-      });
-    });
-
-    // Behaviour-linked / relationship patterns.
-    corrPairs.slice(0, 5).forEach((pair, idx) => {
-      const metrics = [pair.aKey as MetricKey, pair.bKey as MetricKey];
-      const a = labelFor(pair.aKey as MetricKey, userData);
-      const b = labelFor(pair.bKey as MetricKey, userData);
-      const lowerA = a.toLowerCase();
-      const lowerB = b.toLowerCase();
-      let text = '';
-
-      if ((pair.aKey === 'sleep' && pair.bKey === 'stress') || (pair.aKey === 'stress' && pair.bKey === 'sleep')) {
-        text = pair.r >= 0
-          ? 'Stressful days have often been followed by worse sleep'
-          : 'Calmer days have often lined up with steadier sleep';
-      } else if ((pair.aKey === 'sleep' && pair.bKey === 'energy') || (pair.aKey === 'energy' && pair.bKey === 'sleep')) {
-        text = pair.r >= 0
-          ? 'Sleep and energy have often moved together'
-          : 'Better sleep has often been followed by steadier energy';
-      } else if (pair.r >= 0) {
-        text = `${a} and ${lowerB} have often moved together`;
-      } else {
-        text = `When ${lowerA} has been higher, ${lowerB} has often been lower`;
+      case 'trend_shift': {
+        if (primary === 'Sleep') return signal.direction === 'higher' ? 'Sleep has been a bit more broken lately.' : 'Sleep has been steadier lately.';
+        if (primary === 'Energy') return signal.direction === 'higher' ? 'Energy has been a little lower lately.' : 'Energy has been steadier lately.';
+        if (primary === 'Overall mood') return signal.direction === 'higher' ? 'Mood has been a little brighter lately.' : 'Mood has been a little lower lately.';
+        return signal.direction === 'higher' ? `${primary} has been a little higher lately.` : `${primary} has eased a little lately.`;
       }
-
-      pushCandidate(candidateItems, {
-        id: `pair-${idx}`,
-        kind: pair.confidence === 'high' && pair.n >= 10 ? 'discovery' : 'pattern',
-        text,
-        score: pair.quality + phaseWeight(metrics),
-        metrics,
-      });
-    });
-
-    // Weekday patterns make the hero feel observant without being overcomplicated.
-    if (entriesSorted.length >= 6) {
-      candidateMetrics.forEach((metric) => {
-        const rows = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
-          const vals = entriesSorted
-            .filter((entry) => new Date(entry.dateISO + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' }) === day)
-            .map((entry) => getMetricValue(entry, metric, userData))
-            .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-          return { day, vals, avg: vals.length ? mean(vals) : null };
-        }).filter((row) => row.avg != null && row.vals.length >= 2);
-
-        if (rows.length < 2) return;
-        const sortedRows = rows.slice().sort((a, b) => (b.avg ?? 0) - (a.avg ?? 0));
-        const strongest = sortedRows[0];
-        const quietest = sortedRows[sortedRows.length - 1];
-        if (strongest.avg == null || quietest.avg == null) return;
-        const delta = strongest.avg - quietest.avg;
-        if (delta < 1.4) return;
-
-        const label = metricLabelLower(metric);
-        const dayMap: Record<string, string> = { Mon: 'on Mondays', Tue: 'on Tuesdays', Wed: 'mid-week', Thu: 'later in the week', Fri: 'towards the weekend', Sat: 'at weekends', Sun: 'on Sundays' };
-        const when = dayMap[strongest.day] ?? `on ${strongest.day}`;
-        const text = metric === 'brainFog' || metric === 'fatigue' || metric === 'stress'
-          ? `${labelFor(metric, userData)} has shown up more often ${when}`
-          : `${labelFor(metric, userData)} has looked a little higher ${when}`;
-
-        pushCandidate(candidateItems, {
-          id: `weekday-${metric}`,
-          kind: delta >= 2 ? 'discovery' : 'pattern',
-          text,
-          score: 44 + Math.round(delta * 14) + phaseWeight([metric]),
-          metric,
-          metrics: [metric],
-        });
-      });
-    }
-
-    // Bring through the strongest existing findings, but strip out UI-ish filler.
-    findings.forEach((finding, idx) => {
-      const raw = String(finding.title || '').trim();
-      if (!raw || /want sharper insights/i.test(raw)) return;
-      const label = raw.replace(/^Possible pattern:\s*/i, '').replace(/^Stronger pattern:\s*/i, '').replace(/^Weak pattern:\s*/i, '');
-      const text = label.startsWith('Since yesterday')
-        ? raw
-        : label.includes(' and ')
-          ? `${label.charAt(0).toUpperCase()}${label.slice(1)} have been worth watching`
-          : raw;
-
-      pushCandidate(candidateItems, {
-        id: `finding-${idx}`,
-        kind: /stronger pattern/i.test(raw) ? 'discovery' : 'pattern',
-        text,
-        score: 38 + phaseWeight(finding.metrics),
-        metrics: finding.metrics,
-      });
-    });
-
-    const deduped: HeroInsightItem[] = [];
-    const seen = new Set<string>();
-    candidateItems
-      .sort((a, b) => b.score - a.score)
-      .forEach((item) => {
-        const key = item.text.toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        deduped.push(item);
-      });
-
-    const enoughForInsights = entriesSorted.length >= 4 && deduped.length > 0;
-    if (!enoughForInsights) {
-      const progressItems: HeroInsightItem[] = [];
-      const sleepCount = metricCounts.get('sleep') ?? 0;
-      const energyCount = metricCounts.get('energy') ?? 0;
-      const cycleStarts = entriesAllSorted.reduce((count, entry, idx, arr) => {
-        const flow = normalise10((entry.values as any)?.flow) ?? 0;
-        const prevFlow = idx > 0 ? (normalise10((arr[idx - 1].values as any)?.flow) ?? 0) : 0;
-        if ((entry as any)?.cycleStartOverride === true) return count + 1;
-        if (flow >= 3 && prevFlow === 0) return count + 1;
-        return count;
-      }, 0);
-
-      pushCandidate(progressItems, {
-        id: 'progress-intro',
-        kind: 'progress',
-        text: 'We will start spotting clearer trends after a few more check-ins',
-        score: 100,
-      });
-      pushCandidate(progressItems, {
-        id: 'progress-sleep',
-        kind: 'progress',
-        text: sleepCount >= 4 ? 'Sleep trends are starting to unlock' : `Sleep trends unlock after ${Math.max(0, 4 - sleepCount)} more sleep logs`,
-        score: 95,
-      });
-      pushCandidate(progressItems, {
-        id: 'progress-energy',
-        kind: 'progress',
-        text: energyCount >= 4 ? 'Energy patterns are starting to come through' : `Energy patterns unlock after ${Math.max(0, 4 - energyCount)} more energy logs`,
-        score: 90,
-      });
-      if (cycleEnabled) {
-        pushCandidate(progressItems, {
-          id: 'progress-cycle',
-          kind: 'progress',
-          text: cycleStarts >= 2 ? 'Cycle-linked patterns are starting to sharpen' : 'Cycle-linked patterns get sharper once you have logged a bit more cycle data',
-          score: 85,
-        });
+      case 'metric_pair': {
+        const a = primary.toLowerCase();
+        const b = secondary.toLowerCase();
+        if ((primary === 'Sleep' && secondary === 'Stress') || (primary === 'Stress' && secondary === 'Sleep')) {
+          return signal.direction === 'together'
+            ? 'Stressful days have often been followed by worse sleep.'
+            : 'Calmer days have often lined up with steadier sleep.';
+        }
+        if ((primary === 'Sleep' && secondary === 'Energy') || (primary === 'Energy' && secondary === 'Sleep')) {
+          return signal.direction === 'together'
+            ? 'Sleep and energy have often moved together.'
+            : 'Better sleep has often been followed by steadier energy.';
+        }
+        return signal.direction === 'together'
+          ? `${primary} and ${b} have often moved together.`
+          : `When ${a} has been higher, ${b} has often been lower.`;
       }
-
-      return {
-        heading: 'Getting to know your patterns',
-        subtitle: 'A few more check-ins will help this page turn your graphs into a clearer story.',
-        items: progressItems.slice(0, 3),
-      };
+      case 'weekday_pattern': {
+        const when = dayMap[String(signal.summary.day ?? '')] ?? `on ${String(signal.summary.day ?? 'that day')}`;
+        if (primary === 'Brain fog' || primary === 'Fatigue' || primary === 'Stress') {
+          return `${primary} has shown up more often ${when}.`;
+        }
+        return `${primary} has looked a little higher ${when}.`;
+      }
+      case 'low_data':
+      default:
+        return 'We will start spotting clearer trends after a few more check-ins.';
     }
+  };
 
-    const rotationBucket = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 3));
-    const rotated = deduped.map((_, idx, arr) => arr[(idx + (rotationBucket % arr.length)) % arr.length]);
-    const discovery = rotated.find((item) => item.kind === 'discovery');
-    const items: HeroInsightItem[] = [];
-    if (discovery) items.push({ ...discovery, text: discovery.text.startsWith('✨') ? discovery.text : `✨ New pattern spotted: ${discovery.text.charAt(0).toLowerCase()}${discovery.text.slice(1)}` });
-    rotated.forEach((item) => {
-      if (items.length >= 3) return;
-      if (discovery && item.id === discovery.id) return;
-      items.push(item);
-    });
+  const heroSignals = useMemo(
+    () => selectStableHeroInsights(getTopInsights(entriesAllSorted, userData, 6, selected), 3),
+    [entriesAllSorted, selected, userData],
+  );
+
+  useEffect(() => {
+    const unseen = heroSignals.filter((signal) => signal.isNewPattern);
+    if (!unseen.length) return;
+    markPatternsDiscovered(unseen);
+  }, [heroSignals]);
+
+  const heroInsightState = useMemo(() => {
+    const items: HeroInsightItem[] = heroSignals.map((signal) => ({
+      id: signal.id,
+      text: copyForInsightSignal(signal),
+      confidence: signal.confidence,
+      isNewPattern: signal.isNewPattern,
+    }));
+
+    const lowDataOnly = heroSignals.every((signal) => signal.type === 'low_data');
 
     return {
-      heading: 'Your body lately',
-      subtitle: currentInsightsPhase
-        ? `A reflective read on the patterns that have been showing up around your ${String(currentInsightsPhase).toLowerCase()} phase.`
-        : 'A reflective read on the patterns your recent check-ins have been starting to show.',
-      items: items.slice(0, 3),
+      heading: lowDataOnly ? 'Getting to know your patterns' : 'Your body lately',
+      subtitle: lowDataOnly
+        ? 'A few more check-ins will help this page turn your graphs into a clearer story.'
+        : currentInsightsPhase
+          ? `A reflective read on the patterns that have been showing up around your ${String(currentInsightsPhase).toLowerCase()} phase.`
+          : 'A reflective read on the patterns your recent check-ins have been starting to show.',
+      items: items.length
+        ? items
+        : [
+            {
+              id: 'hero-fallback',
+              text: 'We will start spotting clearer trends after a few more check-ins.',
+              confidence: 'low',
+              isNewPattern: false,
+            },
+          ],
+      confidenceLabel,
     };
-  }, [avgForMetric, corrPairs, currentInsightsPhase, cycleEnabled, entriesAllSorted, entriesSorted, findings, phaseBuckets, selected, userData]);
+  }, [currentInsightsPhase, heroSignals]);
 
   const scrollToInsightsSection = (id: string) => {
     try {
@@ -3267,7 +3086,18 @@ const tryNextPrompts = useMemo(() => {
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.65)]">
               {heroInsightState.items.length ? (
                 heroInsightState.items.map((item) => (
-                  <p key={item.id} className="leading-6 text-[rgba(0,0,0,0.65)]">{item.text}</p>
+                  <div key={item.id} className="rounded-2xl bg-white/30 px-3 py-3 border border-white/30">
+                    {item.isNewPattern ? (
+                      <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[rgba(0,0,0,0.62)]">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        <span>New pattern spotted</span>
+                      </div>
+                    ) : null}
+                    <p className="leading-6 text-[rgba(0,0,0,0.65)]">{item.text}</p>
+                    <div className="mt-1 text-xs font-medium text-[rgba(0,0,0,0.50)]">
+                      {heroInsightState.confidenceLabel(item.confidence)}
+                    </div>
+                  </div>
                 ))
               ) : (
                 <p className="leading-6 text-[rgba(0,0,0,0.65)]">We will start spotting clearer trends after a few more check-ins.</p>

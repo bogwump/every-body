@@ -21,6 +21,8 @@ export const BACKUP_KEYS = [
   "eb_sleep_overlay",
   "eb_checkin_dismissed_date",
   "eb_dismissed_experiment_prompts_v1",
+  "everybody:v2:discovered_patterns",
+  "everybody:v2:insights_hero_rotation",
 ] as const;
 
 export type BackupPayload = Partial<Record<(typeof BACKUP_KEYS)[number], string | null>>;
