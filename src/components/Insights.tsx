@@ -1936,6 +1936,7 @@ const uniq = new Map<string, (typeof items)[number]>();
 const tryNextPrompts = useMemo(() => {
     const today = isoTodayLocal();
     const recent = filterByDays(entriesAllSorted, 21);
+    const inScopeNow = (key: MetricKey) => isMetricInScope(userData, String(key), today);
 
     const makeStarter = (): TryNextPrompt => ({
       id: 'starter-simple-experiment',
@@ -1943,7 +1944,7 @@ const tryNextPrompts = useMemo(() => {
       suggestion: 'Pick one small thing to change',
       description: 'Start tiny: choose one change you can actually do, and keep everything else roughly the same.',
       changeKey: 'lateNight',
-      metrics: (['mood', 'sleep', 'energy'] as any).filter((k: any) => isMetricInScope(k as any, userData)) as any,
+      metrics: (['mood', 'sleep', 'energy'] as MetricKey[]).filter((k) => inScopeNow(k)),
       durationDays: 3,
       why: [
         'What I noticed: you have enough recent logs to start learning quickly.',
@@ -1952,488 +1953,218 @@ const tryNextPrompts = useMemo(() => {
       ],
     });
 
-    // Day 1+: always offer at least one idea so the feature never feels empty.
     if (recent.length < 7) {
       const s = makeStarter();
-      return (s.metrics || []).length ? [s] : [];
+      return s.metrics.length ? [s] : [];
     }
 
-
-    const enabledModulesSet = new Set(userData.enabledModules || []);
-    const enabledInf = new Set(userData.enabledInfluences || []);
-
+    const hasNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+    const variance = (nums: number[]) => {
+      if (nums.length < 2) return 0;
+      const m = nums.reduce((a, b) => a + b, 0) / nums.length;
+      return nums.reduce((acc, x) => acc + (x - m) * (x - m), 0) / (nums.length - 1);
+    };
+    const median = (nums: number[]) => {
+      if (!nums.length) return 0;
+      const xs = nums.slice().sort((a, b) => a - b);
+      const mid = Math.floor(xs.length / 2);
+      return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
+    };
+    const eventHit = (entry: any, key: string) => {
+      const events = entry?.events ?? {};
+      const influences = entry?.influences ?? {};
+      const influenceFlags = entry?.influenceFlags ?? {};
+      return Boolean(events?.[key] || influences?.[key] || influenceFlags?.[key]);
+    };
+    const countEventDays = (key: string) => recent.filter((e: any) => eventHit(e, key)).length;
     const valuesFor = (k: MetricKey): number[] => {
       const xs: number[] = [];
       recent.forEach((e) => {
         const v = metricValue(e, k);
-        if (v != null) xs.push(v);
+        if (hasNum(v)) xs.push(v);
       });
       return xs;
     };
 
-    const countInfluence = (key: string): number => {
-      let n = 0;
-      recent.forEach((e) => {
-        const anyE: any = e as any;
+    const enabledModulesSet = new Set((userData.enabledModules || []).map(String));
+    const enabledInf = new Set((userData.enabledInfluences || []).map(String));
+    const candidateKeys = Array.from(
+      new Set<MetricKey>([
+        'sleep' as MetricKey,
+        'energy' as MetricKey,
+        ...(Array.from(enabledModulesSet) as MetricKey[]),
+      ]),
+    ).filter((k) => inScopeNow(k));
 
-        // Older builds used `events` (boolean flags), newer ones may use `influences` / `influenceFlags`.
-        const flags = anyE?.influences || anyE?.influenceFlags || {};
-        const events = anyE?.events || {};
+    const symptomPromptFor = (focus: MetricKey): TryNextPrompt | null => {
+      const label = labelFor(focus as any, userData);
+      const metricLabel = label.toLowerCase();
+      const xs = valuesFor(focus);
+      const n = xs.length;
+      if (n < 5) return null;
+      const med = median(xs);
+      const spread = variance(xs);
 
-        const hit =
-          (flags && typeof flags === 'object' && Boolean(flags[key])) ||
-          (events && typeof events === 'object' && Boolean(events[key]));
+      let changeKey = 'lateNight';
+      let title = `A steadier routine for ${metricLabel}`;
+      let why: string[] = [];
 
-        if (hit) n += 1;
-      });
-      return n;
+      if (focus === 'sleep') {
+        changeKey = enabledInf.has('lateNight') ? 'lateNight' : 'stressfulDay';
+        title = 'A steadier routine for sleep';
+        why = [
+          'What I noticed: your sleep has moved around recently.',
+          'A steadier bedtime is a simple, reversible test that often gives quick feedback.',
+          `Seen across ${n} recent log${n === 1 ? '' : 's'}.`,
+        ];
+      } else if (['stress', 'anxiety', 'irritability'].includes(String(focus))) {
+        changeKey = enabledInf.has('stressfulDay') ? 'stressfulDay' : 'lateNight';
+        title = `A gentler routine for ${metricLabel}`;
+        why = [
+          `What I noticed: ${metricLabel} has been one of the noisier patterns in your recent logs.`,
+          'A tiny daily buffer is an easy, low-pressure test to see if things settle.',
+          `Seen across ${n} recent log${n === 1 ? '' : 's'}.`,
+        ];
+      } else if (['brainFog', 'focus', 'fatigue', 'energy'].includes(String(focus))) {
+        changeKey = enabledInf.has('lateNight') ? 'lateNight' : 'stressfulDay';
+        title = `A clearer day for ${metricLabel}`;
+        why = [
+          `What I noticed: ${metricLabel} has been showing up enough to be worth a small test.`,
+          'A steadier evening routine is often the easiest first lever to try.',
+          `Seen across ${n} recent log${n === 1 ? '' : 's'}.`,
+        ];
+      } else if (['digestion', 'bloating', 'acidReflux', 'nausea'].includes(String(focus))) {
+        changeKey = enabledInf.has('caffeine') ? 'caffeine' : 'lateNight';
+        title = `A steadier routine for ${metricLabel}`;
+        why = [
+          'What I noticed: digestive symptoms can be sensitive to routine.',
+          changeKey === 'caffeine'
+            ? 'A small caffeine tweak is an easy, reversible test.'
+            : 'A steadier evening routine is an easy, reversible test.',
+          `Seen across ${n} recent log${n === 1 ? '' : 's'}.`,
+        ];
+      } else if (['nightSweats', 'hotFlushes'].includes(String(focus))) {
+        changeKey = enabledInf.has('alcohol') ? 'alcohol' : enabledInf.has('lateNight') ? 'lateNight' : 'stressfulDay';
+        title = `A calmer night for ${metricLabel}`;
+        why = [
+          `What I noticed: ${metricLabel} has been noticeable in your recent logs.`,
+          changeKey === 'alcohol'
+            ? 'A short alcohol-free window is a clear, reversible test.'
+            : 'A steadier evening routine is a clear, reversible test.',
+          `Seen across ${n} recent log${n === 1 ? '' : 's'}.`,
+        ];
+      } else if (['headache', 'dizziness', 'pain', 'cramps', 'jointPain'].includes(String(focus))) {
+        changeKey = enabledInf.has('lowHydration') ? 'lowHydration' : enabledInf.has('exercise') ? 'exercise' : 'lateNight';
+        title = `A steadier day for ${metricLabel}`;
+        why = [
+          `What I noticed: ${metricLabel} has been one of the more noticeable symptoms recently.`,
+          changeKey === 'lowHydration'
+            ? 'A hydration check is simple, low-risk, and easy to undo.'
+            : changeKey === 'exercise'
+              ? 'Gentle movement is a practical first test when symptoms feel sticky.'
+              : 'A steadier routine is a sensible first test.',
+          `Seen across ${n} recent log${n === 1 ? '' : 's'}.`,
+        ];
+      } else {
+        changeKey = enabledInf.has('lateNight') ? 'lateNight' : enabledInf.has('stressfulDay') ? 'stressfulDay' : 'lateNight';
+        why = [
+          `What I noticed: ${metricLabel} has been showing up often enough to be worth testing.`,
+          'A small routine tweak is the easiest place to start.',
+          `Seen across ${n} recent log${n === 1 ? '' : 's'}.`,
+        ];
+      }
+
+      const supportMetrics = ([focus, 'mood', 'energy'] as MetricKey[])
+        .filter((k, i, arr) => arr.indexOf(k) === i)
+        .filter((k) => inScopeNow(k))
+        .slice(0, 5);
+
+      return {
+        id: `symptom-${String(focus)}`,
+        title,
+        suggestion: `Suggested tweak: ${leverLabel(changeKey)}`,
+        description: why[0].replace(/^What I noticed:\s*/i, ''),
+        changeKey,
+        metrics: supportMetrics,
+        durationDays: 3,
+        why,
+      };
     };
+
+    const scoredSymptoms = candidateKeys
+      .map((k) => {
+        const xs = valuesFor(k);
+        return {
+          key: k,
+          n: xs.length,
+          med: median(xs),
+          variance: variance(xs),
+          score: median(xs) * 2 + variance(xs),
+        };
+      })
+      .filter((s) => s.n >= 5)
+      .filter((s) => s.med >= 4 || s.variance >= 1)
+      .sort((a, b) => {
+        const ds = b.score - a.score;
+        if (Math.abs(ds) > 1e-9) return ds;
+        return String(a.key).localeCompare(String(b.key));
+      });
 
     const prompts: TryNextPrompt[] = [];
-    // Data-driven "Try next" ideas: compare how a symptom looks on days when a behaviour was present vs not.
-    // This helps keep the cards feeling alive when you have enough logs.
-    const median = (arr: number[]): number => {
-      const xs = arr.filter((n) => typeof n === 'number' && Number.isFinite(n)).slice().sort((a, b) => a - b);
-      if (!xs.length) return NaN;
-      const mid = Math.floor(xs.length / 2);
-      return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
-    };
-
-    const influenceEffect = (infKey: string, metricKey: MetricKey) => {
-      const on: number[] = [];
-      const off: number[] = [];
-      let seen = 0;
-
-      recent.forEach((e) => {
-        const anyE: any = e as any;
-        const flags = anyE?.influences || anyE?.influenceFlags || {};
-        const events = anyE?.events || {};
-        const hit =
-          (flags && typeof flags === 'object' && Boolean(flags[infKey])) ||
-          (events && typeof events === 'object' && Boolean(events[infKey]));
-
-        const v = metricValue(e, metricKey);
-        if (v == null) return;
-
-        if (hit) {
-          on.push(v);
-          seen += 1;
-        } else {
-          off.push(v);
-        }
-      });
-
-      // Need enough contrast to say anything.
-      if (on.length < 3 || off.length < 3) return null;
-
-      const medOn = median(on);
-      const medOff = median(off);
-      if (!Number.isFinite(medOn) || !Number.isFinite(medOff)) return null;
-
-      const delta = medOn - medOff; // + means higher on influence days
-      return { on: medOn, off: medOff, delta, seen, onN: on.length, offN: off.length };
-    };
-
-    const addDataPrompt = (p: TryNextPrompt) => {
-      // Avoid duplicates by id
-      if (!p?.id) return;
-      if (prompts.some((x) => x.id === p.id)) return;
+    const seenIds = new Set<string>();
+    const addPrompt = (p: TryNextPrompt | null | undefined) => {
+      if (!p || !p.metrics?.length) return;
+      if (seenIds.has(p.id)) return;
+      seenIds.add(p.id);
       prompts.push(p);
     };
 
-    const buildLeverCopy = (changeKey: string) => {
-      if (changeKey === 'caffeine') {
-        return {
-          suggestion: 'Try a small caffeine tweak for 3 days',
-          description: 'Digestive symptoms can be sensitive to routine. A small caffeine tweak is an easy, reversible test.',
-          whyExtra: ['Try: no caffeine after lunch (swap to decaf or herbal).'],
-        };
-      }
-      if (changeKey === 'alcohol') {
-        return {
-          suggestion: 'Try an alcohol-free window for 3 days',
-          description: 'Night symptoms can be sensitive to alcohol. A short alcohol-free window is an easy, reversible test.',
-          whyExtra: ['Try: 3 evenings alcohol-free (or swap to low-alcohol).'],
-        };
-      }
-      if (changeKey === 'lateNight') {
-        return {
-          suggestion: 'Try a steadier bedtime for 3 days',
-          description: 'Sleep and stress can be sensitive to late nights. A steadier bedtime is a small, realistic test.',
-          whyExtra: ['Try: set a “lights out” target and start wind-down 30 minutes earlier.'],
-        };
-      }
-      if (changeKey === 'lowHydration') {
-        return {
-          suggestion: 'Try a hydration support test for 3 days',
-          description: 'Head and dizzy symptoms can be sensitive to hydration. A hydration check is simple and reversible.',
-          whyExtra: ['Try: add one extra glass of water mid-morning and mid-afternoon.'],
-        };
-      }
-      if (changeKey === 'stressfulDay') {
-        return {
-          suggestion: 'Try a stress buffer test for 3 days',
-          description: 'Stress can spill into sleep and symptoms. A tiny buffer is a quick test you can actually do.',
-          whyExtra: ['Try: 10 minutes of downshift (walk, stretch, shower) before dinner.'],
-        };
-      }
-      return {
-        suggestion: 'Try one small change for 3 days',
-        description: 'Start tiny: choose one change you can actually do, and keep everything else roughly the same.',
-        whyExtra: [],
-      };
-    };
-
-
-    // Pick 1–2 symptom-led, behaviour-linked prompts if the data supports it.
-    const symptomLevers: Array<{ metric: MetricKey; changeKey: string; titleTpl: (label: string) => string }> = [
-      { metric: 'acidReflux' as any, changeKey: 'caffeine', titleTpl: (l) => `A steadier routine for ${l.toLowerCase()}` },
-      { metric: 'digestion' as any, changeKey: 'caffeine', titleTpl: (l) => `A gentler day for ${l.toLowerCase()}` },
-      { metric: 'bloating' as any, changeKey: 'caffeine', titleTpl: (l) => `A steadier routine for ${l.toLowerCase()}` },
-      { metric: 'nightSweats' as any, changeKey: 'alcohol', titleTpl: (l) => `A calmer night for ${l.toLowerCase()}` },
-      { metric: 'hotFlushes' as any, changeKey: 'alcohol', titleTpl: (l) => `A calmer night for ${l.toLowerCase()}` },
-      { metric: 'headache' as any, changeKey: 'lowHydration', titleTpl: (l) => `A steadier day for ${l.toLowerCase()}` },
-      { metric: 'dizziness' as any, changeKey: 'lowHydration', titleTpl: (l) => `A steadier day for ${l.toLowerCase()}` },
+    // First pass: behaviour-linked prompts when your data supports them.
+    const behaviourRules: Array<{ metric: MetricKey; eventKey: string; minDelta: number }> = [
+      { metric: 'nightSweats' as MetricKey, eventKey: 'alcohol', minDelta: 0.5 },
+      { metric: 'hotFlushes' as MetricKey, eventKey: 'alcohol', minDelta: 0.5 },
+      { metric: 'sleep' as MetricKey, eventKey: 'lateNight', minDelta: 0.5 },
+      { metric: 'energy' as MetricKey, eventKey: 'lateNight', minDelta: 0.5 },
+      { metric: 'stress' as MetricKey, eventKey: 'stressfulDay', minDelta: 0.5 },
+      { metric: 'brainFog' as MetricKey, eventKey: 'lateNight', minDelta: 0.5 },
+      { metric: 'acidReflux' as MetricKey, eventKey: 'caffeine', minDelta: 0.4 },
+      { metric: 'digestion' as MetricKey, eventKey: 'caffeine', minDelta: 0.4 },
+      { metric: 'bloating' as MetricKey, eventKey: 'caffeine', minDelta: 0.4 },
     ];
 
-    const dataCandidates: Array<{ score: number; prompt: TryNextPrompt }> = [];
-
-    symptomLevers.forEach(({ metric, changeKey, titleTpl }) => {
-      if (!isMetricInScope(metric as any, userData)) return;
-      if (!enabledInf.has(changeKey)) return;
-
-      const eff = influenceEffect(changeKey, metric);
-      if (!eff) return;
-
-      // We want the lever where symptom is higher on influence days (delta > 0.6-ish on 0-10 scale).
-      if (eff.delta < 0.6) return;
-
-      const label = labelFor(metric as any, userData);
-      const leverCopy = buildLeverCopy(changeKey);
-
-      const p: TryNextPrompt = {
-        id: `data-${String(metric)}-${changeKey}`,
-        title: titleTpl(label),
-        suggestion: leverCopy.suggestion,
-        description: leverCopy.description,
-        changeKey,
-        metrics: ([metric, 'mood', 'energy'] as any)
-          .filter((k: any) => isMetricInScope(k as any, userData))
-          .slice(0, 5) as any,
-        durationDays: 3,
-        why: [
-          `What I noticed: when ${changeKey === 'caffeine' ? 'caffeine was logged' : changeKey.replace(/([A-Z])/g, ' $1').toLowerCase()} your ${label.toLowerCase()} was typically higher.`,
-          `Seen ${eff.seen} time(s) in your recent logs.`,
-          `Baseline check: ${label} was ~${eff.off.toFixed(1)}/10 without it, and ~${eff.on.toFixed(1)}/10 with it.`,
-          ...(leverCopy.whyExtra || []),
-        ],
-      };
-
-      const score = eff.delta * 10 + Math.min(10, eff.seen);
-      dataCandidates.push({ score, prompt: p });
-    });
-
-    dataCandidates
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 2)
-      .forEach((c) => addDataPrompt(c.prompt));
-
-    // Symptom-led prompts (even when we can't cleanly attribute to an influence yet).
-    // This keeps "Try next" feeling personal, without over-claiming causality.
-    const symptomRules: Array<{
-      metric: MetricKey;
-      minMedian: number;
-      changeKey: string;
-      title: (label: string) => string;
-      suggestion: (lever: string) => string;
-      description: (label: string, lever: string) => string;
-      why: (label: string, lever: string, m: number) => string[];
-      preferIfEnabled?: string[];
-    }> = [
-      {
-        metric: 'nightSweats' as any,
-        minMedian: 5,
-        changeKey: 'alcohol',
-        title: (l) => `A calmer night for ${l.toLowerCase()}`,
-        suggestion: (lever) => `Try an ${lever} for 3 days`,
-        description: (l, lever) => `${l} can be sensitive to small lifestyle shifts. An ${lever} is a simple, reversible test.`,
-        why: (l, lever, m) => [
-          `What I noticed: your recent ${l.toLowerCase()} has been running around ${m.toFixed(1)}/10.`,
-          `Why this is sensible: an ${lever} is easy to try for a few days and easy to undo.`,
-          `What you'll learn: whether ${l.toLowerCase()} settles even 1–2 points with this change.`,
-        ],
-        preferIfEnabled: ['alcohol'],
-      },
-      {
-        metric: 'brainFog' as any,
-        minMedian: 4.5,
-        changeKey: 'lateNight',
-        title: (l) => `A clearer head for ${l.toLowerCase()}`,
-        suggestion: (lever) => `Try a ${lever} for 3 days`,
-        description: (l, lever) => `${l} often responds to routine. A ${lever} is a small, realistic test.`,
-        why: (l, lever, m) => [
-          `What I noticed: your recent ${l.toLowerCase()} has been around ${m.toFixed(1)}/10.`,
-          `Why this is sensible: sleep routine is one of the fastest levers to test.`,
-          `What you'll learn: whether ${l.toLowerCase()} shifts with steadier rest.`,
-        ],
-        preferIfEnabled: ['lateNight'],
-      },
-      {
-        metric: 'stress' as any,
-        minMedian: 5.5,
-        changeKey: 'stressfulDay',
-        title: (l) => `A steadier day for ${l.toLowerCase()}`,
-        suggestion: () => `Try a tiny daily buffer for 3 days`,
-        description: () => `Stress can spill into sleep and symptoms. A tiny buffer is a quick test you can actually do.`,
-        why: (l, _lever, m) => [
-          `What I noticed: your recent ${l.toLowerCase()} has been around ${m.toFixed(1)}/10.`,
-          `Why this is sensible: a 10-minute downshift is small enough to stick with.`,
-          `What you'll learn: whether stress eases even slightly with a daily buffer.`,
-        ],
-      },
-      {
-        metric: 'fatigue' as any,
-        minMedian: 5,
-        changeKey: 'lateNight',
-        title: (l) => `A gentler week for ${l.toLowerCase()}`,
-        suggestion: (lever) => `Try a ${lever} for 3 days`,
-        description: (l, lever) => `${l} often improves with consistency. A ${lever} is a small, reversible test.`,
-        why: (l, lever, m) => [
-          `What I noticed: your recent ${l.toLowerCase()} has been around ${m.toFixed(1)}/10.`,
-          `Why this is sensible: steadier sleep can move fatigue quickly.`,
-          `What you'll learn: whether ${l.toLowerCase()} shifts with a small routine tweak.`,
-        ],
-        preferIfEnabled: ['lateNight'],
-      },
-    ];
-
-    const symptomCandidates: Array<{ score: number; prompt: TryNextPrompt }> = [];
-    const safeMedian = (xs: number[]) => {
-      const m = median(xs);
-      return Number.isFinite(m) ? m : NaN;
-    };
-
-    symptomRules.forEach((r) => {
-      if (!isMetricInScope(r.metric as any, userData)) return;
-      const xs = valuesFor(r.metric as any);
-      if (xs.length < 6) return;
-      const m = safeMedian(xs);
-      if (!Number.isFinite(m)) return;
-      if (m < r.minMedian) return;
-
-      // If the rule prefers a lever the user actually tracks, honour that.
-      if (r.preferIfEnabled && r.preferIfEnabled.length) {
-        const ok = r.preferIfEnabled.some((k) => enabledInf.has(k));
-        if (!ok) return;
+    for (const rule of behaviourRules) {
+      if (!inScopeNow(rule.metric)) continue;
+      if (!enabledInf.has(rule.eventKey)) continue;
+      const on: number[] = [];
+      const off: number[] = [];
+      for (const e of recent as any[]) {
+        const v = metricValue(e, rule.metric);
+        if (!hasNum(v)) continue;
+        if (eventHit(e, rule.eventKey)) on.push(v);
+        else off.push(v);
       }
-
-      const label = labelFor(r.metric as any, userData);
-      const lever = leverLabel(r.changeKey);
-      const p: TryNextPrompt = {
-        id: `symptom-${String(r.metric)}-${r.changeKey}`,
-        title: r.title(label),
-        suggestion: r.suggestion(lever),
-        description: r.description(label, lever),
-        changeKey: r.changeKey,
-        metrics: ([r.metric, 'sleep', 'energy', 'mood'] as any)
-          .filter((k: any) => isMetricInScope(k as any, userData))
-          .slice(0, 5) as any,
-        durationDays: 3,
-        why: r.why(label, lever, m),
-      };
-
-      const score = m * 10 + xs.length;
-      symptomCandidates.push({ score, prompt: p });
-    });
-
-    symptomCandidates
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 2)
-      .forEach((c) => addDataPrompt(c.prompt));
-
-
-
-
-    // 1) Sleep up and down → earlier bedtime / fewer late nights
-    if (recent.length >= 14 && enabledModulesSet.has('sleep' as any) && enabledInf.has('lateNight')) {
-      const xs = valuesFor('sleep' as any);
-      if (xs.length >= 5 && stdev(xs) >= 2) {
-        prompts.push({
-          id: 'try-sleep-consistency',
-          title: 'Sleep consistency test',
-          changeKey: 'lateNight',
-          metrics: (['sleep', 'energy'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
-          durationDays: 3,
-          why: ['Sleep has been a bit up and down recently.', 'A steadier bedtime is a simple lever to test.'],
-        });
-      }
-    }
-
-    // 2) High stress → add a small buffer
-    if (recent.length >= 14 && enabledModulesSet.has('stress' as any) && enabledInf.has('stressfulDay')) {
-      const xs = valuesFor('stress' as any);
-      if (xs.length >= 5 && mean(xs) >= 6.5) {
-        prompts.push({
-          id: 'try-stress-buffer',
-          title: 'Stress buffer test',
-          changeKey: 'stressfulDay',
-          metrics: (['stress', 'sleep'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
-          durationDays: 3,
-          why: ['Stress has been running a bit high recently.', 'A tiny daily buffer can be enough to shift the pattern.'],
-        });
-      }
-    }
-
-    // 3) Anxiety + caffeine logged → caffeine timing
-    if (recent.length >= 14 && enabledModulesSet.has('anxiety' as any) && enabledInf.has('caffeine')) {
-      const xs = valuesFor('anxiety' as any);
-      const cafDays = countInfluence('caffeine');
-      if (xs.length >= 5 && mean(xs) >= 6 && cafDays >= 3) {
-        prompts.push({
-          id: 'try-caffeine-timing',
-          title: 'Caffeine timing test',
-          changeKey: 'caffeine',
-          metrics: (['anxiety', 'sleep'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
-          durationDays: 3,
-          why: ['You have logged caffeine on several recent days.', 'A simple timing tweak can sometimes reduce jittery days.'],
-        });
-      }
-    }
-
-    // 3b) Digestive symptoms + caffeine → caffeine tweak (easy reversible test)
-    if (recent.length >= 14 && enabledModulesSet.has('acidReflux' as any) && enabledInf.has('caffeine')) {
-      const xs = valuesFor('acidReflux' as any);
-      const cafDays = countInfluence('caffeine');
-      if (xs.length >= 5 && mean(xs) >= 4 && cafDays >= 2) {
-        prompts.push({
-          id: 'try-reflux-caffeine',
-          title: 'A steadier routine for acid reflux',
-          suggestion: 'Try a 3-day caffeine experiment',
-          description: 'Digestive symptoms can be sensitive to routine. A small caffeine tweak for a few days is an easy, reversible test.',
-          changeKey: 'caffeine',
-          metrics: (['acidReflux', 'mood', 'energy'] as any).filter((k: any) => isMetricInScope(k as any, userData)) as any,
-          durationDays: 3,
-          why: [
-            'What I noticed: digestive symptoms tend to rise on days where caffeine is logged.',
-            'Why this is sensible: reducing caffeine briefly is low risk and easy to undo.',
-            'What you will learn: whether caffeine seems to play a role in your reflux days.',
-          ],
-        });
-      }
-    }
-
-    // 4) Headache + low hydration logged → hydration support
-    if (recent.length >= 14 && enabledModulesSet.has('headache' as any) && enabledInf.has('lowHydration')) {
-      const xs = valuesFor('headache' as any);
-      const lowHydDays = countInfluence('lowHydration');
-      if (xs.length >= 5 && mean(xs) >= 4.5 && lowHydDays >= 2) {
-        prompts.push({
-          id: 'try-hydration-support',
-          title: 'Hydration support test',
-          changeKey: 'lowHydration',
-          metrics: (['headache', 'dizziness'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
-          durationDays: 3,
-          why: ['Headaches have shown up a few times recently.', 'Hydration is an easy first lever to test.'],
-        });
-      }
-    }
-
-    // 5) Night sweats + alcohol logged → alcohol-free window
-    if (recent.length >= 14 && enabledModulesSet.has('nightSweats' as any) && enabledInf.has('alcohol')) {
-      const xs = valuesFor('nightSweats' as any);
-      const alcDays = countInfluence('alcohol');
-      if (xs.length >= 5 && mean(xs) >= 4.5 && alcDays >= 2) {
-        prompts.push({
-          id: 'try-alcohol-free',
-          title: 'Alcohol-free window',
-          changeKey: 'alcohol',
-          metrics: (['nightSweats', 'sleep'] as any).filter((k: any) => enabledModulesSet.has(k)) as any,
-          durationDays: 3,
-          why: ['Night sweats have been noticeable recently.', 'A short alcohol-free window can be a clear test.'],
-        });
-      }
-    }
-
-
-    // 6) Sleep details: trouble falling asleep → late nights / caffeine timing
-    // This works even if the main Sleep score looks "fine" because the detail can still be disruptive.
-    if (recent.length >= 14 && enabledInf.has('lateNight')) {
-      const detailVals: number[] = [];
-      recent.forEach((e) => {
-        const d: any = (e as any)?.sleepDetails;
-        const v = d?.troubleFallingAsleep;
-        if (typeof v === 'number') detailVals.push(v);
+      if (on.length < 3 || off.length < 3) continue;
+      const delta = median(on) - median(off);
+      if (delta < rule.minDelta) continue;
+      const base = symptomPromptFor(rule.metric);
+      if (!base) continue;
+      const seen = countEventDays(rule.eventKey);
+      addPrompt({
+        ...base,
+        id: `behaviour-${String(rule.metric)}-${rule.eventKey}`,
+        description: `${base.description} ${leverLabel(rule.eventKey)} looks worth testing.`,
+        why: [...base.why.slice(0, 2), `Seen ${seen} time${seen === 1 ? '' : 's'} in your recent logs.`],
       });
-      if (detailVals.length >= 5) {
-        const avg = mean(detailVals);
-        if (avg >= 1.6) {
-          prompts.push({
-            id: 'try-sleep-details',
-            title: 'Wind-down test',
-            changeKey: 'lateNight',
-            metrics: (['sleep', 'energy'] as any).filter((k: any) => isMetricInScope(k as any, userData)) as any,
-            durationDays: 3,
-            why: ['Falling asleep has been a bit harder on several days.', 'A short wind-down window is a clean experiment to try.'],
-          });
-        }
-      }
     }
 
-
-
-    // If the signal rules didn't trigger many prompts, still offer a few "tiny tests"
-    // based on what the user has actually enabled, so this lane feels alive.
-    if (prompts.length < 3) {
-      const hasId = (id: string) => prompts.some((p) => p.id === id);
-
-      const addIf = (p: TryNextPrompt) => {
-        if (hasId(p.id)) return;
-        const ms = (p.metrics || []).filter((k: any) => isMetricInScope(k as any, userData));
-        if (!ms.length) return;
-        prompts.push({ ...p, metrics: ms });
-      };
-
-      if (enabledModulesSet.has('sleep' as any) && enabledInf.has('lateNight') && !hasId('try-sleep-consistency-lite')) {
-        addIf({
-          id: 'try-sleep-consistency-lite',
-          title: 'Sleep consistency test',
-          suggestion: 'Suggested tweak: fewer late nights for 3 days',
-          description: 'Sleep can be sensitive to routine. A small bedtime consistency tweak is easy to try and easy to undo.',
-          changeKey: 'lateNight',
-          metrics: (['sleep', 'energy'] as any),
-          durationDays: 3,
-          why: ['Sleep can be sensitive to routine.', 'A small bedtime tweak is a clean, reversible test.'],
-        });
-      }
-
-      if (enabledModulesSet.has('stress' as any) && enabledInf.has('stressfulDay') && !hasId('try-stress-buffer-lite')) {
-        addIf({
-          id: 'try-stress-buffer-lite',
-          title: 'Stress buffer test',
-          suggestion: 'Suggested tweak: add a small daily buffer',
-          description: 'Even 10 minutes of decompression can shift how a day feels. Try the smallest buffer you can actually stick with.',
-          changeKey: 'stressfulDay',
-          metrics: (['stress', 'sleep'] as any),
-          durationDays: 3,
-          why: ['Stress often moves fastest with tiny, consistent changes.', 'A small daily buffer is low effort and informative.'],
-        });
-      }
-
-      if (enabledModulesSet.has('nightSweats' as any) && enabledInf.has('alcohol') && !hasId('try-alcohol-free-lite')) {
-        addIf({
-          id: 'try-alcohol-free-lite',
-          title: 'Alcohol-free window',
-          suggestion: 'Suggested tweak: alcohol-free for 3 days',
-          description: 'Night symptoms can be sensitive to alcohol and late nights. A short alcohol-free window is a clear, reversible test.',
-          changeKey: 'alcohol',
-          metrics: (['nightSweats', 'sleep'] as any),
-          durationDays: 3,
-          why: ['A short alcohol-free window is a clean test.', 'If it helps, you will feel it quickly.'],
-        });
-      }
+    // Second pass: restore the older symptom-led suggestions that felt more alive.
+    for (const item of scoredSymptoms) {
+      addPrompt(symptomPromptFor(item.key));
+      if (prompts.length >= 6) break;
     }
 
-    // Remove dismissed prompts (local only) and prompts with no metrics.
+    // Keep a practical starter if we still have fewer than 3 options.
+    if (prompts.length < 3) addPrompt(makeStarter());
 
     const changeLabel = (key: string | undefined) => {
       if (!key) return 'one small change';
@@ -2456,7 +2187,12 @@ const tryNextPrompts = useMemo(() => {
           (Array.isArray(p.why) && p.why.length
             ? String(p.why[0]).replace(/^What I noticed:\s*/i, '').replace(/^Why this is sensible:\s*/i, '')
             : 'Tiny, reversible test based on your recent logs.');
-        return { ...p, suggestion, description, metrics: (p.metrics || []).filter((k) => isMetricInScope(k as any, userData)) };
+        return {
+          ...p,
+          suggestion,
+          description,
+          metrics: (p.metrics || []).filter((k) => inScopeNow(k)),
+        };
       })
       .filter((p) => (p.metrics || []).length > 0)
       .filter((p) => {
@@ -2465,9 +2201,9 @@ const tryNextPrompts = useMemo(() => {
         return until < today;
       });
 
-    if (active.length === 0) {
+    if (!active.length) {
       const s = makeStarter();
-      return (s.metrics || []).length ? [s] : [];
+      return s.metrics.length ? [s] : [];
     }
 
     return active.slice(0, 6);
