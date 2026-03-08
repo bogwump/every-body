@@ -19,6 +19,8 @@ import {
   Legend,
 } from 'recharts';
 import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
+import { CompanionMomentHistory } from './CompanionMomentHistory';
+import { getMomentHistory } from '../lib/companionMoments';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
 import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
@@ -1497,6 +1499,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           ],
     };
   }, [currentInsightsPhase, heroSignals]);
+
+  const companionMomentHistory = useMemo(() => getMomentHistory(6), [entriesAllSorted.length]);
 
   const scrollToInsightsSection = (id: string) => {
     try {
@@ -3123,6 +3127,8 @@ const tryNextPrompts = useMemo(() => {
           </div>
         </div>
       </div>
+
+      <CompanionMomentHistory moments={companionMomentHistory} />
 
       {/* Highlights + Top findings carousel */}
       <div id="eb-full-insights" className="eb-card">

@@ -120,7 +120,7 @@ export function applyPhaseChangeForEntries(args: {
     if (changed) {
       setRecentPhaseChange(currentPhase, args.refISO);
       updatePhaseHistory(currentPhase, args.refISO ?? isoToday());
-      createMoment({ type: 'phase_change', phase: currentPhase, date: todayISOOr(args.refISO) });
+      createMoment({ type: 'phase_change', date: todayISOOr(args.refISO), data: { phase: currentPhase } });
     } else if (!getCurrentPhaseEntry()) {
       updatePhaseHistory(currentPhase, args.refISO ?? isoToday());
     }
