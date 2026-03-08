@@ -570,7 +570,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
           userData={(userData ?? ({} as any)) as UserData}
           phaseKey={phaseKey}
           phaseTitle={computed.soft}
-          phaseSubtitle={`${computed.sci} phase`}
+          phaseSubtitle={/phase$/i.test(String(computed.sci).trim()) ? String(computed.sci).trim() : `${computed.sci} phase`}
           phaseDescription={phaseOneLiner(phaseKey, (((userData ?? {}) as any).goal ?? null) as any)}
           confidenceLabel={computed.confidence}
           phaseIcon={phaseIcon}

@@ -37,7 +37,7 @@ export function RhythmHero(props: {
   }, [lowData, props.phaseKey, patternState.strongestSignal, props.userData, props.entries]);
 
   return (
-    <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-8 sm:p-10 overflow-hidden shadow-sm space-y-5">
+    <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-6 sm:p-8 overflow-hidden shadow-sm space-y-4">
       <RhythmPhaseHeader
         icon={props.phaseIcon}
         phaseTitle={props.phaseTitle}

@@ -2,11 +2,11 @@ import React from 'react';
 
 export function RhythmPatternBubble(props: { title?: string; lines: string[]; isLowData?: boolean }) {
   return (
-    <div className="eb-inset rounded-3xl p-5 sm:p-6 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
-      <div className="text-base font-medium text-neutral-800">{props.title ?? 'Your body lately'}</div>
-      <div className="mt-3 space-y-2">
+    <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)] insights-hero-bubble">
+      <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{props.title ?? 'Your body lately'}</div>
+      <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.65)]">
         {props.lines.map((line) => (
-          <p key={line} className="text-base text-neutral-800 leading-7 font-normal">
+          <p key={line} className="leading-6 text-[rgba(0,0,0,0.65)]">
             {line}
           </p>
         ))}

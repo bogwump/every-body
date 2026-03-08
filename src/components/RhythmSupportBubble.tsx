@@ -2,9 +2,9 @@ import React from 'react';
 
 export function RhythmSupportBubble(props: { title?: string; body: string }) {
   return (
-    <div className="eb-inset rounded-3xl p-5 sm:p-6 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
-      <div className="text-base font-medium text-neutral-800">{props.title ?? 'Gentle reminder'}</div>
-      <p className="mt-3 text-base text-neutral-800 leading-7 font-normal">{props.body}</p>
+    <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)] insights-hero-bubble">
+      <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{props.title ?? 'Gentle reminder'}</div>
+      <p className="mt-2 leading-6 text-sm text-[rgba(0,0,0,0.65)]">{props.body}</p>
     </div>
   );
 }
