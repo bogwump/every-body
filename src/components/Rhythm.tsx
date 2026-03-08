@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
+import { RhythmHero } from './RhythmHero';
 import { useEntries, useExperimentHistory } from '../lib/appStore';
 import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
 import { getExperimentLearnings, getWhatsComingPredictions } from '../lib/rhythmPredictions';
@@ -528,7 +529,6 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
   const phaseKey: PhaseKey = computed.phaseKey;
   const content = phaseContent[phaseKey] ?? phaseContent.protective;
   const softMeta = softPhaseMeta(phaseKey);
-  const gentleReminder = useMemo(() => pickDailyReminder(phaseKey, localISODate(new Date())), [phaseKey]);
 
   function IconBadge({ icon }: { icon: React.ReactNode }) {
     return (
@@ -565,78 +565,16 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         </div>
 
         {/* Where you are */}
-        <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-8 sm:p-10 overflow-hidden shadow-sm space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                  <div className="text-white">{phaseIcon}</div>
-                </div>
-                <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">{computed.soft}</h3>
-              </div>
-              <div className="eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{computed.sci}</div>
-              {(() => {
-                const ud = (userData ?? ({} as any)) as UserData;
-                const distinctDays = new Set(computed.sorted.map((e: any) => (e as any)?.dateISO).filter(Boolean)).size;
-                const sourceLine = formatSourceLine((computed as any).source);
-                const reasons = Array.isArray((computed as any).reasons) ? ((computed as any).reasons as string[]) : [];
-                const reasonList = reasons.filter(Boolean).slice(0, 2);
-                const because = reasonList.length ? ` (Recently, ${reasonList.join(' and ')})` : '';
-                const phaseLine = phaseOneLiner(phaseKey, (ud.goal ?? null) as any);
-                const confLine = ud.goal === 'perimenopause' ? confidenceOneLiner((computed as any).confidence, distinctDays) : '';
-
-                return (
-                  <>
-                    <div className="text-xs text-white/80 mt-1">{sourceLine}{because}</div>
-                    <div className="text-sm text-white/90 mt-3">{phaseLine}</div>
-                    {confLine ? <div className="text-xs text-white/80 mt-2">{confLine}</div> : null}
-                    {experimentLearnings && (experimentLearnings as any).length ? (
-                      <div className="mt-4 rounded-2xl bg-white/10 p-4">
-                        <div className="text-xs text-white/80 font-semibold">From your experiments</div>
-                        <div className="mt-2 space-y-2">
-                          {(experimentLearnings as any).slice(0, 2).map((l: any, i: number) => (
-                            <div key={i} className="text-sm text-white/90">
-                              {l.body}
-                              {l.confidenceHint ? <div className="text-xs text-white/70 mt-1">{l.confidenceHint}</div> : null}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {whatsComing && (whatsComing as any).length ? (
-                      <div className="mt-3 rounded-2xl bg-white/10 p-4">
-                        <div className="text-xs text-white/80 font-semibold">What might be coming next</div>
-                        <ul className="mt-2 space-y-2">
-                          {(whatsComing as any).slice(0, 2).map((p: any, i: number) => (
-                            <li key={i} className="text-sm text-white/90">
-                              {p.text}
-                              {p.confidenceHint ? <div className="text-xs text-white/70 mt-1">{p.confidenceHint}</div> : null}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-
-                  </>
-                );
-              })()}
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-white/80">Confidence</div>
-              <div className="text-sm font-medium text-white/90">{computed.confidence}</div>
-            </div>
-          </div>
-
-          <p className="eb-hero-on-dark-muted text-white/90">
-            {content.heroBody}
-          </p>
-
-          <div className="eb-inset rounded-xl p-4 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
-            <div className="text-base font-medium text-neutral-800">Gentle reminder</div>
-            <div className="text-base text-neutral-800 font-normal">{gentleReminder}</div>
-          </div>
-        </div>
+        <RhythmHero
+          entries={computed.sorted}
+          userData={(userData ?? ({} as any)) as UserData}
+          phaseKey={phaseKey}
+          phaseTitle={computed.soft}
+          phaseSubtitle={`${computed.sci} phase`}
+          phaseDescription={phaseOneLiner(phaseKey, (((userData ?? {}) as any).goal ?? null) as any)}
+          confidenceLabel={computed.confidence}
+          phaseIcon={phaseIcon}
+        />
 
         {/* It grows with you (reassurance) */}
         <div className="eb-card p-6 sm:p-8">
