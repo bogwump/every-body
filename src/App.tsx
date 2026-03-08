@@ -6,6 +6,7 @@ import { Insights } from './components/Insights';
 import { Rhythm } from './components/Rhythm';
 import { ProfileSettings } from './components/ProfileSettings';
 import { History } from './components/History';
+import { InsightsErrorBoundary } from './components/InsightsErrorBoundary';
 import { CalendarView } from './components/CalendarView';
 import { Navigation } from './components/Navigation';
 
@@ -224,7 +225,11 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
         );
 
         case 'insights':
-          return <Insights userData={userData} onOpenCheckIn={navigateToCheckIn} onUpdateUserData={setUserData} />;
+          return (
+            <InsightsErrorBoundary>
+              <Insights userData={userData} onOpenCheckIn={navigateToCheckIn} onUpdateUserData={setUserData} />
+            </InsightsErrorBoundary>
+          );
 
       case 'history':
         return <History onNavigate={setCurrentScreen} />;

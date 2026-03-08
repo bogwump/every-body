@@ -41,6 +41,7 @@ import { getExperimentHistoryContext, getHelpfulPatternsFromExperiments } from '
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
+import { pushRuntimeDebug } from '../lib/runtimeDebug';
 
 interface InsightsProps {
   userData: UserData;
@@ -577,6 +578,17 @@ export function Insights({ userData, onOpenCheckIn, onUpdateUserData }: Insights
   const entriesAllSorted = useMemo(() => sortByDateAsc(Array.isArray(entries) ? entries : []), [entries]);
 
   const [timeframe, setTimeframe] = useState<Timeframe>('month');
+
+  useEffect(() => {
+    pushRuntimeDebug('insights', 'Insights mounted', {
+      entries: Array.isArray(entries) ? entries.length : 0,
+      customSymptoms: Array.isArray(userData?.customSymptoms) ? userData.customSymptoms.length : 0,
+      enabledModules: Array.isArray(userData?.enabledModules) ? userData.enabledModules.length : 0,
+    });
+    return () => {
+      pushRuntimeDebug('insights', 'Insights unmounted');
+    };
+  }, [entries, userData]);
   const [smoothTrends, setSmoothTrends] = useState<boolean>(false);
   const [sleepExploreOpen, setSleepExploreOpen] = useState<boolean>(false);
   // Persist the user's last overlay choice (nice on mobile where you can't hover)
