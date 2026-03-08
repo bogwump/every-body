@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Calendar, TrendingUp, MessageCircle, Moon, User } from 'lucide-react';
+import { Home, Calendar, TrendingUp, History as HistoryIcon, Moon, User } from 'lucide-react';
 
 import appLogo from '../assets/everybody-logo-256.png';
 
@@ -11,9 +11,9 @@ interface NavigationProps {
 const navItems = [
   { id: 'dashboard', label: 'Home', icon: Home },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
-  { id: 'resources', label: 'Rhythm', icon: Moon },
+  { id: 'rhythm', label: 'Rhythm', icon: Moon },
   { id: 'insights', label: 'Insights', icon: TrendingUp },
-  { id: 'chat', label: 'Chat', icon: MessageCircle },
+  { id: 'history', label: 'History', icon: HistoryIcon },
   { id: 'profile', label: 'Profile', icon: User }
 ];
 

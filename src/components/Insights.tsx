@@ -2024,6 +2024,19 @@ const confirmFinishExperiment = () => {
     openPrefilledExperiment(pending);
   }, []);
 
+  useEffect(() => {
+    try {
+      const focus = localStorage.getItem('everybody:v2:page_focus');
+      if (!focus) return;
+      if (focus === 'insights:experiments') {
+        window.setTimeout(() => scrollToInsightsSection('eb-experiments'), 60);
+      }
+      localStorage.removeItem('everybody:v2:page_focus');
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const experimentComparison = useMemo(() => {
     if (!experimentStatus) return null;
     try {

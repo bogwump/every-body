@@ -3,9 +3,9 @@ import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { DailyCheckIn } from './components/DailyCheckIn';
 import { Dashboard } from './components/Dashboard';
 import { Insights } from './components/Insights';
-import { AIChat } from './components/AIChat';
 import { Rhythm } from './components/Rhythm';
 import { ProfileSettings } from './components/ProfileSettings';
+import { History } from './components/History';
 import { CalendarView } from './components/CalendarView';
 import { Navigation } from './components/Navigation';
 
@@ -226,8 +226,8 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
         case 'insights':
           return <Insights userData={userData} onOpenCheckIn={navigateToCheckIn} onUpdateUserData={setUserData} />;
 
-      case 'chat':
-        return <AIChat userName={userData.name || 'there'} userData={userData} />;
+      case 'history':
+        return <History onNavigate={setCurrentScreen} />;
 
       case 'rhythm':
       case 'resources':
@@ -272,7 +272,7 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
             ? // Most pages need space for the iPhone bottom nav.
               // Eve is a full-height chat screen, so we avoid the extra page padding and
               // handle safe spacing inside the chat layout itself.
-              (currentScreen === 'chat' ? 'md:pl-64' : 'pb-20 md:pb-0 md:pl-64')
+              'pb-20 md:pb-0 md:pl-64'
             : ''
         }
       >

@@ -610,9 +610,9 @@ export function Dashboard({
   <DashboardTile
     title="Guide"
     subtitle="Start with a daily check-in. After a few days you can spot early patterns, and after a week it gets even clearer."
-    cta="Ask a question in chat"
+    cta="Open History"
     icon={<Lightbulb className="w-5 h-5" />}
-    onClick={() => onNavigate('chat')}
+    onClick={() => onNavigate('history')}
   />
 </div>
 
