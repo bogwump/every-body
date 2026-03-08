@@ -6,6 +6,7 @@ import { createMoment, getActiveMoments, getCompanionMoments, getHighestPriority
 import { generateExperimentSuggestions, getExperimentForSignal, rankExperimentSuggestions } from './experimentSuggestions';
 import { detectLongCycle, detectShortCycle, detectUnusualPhaseLength } from './rhythmDiagnostics';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
+import { getConfidencePhrase } from './confidenceCopy';
 import { phaseLabelFromKey } from './phaseChange';
 
 function hasMomentWithId(id: string): boolean {
@@ -26,13 +27,13 @@ function patternCopy(signal: InsightSignal): { title: string; body: string } {
   const metric = String(signal.metrics?.[0] ?? 'This pattern');
   const niceMetric = metric.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
   if (signal.id.includes('sleep_before_bleed')) {
-    return { title: 'Sleep tends to dip before your bleed', body: 'Insights has picked up a repeat pattern around sleep worth keeping an eye on.' };
+    return { title: `Sleep ${getConfidencePhrase('high')} dip before your bleed`, body: 'Insights has picked up a repeat pattern around sleep that looks worth keeping an eye on.' };
   }
   if (signal.type === 'metric_pair') {
     return { title: `${niceMetric} is showing a clearer pattern`, body: 'Insights has noticed a stronger link between a couple of your recent signals.' };
   }
   if (signal.type === 'phase_shift') {
-    return { title: `${niceMetric} often shifts with this part of your cycle`, body: 'This has started looking repeatable enough to feel worth noticing.' };
+    return { title: `${niceMetric} ${getConfidencePhrase('high')} shift with this part of your cycle`, body: 'This has started looking repeatable enough to feel worth noticing.' };
   }
   return { title: `${niceMetric} has started standing out`, body: 'Insights has picked up a pattern that looks more repeatable now.' };
 }

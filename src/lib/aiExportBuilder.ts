@@ -6,6 +6,7 @@ import { buildTimelineEvents } from './timelineBuilder';
 import { getRhythmTimingModel } from './rhythmTiming';
 import { phaseLabelFromKey } from './phaseChange';
 import { getAverageCycleLength } from './phaseHistory';
+import { getConfidencePhrase, getHelpfulPhrase } from './confidenceCopy';
 
 export type AIExportContext = {
   generatedAtISO: string;
@@ -70,15 +71,21 @@ function describeSignal(signal: InsightSignal): string {
   const id = String(signal.id || '').toLowerCase();
   const metricA = metricLabel(String(signal.metrics?.[0] || 'this pattern'));
   const metricB = metricLabel(String(signal.metrics?.[1] || ''));
+  const phrase = getConfidencePhrase(signal.confidence);
 
-  if (id.includes('sleep_before_bleed')) return 'Sleep tends to dip before bleeding starts.';
-  if (id.includes('stress') && id.includes('sleep')) return 'Stressful days are often followed by worse sleep.';
-  if (id.includes('brainfog') || id.includes('brain_fog')) return 'Brain fog has started to show a repeat pattern.';
-  if (signal.type === 'metric_pair' && metricB) return `${toTitleCase(metricA)} and ${metricB} often move together.`;
-  if (signal.type === 'phase_shift' && signal.phase) return `${toTitleCase(metricA)} often shifts during your ${String(signal.phase).toLowerCase()} phase.`;
+  if (id.includes('sleep_before_bleed')) return `Sleep ${phrase} dip before bleeding starts.`;
+  if (id.includes('stress') && id.includes('sleep')) {
+    if (signal.confidence === 'high') return 'Stressful days are often followed by worse sleep.';
+    if (signal.confidence === 'medium') return 'Stressful days seem to be followed by worse sleep.';
+    if (signal.confidence === 'low') return 'Stressful days might sometimes be followed by worse sleep.';
+    return 'This sleep pattern is still emerging.';
+  }
+  if (id.includes('brainfog') || id.includes('brain_fog')) return 'Brain fog is showing a pattern that is still emerging.';
+  if (signal.type === 'metric_pair' && metricB) return `${toTitleCase(metricA)} and ${metricB} ${phrase} move together.`;
+  if (signal.type === 'phase_shift' && signal.phase) return `${toTitleCase(metricA)} ${phrase} shift during your ${String(signal.phase).toLowerCase()} phase.`;
   if (signal.type === 'trend_shift') return `${toTitleCase(metricA)} has been shifting over time.`;
-  if (signal.type === 'weekday_pattern') return `${toTitleCase(metricA)} shows a day-of-week pattern.`;
-  return `${toTitleCase(metricA)} is showing a clearer pattern.`;
+  if (signal.type === 'weekday_pattern') return `${toTitleCase(metricA)} has shown a day-of-week pattern that is still emerging.`;
+  return `${toTitleCase(metricA)} is showing a pattern that is still emerging.`;
 }
 
 function outcomeLabel(status?: string): string {
@@ -118,7 +125,7 @@ export function buildHelpfulPatternsSummary(): string[] {
   return getHelpfulPatternsFromExperiments()
     .filter((item) => item.confidence === 'moderate' || item.confidence === 'high')
     .slice(0, 3)
-    .map((item) => item.text);
+    .map((item) => item.text.replace('seems to help', getHelpfulPhrase(item.confidence)).replace('may support', getHelpfulPhrase(item.confidence)));
 }
 
 export function buildExperimentSummary(): AIExportContext['experiments'] {

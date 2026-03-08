@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, CheckCircle2, Clock3, FlaskConical, Heart, RefreshCw, Sparkles } from 'lucide-react';
-import { buildTimelineEvents, filterTimelineEvents, type TimelineEvent, type TimelineFilter } from '../lib/timelineBuilder';
+import { buildTimelineEvents, filterTimelineEvents, getTimelineSummary, groupEventsByMonth, type TimelineEvent, type TimelineFilter } from '../lib/timelineBuilder';
 
 interface HistoryProps {
   onNavigate: (screen: string) => void;
@@ -43,20 +43,6 @@ function iconForEvent(type: TimelineEvent['type']) {
   }
 }
 
-function summaryLine(events: TimelineEvent[]): string {
-  const patterns = events.filter((event) => event.type === 'pattern_discovered').length;
-  const helped = events.filter((event) => event.type === 'experiment_helped').length;
-  const shifts = events.filter((event) => event.type === 'phase_change' || event.type === 'rhythm_shift').length;
-
-  const bits = [
-    `${patterns} pattern${patterns === 1 ? '' : 's'} discovered`,
-    `${helped} experiment${helped === 1 ? '' : 's'} looked helpful`,
-    `${shifts} rhythm shift${shifts === 1 ? '' : 's'} recorded`,
-  ];
-
-  return bits.join(' · ');
-}
-
 function setPageFocus(target?: string) {
   if (!target || !target.includes(':')) return;
   try {
@@ -82,6 +68,8 @@ export function History({ onNavigate }: HistoryProps) {
 
   const events = useMemo(() => buildTimelineEvents(40), []);
   const visible = useMemo(() => filterTimelineEvents(events, filter), [events, filter]);
+  const summary = useMemo(() => getTimelineSummary(events), [events]);
+  const grouped = useMemo(() => groupEventsByMonth(visible), [visible]);
 
   const empty = visible.length === 0;
 
@@ -96,7 +84,7 @@ export function History({ onNavigate }: HistoryProps) {
             <div className="text-xs uppercase tracking-[0.2em] text-[rgb(var(--color-text-secondary))]">History</div>
             <h1 className="mt-1">Your story so far</h1>
             <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
-              {summaryLine(events)}
+              {summary.patterns} pattern{summary.patterns === 1 ? '' : 's'} discovered · {summary.helpfulExperiments} experiment{summary.helpfulExperiments === 1 ? '' : 's'} looked helpful · {summary.phaseChanges} phase shift{summary.phaseChanges === 1 ? '' : 's'} recorded
             </p>
           </div>
         </div>
@@ -139,40 +127,47 @@ export function History({ onNavigate }: HistoryProps) {
           </div>
         </section>
       ) : (
-        <section className="space-y-4">
-          {visible.map((event) => {
-            const Icon = iconForEvent(event.type);
-            return (
-              <article key={event.id} className="eb-card">
-                <div className="flex items-start gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-accent)/0.18)] text-[rgb(var(--color-primary))] flex items-center justify-center shrink-0 mt-0.5">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3>{event.title}</h3>
-                        <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">{event.description}</p>
+        <section className="space-y-6">
+          {grouped.map((group) => (
+            <div key={group.label} className="space-y-4">
+              <div className="px-1">
+                <div className="text-xs uppercase tracking-[0.18em] text-[rgb(var(--color-text-secondary))]">{group.label}</div>
+              </div>
+              {group.events.map((event) => {
+                const Icon = iconForEvent(event.type);
+                return (
+                  <article key={event.id} className="eb-card">
+                    <div className="flex items-start gap-4">
+                      <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-accent)/0.18)] text-[rgb(var(--color-primary))] flex items-center justify-center shrink-0 mt-0.5">
+                        <Icon className="w-5 h-5" />
                       </div>
-                      <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">{fmtDate(event.date)}</div>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3>{event.title}</h3>
+                            <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">{event.description}</p>
+                          </div>
+                          <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">{fmtDate(event.date)}</div>
+                        </div>
 
-                    {event.actionLabel && event.actionTarget ? (
-                      <div className="mt-4">
-                        <button
-                          type="button"
-                          className="eb-btn eb-btn-secondary"
-                          onClick={() => navigateToTarget(event.actionTarget, onNavigate)}
-                        >
-                          {event.actionLabel}
-                        </button>
+                        {event.actionLabel && event.actionTarget ? (
+                          <div className="mt-4">
+                            <button
+                              type="button"
+                              className="eb-btn eb-btn-secondary"
+                              onClick={() => navigateToTarget(event.actionTarget, onNavigate)}
+                            >
+                              {event.actionLabel}
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ))}
         </section>
       )}
     </div>

@@ -2,6 +2,7 @@ import type { CheckInEntry, InsightMetricKey, UserData } from '../types';
 import type { InsightSignal } from './insightEngine';
 import { generateCandidateInsights, rankInsights, scoreInsights } from './insightEngine';
 import { getExperimentsForSignal, getHelpfulPatternsForMetrics } from './experimentLearning';
+import { getRhythmPhrase } from './confidenceCopy';
 
 export type RhythmPhaseKey = 'reset' | 'rebuilding' | 'expressive' | 'protective';
 
@@ -76,14 +77,14 @@ function copyForSignal(signal: InsightSignal, userData: UserData, phaseKey: Rhyt
   const b = metricB ? metricLabel(metricB, userData) : 'things';
 
   if (signal.type === 'phase_shift' && metricA) {
-    if (signal.direction === 'higher') return `Based on your logs, ${a} often rises around here.`;
-    if (signal.direction === 'lower') return `Based on your logs, ${a} can feel a little lower around here.`;
+    if (signal.direction === 'higher') return `Based on your logs, ${a} ${getRhythmPhrase(signal.confidence)} rises around here.`;
+    if (signal.direction === 'lower') return `Based on your logs, ${a} ${getRhythmPhrase(signal.confidence)} feels a little lower around here.`;
   }
 
   if (signal.type === 'trend_shift' && metricA) {
     if (signal.direction === 'higher') {
-      if (metricA === 'energy') return 'Based on your logs, energy often starts to lift around here.';
-      if (metricA === 'sleep') return 'Sleep can feel a bit heavier around here.';
+      if (metricA === 'energy') return `Based on your logs, energy ${getRhythmPhrase(signal.confidence)} starts to lift around here.`;
+      if (metricA === 'sleep') return `Sleep ${getRhythmPhrase(signal.confidence)} feels a bit heavier around here.`;
       return `Lately, ${a} has been creeping up around this point.`;
     }
     if (signal.direction === 'lower') {
@@ -101,15 +102,15 @@ function copyForSignal(signal: InsightSignal, userData: UserData, phaseKey: Rhyt
       if ((metricA === 'sleep' && metricB === 'energy') || (metricA === 'energy' && metricB === 'sleep')) {
         return 'Sleep and energy often pull against each other for you here.';
       }
-      return `${a[0].toUpperCase() + a.slice(1)} and ${b} often move in opposite directions for you here.`;
+      return `${a[0].toUpperCase() + a.slice(1)} and ${b} ${getRhythmPhrase(signal.confidence)} move in opposite directions for you here.`;
     }
     if ((metricA === 'stress' && metricB === 'fatigue') || (metricA === 'fatigue' && metricB === 'stress')) {
-      return 'Stress and fatigue often rise together for you here.';
+      return `Stress and fatigue ${getRhythmPhrase(signal.confidence)} rise together for you here.`;
     }
     if ((metricA === 'sleep' && metricB === 'energy') || (metricA === 'energy' && metricB === 'sleep')) {
-      return 'Better sleep often lines up with steadier energy here.';
+      return `Better sleep ${getRhythmPhrase(signal.confidence)} lines up with steadier energy here.`;
     }
-    return `${a[0].toUpperCase() + a.slice(1)} and ${b} often move together for you around here.`;
+    return `${a[0].toUpperCase() + a.slice(1)} and ${b} ${getRhythmPhrase(signal.confidence)} move together for you around here.`;
   }
 
   if (signal.type === 'weekday_pattern' && metricA) {

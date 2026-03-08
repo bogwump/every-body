@@ -1430,13 +1430,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       case 'phase_shift': {
         if (primary === 'Sleep') {
           return signal.direction === 'higher'
-            ? `Sleep has tended to feel more unsettled in your ${phaseName} phase.`
-            : `Sleep has tended to feel steadier in your ${phaseName} phase.`;
+            ? (signal.confidence === 'high' ? `Sleep has tended to feel more unsettled in your ${phaseName} phase.` : signal.confidence === 'medium' ? `Sleep has seemed a little more unsettled in your ${phaseName} phase.` : `Sleep might sometimes feel more unsettled in your ${phaseName} phase.`)
+            : (signal.confidence === 'high' ? `Sleep has tended to feel steadier in your ${phaseName} phase.` : signal.confidence === 'medium' ? `Sleep has seemed steadier in your ${phaseName} phase.` : `Sleep might sometimes feel steadier in your ${phaseName} phase.`);
         }
         if (primary === 'Energy') {
           return signal.direction === 'higher'
-            ? `Energy has tended to run lower in your ${phaseName} phase.`
-            : `Energy has tended to feel steadier in your ${phaseName} phase.`;
+            ? (signal.confidence === 'high' ? `Energy has tended to run lower in your ${phaseName} phase.` : signal.confidence === 'medium' ? `Energy has seemed a little lower in your ${phaseName} phase.` : `Energy might sometimes run lower in your ${phaseName} phase.`)
+            : (signal.confidence === 'high' ? `Energy has tended to feel steadier in your ${phaseName} phase.` : signal.confidence === 'medium' ? `Energy has seemed steadier in your ${phaseName} phase.` : `Energy might sometimes feel steadier in your ${phaseName} phase.`);
         }
         if (primary === 'Overall mood') {
           return signal.direction === 'higher'
@@ -1458,17 +1458,17 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         const b = secondary.toLowerCase();
         if ((primary === 'Sleep' && secondary === 'Stress') || (primary === 'Stress' && secondary === 'Sleep')) {
           return signal.direction === 'together'
-            ? 'Stressful days have often been followed by worse sleep.'
-            : 'Calmer days have often lined up with steadier sleep.';
+            ? (signal.confidence === 'high' ? 'Stressful days have often been followed by worse sleep.' : signal.confidence === 'medium' ? 'Stressful days have seemed to be followed by worse sleep.' : 'Stressful days might sometimes be followed by worse sleep.')
+            : (signal.confidence === 'high' ? 'Calmer days have often lined up with steadier sleep.' : signal.confidence === 'medium' ? 'Calmer days have seemed to line up with steadier sleep.' : 'Calmer days might sometimes line up with steadier sleep.');
         }
         if ((primary === 'Sleep' && secondary === 'Energy') || (primary === 'Energy' && secondary === 'Sleep')) {
           return signal.direction === 'together'
-            ? 'Sleep and energy have often moved together.'
-            : 'Better sleep has often been followed by steadier energy.';
+            ? `Sleep and energy ${getConfidencePhrase(signal.confidence)} move together.`
+            : (signal.confidence === 'high' ? 'Better sleep has often been followed by steadier energy.' : signal.confidence === 'medium' ? 'Better sleep has seemed to be followed by steadier energy.' : 'Better sleep might sometimes be followed by steadier energy.');
         }
         return signal.direction === 'together'
-          ? `${primary} and ${b} have often moved together.`
-          : `When ${a} has been higher, ${b} has often been lower.`;
+          ? `${primary} and ${b} ${getConfidencePhrase(signal.confidence)} move together.`
+          : (signal.confidence === 'high' ? `When ${a} has been higher, ${b} has often been lower.` : signal.confidence === 'medium' ? `When ${a} has been higher, ${b} has sometimes looked lower.` : `When ${a} has been higher, ${b} might sometimes have been lower.`);
       }
       case 'weekday_pattern': {
         const when = dayMap[String(signal.summary.day ?? '')] ?? `on ${String(signal.summary.day ?? 'that day')}`;

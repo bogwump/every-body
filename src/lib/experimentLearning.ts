@@ -1,6 +1,7 @@
 import type { ExperimentHistoryItem, InsightMetricKey } from '../types';
+import { getHelpfulPhrase } from './confidenceCopy';
 
-export type HelpfulMemoryConfidence = 'low' | 'moderate' | 'high';
+export type HelpfulMemoryConfidence = 'very_low' | 'low' | 'moderate' | 'high';
 
 export type HelpfulPattern = {
   type: 'helpful_pattern';
@@ -51,8 +52,8 @@ function classifyExperiment(item: ExperimentHistoryItem): Omit<HelpfulPattern, '
       signal: 'sleep_before_bleed',
       intervention: 'wind_down_routine',
       metrics: uniq(['sleep', 'energy', ...metrics]) as InsightMetricKey[],
-      text: 'Earlier nights seem to support your sleep quality.',
-      shortText: 'Earlier nights seem to support your sleep quality.',
+      text: `Earlier nights ${getHelpfulPhrase('high')} your sleep quality.`,
+      shortText: `Earlier nights ${getHelpfulPhrase('high')} your sleep quality.`,
     };
   }
 
@@ -62,8 +63,8 @@ function classifyExperiment(item: ExperimentHistoryItem): Omit<HelpfulPattern, '
       signal: 'stress_sleep_link',
       intervention: 'lower_friction_evenings',
       metrics: uniq(['stress', 'sleep', 'mood', ...metrics]) as InsightMetricKey[],
-      text: 'Lower-friction evenings seem to support sleep after stressful days.',
-      shortText: 'Lower-friction evenings seem to support sleep after stressful days.',
+      text: `Lower-friction evenings ${getHelpfulPhrase('high')} sleep after stressful days.`,
+      shortText: `Lower-friction evenings ${getHelpfulPhrase('high')} sleep after stressful days.`,
     };
   }
 
@@ -73,8 +74,8 @@ function classifyExperiment(item: ExperimentHistoryItem): Omit<HelpfulPattern, '
       signal: 'energy_morning_boost',
       intervention: 'morning_rhythm',
       metrics: uniq(['energy', 'fatigue', 'sleep', ...metrics]) as InsightMetricKey[],
-      text: 'A steadier morning rhythm seems to support your energy.',
-      shortText: 'A steadier morning rhythm seems to support your energy.',
+      text: `A steadier morning rhythm ${getHelpfulPhrase('high')} your energy.`,
+      shortText: `A steadier morning rhythm ${getHelpfulPhrase('high')} your energy.`,
     };
   }
 
@@ -84,8 +85,8 @@ function classifyExperiment(item: ExperimentHistoryItem): Omit<HelpfulPattern, '
       signal: 'cravings_protective',
       intervention: 'snack_timing',
       metrics: uniq(['appetite', 'energy', ...metrics]) as InsightMetricKey[],
-      text: 'Having snacks ready earlier may help your energy feel steadier.',
-      shortText: 'Having snacks ready earlier may help energy feel steadier.',
+      text: `Having snacks ready earlier ${getHelpfulPhrase('moderate')} steadier energy.`,
+      shortText: `Having snacks ready earlier ${getHelpfulPhrase('moderate')} steadier energy.`,
     };
   }
 
@@ -95,8 +96,8 @@ function classifyExperiment(item: ExperimentHistoryItem): Omit<HelpfulPattern, '
       signal: 'sleep_support_general',
       intervention: 'sleep_support',
       metrics: uniq(['sleep', ...metrics]) as InsightMetricKey[],
-      text: 'Earlier nights have looked helpful for your sleep before.',
-      shortText: 'Earlier nights have looked helpful for your sleep.',
+      text: `Earlier nights ${getHelpfulPhrase('low')} for your sleep.`,
+      shortText: `Earlier nights ${getHelpfulPhrase('low')} for your sleep.`,
     };
   }
 
@@ -140,7 +141,7 @@ export function getHelpfulPatternsFromExperiments(): HelpfulPattern[] {
       const confidence: HelpfulMemoryConfidence =
         group.score >= 2 ? 'high' :
         group.score >= 1 ? 'moderate' :
-        'low';
+        'very_low';
       return {
         ...group.base,
         confidence,

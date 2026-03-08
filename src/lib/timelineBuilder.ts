@@ -306,6 +306,46 @@ export function filterTimelineEvents(events: TimelineEvent[], filter: TimelineFi
   return events;
 }
 
+
+
+export function countPatternEvents(events: TimelineEvent[]): number {
+  return events.filter((event) => event.type === 'pattern_discovered').length;
+}
+
+export function countHelpfulExperiments(events: TimelineEvent[]): number {
+  return events.filter((event) => event.type === 'experiment_helped').length;
+}
+
+export function countPhaseChanges(events: TimelineEvent[]): number {
+  return events.filter((event) => event.type === 'phase_change' || event.type === 'rhythm_shift').length;
+}
+
+export function getTimelineSummary(events: TimelineEvent[]) {
+  return {
+    patterns: countPatternEvents(events),
+    helpfulExperiments: countHelpfulExperiments(events),
+    phaseChanges: countPhaseChanges(events),
+  };
+}
+
+export function groupEventsByMonth(events: TimelineEvent[]): Array<{ label: string; events: TimelineEvent[] }> {
+  const groups = new Map<string, TimelineEvent[]>();
+  for (const event of events) {
+    const key = String(event.date || '').slice(0, 7);
+    if (!key) continue;
+    const existing = groups.get(key) ?? [];
+    existing.push(event);
+    groups.set(key, existing);
+  }
+  return Array.from(groups.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, items]) => {
+      const [year, month] = key.split('-').map(Number);
+      const label = year && month ? new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : key;
+      return { label, events: sortTimelineEvents(items) };
+    });
+}
+
 export function buildTimelineEvents(limit = 40): TimelineEvent[] {
   const all = [
     ...buildPhaseEvents(),
