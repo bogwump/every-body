@@ -1,4 +1,5 @@
 import type { InsightSignal } from './insightEngine';
+import { getExperimentHistoryContext } from './experimentLearning';
 
 export type ExperimentSuggestion = {
   id: string;
@@ -68,10 +69,14 @@ export function getExperimentForSignal(signal: InsightSignal): ExperimentForSign
 function suggestionForSignal(signal: InsightSignal): ExperimentSuggestion | null {
   const experiment = getExperimentForSignal(signal);
   if (!experiment) return null;
+  const historyContext = getExperimentHistoryContext(experiment.experimentId);
+  const note = historyContext.text
+    ? `${experiment.experimentDescription} ${historyContext.text}`
+    : experiment.experimentDescription;
   return {
     id: `experiment:${signal.id}`,
     title: `Try a ${experiment.experimentName.toLowerCase()}`,
-    note: experiment.experimentDescription,
+    note,
     metrics: experiment.metrics,
     rank: signal.score + (signal.confidence === 'high' ? 10 : signal.confidence === 'medium' ? 6 : 2),
     experimentId: experiment.experimentId,

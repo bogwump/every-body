@@ -21,6 +21,7 @@ import {
 import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
 import { CompanionMomentHistory } from './CompanionMomentHistory';
 import { TryNextCard, type TryNextItem } from './TryNextCard';
+import { WhatsHelpingCard } from './WhatsHelpingCard';
 import { getMomentHistory } from '../lib/companionMoments';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
@@ -36,6 +37,7 @@ import { getExperimentForSignal } from '../lib/experimentSuggestions';
 import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, saveAction } from '../lib/savedActions';
 import { recordExperimentOutcome } from '../lib/experimentOutcomes';
 import { consumePendingExperimentLaunch, inferPendingExperimentLaunchFromText } from '../lib/experimentLaunch';
+import { getExperimentHistoryContext, getHelpfulPatternsFromExperiments } from '../lib/experimentLearning';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
@@ -1535,10 +1537,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       const experiment = getExperimentForSignal(signal);
       if (!experiment) continue;
       if (isDismissedAction(experiment.experimentId)) continue;
+      const historyContext = getExperimentHistoryContext(experiment.experimentId);
       items.push({
         id: experiment.experimentId,
         title: experiment.experimentName,
-        description: experiment.experimentDescription,
+        description: historyContext.text
+          ? `${experiment.experimentDescription} ${historyContext.text}`
+          : experiment.experimentDescription,
         label: isSavedAction(experiment.experimentId) ? 'Saved' : 'Suggested',
         saved: isSavedAction(experiment.experimentId),
         signal,
@@ -1677,6 +1682,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const { experiment, setExperiment, clearExperiment } = useExperiment();
   const { history: experimentHistory, upsertHistoryItem } = useExperimentHistory();
 
+  const helpfulPatterns = useMemo(
+    () => getHelpfulPatternsFromExperiments().filter((item) => item.confidence !== 'low').slice(0, 3),
+    [experimentHistory, entriesAllSorted.length],
+  );
+  const helpfulHeroLine = helpfulPatterns[0]?.text ?? null;
 
   const CUSTOM_EXPERIMENT_MAX_METRICS = 5;
   const [preOpenExperimentConfirm, setPreOpenExperimentConfirm] = useState<
@@ -3287,6 +3297,13 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
+          {helpfulHeroLine ? (
+            <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
+              <div className="text-sm font-semibold text-black">What&apos;s been helping</div>
+              <div className="mt-1 text-sm text-[rgba(0,0,0,0.68)]">{helpfulHeroLine}</div>
+            </div>
+          ) : null}
+
           <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
             <div className="text-sm font-semibold text-black">Explore deeper insights</div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -3317,6 +3334,8 @@ const tryNextPrompts = useMemo(() => {
       </div>
 
       <CompanionMomentHistory moments={companionMomentHistory} onSelectMoment={handleCompanionMomentSelect} />
+
+      <WhatsHelpingCard items={helpfulPatterns.map((item) => item.text)} />
 
       {/* Highlights + Top findings carousel */}
       <div id="eb-full-insights" className="eb-card">

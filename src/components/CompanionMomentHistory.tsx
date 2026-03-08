@@ -12,6 +12,8 @@ function iconForType(type: CompanionMoment['type']) {
     case 'experiment_suggestion':
     case 'experiment_result_ready':
       return <FlaskConical className="w-4 h-4" />;
+    case 'helpful_pattern_detected':
+      return <Sparkles className="w-4 h-4" />;
     case 'rhythm_shift':
       return <Activity className="w-4 h-4" />;
     default:
@@ -30,6 +32,8 @@ function lineForMoment(moment: CompanionMoment): string {
       return typeof data.title === 'string' ? data.title : 'Experiment idea suggested';
     case 'experiment_result_ready':
       return typeof data.title === 'string' ? data.title : 'Experiment result ready';
+    case 'helpful_pattern_detected':
+      return typeof data.title === 'string' ? data.title : 'Something that helps has started standing out';
     case 'rhythm_shift':
       return typeof data.title === 'string' ? data.title : 'Rhythm shift noticed';
     case 'unlock_milestone':

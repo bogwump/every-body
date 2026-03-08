@@ -1,6 +1,7 @@
 import type { CheckInEntry, InsightMetricKey, UserData } from '../types';
 import type { InsightSignal } from './insightEngine';
 import { generateCandidateInsights, rankInsights, scoreInsights } from './insightEngine';
+import { getExperimentsForSignal, getHelpfulPatternsForMetrics } from './experimentLearning';
 
 export type RhythmPhaseKey = 'reset' | 'rebuilding' | 'expressive' | 'protective';
 
@@ -181,6 +182,25 @@ export function getRhythmSupportNudge(args: {
   entries: CheckInEntry[];
 }): string {
   const signalMetric = args.strongestSignal?.metrics?.[0];
+
+  const helpfulForSignal = args.strongestSignal
+    ? getExperimentsForSignal(String(args.strongestSignal.id || '')).filter((item) => item.confidence !== 'low')[0] ?? null
+    : null;
+  const helpfulForMetric = signalMetric
+    ? getHelpfulPatternsForMetrics([signalMetric]).filter((item) => item.confidence !== 'low')[0] ?? null
+    : null;
+  const helpful = helpfulForSignal ?? helpfulForMetric;
+
+  if (helpful) {
+    if (helpful.signal === 'sleep_before_bleed' || helpful.signal === 'sleep_support_general') {
+      return 'Earlier nights have seemed helpful for you in this phase before.';
+    }
+    if (helpful.signal === 'stress_sleep_link') {
+      return 'Lower-friction evenings have looked helpful for you after stressful days before.';
+    }
+    return helpful.shortText;
+  }
+
   if (signalMetric) {
     const phrase = metricSupportPhrase(signalMetric, args.userData);
     if (phrase === 'Give yourself a little more breathing room today, if you can.') return 'Give yourself a little more breathing room today, if you can.';

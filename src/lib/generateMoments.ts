@@ -5,6 +5,7 @@ import { getDiscoveredPatterns, getTopInsights } from './insightEngine';
 import { createMoment, getActiveMoments, getCompanionMoments, getHighestPriorityMoment } from './companionMoments';
 import { generateExperimentSuggestions, getExperimentForSignal, rankExperimentSuggestions } from './experimentSuggestions';
 import { detectLongCycle, detectShortCycle, detectUnusualPhaseLength } from './rhythmDiagnostics';
+import { getHelpfulPatternsFromExperiments } from './experimentLearning';
 import { phaseLabelFromKey } from './phaseChange';
 
 function hasMomentWithId(id: string): boolean {
@@ -112,6 +113,25 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
     }
   }
 
+  const helpfulPattern = getHelpfulPatternsFromExperiments().filter((item) => item.confidence !== 'low')[0] ?? null;
+  if (helpfulPattern && !active.some((moment) => moment.type === 'helpful_pattern_detected')) {
+    const helpfulDate = helpfulPattern.lastEvidenceDate || refISO;
+    const helpfulId = `helpful:${helpfulPattern.signal}:${helpfulPattern.evidenceCount}:${helpfulDate}`;
+    if (!hasMomentWithId(helpfulId)) {
+      createMoment({
+        id: helpfulId,
+        type: 'helpful_pattern_detected',
+        date: helpfulDate,
+        data: {
+          signalId: helpfulPattern.signal,
+          title: 'Something that helps',
+          body: helpfulPattern.text,
+        },
+      });
+      return;
+    }
+  }
+
   const strongestSignal = getTopInsights(entries, userData, 6).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low');
   const topSuggestion = rankExperimentSuggestions(generateExperimentSuggestions(strongestSignal))[0] ?? null;
   if (topSuggestion && !active.some((moment) => moment.type === 'experiment_suggestion')) {
@@ -127,7 +147,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
         signalId: sourceSignal?.id,
         experimentId: linkedExperiment?.experimentId ?? topSuggestion.experimentId,
         experimentName: linkedExperiment?.experimentName ?? topSuggestion.experimentName,
-        experimentDescription: linkedExperiment?.experimentDescription ?? topSuggestion.experimentDescription,
+        experimentDescription: topSuggestion.note || linkedExperiment?.experimentDescription || topSuggestion.experimentDescription,
         metrics: linkedExperiment?.metrics ?? topSuggestion.metrics,
         durationDays: linkedExperiment?.durationDays ?? topSuggestion.durationDays,
         changeKey: linkedExperiment?.changeKey ?? topSuggestion.changeKey,
