@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Pencil,
   FlaskConical,
+  Leaf,
 } from 'lucide-react';
 
 import type { CheckInEntry, SymptomKey, UserData, ExperimentPlan, InsightMetricKey } from '../types';
@@ -24,6 +25,7 @@ import { EBDialogContent } from "./EBDialog";
 import { isoToday } from '../lib/analytics';
 import { isoFromDateLocal } from '../lib/date';
 import { useEntries, useExperiment } from '../lib/appStore';
+import { applyPhaseChangeForEntries, phaseLabelFromKey } from '../lib/phaseChange';
 
 const INFLUENCE_DEFS: Array<{ key: string; label: string; hint: string }> = [
   {
@@ -385,6 +387,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   // When bleeding starts, ask whether this is a new period or just spotting/breakthrough.
   const [periodPromptOpen, setPeriodPromptOpen] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<CheckInEntry | null>(null);
+  const [phaseChangeNotice, setPhaseChangeNotice] = useState<{ phase: string } | null>(null);
   // Behavioural influences (kept discreet, but not hidden)
   const [influencesOpen, setInfluencesOpen] = useState(false);
   const [eventsState, setEventsState] = useState<Record<string, boolean>>({});
@@ -562,6 +565,43 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     });
   }, [activeDateISO]);
 
+  const saveEntryWithPhaseCheck = useCallback((entry: CheckInEntry) => {
+    const entryISO = (entry as any).dateISO;
+    const nextEntries = [
+      ...entries.filter((e) => {
+        const iso = (e as any).dateISO || (e as any).date;
+        return iso !== entryISO;
+      }),
+      entry,
+    ] as CheckInEntry[];
+
+    upsertEntry(entry as any);
+
+    try {
+      const today = isoToday();
+      if (activeDateISO === today) {
+        localStorage.removeItem('eb_checkin_dismissed_date');
+      }
+    } catch {
+      // ignore
+    }
+
+    const phaseChange = applyPhaseChangeForEntries({
+      previousEntries: entries,
+      nextEntries,
+      userData,
+    });
+
+    safeBlur();
+
+    if (phaseChange.changed && phaseChange.currentPhase) {
+      setPhaseChangeNotice({ phase: phaseChange.currentPhase });
+      return;
+    }
+
+    onDone();
+  }, [entries, upsertEntry, activeDateISO, userData, onDone]);
+
   const handleSubmit = () => {
     const now = new Date().toISOString();
 
@@ -640,9 +680,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       if (startedBleeding && !alreadyBreakthrough) {
         // If the user prefers not to be asked each time, auto-start the period.
         if (userData.autoStartPeriodFromBleeding) {
-          upsertEntry({ ...(next as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
-          safeBlur();
-          onDone();
+          saveEntryWithPhaseCheck({ ...(next as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
           return;
         }
 
@@ -652,18 +690,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       }
     }
 
-    upsertEntry(next as any);
-    // If they saved today, clear any prior dismissal for today (best-effort)
-    try {
-      const today = isoToday();
-      if (activeDateISO === today) {
-        localStorage.removeItem('eb_checkin_dismissed_date');
-      }
-    } catch {
-      // ignore
-    }
-    safeBlur();
-    onDone();
+    saveEntryWithPhaseCheck(next as any);
   };
 
   return (
@@ -707,11 +734,9 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
               className="eb-btn-secondary"
               onClick={() => {
                 if (!pendingEntry) return;
-                upsertEntry({ ...(pendingEntry as any), cycleStartOverride: undefined, breakthroughBleed: true } as any);
+                saveEntryWithPhaseCheck({ ...(pendingEntry as any), cycleStartOverride: undefined, breakthroughBleed: true } as any);
                 setPeriodPromptOpen(false);
                 setPendingEntry(null);
-                safeBlur();
-                onDone();
               }}
             >
               Just spotting
@@ -721,14 +746,58 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
               className="eb-btn-primary"
               onClick={() => {
                 if (!pendingEntry) return;
-                upsertEntry({ ...(pendingEntry as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
+                saveEntryWithPhaseCheck({ ...(pendingEntry as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
                 setPeriodPromptOpen(false);
                 setPendingEntry(null);
-                safeBlur();
-                onDone();
               }}
             >
               Start period
+            </button>
+          </DialogFooter>
+        </EBDialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(phaseChangeNotice)} onOpenChange={(open) => { if (!open) setPhaseChangeNotice(null); }}>
+        <EBDialogContent
+          title="New phase detected"
+          description="Your Rhythm page has been updated with your latest phase."
+        >
+          <DialogHeader>
+            <DialogTitle>New phase detected</DialogTitle>
+            <DialogDescription>
+              You’ve moved into {phaseLabelFromKey(phaseChangeNotice?.phase)}. Your Rhythm page has been updated.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="eb-card mt-3">
+            <div className="flex items-start gap-3">
+              <span className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0 text-[rgb(var(--color-primary))]">
+                <Leaf className="w-5 h-5" />
+              </span>
+              <p className="text-[rgb(var(--color-text-secondary))]">Open Rhythm to see what tends to show up for you here and what may support you next.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              className="eb-btn-secondary"
+              onClick={() => {
+                setPhaseChangeNotice(null);
+                onDone();
+              }}
+            >
+              Dismiss
+            </button>
+            <button
+              type="button"
+              className="eb-btn-primary"
+              onClick={() => {
+                setPhaseChangeNotice(null);
+                onNavigate?.('rhythm');
+              }}
+            >
+              View your rhythm
             </button>
           </DialogFooter>
         </EBDialogContent>

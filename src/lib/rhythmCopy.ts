@@ -55,11 +55,11 @@ function metricSupportPhrase(key: InsightMetricKey, userData?: UserData): string
   const phrases: Record<string, string> = {
     sleep: 'Protect your wind-down tonight if you can.',
     energy: 'Let energy build gradually rather than forcing momentum.',
-    stress: 'Lower the bar a little and protect your breathing room.',
+    stress: 'Give yourself a little more breathing room today, if you can.',
     fatigue: 'Let recovery count as progress today.',
-    mood: 'Keep the day gentle and give yourself a softer baseline.',
-    appetite: 'Keep satisfying snacks nearby so you are not caught short.',
-    brainFog: 'Keep things simple and avoid overloading yourself.',
+    mood: 'Keep the day a little gentler and easier to land in.',
+    appetite: 'Keep satisfying snacks nearby so the day feels easier to support.',
+    brainFog: 'Keep things simple and give yourself a bit less to carry.',
     pain: 'Choose comfort where you can and keep plans flexible.',
     cramps: 'Warmth, rest, and a lighter pace may help today feel easier.',
     nightSweats: 'Keep your evening setup cool and low effort tonight.',
@@ -189,7 +189,7 @@ export function getRhythmSupportNudge(args: {
     reset: 'Keep the day simple where you can. Comfort counts.',
     rebuilding: 'Let momentum build gently rather than expecting a full bounce-back.',
     expressive: 'Use the lift if it is there, but leave yourself some breathing room.',
-    protective: 'Protect your energy a bit more than usual and keep the bar realistic.',
+    protective: 'Protect your energy a little more than usual and keep things kind to yourself.',
   };
 
   void args.entries;

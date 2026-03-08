@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload } from 'lucide-react';
+import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload, Leaf, X } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -17,6 +17,7 @@ import { buildHomepageHeroModel, computeCycleStats, estimatePhaseByFlow, filterB
 import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
 import { importBackupFile, parseBackupJson, looksLikeInsightsExport } from '../lib/backup';
+import { dismissRecentPhaseChange, getRecentPhaseChange, phaseLabelFromKey } from '../lib/phaseChange';
 
 interface DashboardProps {
   userName: string;
@@ -223,6 +224,13 @@ export function Dashboard({
     if (userData.cycleTrackingMode !== 'cycle') return null;
     return estimatePhaseByFlow(todayISO, entriesSorted);
   }, [userData.cycleTrackingMode, todayISO, entriesSorted]);
+
+  const recentPhaseChange = useMemo(() => getRecentPhaseChange(), [entriesSorted.length, todayISO]);
+  const [phaseCalloutDismissed, setPhaseCalloutDismissed] = useState(false);
+  React.useEffect(() => {
+    setPhaseCalloutDismissed(false);
+  }, [recentPhaseChange?.phase, recentPhaseChange?.changedAt]);
+  const showRecentPhaseChange = Boolean(recentPhaseChange && !recentPhaseChange.dismissed && !phaseCalloutDismissed);
 
   function dayPhaseKey(p: any) {
     if (p === 'Ovulatory') return 'Ovulation';
@@ -463,7 +471,36 @@ export function Dashboard({
           <p>{todayLabel}</p>
         </div>
 
-                {/* HERO: Symptom tracking */}
+        
+        {showRecentPhaseChange ? (
+          <div className="eb-card mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
+                <div className="text-[rgb(var(--color-primary))]"><Leaf className="w-5 h-5" /></div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-1">You’ve moved into a new phase</h3>
+                <p className="text-sm text-[rgba(0,0,0,0.68)]">You’re now in {phaseLabelFromKey(recentPhaseChange?.phase)}. Head to Rhythm to see what often shows up for you here.</p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button type="button" className="eb-btn-primary" onClick={() => onNavigate('rhythm')}>View rhythm</button>
+                  <button
+                    type="button"
+                    className="eb-btn-secondary inline-flex items-center gap-2"
+                    onClick={() => {
+                      dismissRecentPhaseChange();
+                      setPhaseCalloutDismissed(true);
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* HERO: Symptom tracking */}
         <div className="eb-card eb-hero eb-hero-surface rounded-2xl p-6 relative">
           {/* Calendar icon */}
           <button

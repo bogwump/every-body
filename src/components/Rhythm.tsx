@@ -126,7 +126,7 @@ const phaseContent: Record<PhaseKey, PhaseContent> = {
   },
   protective: {
     heroBody:
-      'This is your Protective window. Many people feel more inward, more sensitive, and benefit from softer pacing. It’s a good time to protect energy and lower the bar a little.',
+      'This is your Protective window. Many people feel more inward, more sensitive, and benefit from softer pacing. It’s a good time to protect energy and be a little gentler with yourself.',
     lookLikeIntro:
       'These can be common signs in Protective. Over time, we’ll swap more of these for patterns that are uniquely yours.',
     lookLikeBullets: [
@@ -738,7 +738,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
               <div className="eb-inset rounded-xl p-4 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
                 <div className="text-base font-medium text-neutral-800">{content.nextPlanTitle}</div>
-                <div className="text-base text-neutral-800 font-normal">{content.nextPlanBody}</div>
+                <div className="mt-1 text-base text-neutral-800 font-normal">{content.nextPlanBody}</div>
               </div>
             </div>
           </div>

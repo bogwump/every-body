@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { CheckInEntry, UserData } from '../types';
 import { getRhythmLowDataNudge, getRhythmLowDataPatternLines, getRhythmPatternLines, getRhythmSupportNudge, type RhythmPhaseKey } from '../lib/rhythmCopy';
+import { getRhythmTimingModel } from '../lib/rhythmTiming';
 import { RhythmPatternBubble } from './RhythmPatternBubble';
 import { RhythmPhaseHeader } from './RhythmPhaseHeader';
 import { RhythmSupportBubble } from './RhythmSupportBubble';
@@ -26,6 +27,8 @@ export function RhythmHero(props: {
     return getRhythmPatternLines(props.entries, props.userData, props.phaseKey, 2);
   }, [lowData, props.entries, props.userData, props.phaseKey]);
 
+  const timingModel = useMemo(() => getRhythmTimingModel(props.entries, props.userData), [props.entries, props.userData]);
+
   const supportNudge = useMemo(() => {
     if (lowData) return getRhythmLowDataNudge();
     return getRhythmSupportNudge({
@@ -44,6 +47,8 @@ export function RhythmHero(props: {
         phaseSubtitle={props.phaseSubtitle}
         description={props.phaseDescription}
         confidenceLabel={props.confidenceLabel}
+        timingCopy={timingModel.timingCopy}
+        progressPercent={timingModel.progressPercent}
       />
 
       <RhythmPatternBubble
