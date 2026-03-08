@@ -487,13 +487,21 @@ export function getDiscoveredPatterns(): StoredDiscoveredPattern[] {
   return safeReadJson<StoredDiscoveredPattern[]>(DISCOVERED_PATTERNS_KEY, []);
 }
 
+function qualifiesForDiscovery(signal: InsightSignal): boolean {
+  if (signal.type === 'low_data') return false;
+  if (signal.type === 'weekday_pattern') return false;
+  if (signal.confidence === 'low') return false;
+  if (signal.strength === 'weak') return false;
+  return true;
+}
+
 export function markPatternsDiscovered(signals: InsightSignal[]): void {
   if (!signals.length) return;
   const existing = getDiscoveredPatterns();
   const map = new Map(existing.map((item) => [item.id, item]));
   const today = isoTodayLocal();
   signals.forEach((signal) => {
-    if (signal.type === 'low_data') return;
+    if (!qualifiesForDiscovery(signal)) return;
     if (map.has(signal.id)) return;
     map.set(signal.id, {
       id: signal.id,
@@ -526,9 +534,42 @@ export function selectStableHeroInsights(rankedSignals: InsightSignal[], limit =
 
   const today = isoTodayLocal();
   const discovered = new Set(getDiscoveredPatterns().map((item) => item.id));
-  const fallback = ranked.slice(0, Math.max(1, limit));
   const existingRotation = getRotationState();
   const availableIds = new Set(ranked.map((signal) => signal.id));
+
+  const withDiscoveryFlag = (signals: InsightSignal[]) =>
+    signals.map((signal) => ({ ...signal, isNewPattern: qualifiesForDiscovery(signal) && !discovered.has(signal.id) }));
+
+  const buildSelection = () => {
+    const normalPreferred = ranked.filter(
+      (signal) => signal.type !== 'low_data' && (!qualifiesForDiscovery(signal) || discovered.has(signal.id)),
+    );
+    const moderateOrBetter = normalPreferred.filter((signal) => signal.confidence !== 'low' && signal.strength !== 'weak');
+    const weakNormals = normalPreferred.filter((signal) => !moderateOrBetter.some((item) => item.id === signal.id));
+    const discoveryCandidate = ranked.find((signal) => qualifiesForDiscovery(signal) && !discovered.has(signal.id));
+
+    const selected: InsightSignal[] = [];
+    const seen = new Set<string>();
+    const push = (signal?: InsightSignal | null) => {
+      if (!signal) return;
+      if (seen.has(signal.id)) return;
+      seen.add(signal.id);
+      selected.push(signal);
+    };
+
+    push(moderateOrBetter[0] ?? weakNormals[0] ?? ranked.find((signal) => signal.type !== 'low_data') ?? ranked[0]);
+    push(moderateOrBetter[1] ?? weakNormals[0] ?? weakNormals[1]);
+    if (selected.length < limit && discoveryCandidate) push(discoveryCandidate);
+
+    if (selected.length < limit) {
+      for (const signal of ranked) {
+        push(signal);
+        if (selected.length >= limit) break;
+      }
+    }
+
+    return selected.slice(0, Math.max(1, limit));
+  };
 
   if (
     existingRotation?.lastRotation &&
@@ -542,20 +583,13 @@ export function selectStableHeroInsights(rankedSignals: InsightSignal[], limit =
       .filter((signal): signal is InsightSignal => !!signal)
       .slice(0, limit);
     if (sticky.length) {
-      return sticky.map((signal) => ({ ...signal, isNewPattern: !discovered.has(signal.id) && signal.type !== 'low_data' }));
+      return withDiscoveryFlag(sticky);
     }
   }
 
-  const undiscovered = ranked.filter((signal) => !discovered.has(signal.id) && signal.type !== 'low_data');
-  const lead = undiscovered[0] ?? fallback[0];
-  const remaining = ranked.filter((signal) => signal.id !== lead.id);
-  const rotationSeed = Math.floor(hashIds(ranked.map((signal) => signal.id)) / 17) + Math.floor(daysBetween('2026-01-01', today) / ROTATION_DAYS);
-  const rotated = remaining.length
-    ? remaining.map((_, idx, arr) => arr[(idx + (rotationSeed % arr.length)) % arr.length])
-    : [];
-  const selected = [lead, ...rotated].slice(0, Math.max(1, limit));
+  const selected = buildSelection();
   saveRotationState({ lastRotation: today, insightIds: selected.map((signal) => signal.id) });
-  return selected.map((signal) => ({ ...signal, isNewPattern: !discovered.has(signal.id) && signal.type !== 'low_data' }));
+  return withDiscoveryFlag(selected);
 }
 
 export function metricLabelsForSignal(signal: InsightSignal, userData: UserData): string[] {

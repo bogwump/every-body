@@ -1384,12 +1384,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   type HeroInsightItem = {
     id: string;
     text: string;
-    confidence: 'low' | 'medium' | 'high';
     isNewPattern: boolean;
   };
-
-  const confidenceLabel = (confidence: 'low' | 'medium' | 'high') =>
-    confidence === 'high' ? 'High confidence' : confidence === 'medium' ? 'Medium confidence' : 'Low confidence';
 
   const copyForInsightSignal = (signal: InsightSignal): string => {
     const labels = metricLabelsForSignal(signal, userData);
@@ -1478,7 +1474,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const items: HeroInsightItem[] = heroSignals.map((signal) => ({
       id: signal.id,
       text: copyForInsightSignal(signal),
-      confidence: signal.confidence,
       isNewPattern: signal.isNewPattern,
     }));
 
@@ -1497,11 +1492,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             {
               id: 'hero-fallback',
               text: 'We will start spotting clearer trends after a few more check-ins.',
-              confidence: 'low',
               isNewPattern: false,
             },
           ],
-      confidenceLabel,
     };
   }, [currentInsightsPhase, heroSignals]);
 
@@ -3086,17 +3079,14 @@ const tryNextPrompts = useMemo(() => {
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.65)]">
               {heroInsightState.items.length ? (
                 heroInsightState.items.map((item) => (
-                  <div key={item.id} className="rounded-2xl bg-white/30 px-3 py-3 border border-white/30">
+                  <div key={item.id} className="leading-6">
                     {item.isNewPattern ? (
-                      <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[rgba(0,0,0,0.62)]">
+                      <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[rgba(0,0,0,0.62)] mr-2">
                         <Sparkles className="h-3.5 w-3.5" />
                         <span>New pattern spotted</span>
                       </div>
                     ) : null}
-                    <p className="leading-6 text-[rgba(0,0,0,0.65)]">{item.text}</p>
-                    <div className="mt-1 text-xs font-medium text-[rgba(0,0,0,0.50)]">
-                      {heroInsightState.confidenceLabel(item.confidence)}
-                    </div>
+                    <span className="text-[rgba(0,0,0,0.65)]">{item.text}</span>
                   </div>
                 ))
               ) : (
