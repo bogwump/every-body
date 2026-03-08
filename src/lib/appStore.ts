@@ -23,6 +23,10 @@ export const BACKUP_KEYS = [
   "eb_dismissed_experiment_prompts_v1",
   "everybody:v2:discovered_patterns",
   "everybody:v2:insights_hero_rotation",
+  "everybody:v2:last_detected_phase",
+  "everybody:v2:recent_phase_change",
+  "everybody:v2:phase_history",
+  "everybody:v2:companion_moments",
 ] as const;
 
 export type BackupPayload = Partial<Record<(typeof BACKUP_KEYS)[number], string | null>>;

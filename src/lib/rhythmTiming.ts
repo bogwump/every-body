@@ -1,6 +1,7 @@
 import type { CheckInEntry, UserData } from '../types';
 import type { RhythmPhaseKey } from './rhythmCopy';
-import { getRhythmModel } from './analytics';
+import { getRhythmModel, isoToday } from './analytics';
+import { getAverageCycleLength, getAveragePhaseLength, getCurrentPhaseEntry, getPhaseElapsedDays } from './phaseHistory';
 
 export type RhythmTimingModel = {
   currentDay: number | null;
@@ -69,12 +70,15 @@ export function getRhythmTimingModel(entries: CheckInEntry[], userData: UserData
   const phaseKey = (rhythm.phaseKey ?? 'protective') as RhythmPhaseKey;
   const lowData = distinctDays < 5;
 
-  if (rhythm.dayInCycle != null && rhythm.dayInCycle >= 1) {
-    const bounds = getPhaseBounds(phaseKey, rhythm.cycleLen || 28);
-    const totalDays = Math.max(1, bounds.end - bounds.start + 1);
-    const currentDay = clamp(rhythm.dayInCycle - bounds.start + 1, 1, totalDays);
-    const daysRemaining = Math.max(0, totalDays - currentDay);
-    const approximate = rhythm.source === 'inferred' || lowData;
+  const currentEntry = getCurrentPhaseEntry();
+  const historicalPhaseLength = getAveragePhaseLength(phaseKey, null);
+  const historicalCycleLength = getAverageCycleLength(rhythm.cycleLen || 28);
+
+  if (currentEntry && currentEntry.phase === phaseKey) {
+    const currentDay = getPhaseElapsedDays(isoToday()) ?? null;
+    const totalDays = historicalPhaseLength ?? getDefaultPhaseLength(phaseKey);
+    const daysRemaining = currentDay ? Math.max(0, totalDays - currentDay) : null;
+    const approximate = lowData || !historicalPhaseLength;
     const model: RhythmTimingModel = {
       currentDay,
       totalDays,
@@ -87,7 +91,26 @@ export function getRhythmTimingModel(entries: CheckInEntry[], userData: UserData
     return model;
   }
 
-  const totalDays = getDefaultPhaseLength(phaseKey);
+  if (rhythm.dayInCycle != null && rhythm.dayInCycle >= 1) {
+    const bounds = getPhaseBounds(phaseKey, historicalCycleLength || rhythm.cycleLen || 28);
+    const boundedLength = Math.max(1, bounds.end - bounds.start + 1);
+    const totalDays = historicalPhaseLength ?? boundedLength;
+    const currentDay = clamp(rhythm.dayInCycle - bounds.start + 1, 1, totalDays);
+    const daysRemaining = Math.max(0, totalDays - currentDay);
+    const approximate = rhythm.source === 'inferred' || lowData || !historicalPhaseLength;
+    const model: RhythmTimingModel = {
+      currentDay,
+      totalDays,
+      daysRemaining,
+      progressPercent: getPhaseProgressPercent(currentDay, totalDays),
+      timingCopy: '',
+      approximate,
+    };
+    model.timingCopy = getTimingStripCopy(model);
+    return model;
+  }
+
+  const totalDays = historicalPhaseLength ?? getDefaultPhaseLength(phaseKey);
   const currentDay = lowData ? null : Math.max(1, Math.min(totalDays - 1, Math.round(totalDays * 0.35)));
   const daysRemaining = currentDay ? Math.max(0, totalDays - currentDay) : null;
   const model: RhythmTimingModel = {

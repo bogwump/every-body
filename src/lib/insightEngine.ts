@@ -156,7 +156,14 @@ function confidenceFromStrength(value: number, sampleSize: number): InsightConfi
 }
 
 function confidenceToNumber(confidence: InsightConfidence): number {
-  return confidence === 'high' ? 0.8 : confidence === 'medium' ? 0.6 : 0.4;
+  return confidence === 'high' ? 0.85 : confidence === 'medium' ? 0.65 : 0.4;
+}
+
+function recencyWeight(sampleSize: number): number {
+  if (sampleSize >= 14) return 8;
+  if (sampleSize >= 9) return 5;
+  if (sampleSize >= 6) return 2;
+  return 0;
 }
 
 function strengthFromValue(value: number): InsightStrength {
@@ -434,9 +441,12 @@ export function generateCandidateInsights(
 
 export function scoreInsights(candidates: InsightSignal[]): InsightSignal[] {
   return candidates.map((candidate) => {
-    const confidenceBoost = candidate.confidence === 'high' ? 10 : candidate.confidence === 'medium' ? 5 : 0;
-    const strengthBoost = candidate.strength === 'strong' ? 8 : candidate.strength === 'moderate' ? 4 : 0;
-    return { ...candidate, score: candidate.score + confidenceBoost + strengthBoost };
+    const confidenceBoost = candidate.confidence === 'high' ? 11 : candidate.confidence === 'medium' ? 6 : 0;
+    const strengthBoost = candidate.strength === 'strong' ? 10 : candidate.strength === 'moderate' ? 4 : 0;
+    const typeBoost = candidate.type === 'phase_shift' ? 14 : candidate.type === 'metric_pair' ? 7 : candidate.type === 'trend_shift' ? 3 : candidate.type === 'weekday_pattern' ? -20 : 0;
+    const cycleBoost = candidate.phase && candidate.phase !== 'Unknown' ? 6 : 0;
+    const repeatabilityBoost = recencyWeight(candidate.sampleSize);
+    return { ...candidate, score: candidate.score + confidenceBoost + strengthBoost + typeBoost + cycleBoost + repeatabilityBoost };
   });
 }
 
@@ -490,8 +500,10 @@ export function getDiscoveredPatterns(): StoredDiscoveredPattern[] {
 function qualifiesForDiscovery(signal: InsightSignal): boolean {
   if (signal.type === 'low_data') return false;
   if (signal.type === 'weekday_pattern') return false;
+  if (signal.sampleSize < 6) return false;
   if (signal.confidence === 'low') return false;
-  if (signal.strength === 'weak') return false;
+  if (signal.strength !== 'strong' && signal.score < 82) return false;
+  if (signal.type === 'trend_shift' && signal.confidence !== 'high') return false;
   return true;
 }
 

@@ -1,5 +1,7 @@
 import type { CheckInEntry, UserData } from '../types';
 import { getRhythmModel, isoToday, sortByDateAsc } from './analytics';
+import { createMoment } from './companionMoments';
+import { getCurrentPhaseEntry, updatePhaseHistory } from './phaseHistory';
 
 const LAST_DETECTED_PHASE_KEY = 'everybody:v2:last_detected_phase';
 const RECENT_PHASE_CHANGE_KEY = 'everybody:v2:recent_phase_change';
@@ -115,7 +117,13 @@ export function applyPhaseChangeForEntries(args: {
   const changed = detectPhaseChange(previousStored, currentPhase);
 
   if (currentPhase) {
-    if (changed) setRecentPhaseChange(currentPhase, args.refISO);
+    if (changed) {
+      setRecentPhaseChange(currentPhase, args.refISO);
+      updatePhaseHistory(currentPhase, args.refISO ?? isoToday());
+      createMoment({ type: 'phase_change', phase: currentPhase, date: todayISOOr(args.refISO) });
+    } else if (!getCurrentPhaseEntry()) {
+      updatePhaseHistory(currentPhase, args.refISO ?? isoToday());
+    }
     setStoredPhase(currentPhase, args.refISO);
   }
 

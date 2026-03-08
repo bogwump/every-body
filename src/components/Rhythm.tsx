@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
 import { RhythmHero } from './RhythmHero';
+import { PhaseHistoryCard } from './PhaseHistoryCard';
 import { useEntries, useExperimentHistory } from '../lib/appStore';
 import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
 import { getExperimentLearnings, getWhatsComingPredictions } from '../lib/rhythmPredictions';
+import { getPhaseHistory } from '../lib/phaseHistory';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
 
@@ -453,6 +455,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
   const { history: experimentHistory } = useExperimentHistory();
   // Back-compat: some older wiring passed entries via userData. Prefer store entries.
   const entries: CheckInEntry[] = (Array.isArray((userData as any)?.entries) ? ((userData as any).entries as any[]) : storeEntries) as any;
+  const phaseHistory = useMemo(() => getPhaseHistory(), [entries]);
 
   const daysLogged = useMemo(() => {
     try {
@@ -748,6 +751,8 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             </div>
           </div>
         </div>
+
+        <PhaseHistoryCard history={phaseHistory} />
 
         {/* What usually comes next */}
         <div className="eb-card p-6">
