@@ -3032,7 +3032,7 @@ const tryNextPrompts = useMemo(() => {
         </div>
 
         <div className="mt-4 space-y-3">
-          <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
+          <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)] insights-hero-bubble">
             <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">Your body lately</div>
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.65)]">
               {insightHeroItems.length ? (
@@ -3045,26 +3045,26 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
-            <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">Explore deeper insights</div>
+          <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
+            <div className="text-sm font-semibold text-black">Explore deeper insights</div>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
                 onClick={() => scrollToInsightsSection('eb-sleep-trend')}
               >
                 See sleep trend
               </button>
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
                 onClick={() => scrollToInsightsSection('eb-experiments')}
               >
                 Run experiment
               </button>
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
                 onClick={() => scrollToInsightsSection('eb-insights-settings')}
               >
                 Change metrics
@@ -4306,7 +4306,7 @@ const tryNextPrompts = useMemo(() => {
       {/* Your settings */}
       <div
         id="eb-insights-settings"
-        className="insights-settings-card rounded-2xl p-6 shadow-sm"
+        className="insights-settings-card bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30 shadow-sm"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -4355,7 +4355,7 @@ const tryNextPrompts = useMemo(() => {
             <DialogTrigger asChild>
               <button
                 type="button"
-                className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-sm text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+                className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-sm text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
               >
                 Change metrics
               </button>
