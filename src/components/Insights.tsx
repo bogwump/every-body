@@ -60,6 +60,20 @@ function fmtDateShort(iso: string): string {
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function fmtDateUi(iso: string, includeYear = false): string {
+  const [y, m, d] = iso.split('-').map((s) => Number(s));
+  if (!y || !m || !d) return iso;
+  const dd = String(d).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  return includeYear ? `${dd}-${mm}-${y}` : `${dd}-${mm}`;
+}
+
+function isoDatePartFromDateTime(value?: string): string | null {
+  if (!value || typeof value !== 'string') return null;
+  const m = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
 function hasNum(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v);
 }
@@ -1614,6 +1628,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           completedAtISO,
           rating: (plan as any)?.outcome?.rating,
           note: (plan as any)?.outcome?.note,
+          digest: (plan as any)?.outcome?.digest,
         },
       });
     } catch {
@@ -1915,7 +1930,48 @@ const uniq = new Map<string, (typeof items)[number]>();
     setDismissedPrompts((prev) => ({ ...(prev || {}), [id]: until }));
   };
 
-  
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [openHistoryCardId, setOpenHistoryCardId] = useState<string | null>(null);
+
+  const daysBetweenIso = (fromIso: string, toIso: string) => {
+    try {
+      const from = new Date(`${fromIso}T00:00:00`);
+      const to = new Date(`${toIso}T00:00:00`);
+      return Math.floor((to.getTime() - from.getTime()) / 86400000);
+    } catch {
+      return Number.POSITIVE_INFINITY;
+    }
+  };
+
+  const rerunHistoryExperiment = (item: any) => {
+    if (!item) return;
+    const metrics = (Array.isArray(item?.metrics) ? item.metrics : []).slice(0, CUSTOM_EXPERIMENT_MAX_METRICS) as MetricKey[];
+    const durationDays = Math.max(3, Number(item?.durationDays ?? 3));
+    const title = typeof item?.title === 'string' && item.title.trim() ? item.title.trim() : 'Your experiment';
+    const kind = item?.kind === 'track' ? 'track' : 'change';
+
+    if (kind === 'track') {
+      openExperiment(metrics, { mode: 'track', durationDays });
+      return;
+    }
+
+    setCustomExperimentTitle(title);
+    setCustomExperimentChangeKey(typeof item?.changeKey === 'string' ? item.changeKey : '');
+    setExperimentMetrics(metrics);
+    setExperimentDurationDays(durationDays);
+    setIsCustomExperiment(true);
+    setExperimentChangeKey(typeof item?.changeKey === 'string' ? item.changeKey : '');
+    setExperimentPlan({
+      title,
+      steps: [
+        'Try ONE small change for the duration.',
+        'Keep everything else roughly the same, if you can.',
+        'Log your chosen measures each day, then review the before/after summary.',
+      ],
+      note: 'Reuse this experiment as a second pass if you want to sense-check what happened last time.',
+    });
+    setExperimentOpen(true);
+  };
 
   const leverLabel = (changeKey: string) => {
     switch (changeKey) {
@@ -2288,6 +2344,29 @@ const tryNextPrompts = useMemo(() => {
 
     return selected.slice(0, 6);
   }, [entriesAllSorted, userData, dismissedPrompts]);
+
+  const visibleTryNextPrompts = useMemo(() => tryNextPrompts, [tryNextPrompts]);
+
+  const visibleSuggestedExperiments = useMemo(() => {
+    const today = isoTodayLocal();
+    const recentlyCompleted = new Set<string>();
+    (Array.isArray(experimentHistory) ? experimentHistory : []).forEach((item: any) => {
+      const completedIso = isoDatePartFromDateTime(item?.outcome?.completedAtISO) || item?.startDateISO;
+      if (!completedIso) return;
+      if (daysBetweenIso(completedIso, today) > 28) return;
+      const titleKey = typeof item?.title === 'string' ? item.title.trim().toLowerCase() : '';
+      const metricsKey = Array.isArray(item?.metrics) ? item.metrics.map((k: any) => String(k)).sort().join('|') : '';
+      if (titleKey) recentlyCompleted.add(`title:${titleKey}`);
+      if (metricsKey) recentlyCompleted.add(`metrics:${metricsKey}`);
+    });
+
+    return suggestedExperiments.filter((item) => {
+      const titleKey = typeof item?.title === 'string' ? item.title.trim().toLowerCase() : '';
+      const metricsKey = Array.isArray(item?.metrics) ? item.metrics.map((k: any) => String(k)).sort().join('|') : '';
+      return !recentlyCompleted.has(`title:${titleKey}`) && !recentlyCompleted.has(`metrics:${metricsKey}`);
+    });
+  }, [suggestedExperiments, experimentHistory]);
+
   const [outcomeNote, setOutcomeNote] = useState<string>('');
   const lastOutcomeNoteExperimentIdRef = useRef<string | null>(null);
   const [showAllExperimentMetrics, setShowAllExperimentMetrics] = useState(false);
@@ -2429,11 +2508,8 @@ const tryNextPrompts = useMemo(() => {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">No active experiment</div>
-              <div className="mt-1 text-sm eb-muted">Start small. You can always change it later.</div>
+              <div className="mt-1 text-sm eb-muted">Start small. Choose a suggestion below, or create your own at the bottom.</div>
             </div>
-            <button type="button" className="eb-btn eb-btn-primary" onClick={openCustomExperiment}>
-              Set up 3-day experiment
-            </button>
           </div>
         </div>
       );
@@ -2471,7 +2547,7 @@ const tryNextPrompts = useMemo(() => {
                 ? 'Finished'
                 : started
                   ? `Day ${experimentStatus.day} of ${ex.durationDays ?? 3}`
-                  : `Starts ${ex.startDateISO}`}
+                  : `Starts ${fmtDateUi(ex.startDateISO, false)}`}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">{metricPills}</div>
           </div>
@@ -2611,8 +2687,8 @@ const tryNextPrompts = useMemo(() => {
           ? `You have logged ${cmp.duringDaysWithAny}/${cmp.durationDays} experiment day(s) so far · Usual baseline uses ${Number((cmp as any).baselineDaysUsed ?? cmp.beforeDaysWithAny)} day(s)`
           : `You have logged ${cmp.duringDaysWithAny}/${cmp.durationDays} experiment day(s) so far · Baseline uses ${cmp.beforeDaysWithAny} recent day(s)`
         : experimentCompareMode === 'usual' && hasUsual
-          ? `Usual baseline: ${cmp.window.beforeStartISO} → ${cmp.window.beforeEndISO} (${Number((cmp as any).baselineDaysUsed ?? cmp.beforeDaysWithAny)} day(s)) · During: ${cmp.window.duringStartISO} → ${cmp.window.duringEndISO}`
-          : `Before: ${cmp.window.beforeStartISO} → ${cmp.window.beforeEndISO} · During: ${cmp.window.duringStartISO} → ${cmp.window.duringEndISO}`;
+          ? `Usual baseline: ${fmtDateUi(cmp.window.beforeStartISO, true)} → ${fmtDateUi(cmp.window.beforeEndISO, true)} (${Number((cmp as any).baselineDaysUsed ?? cmp.beforeDaysWithAny)} day(s)) · During: ${fmtDateUi(cmp.window.duringStartISO, true)} → ${fmtDateUi(cmp.window.duringEndISO, true)}`
+          : `Before: ${fmtDateUi(cmp.window.beforeStartISO, mode === 'conclusion')} → ${fmtDateUi(cmp.window.beforeEndISO, mode === 'conclusion')} · During: ${fmtDateUi(cmp.window.duringStartISO, mode === 'conclusion')} → ${fmtDateUi(cmp.window.duringEndISO, mode === 'conclusion')}`;
 
     if (!cmp.metrics.length) return null;
 
@@ -3999,14 +4075,14 @@ const tryNextPrompts = useMemo(() => {
           <div className="mt-1 text-sm eb-muted">Two lanes: quick "Try next" nudges from your recent patterns, and deeper ideas when the signal is strong.</div>
 
           {/* Try next: pattern-aware prompts (Option B) */}
-          {tryNextPrompts.length > 0 && (
+          {visibleTryNextPrompts.length > 0 && (
             <div className="mt-3">
               <div className="text-sm font-semibold">Try next</div>
               <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
               <div className="mt-3">
                 <Carousel opts={{ align: 'start' }} className="w-full">
                   <CarouselContent>
-                    {tryNextPrompts.map((p) => (
+                    {visibleTryNextPrompts.map((p) => (
                       <CarouselItem key={p.id} className="basis-full md:basis-1/2">
                         <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
                           <div className="flex items-start justify-between gap-3">
@@ -4073,11 +4149,11 @@ const tryNextPrompts = useMemo(() => {
           )}
 
           {/* Strong signal: existing confidence-gated suggestions */}
-          <div className={tryNextPrompts.length ? 'mt-6' : 'mt-3'}>
+          <div className={visibleTryNextPrompts.length ? 'mt-6' : 'mt-3'}>
             <div className="text-sm font-semibold">When the signal is strong</div>
             <div className="mt-1 text-sm eb-muted">These start to appear as you log more days together.</div>
 
-            {suggestedExperiments.length === 0 ? (
+            {visibleSuggestedExperiments.length === 0 ? (
               <div className="mt-3 eb-inset rounded-2xl p-5 text-sm eb-muted !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
                 To generate these, the app needs overlap between a behaviour (like sleep, caffeine, late nights) and how you feel. If you are mainly logging body symptoms, try switching on Sleep or Stress for a few days and this section will start to fill up.
               </div>
@@ -4085,7 +4161,7 @@ const tryNextPrompts = useMemo(() => {
               <div className="mt-3">
                 <Carousel opts={{ align: 'start' }} className="w-full">
                   <CarouselContent>
-                    {suggestedExperiments.map((s) => {
+                    {visibleSuggestedExperiments.map((s) => {
                       const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
                       return (
                         <CarouselItem key={s.id} className="basis-full md:basis-1/2">
@@ -4135,7 +4211,7 @@ const tryNextPrompts = useMemo(() => {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="min-w-0">
               <div className="text-sm font-semibold">Run your own experiment</div>
-              <div className="mt-1 text-sm eb-muted">Name it first, then pick what you’re changing and what you’ll measure.</div>
+              <div className="mt-1 text-sm eb-muted">Name it first, then pick one small thing to change and what you’ll measure. Start simple. You can always change it later.</div>
             </div>
             <button
               type="button"
@@ -4146,6 +4222,97 @@ const tryNextPrompts = useMemo(() => {
               Create experiment
             </button>
           </div>
+        </div>
+
+        <div className="mt-6 eb-inset rounded-2xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Past experiments</div>
+              <div className="mt-1 text-sm eb-muted">Revisit what you tried, what helped, and what you might want to rerun.</div>
+            </div>
+            <button
+              type="button"
+              className="eb-btn eb-btn-secondary"
+              onClick={() => setHistoryOpen((prev) => !prev)}
+            >
+              {historyOpen ? 'Hide past experiments' : 'Revisit past experiments'}
+            </button>
+          </div>
+
+          {historyOpen ? (
+            Array.isArray(experimentHistory) && experimentHistory.length > 0 ? (
+              <div className="mt-4">
+                <Carousel opts={{ align: 'start' }} className="w-full">
+                  <CarouselContent>
+                    {(experimentHistory as any[]).slice(0, 20).map((item: any) => {
+                      const id = String(item?.experimentId || item?.title || Math.random());
+                      const outcomeStatus = String(item?.outcome?.status || '');
+                      const outcomeLabel = outcomeStatus === 'helped' ? 'Helped' : outcomeStatus === 'notReally' ? 'Not really' : outcomeStatus === 'abandoned' ? 'Didn’t finish' : 'Stopped early';
+                      const completedDate = fmtDateUi(isoDatePartFromDateTime(item?.outcome?.completedAtISO) || item?.startDateISO, true);
+                      const metrics = Array.isArray(item?.metrics) ? item.metrics.slice(0, 4) : [];
+                      const digest = item?.outcome?.digest;
+                      const isOpen = openHistoryCardId === id;
+                      return (
+                        <CarouselItem key={id} className="basis-full md:basis-1/2">
+                          <div className="eb-inset rounded-2xl p-5 h-full flex flex-col">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-semibold">{item?.title || 'Past experiment'}</div>
+                                <div className="mt-1 text-sm eb-muted">Completed {completedDate}</div>
+                              </div>
+                              <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>{outcomeLabel}</span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {metrics.map((k: any) => (
+                                <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                                  {labelFor(k as any, userData)}
+                                </span>
+                              ))}
+                            </div>
+
+                            {isOpen ? (
+                              <div className="mt-4 rounded-2xl border border-black/8 bg-white p-4 text-sm">
+                                <div className="font-medium">What happened</div>
+                                <div className="mt-1 eb-muted">Started {fmtDateUi(String(item?.startDateISO || ''), true)} · {Number(item?.durationDays ?? 3)} day(s)</div>
+                                {digest?.quick?.metrics?.length ? (
+                                  <div className="mt-3 space-y-2">
+                                    {digest.quick.metrics.slice(0, 3).map((m: any) => (
+                                      <div key={String(m?.key)} className="text-sm eb-muted">
+                                        <span className="font-medium text-neutral-900">{labelFor(m?.key as any, userData)}:</span>{' '}
+                                        {typeof m?.beforeAvg === 'number' ? m.beforeAvg.toFixed(1) : '–'}/10 before · {typeof m?.duringAvg === 'number' ? m.duringAvg.toFixed(1) : '–'}/10 during
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {item?.outcome?.note ? (
+                                  <div className="mt-3 rounded-xl border border-black/8 bg-black/3 p-3 whitespace-pre-wrap eb-muted">{item.outcome.note}</div>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            <div className="flex-1" />
+                            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setOpenHistoryCardId((prev) => prev === id ? null : id)}>
+                                {isOpen ? 'Hide details' : 'View results'}
+                              </button>
+                              <button type="button" className="eb-btn eb-btn-primary" onClick={() => rerunHistoryExperiment(item)}>
+                                Re-run experiment
+                              </button>
+                            </div>
+                          </div>
+                        </CarouselItem>
+                      );
+                    })}
+                  </CarouselContent>
+                  <CarouselPrevious className="flex opacity-70" />
+                  <CarouselNext className="flex opacity-70" />
+                </Carousel>
+              </div>
+            ) : (
+              <div className="mt-4 text-sm eb-muted">No completed experiments yet.</div>
+            )
+          ) : null}
         </div>
       </div>
 
@@ -4184,4 +4351,3 @@ const tryNextPrompts = useMemo(() => {
   );
 }
 
-//testwrite
