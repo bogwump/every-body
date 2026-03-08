@@ -34,7 +34,7 @@ import {
 } from '../lib/cloudSync';
 import { useEntries, useChat, useExperiment } from '../lib/appStore';
 import { calculateStreak, isoToday } from '../lib/analytics';
-import { buildAIExportContext, buildChatGPTPrompt } from '../lib/aiExportBuilder';
+import { buildAIExportContext, buildChatGPTPrompt, getPresetMeta, type AIExportPreset } from '../lib/aiExportBuilder';
 
 import appLogo from '../assets/everybody-logo-256.png';
 
@@ -300,6 +300,9 @@ function cloudStatusLabel(userData: UserData): string {
   return 'Ready (sign in to link your data)';
 }
 
+const AI_EXPORT_PRESETS: AIExportPreset[] = ['patterns', 'doctor', 'helpful', 'next_tests'];
+
+
 export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onNavigate, onPreviewOnboarding }: ProfileSettingsProps) {
   const [view, setView] = useState<'main' | 'personal'>('main');
 
@@ -322,6 +325,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onN
   const [showLogoutPanel, setShowLogoutPanel] = useState(false);
   const [showAIExportPanel, setShowAIExportPanel] = useState(false);
   const [aiExportMessage, setAiExportMessage] = useState<string | null>(null);
+  const [aiExportPreset, setAiExportPreset] = useState<AIExportPreset>('doctor');
   const [resetConfirm, setResetConfirm] = useState<null | 'logs' | 'all'>(null);
 
   // When turning off a symptom, ask whether to retire its past data from Insights.
@@ -549,13 +553,24 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
     }
   };
 
+  const aiExportPreview = useMemo(() => {
+    const context = buildAIExportContext(entries, userData, aiExportPreset);
+    const prompt = buildChatGPTPrompt(entries, userData, aiExportPreset);
+    return {
+      context,
+      prompt,
+      meta: getPresetMeta(aiExportPreset),
+      previewLines: prompt.split('\n').filter((line) => line.trim()).slice(0, 6),
+    };
+  }, [entries, userData, aiExportPreset]);
+
   const handleContinueInChatGPT = async () => {
     setShowAIExportPanel(false);
-    const prompt = buildChatGPTPrompt(entries, userData);
+    const prompt = aiExportPreview.prompt;
     const win = typeof window !== 'undefined' ? window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer') : null;
     const copied = await copyText(prompt);
     setAiExportMessage(copied
-      ? 'Your summary has been copied. Paste it into ChatGPT to continue the discussion.'
+      ? aiExportPreview.meta.copiedMessage
       : 'Your AI summary is ready, but automatic copy was blocked on this device. Use the export option below instead.'
     );
     if (!win) {
@@ -564,22 +579,22 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
   };
 
   const handleCopyAIPrompt = async () => {
-    const prompt = buildChatGPTPrompt(entries, userData);
-    const copied = await copyText(prompt);
-    setAiExportMessage(copied ? 'Your AI prompt has been copied.' : 'Copying was blocked on this device.');
+    const copied = await copyText(aiExportPreview.prompt);
+    setAiExportMessage(copied ? `${aiExportPreview.meta.title} prompt copied.` : 'Copying was blocked on this device.');
     setShowAIExportPanel(true);
   };
 
   const handleDownloadAIJson = () => {
-    const context = buildAIExportContext(entries, userData);
     const payload = {
       type: 'everybody-ai-export',
-      version: 1,
+      version: 2,
       generatedAtISO: new Date().toISOString(),
-      prompt: buildChatGPTPrompt(entries, userData),
-      context,
+      preset: aiExportPreset,
+      title: aiExportPreview.meta.title,
+      prompt: aiExportPreview.prompt,
+      context: aiExportPreview.context,
     };
-    downloadTextFile(`everybody_ai_export_${isoToday()}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    downloadTextFile(`${aiExportPreview.meta.filename}_${isoToday()}.json`, JSON.stringify(payload, null, 2), 'application/json');
     setAiExportMessage('Your AI export JSON has been downloaded.');
     setShowAIExportPanel(true);
   };
@@ -1400,6 +1415,46 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                   <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
                     This export contains a summary of your tracking data. Only share it with tools you trust.
                   </p>
+
+                  <div className="mt-4">
+                    <p className="text-sm font-medium">Choose a focus</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {AI_EXPORT_PRESETS.map((preset) => {
+                        const meta = getPresetMeta(preset);
+                        const selected = aiExportPreset === preset;
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => {
+                              setAiExportPreset(preset);
+                              setAiExportMessage(null);
+                            }}
+                            className={selected
+                              ? 'rounded-full border border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.12)] px-3 py-2 text-sm font-medium text-[rgb(var(--color-text))]'
+                              : 'rounded-full border border-[rgb(var(--color-border))] bg-white px-3 py-2 text-sm text-[rgb(var(--color-text-secondary))]'}
+                          >
+                            {meta.title}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                    <p className="font-medium">{aiExportPreview.meta.title}</p>
+                    <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
+                      {aiExportPreview.meta.description}
+                    </p>
+                    <div className="mt-3 rounded-xl bg-neutral-50 p-3">
+                      {aiExportPreview.previewLines.slice(0, 4).map((line, index) => (
+                        <p key={`${line}-${index}`} className="text-sm text-[rgb(var(--color-text-secondary))] leading-6">
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="mt-4 flex flex-col sm:flex-row gap-2">
                     <button type="button" className="eb-btn eb-btn-primary" onClick={handleContinueInChatGPT}>
                       Continue in ChatGPT
@@ -1422,7 +1477,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                     <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
                       <p className="font-medium">Other AI assistants</p>
                       <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
-                        Copy a structured prompt for Claude, Gemini, Perplexity, Copilot or ChatGPT, or download a JSON export.
+                        Use the current preset with Claude, Gemini, Perplexity, Copilot or ChatGPT, or download a structured JSON export.
                       </p>
                       <div className="mt-4 flex flex-col sm:flex-row gap-2">
                         <button type="button" className="eb-btn eb-btn-secondary" onClick={handleCopyAIPrompt}>
