@@ -34,6 +34,7 @@ import {
 } from '../lib/cloudSync';
 import { useEntries, useChat, useExperiment } from '../lib/appStore';
 import { calculateStreak, isoToday } from '../lib/analytics';
+import { buildAIExportContext, buildChatGPTPrompt } from '../lib/aiExportBuilder';
 
 import appLogo from '../assets/everybody-logo-256.png';
 
@@ -41,6 +42,7 @@ interface ProfileSettingsProps {
   userData: UserData;
   onUpdateTheme: (theme: ColorTheme) => void;
   onUpdateUserData: (updater: ((prev: UserData) => UserData) | UserData) => void;
+  onNavigate?: (screen: string) => void;
   /** Dev/testing helper: lets you re-run onboarding without wiping saved data */
   onPreviewOnboarding?: () => void;
 }
@@ -298,7 +300,7 @@ function cloudStatusLabel(userData: UserData): string {
   return 'Ready (sign in to link your data)';
 }
 
-export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onPreviewOnboarding }: ProfileSettingsProps) {
+export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onNavigate, onPreviewOnboarding }: ProfileSettingsProps) {
   const [view, setView] = useState<'main' | 'personal'>('main');
 
   // iOS Safari often preserves scroll position when navigating within an SPA.
@@ -318,6 +320,8 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onP
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showLogoutPanel, setShowLogoutPanel] = useState(false);
+  const [showAIExportPanel, setShowAIExportPanel] = useState(false);
+  const [aiExportMessage, setAiExportMessage] = useState<string | null>(null);
   const [resetConfirm, setResetConfirm] = useState<null | 'logs' | 'all'>(null);
 
   // When turning off a symptom, ask whether to retire its past data from Insights.
@@ -519,6 +523,67 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
     downloadTextFile(`everybody-insights-report-${isoToday()}.html`, html, 'text/html');
   };
 
+  const copyText = async (value: string) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly', 'true');
+      ta.style.position = 'absolute';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleContinueInChatGPT = async () => {
+    setShowAIExportPanel(false);
+    const prompt = buildChatGPTPrompt(entries, userData);
+    const win = typeof window !== 'undefined' ? window.open('https://chatgpt.com/', '_blank', 'noopener,noreferrer') : null;
+    const copied = await copyText(prompt);
+    setAiExportMessage(copied
+      ? 'Your summary has been copied. Paste it into ChatGPT to continue the discussion.'
+      : 'Your AI summary is ready, but automatic copy was blocked on this device. Use the export option below instead.'
+    );
+    if (!win) {
+      setAiExportMessage((prev) => prev ? `${prev} Pop-ups may be blocked, so open ChatGPT manually if needed.` : 'Pop-ups may be blocked, so open ChatGPT manually if needed.');
+    }
+  };
+
+  const handleCopyAIPrompt = async () => {
+    const prompt = buildChatGPTPrompt(entries, userData);
+    const copied = await copyText(prompt);
+    setAiExportMessage(copied ? 'Your AI prompt has been copied.' : 'Copying was blocked on this device.');
+    setShowAIExportPanel(true);
+  };
+
+  const handleDownloadAIJson = () => {
+    const context = buildAIExportContext(entries, userData);
+    const payload = {
+      type: 'everybody-ai-export',
+      version: 1,
+      generatedAtISO: new Date().toISOString(),
+      prompt: buildChatGPTPrompt(entries, userData),
+      context,
+    };
+    downloadTextFile(`everybody_ai_export_${isoToday()}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    setAiExportMessage('Your AI export JSON has been downloaded.');
+    setShowAIExportPanel(true);
+  };
+
   const exportInsightsJson = () => {
     const selectedMetrics = getInsightsExportSelection();
     const payload = {
@@ -568,6 +633,10 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
         { icon: Palette, label: 'Theme', onClick: () => setShowThemeSelector(!showThemeSelector) },
         { icon: SparklesIcon, label: 'Goal', onClick: () => setShowGoalSelector(!showGoalSelector) },
       ],
+    },
+    {
+      title: 'Analyse your data',
+      items: [],
     },
     {
       title: 'Support',
@@ -1321,6 +1390,53 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
         {settingsSections.map((section) => (
           <div key={section.title} className="mb-6">
             <h3 className="mb-3 px-2">{section.title}</h3>
+            {section.title === 'Analyse your data' ? (
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[rgb(var(--color-primary)/0.22)] p-5">
+                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                  Take your patterns, insights and experiments into an AI assistant for deeper analysis.
+                </p>
+                <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+                  <p className="font-medium">Analyse your data</p>
+                  <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
+                    This export contains a summary of your tracking data. Only share it with tools you trust.
+                  </p>
+                  <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                    <button type="button" className="eb-btn eb-btn-primary" onClick={handleContinueInChatGPT}>
+                      Continue in ChatGPT
+                    </button>
+                    <button
+                      type="button"
+                      className="eb-btn eb-btn-secondary"
+                      onClick={() => {
+                        setShowAIExportPanel((prev) => !prev);
+                        setAiExportMessage(null);
+                      }}
+                    >
+                      Export for another AI assistant
+                    </button>
+                  </div>
+                  {aiExportMessage ? (
+                    <p className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">{aiExportMessage}</p>
+                  ) : null}
+                  {showAIExportPanel ? (
+                    <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                      <p className="font-medium">Other AI assistants</p>
+                      <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
+                        Copy a structured prompt for Claude, Gemini, Perplexity, Copilot or ChatGPT, or download a JSON export.
+                      </p>
+                      <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <button type="button" className="eb-btn eb-btn-secondary" onClick={handleCopyAIPrompt}>
+                          Copy AI prompt
+                        </button>
+                        <button type="button" className="eb-btn eb-btn-secondary" onClick={handleDownloadAIJson}>
+                          Download JSON
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[rgb(var(--color-primary)/0.22)]">
               {section.items.map((item, index) => {
                 const Icon = item.icon;
@@ -1625,7 +1741,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                   <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                                     <p className="text-sm font-medium mb-1">Confirm reset logs</p>
                                     <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                                      This will delete your check-ins, experiments and Eve chat from this device, but keep your settings.
+                                      This will delete your check-ins and experiments from this device, but keep your settings.
                                     </p>
                                     <div className="mt-3 flex flex-col sm:flex-row gap-2">
                                       <button
@@ -1650,7 +1766,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                   <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                                     <p className="text-sm font-medium mb-1">Confirm reset everything</p>
                                     <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                                      This will delete your check-ins, experiments, Eve chat and settings from this device and take you back to day 1.
+                                      This will delete your check-ins, experiments and settings from this device and take you back to day 1.
                                     </p>
                                     <div className="mt-3 flex flex-col sm:flex-row gap-2">
                                       <button
@@ -2123,50 +2239,9 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                 );
               })}
             </div>
+            )}
           </div>
         ))}
-
-        {/* Testing */}
-        
-        {/* Eve testing */}
-        <div className="eb-card mb-6">
-          <h3 className="mb-2">Eve</h3>
-          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">Settings for testing and cost control.</p>
-
-          <div className="flex items-center justify-between py-3 border-t border-[rgb(var(--color-border))]">
-            <div>
-              <p className="font-medium mb-1">Mock Eve (testing)</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {userData.useMockEve ? 'On (no API calls, free to test)' : 'Off (uses OpenAI API)'}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled
-              onClick={() => onUpdateUserData((prev) => ({ ...prev, useMockEve: !prev.useMockEve }))}
-              className="px-3 py-2 rounded-xl border border-[rgb(var(--color-border))] text-sm opacity-50 cursor-not-allowed"
-            >
-              {'Locked'}
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between py-3 border-t border-[rgb(var(--color-border))]">
-            <div>
-              <p className="font-medium mb-1">Low-cost mode</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {userData.eveLowCostMode ? 'On (shorter context, shorter replies)' : 'Off'}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled
-              onClick={() => onUpdateUserData((prev) => ({ ...prev, eveLowCostMode: !prev.eveLowCostMode }))}
-              className="px-3 py-2 rounded-xl border border-[rgb(var(--color-border))] text-sm opacity-50 cursor-not-allowed"
-            >
-              {'Locked'}
-            </button>
-          </div>
-        </div>
 
         {onPreviewOnboarding && (
           <div className="eb-card mb-6">
