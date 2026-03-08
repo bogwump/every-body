@@ -11,6 +11,16 @@ function hasMomentWithId(id: string): boolean {
   return getCompanionMoments().some((moment) => moment.id === id);
 }
 
+function readExperimentHistory(): any[] {
+  try {
+    const raw = localStorage.getItem('everybody:v2:experiment_history');
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function patternCopy(signal: InsightSignal): { title: string; body: string } {
   const metric = String(signal.metrics?.[0] ?? 'This pattern');
   const niceMetric = metric.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
@@ -49,9 +59,29 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
   const active = getActiveMoments(refISO);
   const topActive = getHighestPriorityMoment(refISO);
 
-  // Do not add more noise if something higher priority is already active.
   const currentTopPriority = topActive ? topActive.type : null;
   if (currentTopPriority === 'phase_change') return;
+
+  const experimentHistory = readExperimentHistory();
+  const latestCompleted = experimentHistory
+    .filter((item) => item?.outcome?.completedAtISO)
+    .sort((a, b) => String(b?.outcome?.completedAtISO || '').localeCompare(String(a?.outcome?.completedAtISO || '')))[0] ?? null;
+  if (latestCompleted) {
+    const completedDate = String(latestCompleted?.outcome?.completedAtISO || '').slice(0, 10);
+    const momentId = `experiment-result:${String(latestCompleted?.experimentId || latestCompleted?.title || 'latest')}:${completedDate}`;
+    if (completedDate && completedDate >= refISO && !hasMomentWithId(momentId) && !active.some((moment) => moment.type === 'experiment_result_ready')) {
+      createMoment({
+        id: momentId,
+        type: 'experiment_result_ready',
+        date: completedDate,
+        data: {
+          title: 'Experiment result ready',
+          body: 'Your latest experiment now has enough data to look back on.',
+        },
+      });
+      return;
+    }
+  }
 
   const discovered = getDiscoveredPatterns()
     .slice()

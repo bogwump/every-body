@@ -6,38 +6,80 @@ export type ExperimentSuggestion = {
   note: string;
   metrics: string[];
   rank: number;
+  experimentId?: string;
+  experimentName?: string;
+  experimentDescription?: string;
+  durationDays?: number;
+  changeKey?: string;
 };
 
-function suggestionForSignal(signal: InsightSignal): ExperimentSuggestion | null {
+export type ExperimentForSignal = {
+  experimentId: string;
+  experimentName: string;
+  experimentDescription: string;
+  metrics: string[];
+  durationDays?: number;
+  changeKey?: string;
+};
+
+function hasMetric(signal: InsightSignal, key: string): boolean {
+  return Array.isArray(signal.metrics) && signal.metrics.some((metric) => String(metric) === key);
+}
+
+export function getExperimentForSignal(signal: InsightSignal): ExperimentForSignal | null {
   const metric = String(signal.metrics?.[0] ?? '');
-  if (signal.id.includes('sleep_before_bleed') || metric === 'sleep') {
+
+  if (String(signal.id).includes('sleep_before_bleed') || (String(signal.id).includes('phase-sleep') && signal.phase === 'Luteal') || metric === 'sleep') {
     return {
-      id: `experiment:${signal.id}`,
-      title: 'Try a 3-day evening wind-down experiment',
-      note: 'A steadier evening routine can help test whether sleep feels easier to support here.',
+      experimentId: 'wind_down',
+      experimentName: 'Wind-down experiment',
+      experimentDescription: 'A short evening routine can help test whether sleep feels easier to support in this window.',
       metrics: ['sleep', 'energy'],
-      rank: signal.score + 10,
+      durationDays: 3,
+      changeKey: 'lateNight',
     };
   }
-  if (metric === 'stress') {
+
+  if ((hasMetric(signal, 'stress') && hasMetric(signal, 'sleep')) || metric === 'stress') {
     return {
-      id: `experiment:${signal.id}`,
-      title: 'Try a 3-day breathing-room experiment',
-      note: 'Lighter evenings, fewer extras, or a calmer start can help test whether stress eases a little.',
-      metrics: ['stress', 'mood'],
-      rank: signal.score + 6,
+      experimentId: 'evening_reset',
+      experimentName: 'Evening reset experiment',
+      experimentDescription: 'A lower-friction evening can help you test whether stressful days lead to lighter sleep.',
+      metrics: ['stress', 'sleep', 'mood'],
+      durationDays: 3,
+      changeKey: 'stressfulDay',
     };
   }
-  if (metric === 'energy' || metric === 'fatigue') {
+
+  if (hasMetric(signal, 'energy') || hasMetric(signal, 'fatigue') || metric === 'energy' || metric === 'fatigue') {
     return {
-      id: `experiment:${signal.id}`,
-      title: 'Try a 3-day gentle energy experiment',
-      note: 'Keep the basics steady and notice whether energy feels more even when you build gradually.',
+      experimentId: 'morning_light',
+      experimentName: 'Morning light experiment',
+      experimentDescription: 'A steadier morning rhythm can help you test whether energy feels easier to lift and hold.',
       metrics: ['energy', 'fatigue', 'sleep'],
-      rank: signal.score + 4,
+      durationDays: 3,
+      changeKey: 'exercise',
     };
   }
+
   return null;
+}
+
+function suggestionForSignal(signal: InsightSignal): ExperimentSuggestion | null {
+  const experiment = getExperimentForSignal(signal);
+  if (!experiment) return null;
+  return {
+    id: `experiment:${signal.id}`,
+    title: `Try a ${experiment.experimentName.toLowerCase()}`,
+    note: experiment.experimentDescription,
+    metrics: experiment.metrics,
+    rank: signal.score + (signal.confidence === 'high' ? 10 : signal.confidence === 'medium' ? 6 : 2),
+    experimentId: experiment.experimentId,
+    experimentName: experiment.experimentName,
+    experimentDescription: experiment.experimentDescription,
+    durationDays: experiment.durationDays,
+    changeKey: experiment.changeKey,
+  };
 }
 
 export function generateExperimentSuggestions(signals: InsightSignal[]): ExperimentSuggestion[] {
@@ -46,8 +88,9 @@ export function generateExperimentSuggestions(signals: InsightSignal[]): Experim
   for (const signal of signals) {
     const suggestion = suggestionForSignal(signal);
     if (!suggestion) continue;
-    if (seen.has(suggestion.title)) continue;
-    seen.add(suggestion.title);
+    const dedupeKey = suggestion.experimentId || suggestion.title;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
     out.push(suggestion);
   }
   return out;

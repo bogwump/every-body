@@ -11,6 +11,7 @@ function iconForType(type: CompanionMoment['type']) {
     case 'new_pattern':
       return <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />;
     case 'experiment_suggestion':
+    case 'experiment_result_ready':
       return <FlaskConical className="w-5 h-5 text-[rgb(var(--color-primary))]" />;
     case 'rhythm_shift':
       return <Activity className="w-5 h-5 text-[rgb(var(--color-primary))]" />;
@@ -46,6 +47,14 @@ function copyForMoment(moment: CompanionMoment): { eyebrow?: string; title: stri
         title: typeof data.title === 'string' ? data.title : 'Something may be worth testing this week',
         body: typeof data.body === 'string' ? data.body : 'A gentle experiment can help you see whether this pattern is worth supporting differently.',
         button: 'Try experiment',
+        screen: 'insights',
+      };
+    case 'experiment_result_ready':
+      return {
+        eyebrow: 'Experiment update',
+        title: typeof data.title === 'string' ? data.title : 'Your experiment is ready to look back on',
+        body: typeof data.body === 'string' ? data.body : 'You now have enough to review what felt useful from that test.',
+        button: 'Review experiment',
         screen: 'insights',
       };
     case 'rhythm_shift':

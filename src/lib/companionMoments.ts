@@ -6,6 +6,7 @@ export type CompanionMomentType =
   | 'phase_change'
   | 'new_pattern'
   | 'experiment_suggestion'
+  | 'experiment_result_ready'
   | 'rhythm_shift'
   | 'unlock_milestone'
   | 'encouragement';
@@ -24,7 +25,8 @@ const MOMENT_PRIORITY: Record<CompanionMomentType, number> = {
   phase_change: 1,
   new_pattern: 2,
   experiment_suggestion: 3,
-  rhythm_shift: 4,
+  experiment_result_ready: 4,
+  rhythm_shift: 5,
   unlock_milestone: 5,
   encouragement: 6,
 };
@@ -119,6 +121,7 @@ function defaultExpiry(type: CompanionMomentType, dateISO: string): string | und
     type === 'phase_change' ? 2 :
     type === 'new_pattern' ? 5 :
     type === 'experiment_suggestion' ? 5 :
+    type === 'experiment_result_ready' ? 5 :
     type === 'rhythm_shift' ? 4 :
     type === 'unlock_milestone' ? undefined :
     type === 'encouragement' ? 3 :

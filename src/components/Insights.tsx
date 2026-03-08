@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
 import { CompanionMomentHistory } from './CompanionMomentHistory';
+import { TryNextCard, type TryNextItem } from './TryNextCard';
 import { getMomentHistory } from '../lib/companionMoments';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
@@ -30,6 +31,10 @@ import { getMixedChartColors } from '../lib/chartPalette';
 import { isMetricInScope } from '../lib/insightsScope';
 import { type InsightSignal, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
 import { computeExperimentComparison } from '../lib/experimentAnalysis';
+import { getSupportSuggestion } from '../lib/patternSupport';
+import { getExperimentForSignal } from '../lib/experimentSuggestions';
+import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, saveAction } from '../lib/savedActions';
+import { recordExperimentOutcome } from '../lib/experimentOutcomes';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
@@ -411,6 +416,8 @@ type Finding = {
   body: string;
   metrics?: Array<MetricKey>;
   kind: 'trend' | 'correlation' | 'pattern';
+  supportSuggestion?: string | null;
+  signalId?: string;
 };
 
 function buildExperimentPlan(metrics: Array<MetricKey>): { title: string; steps: string[]; note: string } {
@@ -1032,8 +1039,20 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       });
     }
 
-    return out.slice(0, 8);
-  }, [selected, entriesSorted, entriesAllSorted, days, userData.enabledModules]);
+    const strongestSignals = getTopInsights(entriesAllSorted, userData, 8, selected)
+      .filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low')
+      .slice(0, 6);
+
+    return out.slice(0, 8).map((item) => {
+      const matchedSignal = strongestSignals.find((signal) => (item.metrics || []).some((metric) => signal.metrics.includes(metric as any)));
+      const support = matchedSignal ? getSupportSuggestion(matchedSignal) : null;
+      return {
+        ...item,
+        signalId: matchedSignal?.id,
+        supportSuggestion: support?.body ?? null,
+      };
+    });
+  }, [selected, entriesSorted, entriesAllSorted, days, userData, userData.enabledModules]);
 
   // --- Correlations list (for soft display + report) ---
   const corrPairs = useMemo(() => {
@@ -1500,6 +1519,55 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     };
   }, [currentInsightsPhase, heroSignals]);
 
+  const strongPatternSignals = useMemo(
+    () => getTopInsights(entriesAllSorted, userData, 8, selected).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low' && signal.strength !== 'weak'),
+    [entriesAllSorted, userData, selected],
+  );
+
+  const [savedActionsVersion, setSavedActionsVersion] = useState(0);
+  const refreshSavedActions = () => setSavedActionsVersion((value) => value + 1);
+
+  const tryNextActions = useMemo(() => {
+    const saved = getSavedActions();
+    const items: Array<TryNextItem & { signal?: InsightSignal; experiment: any }> = [];
+    for (const signal of strongPatternSignals) {
+      const experiment = getExperimentForSignal(signal);
+      if (!experiment) continue;
+      if (isDismissedAction(experiment.experimentId)) continue;
+      items.push({
+        id: experiment.experimentId,
+        title: experiment.experimentName,
+        description: experiment.experimentDescription,
+        label: isSavedAction(experiment.experimentId) ? 'Saved' : 'Suggested',
+        saved: isSavedAction(experiment.experimentId),
+        signal,
+        experiment,
+      });
+    }
+
+    const savedItems = saved
+      .filter((item) => item.type === 'experiment')
+      .map((item) => ({
+        id: item.experimentId,
+        title: item.title || 'Saved experiment',
+        description: item.description || 'A saved experiment from an earlier insight.',
+        label: 'Saved',
+        saved: true,
+        signal: strongPatternSignals.find((signal) => getExperimentForSignal(signal)?.experimentId === item.experimentId) || strongPatternSignals[0],
+        experiment: strongPatternSignals.map((signal) => getExperimentForSignal(signal)).find((exp) => exp?.experimentId === item.experimentId) || {
+          experimentId: item.experimentId,
+          experimentName: item.title || 'Saved experiment',
+          experimentDescription: item.description || 'A saved experiment from an earlier insight.',
+          metrics: Array.isArray(item.metrics) ? item.metrics : ['sleep', 'energy'],
+          durationDays: 3,
+          changeKey: undefined,
+        },
+      }));
+
+    const merged = [...savedItems, ...items].filter((item, idx, arr) => arr.findIndex((other) => other.id === item.id) === idx);
+    return merged.slice(0, 2);
+  }, [strongPatternSignals, savedActionsVersion]);
+
   const companionMomentHistory = useMemo(() => getMomentHistory(6), [entriesAllSorted.length]);
 
   const scrollToInsightsSection = (id: string) => {
@@ -1784,6 +1852,10 @@ const confirmFinishExperiment = () => {
     };
 
     recordExperimentToHistory(next, outcome);
+    recordExperimentOutcome({
+      experimentId: ex.id,
+      result: outcome === 'helped' ? 'helpful' : outcome === 'notReally' ? 'slightly_helpful' : 'stopped_early',
+    });
     setExperiment(next);
 
     setFinishExperimentConfirm(null);
@@ -2622,6 +2694,7 @@ const tryNextPrompts = useMemo(() => {
 
     setExperiment(next);
     recordExperimentToHistory(next, 'stopped');
+    recordExperimentOutcome({ experimentId: ex.id, result: 'stopped_early' });
   };
 
   // Active experiment card (shown near the top of the Experiments section)
@@ -3018,6 +3091,47 @@ const tryNextPrompts = useMemo(() => {
   };
 
 
+  const startSignalExperiment = (experimentId: string) => {
+    const action = tryNextActions.find((item) => item.id === experimentId);
+    if (!action) return;
+    setExperimentPlan({
+      title: action.experiment.experimentName,
+      steps: [
+        'Try one small version of this for the next few days.',
+        'Keep the rest of your routine as steady as you can.',
+        'Log the same measures each day, then look back at the shift.',
+      ],
+      note: action.experiment.experimentDescription,
+    });
+    setExperimentMetrics((action.experiment.metrics || []).slice(0, 5) as MetricKey[]);
+    setExperimentDurationDays(action.experiment.durationDays ?? 3);
+    setIsCustomExperiment(false);
+    setExperimentChangeKey(action.experiment.changeKey || '');
+    setExperimentOpen(true);
+    removeSavedAction(experimentId, 'dismissed');
+    refreshSavedActions();
+  };
+
+  const saveSignalExperiment = (experimentId: string) => {
+    const action = tryNextActions.find((item) => item.id === experimentId);
+    if (!action) return;
+    saveAction({
+      type: 'experiment',
+      experimentId,
+      title: action.experiment.experimentName,
+      description: action.experiment.experimentDescription,
+      metrics: action.experiment.metrics,
+      signalId: action.signal?.id,
+    });
+    removeSavedAction(experimentId, 'dismissed');
+    refreshSavedActions();
+  };
+
+  const dismissSignalExperiment = (experimentId: string) => {
+    removeSavedAction(experimentId, 'experiment');
+    saveAction({ type: 'dismissed', experimentId });
+    refreshSavedActions();
+  };
 
   const renderExperimentCTA = (ms: any) => {
     if (!ms) return null;
@@ -3154,6 +3268,12 @@ const tryNextPrompts = useMemo(() => {
                   <div className="eb-inset rounded-2xl p-5 h-full">
                     <div className="text-sm font-semibold">{f.title}</div>
                     <div className="mt-1 text-sm eb-muted">{f.body}</div>
+                    {f.supportSuggestion ? (
+                      <div className="mt-3 eb-inset rounded-2xl p-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[rgba(0,0,0,0.55)]">What could help</div>
+                        <div className="mt-1 text-sm eb-muted">{f.supportSuggestion}</div>
+                      </div>
+                    ) : null}
 
                     <div className="mt-3 flex flex-wrap gap-2 justify-end">
                       {f.metrics?.slice(0, 2).map((m) => (
@@ -3175,6 +3295,13 @@ const tryNextPrompts = useMemo(() => {
           </Carousel>
         </div>
       </div>
+
+      <TryNextCard
+        items={(experimentStatus && !experimentStatus.done ? [] : tryNextActions).map((item) => ({ id: item.id, title: item.title, description: item.description, label: item.label, saved: item.saved }))}
+        onStart={startSignalExperiment}
+        onSave={saveSignalExperiment}
+        onDismiss={dismissSignalExperiment}
+      />
 
       {/* Sleep Insights (optional) */}
       {sleepInsightsOn ? (
