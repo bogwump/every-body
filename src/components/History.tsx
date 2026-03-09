@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, CheckCircle2, Clock3, FlaskConical, Heart, RefreshCw, Sparkles } from 'lucide-react';
 import { buildTimelineEvents, filterTimelineEvents, getTimelineSummary, groupEventsByMonth, type TimelineEvent, type TimelineFilter } from '../lib/timelineBuilder';
+import { safeFormatISODate } from '../lib/browserSafe';
 
 interface HistoryProps {
   onNavigate: (screen: string) => void;
@@ -14,13 +15,11 @@ const FILTERS: Array<{ key: TimelineFilter; label: string }> = [
 ];
 
 function fmtDate(iso: string): string {
-  const [y, m, d] = String(iso || '').split('-').map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+  return safeFormatISODate(iso, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  });
+  }, iso);
 }
 
 function iconForEvent(type: TimelineEvent['type']) {

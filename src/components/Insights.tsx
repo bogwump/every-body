@@ -42,6 +42,7 @@ import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, Dial
 import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
 import { pushRuntimeDebug } from '../lib/runtimeDebug';
+import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 
 interface InsightsProps {
   userData: UserData;
@@ -68,7 +69,7 @@ function fmtDateShort(iso: string): string {
   const [y, m, d] = iso.split('-').map((s) => Number(s));
   if (!y || !m || !d) return iso;
   const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return safeFormatDate(dt, { month: 'short', day: 'numeric' }, iso);
 }
 
 function fmtDateUi(iso: string, includeYear = false): string {
@@ -1666,7 +1667,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const scrollToInsightsSection = (id: string) => {
     try {
       const el = document.getElementById(id);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      safeScrollIntoView(el, { behavior: 'smooth', block: 'start' });
     } catch {
       // ignore
     }
@@ -1864,7 +1865,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     // Scroll to Experiments section (hero stays first)
     try {
       const el = document.getElementById('eb-experiments');
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      safeScrollIntoView(el, { behavior: 'smooth', block: 'start' });
     } catch {
       // ignore
     }
@@ -1971,7 +1972,7 @@ const confirmFinishExperiment = () => {
     setExperimentStartedFlash(true);
     try {
       const el = document.getElementById('eb-experiments');
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      safeScrollIntoView(el, { behavior: 'smooth', block: 'start' });
     } catch {
       // ignore
     }

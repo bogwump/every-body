@@ -3,6 +3,7 @@ import { Bot, Clock, Send } from 'lucide-react';
 import type { CheckInEntry, UserData } from '../types';
 import { filterByDays, mean } from '../lib/analytics';
 import { COMPANION_NAME, useChat, useEntries } from '../lib/appStore';
+import { safeScrollIntoView } from '../lib/browserSafe';
 
 interface AIChatProps {
   userName: string;
@@ -399,7 +400,7 @@ export function AIChat({ userName: _userName, userData }: AIChatProps) {
   }, [messages.length, addMessage, opening]);
 
   const scrollToBottom = (behavior: ScrollBehavior = 'auto') => {
-    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+    safeScrollIntoView(messagesEndRef.current, { behavior, block: 'end' });
   };
 
   const restoreScrollPosition = () => {

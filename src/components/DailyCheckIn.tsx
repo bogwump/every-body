@@ -26,6 +26,7 @@ import { isoToday } from '../lib/analytics';
 import { isoFromDateLocal } from '../lib/date';
 import { useEntries, useExperiment } from '../lib/appStore';
 import { applyPhaseChangeForEntries, phaseLabelFromKey } from '../lib/phaseChange';
+import { hasResizeObserver } from '../lib/browserSafe';
 
 const INFLUENCE_DEFS: Array<{ key: string; label: string; hint: string }> = [
   {
@@ -207,8 +208,9 @@ function Slider10({
   useLayoutEffect(() => {
     recomputeBubble();
     const wrap = wrapRef.current;
-    if (!wrap) return;
-    const ro = new ResizeObserver(() => recomputeBubble());
+    if (!wrap || !hasResizeObserver()) return;
+    const ResizeObserverCtor = (window as any).ResizeObserver as typeof ResizeObserver;
+    const ro = new ResizeObserverCtor(() => recomputeBubble());
     ro.observe(wrap);
     return () => ro.disconnect();
   }, [recomputeBubble]);

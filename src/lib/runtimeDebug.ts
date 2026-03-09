@@ -7,6 +7,7 @@ export type DebugEntry = {
 
 const DEBUG_KEY = 'everybody:v2:runtime_debug';
 const MAX_ENTRIES = 40;
+let globalDebugInstalled = false;
 
 function safeStringify(value: unknown): string {
   try {
@@ -64,6 +65,28 @@ export function pushRuntimeDebug(scope: string, message: string, details?: unkno
 export function clearRuntimeDebug(): void {
   try {
     localStorage.removeItem(DEBUG_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function installGlobalRuntimeDebug(): void {
+  if (globalDebugInstalled) return;
+  globalDebugInstalled = true;
+
+  try {
+    window.addEventListener('error', (event) => {
+      pushRuntimeDebug('window-error', event.message || 'Uncaught window error', {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: serialiseError(event.error),
+      });
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      pushRuntimeDebug('window-rejection', 'Unhandled promise rejection', serialiseError(event.reason));
+    });
   } catch {
     // ignore
   }

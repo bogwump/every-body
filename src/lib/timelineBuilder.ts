@@ -1,5 +1,6 @@
 import { getCompanionMoments, type CompanionMoment } from './companionMoments';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
+import { safeFormatMonthYearFromKey } from './browserSafe';
 import { getExperimentOutcomes } from './experimentOutcomes';
 import { getDiscoveredPatterns } from './insightEngine';
 import { getPhaseHistory } from './phaseHistory';
@@ -340,8 +341,7 @@ export function groupEventsByMonth(events: TimelineEvent[]): Array<{ label: stri
   return Array.from(groups.entries())
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([key, items]) => {
-      const [year, month] = key.split('-').map(Number);
-      const label = year && month ? new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : key;
+      const label = safeFormatMonthYearFromKey(key);
       return { label, events: sortTimelineEvents(items) };
     });
 }

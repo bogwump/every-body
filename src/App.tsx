@@ -7,6 +7,7 @@ import { Rhythm } from './components/Rhythm';
 import { ProfileSettings } from './components/ProfileSettings';
 import { History } from './components/History';
 import { InsightsErrorBoundary } from './components/InsightsErrorBoundary';
+import { ScreenErrorBoundary } from './components/ScreenErrorBoundary';
 import { CalendarView } from './components/CalendarView';
 import { Navigation } from './components/Navigation';
 
@@ -77,6 +78,10 @@ export default function App() {
       setCurrentScreen('check-in');
     }
   }, [userData.onboardingComplete, forceOnboarding, currentScreen, entries]);
+
+  useEffect(() => {
+    void initSelfHealingStorage();
+  }, []);
 
   // Best-effort request for persistent storage (helps on some browsers; harmless if unsupported)
   useEffect(() => {
@@ -196,11 +201,14 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
     switch (currentScreen) {
       case 'dashboard':
         return (
-          <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} onUpdateUserData={setUserData} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />
+          <ScreenErrorBoundary screenName="dashboard">
+            <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} onUpdateUserData={setUserData} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />
+          </ScreenErrorBoundary>
         );
 
       case 'check-in':
         return (
+          <ScreenErrorBoundary screenName="check-in">
           <DailyCheckIn
             userData={userData}
             onUpdateUserData={setUserData}
@@ -222,24 +230,36 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
             }}
             onNavigate={setCurrentScreen}
           />
+          </ScreenErrorBoundary>
         );
 
         case 'insights':
           return (
-            <InsightsErrorBoundary>
-              <Insights userData={userData} onOpenCheckIn={navigateToCheckIn} onUpdateUserData={setUserData} />
-            </InsightsErrorBoundary>
+            <ScreenErrorBoundary screenName="insights">
+              <InsightsErrorBoundary>
+                <Insights userData={userData} onOpenCheckIn={navigateToCheckIn} onUpdateUserData={setUserData} />
+              </InsightsErrorBoundary>
+            </ScreenErrorBoundary>
           );
 
       case 'history':
-        return <History onNavigate={setCurrentScreen} />;
+        return (
+          <ScreenErrorBoundary screenName="history">
+            <History onNavigate={setCurrentScreen} />
+          </ScreenErrorBoundary>
+        );
 
       case 'rhythm':
       case 'resources':
-        return <Rhythm userData={userData} />;
+        return (
+          <ScreenErrorBoundary screenName="rhythm">
+            <Rhythm userData={userData} />
+          </ScreenErrorBoundary>
+        );
 
       case 'profile':
         return (
+          <ScreenErrorBoundary screenName="profile">
           <ProfileSettings
             userData={userData}
             onUpdateTheme={(theme) => setUserData((prev) => ({ ...prev, colorTheme: theme }))}
@@ -255,14 +275,21 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
               setCurrentScreen('dashboard');
             }}
           />
+          </ScreenErrorBoundary>
         );
 
 
       case 'calendar':
-        return <CalendarView userData={userData} onNavigate={setCurrentScreen} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} onUpdateUser={setUserData} />;
+        return (
+          <ScreenErrorBoundary screenName="calendar">
+            <CalendarView userData={userData} onNavigate={setCurrentScreen} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} onUpdateUser={setUserData} />
+          </ScreenErrorBoundary>
+        );
       default:
         return (
-          <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} onUpdateUserData={setUserData} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />
+          <ScreenErrorBoundary screenName="dashboard">
+            <Dashboard userName={userData.name} userGoal={userData.goal} userData={userData} onNavigate={setCurrentScreen} onUpdateUserData={setUserData} onOpenCheckIn={(iso) => navigateToCheckIn(iso)} />
+          </ScreenErrorBoundary>
         );
     }
   }, [currentScreen, userData, setUserData]);

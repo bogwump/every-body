@@ -32,7 +32,18 @@ export function saveToStorage<T>(key: string, value: T): void {
     if (raw) {
       localStorage.setItem(key, raw);
       // Notify same-tab listeners. The native "storage" event only fires across documents.
-      window.dispatchEvent(new CustomEvent('everybody:storage', { detail: { key } }));
+      try {
+        window.dispatchEvent(new CustomEvent('everybody:storage', { detail: { key } }));
+      } catch {
+        try {
+          const fallbackEvent = document.createEvent('Event');
+          fallbackEvent.initEvent('everybody:storage', false, false);
+          (fallbackEvent as any).detail = { key };
+          window.dispatchEvent(fallbackEvent);
+        } catch {
+          // ignore
+        }
+      }
     }
   } catch {
     // ignore
