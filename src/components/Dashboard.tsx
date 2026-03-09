@@ -597,7 +597,40 @@ export function Dashboard({
           </div>
         ) : null}
 
-        {/* Quick check-in */}
+       
+{/* Tip for today */}
+<div className="eb-card">
+  <div className="flex items-start gap-4">
+    <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+      <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+    </div>
+    <div className="min-w-0 flex-1">
+      <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Tip for today</div>
+      <h3 className="mt-1 mb-1">{tip.title}</h3>
+      <p className="text-sm text-[rgba(0,0,0,0.75)]">{tip.body}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {tip.cta ? (
+          <button
+            type="button"
+            className="eb-btn-secondary"
+            onClick={() => onNavigate(tip.cta.screen)}
+          >
+            {tip.cta.label}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="eb-btn-secondary"
+          onClick={() => setTipOffset((v) => v + 1)}
+        >
+          Another tip
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+/* Quick check-in */
         <div className="eb-card">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
