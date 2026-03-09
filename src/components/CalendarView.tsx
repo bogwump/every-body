@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, Frown } from 'lucide-react';
+import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, Frown, Heart, FlaskConical, Sparkles } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
@@ -109,21 +109,6 @@ function influencesFromEntry(entry: any): string[] {
   return labels;
 }
 
-function InfluenceMark({ size = 10, title }: { size?: number; title: string }) {
-  return (
-    <span className="inline-flex items-center justify-center" aria-label={title} title={title}>
-      <span
-        className="rounded-full"
-        style={{
-          width: size,
-          height: size,
-          background: 'rgb(var(--color-primary-dark) / 0.55)',
-          boxShadow: '0 0 0 2px rgb(var(--color-surface))',
-        }}
-      />
-    </span>
-  );
-}
 
 function prettyDate(d: Date): string {
   return d.toLocaleDateString(undefined, {
@@ -168,6 +153,60 @@ function shortPhaseCue(phaseKey: string | null | undefined): string {
   }
 }
 
+
+type CalendarMarker = {
+  key: 'period' | 'ovulation' | 'experiment' | 'sex';
+  priority: number;
+  label: string;
+  icon: React.ReactNode;
+};
+
+function getCalendarMarkers(args: {
+  isPeriod: boolean;
+  isPredictedOvulation: boolean;
+  hasExperiment: boolean;
+  hasSex: boolean;
+}): CalendarMarker[] {
+  const iconProps = { size: 11, strokeWidth: 1.75, className: 'opacity-80' } as const;
+  const markers: CalendarMarker[] = [];
+
+  if (args.isPeriod) {
+    markers.push({
+      key: 'period',
+      priority: 1,
+      label: 'Period day',
+      icon: <Droplet {...iconProps} aria-hidden="true" />,
+    });
+  }
+  if (args.isPredictedOvulation) {
+    markers.push({
+      key: 'ovulation',
+      priority: 2,
+      label: 'Predicted ovulation',
+      icon: <Sparkles {...iconProps} aria-hidden="true" />,
+    });
+  }
+  if (args.hasExperiment) {
+    markers.push({
+      key: 'experiment',
+      priority: 3,
+      label: 'Experiment active',
+      icon: <FlaskConical {...iconProps} aria-hidden="true" />,
+    });
+  }
+  if (args.hasSex) {
+    markers.push({
+      key: 'sex',
+      priority: 4,
+      label: 'Sex logged',
+      icon: <Heart {...iconProps} aria-hidden="true" />,
+    });
+  }
+
+  return markers
+    .sort((a, b) => a.priority - b.priority)
+    .slice(0, 2);
+}
 
 function MoodIcon({ mood, className, size = 20 }: { mood?: number; className?: string; size?: number }) {
   if (mood === 1) return <Frown className={className} width={size} height={size} aria-hidden="true" />;
@@ -909,10 +948,15 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
               barOpacity = clamp(barOpacity, 0.12, 0.55);
             }
 
-            const influences = influencesFromEntry(entry);
-            const hasInfluences = influences.length > 0;
             const hasSex = Boolean((entry as any)?.events?.sex);
             const hasExperiment = isExperimentActiveOnISO(experiment, iso);
+            const isPredictedOvulation = fertilityEnabled && predictedOvulationSet.has(iso);
+            const dayMarkers = getCalendarMarkers({
+              isPeriod,
+              isPredictedOvulation,
+              hasExperiment,
+              hasSex,
+            });
 
             return (
               <button
@@ -922,7 +966,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                   if (editMode) setEditISO(iso);
                   else setSummaryISO(iso);
                 }}
-                className={`relative rounded-2xl border text-left p-2 min-h-[54px] transition shadow-sm active:scale-[0.99] ${
+                className={`relative rounded-2xl border text-left p-2 min-h-[58px] transition shadow-sm active:scale-[0.99] ${
                   inMonth ? 'bg-white border-[rgba(0,0,0,0.08)] hover:shadow-md hover:-translate-y-[1px]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.04)]'
                 } ${isToday ? 'ring-2 ring-[rgb(var(--color-primary)/0.45)] border-[rgb(var(--color-primary)/0.35)]' : ''} ${isFertile ? 'eb-fertile' : ''}`}
                 style={{
@@ -931,47 +975,40 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                   background: isPeriod ? `rgb(var(--color-primary-dark) / 0.16)` : undefined,
                 }}
               >
-                <div className="flex items-start justify-between">
-                  <div className={`text-sm font-medium ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
+                <div className="flex h-full min-h-[42px] flex-col">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className={`text-sm font-medium leading-none ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
 
-                  <div className="relative w-[30px] h-[14px] flex items-center justify-end gap-1">
-                    {hasSex && (
-                      <span
-                        className="absolute top-0 right-3 inline-block rounded-full"
-                        style={{ width: 7, height: 7, background: 'rgb(var(--color-accent) / 0.8)', boxShadow: '0 0 0 2px rgb(var(--color-surface))' }}
-                        aria-label="Sex logged"
-                        title="Sex logged"
-                      />
-                    )}
-                    {hasInfluences && (
-                      <span className="absolute top-0 right-0">
-                        <InfluenceMark size={9} title={influences.join(', ')} />
-                      </span>
-                    )}
+                    <div className="flex min-h-[12px] items-center justify-end gap-1 text-[rgb(var(--color-primary-dark))]">
+                      {dayMarkers.map((marker) => (
+                        <span
+                          key={marker.key}
+                          className="inline-flex items-center justify-center"
+                          aria-label={marker.label}
+                          title={marker.label}
+                        >
+                          {marker.icon}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
-                  {isToday && <div className="eb-today-badge">Today</div>}
+                  {isToday && (
+                    <div className="mt-1 text-[10px] font-medium text-[rgb(var(--color-primary-dark))]">Today</div>
+                  )}
+
+                  {/* Symptom overlay bar (only when data exists for this day) */}
+                  <div className="mt-auto pt-3">
+                    {raw != null && (
+                      <div
+                        className="h-1 rounded-full"
+                        style={{ background: `rgb(var(--color-primary) / ${barOpacity})` }}
+                        aria-label={`${overlayLabel(overlayKey)} overlay`}
+                        title={`${overlayLabel(overlayKey)} overlay`}
+                      />
+                    )}
+                  </div>
                 </div>
-
-                {/* Symptom overlay bar (only when data exists for this day) */}
-                {raw != null && (
-                  <div
-                    className="absolute left-2 right-2 bottom-2 h-1 rounded-full"
-                    style={{ background: `rgb(var(--color-primary) / ${barOpacity})` }}
-                    aria-label={`${overlayLabel(overlayKey)} overlay`}
-                    title={`${overlayLabel(overlayKey)} overlay`}
-                  />
-                )}
-
-                {/* Cycle start is editable, but we intentionally do not show a "Start" pill on tiles.
-                   It caused visual collisions and lowered trust when heuristics shifted. */}
-
-                {fertilityEnabled && predictedOvulationSet.has(iso) && (
-                  <div className="absolute right-2 bottom-6 text-[10px] px-1.5 py-0.5 rounded-md bg-[rgb(var(--color-accent)/0.14)] border border-[rgb(var(--color-accent)/0.55)] text-[rgb(var(--color-primary-dark))]">Ov</div>
-                )}
-                {hasExperiment && (
-                  <div className="absolute left-2 bottom-5 text-[10px] px-1.5 py-0.5 rounded-md bg-[rgb(var(--color-primary-light)/0.24)] border border-[rgb(var(--color-primary)/0.30)] text-[rgb(var(--color-primary-dark))]">Exp</div>
-                )}
               </button>
             );
           })}
@@ -1011,16 +1048,22 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <InfluenceMark size={9} title="Other influences" />
-                <span>Other influences</span>
+                <Droplet size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                <span>Period day</span>
               </div>
+              {fertilityEnabled && (
+                <div className="flex items-center gap-2">
+                  <Sparkles size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                  <span>Predicted ovulation</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
-                <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: 'rgb(var(--color-accent) / 0.8)' }} />
-                <span>Sex logged</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[rgb(var(--color-primary-light)/0.24)] border border-[rgb(var(--color-primary)/0.30)] text-[rgb(var(--color-primary-dark))]">Exp</span>
+                <FlaskConical size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                 <span>Experiment active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Heart size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                <span>Sex logged</span>
               </div>
 
               <div className="flex items-center gap-2">
