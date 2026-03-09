@@ -1,10 +1,11 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, Frown, PlusCircle } from 'lucide-react';
+import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, Frown } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
-import { computeCycleStats, estimatePhaseByFlow, sortByDateAsc } from '../lib/analytics';
+import { computeCycleStats, estimatePhaseByFlow, getRhythmModel, sortByDateAsc } from '../lib/analytics';
+import { getRhythmTimingModel } from '../lib/rhythmTiming';
 
 type Props = {
   userData: UserData;
@@ -140,21 +141,31 @@ function moodLabel(m?: number): string | null {
   return null;
 }
 
-
-function phaseLabel(phase: string | null): string {
-  if (!phase) return 'Unknown';
-  if (phase === 'Follicular') return 'Rebuilding';
-  if (phase === 'Ovulation') return 'Ovulation';
-  if (phase === 'Luteal') return 'Protective';
-  if (phase === 'Menstrual') return 'Rest';
-  return phase;
+function isExperimentActiveOnISO(experiment: any, dateISO: string): boolean {
+  const startISO = typeof experiment?.startDateISO === 'string' ? experiment.startDateISO : null;
+  const durationDays = typeof experiment?.durationDays === 'number' ? experiment.durationDays : 0;
+  const completed = Boolean(experiment?.outcome?.completedAtISO);
+  if (!startISO || durationDays <= 0 || completed) return false;
+  const start = new Date(startISO + 'T00:00:00').getTime();
+  const target = new Date(dateISO + 'T00:00:00').getTime();
+  const end = new Date(startISO + 'T00:00:00');
+  end.setDate(end.getDate() + Math.max(0, durationDays - 1));
+  return target >= start && target <= end.getTime();
 }
 
-function formatExperimentStatus(experiment: any, dateISO: string): string | null {
-  if (!experiment?.startDateISO || !experiment?.durationDays) return null;
-  const endISO = addDaysISO(experiment.startDateISO, Math.max(0, Number(experiment.durationDays) - 1));
-  if (dateISO < experiment.startDateISO || dateISO > endISO) return null;
-  return `Experiment active · day ${Math.max(1, daysBetweenISO(experiment.startDateISO, dateISO) + 1)} of ${experiment.durationDays}`;
+function shortPhaseCue(phaseKey: string | null | undefined): string {
+  switch (phaseKey) {
+    case 'reset':
+      return 'A softer, more restorative patch.';
+    case 'rebuilding':
+      return 'Energy often starts to build here.';
+    case 'expressive':
+      return 'This is often the more outward phase.';
+    case 'protective':
+      return 'Sensitivity can sit a little closer to the surface.';
+    default:
+      return 'Still learning your rhythm.';
+  }
 }
 
 
@@ -292,27 +303,21 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
 
 const CALENDAR_OVERLAY_STORAGE_KEY = 'eb:calendar:overlayKey';
 
-const CALENDAR_OVERLAY_ALLOWED: OverlayKey[] = [
-  'mood',
-  'stress',
-  'energy',
-  'sleep',
-  'pain',
-  'bloating',
-  'focus',
-  'fatigue',
-  'brainFog',
-  'nightSweats',
-  'hairShedding',
-  'facialSpots',
-  'cysts',
-  'flow',
-];
+  const availableOverlayKeys = useMemo<OverlayKey[]>(() => {
+    const preferred: OverlayKey[] = ['mood', 'sleep', 'energy', 'stress', 'pain', 'bloating', 'focus', 'fatigue', 'brainFog', 'nightSweats', 'hairShedding', 'facialSpots', 'cysts', 'flow'];
+    const enabled = Array.isArray(userData.enabledModules) ? (userData.enabledModules as OverlayKey[]) : [];
+    const set = new Set<OverlayKey>(['mood', ...enabled]);
+    const ordered = preferred.filter((key) => set.has(key));
+    for (const key of enabled) {
+      if (!ordered.includes(key)) ordered.push(key);
+    }
+    return ordered;
+  }, [userData.enabledModules]);
 
-function isAllowedOverlayKey(v: any): v is OverlayKey {
-  return typeof v === 'string' && (CALENDAR_OVERLAY_ALLOWED as string[]).includes(v);
+function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
+  return typeof v === 'string' && (allowed as string[]).includes(v);
 }
-  const [overlayKey, setOverlayKey] = useState<OverlayKey>('stress');
+  const [overlayKey, setOverlayKey] = useState<OverlayKey>('mood');
 
 
 
@@ -320,12 +325,13 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CALENDAR_OVERLAY_STORAGE_KEY);
-      if (isAllowedOverlayKey(raw)) setOverlayKey(raw);
+      if (isAllowedOverlayKey(raw, availableOverlayKeys)) setOverlayKey(raw);
+      else if (availableOverlayKeys.length) setOverlayKey(availableOverlayKeys[0]);
     } catch {
       // ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [availableOverlayKeys]);
 
   useEffect(() => {
     try {
@@ -334,9 +340,21 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       // ignore
     }
   }, [overlayKey]);
+  useEffect(() => {
+    if (!availableOverlayKeys.includes(overlayKey)) {
+      setOverlayKey(availableOverlayKeys[0] ?? 'mood');
+    }
+  }, [availableOverlayKeys, overlayKey]);
   const [editMode, setEditMode] = useState(false);
   const [editISO, setEditISO] = useState<string | null>(null);
   const [summaryISO, setSummaryISO] = useState<string | null>(null);
+  const [sleepPeekOpen, setSleepPeekOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Reset the sleep details peek when switching days or closing.
+    setSleepPeekOpen(false);
+  }, [summaryISO]);
+
 
   const monthStart = startOfMonth(monthCursor);
   const monthEnd = endOfMonth(monthCursor);
@@ -363,18 +381,54 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
   const todayISO = toISO(new Date());
 
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
-  const todayPhaseRaw = cycleEnabled ? estimatePhaseByFlow(todayISO, entriesSorted) : null;
-  const todayPhaseLabel = phaseLabel(todayPhaseRaw);
   const fertilityEnabled = Boolean(userData.fertilityMode) && cycleEnabled;
 
   const ovulationSet = useMemo(() => {
-    const list = Array.isArray(userData.ovulationOverrideISOs)
+    const legacy = Array.isArray(userData.ovulationOverrideISOs)
       ? (userData.ovulationOverrideISOs as string[])
       : [];
-    return new Set(list);
-  }, [userData]);
+    const entryOverrides = entriesSorted
+      .filter((entry: any) => Boolean((entry as any)?.ovulationOverride))
+      .map((entry) => entry.dateISO);
+    return new Set([...legacy, ...entryOverrides]);
+  }, [userData.ovulationOverrideISOs, entriesSorted]);
 
   const cycleStarts = cycleEnabled ? (cycleStats?.cycleStarts ?? []) : [];
+
+  const predictedOvulationSet = useMemo(() => {
+    const s = new Set<string>();
+    if (!fertilityEnabled) return s;
+
+    if (ovulationSet.size > 0) {
+      for (const iso of Array.from(ovulationSet)) s.add(iso);
+      return s;
+    }
+
+    if (cycleStarts.length === 0) return s;
+
+    const fallbackLen = avgLen ?? cycleStats?.lastLength ?? 28;
+    for (let i = 0; i < cycleStarts.length; i++) {
+      const startISO = cycleStarts[i];
+      const nextStartISO = cycleStarts[i + 1] ?? addDaysISO(startISO, fallbackLen);
+      const cycleLen = daysBetweenISO(startISO, nextStartISO);
+      const latestAllowed = Math.max(10, cycleLen - 10);
+      const ovulationDay = clamp(cycleLen - 14, 10, latestAllowed);
+      s.add(addDaysISO(startISO, ovulationDay));
+    }
+    return s;
+  }, [fertilityEnabled, ovulationSet, cycleStarts, avgLen, cycleStats?.lastLength]);
+
+  const rhythmModel = useMemo(() => getRhythmModel(entriesSorted, userData, todayISO), [entriesSorted, userData, todayISO]);
+  const rhythmTiming = useMemo(() => getRhythmTimingModel(entriesSorted as any, userData), [entriesSorted, userData]);
+  const rhythmContextLabel = useMemo(() => {
+    const map: Record<string, string> = {
+      reset: 'Reset Phase',
+      rebuilding: 'Rebuilding Phase',
+      expressive: 'Expressive Phase',
+      protective: 'Protective Phase',
+    };
+    return map[String(rhythmModel.phaseKey || '')] ?? 'Rhythm';
+  }, [rhythmModel.phaseKey]);
 
   // Build period + fertile windows
   const periodSet = useMemo(() => {
@@ -437,69 +491,28 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
     const s = new Set<string>();
     if (!fertilityEnabled) return s;
 
-    // If the user has marked ovulation days manually, derive the fertile window from those.
-    // This takes precedence over predictions.
-    if (ovulationSet.size > 0) {
-      for (const ovISO of Array.from(ovulationSet)) {
-        // Fertile window: ovulation -5 through ovulation +1
-        for (let d = -5; d <= 1; d++) {
-          const dayISO = addDaysISO(ovISO, d);
-          if (periodSet.has(dayISO)) continue;
-          s.add(dayISO);
-        }
-      }
-      return s;
-    }
+    if (predictedOvulationSet.size === 0) return s;
 
-    // With no ovulation override, start predicting as soon as we have *some* anchor.
-    // - 0 cycle starts: show nothing
-    // - 1 cycle start: use a default 28-day cycle
-    // - 2+ cycle starts: use personalised average length (avgLen)
-    if (cycleStarts.length === 0) return s;
-
-    const defaultLen = 28;
-    const lenForPrediction = avgLen ?? defaultLen;
-
-    const startsToUse = cycleStarts;
-
-    for (let i = 0; i < startsToUse.length; i++) {
-      const startISO = startsToUse[i];
-
-      const nextStartISO = startsToUse[i + 1] ?? addDaysISO(startISO, lenForPrediction);
-
-      const cycleLen = daysBetweenISO(startISO, nextStartISO);
-
-      // Ovulation estimate:
-      // Use the "nextStart - 14 days" idea, but guard against very short cycles where that
-      // would land during the period window and confuse the UI.
-      // We clamp to at least day 10, and at least 10 days before next start.
-      const latestAllowed = Math.max(10, cycleLen - 10);
-      const ovulationDay = clamp(cycleLen - 14, 10, latestAllowed);
-      const ovulationISO = addDaysISO(startISO, ovulationDay);
-
-      // Fertile window: ovulation -5 through ovulation +1
+    for (const ovISO of Array.from(predictedOvulationSet)) {
       for (let d = -5; d <= 1; d++) {
-        const dayISO = addDaysISO(ovulationISO, d);
-
-        // Never mark fertile days that are within the period window (keeps colours unambiguous).
+        const dayISO = addDaysISO(ovISO, d);
         if (periodSet.has(dayISO)) continue;
-
         s.add(dayISO);
       }
     }
     return s;
-  }, [fertilityEnabled, cycleStarts, avgLen, periodSet, ovulationSet]);
+  }, [fertilityEnabled, periodSet, predictedOvulationSet]);
 
-  const selectedDayPanel = useMemo(() => {
+  const summaryModal = useMemo(() => {
     if (!summaryISO) return null;
     const e = byISO.get(summaryISO);
+    const hasEntry = Boolean(e);
     const influences = influencesFromEntry(e);
     const note = typeof (e as any)?.notes === 'string' ? String((e as any).notes).trim() : '';
     const moodNum = (e as any)?.mood as number | undefined;
     const mood = moodLabel(moodNum);
-    const dayPhaseRaw = cycleEnabled ? estimatePhaseByFlow(summaryISO, entriesSorted) : null;
-    const dayPhase = phaseLabel(dayPhaseRaw);
-    const experimentStatus = formatExperimentStatus(experiment, summaryISO);
+    const sexLogged = Boolean((e as any)?.events?.sex);
+    const experimentActive = isExperimentActiveOnISO(experiment, summaryISO);
 
     const sd = (e as any)?.sleepDetails as any;
     const hasSleepDetails = !!(
@@ -524,92 +537,129 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       const v = vRaw > 10 ? Math.round(vRaw / 10) : vRaw;
       rows.push({ label: overlayLabel(k), value: `${clamp(v, 0, 10)}/10` });
     }
-    const topRows = rows.slice(0, 6);
+    const topRows = rows.slice(0, 5);
 
     const isPeriod = periodSet.has(summaryISO);
     const isFertile = fertileSet.has(summaryISO);
-    const isOv = fertilityEnabled && ovulationSet.has(summaryISO);
-    const sexLogged = Boolean((e as any)?.events?.sex);
+    const isOv = fertilityEnabled && predictedOvulationSet.has(summaryISO);
+
+    const summaryPhase = (() => {
+      if (isPeriod) return 'Reset Phase';
+      const cycleStart = [...cycleStarts].reverse().find((startISO) => startISO <= summaryISO) ?? null;
+      if (cycleStart) {
+        const dayInCycle = daysBetweenISO(cycleStart, summaryISO) + 1;
+        const cycleLen = avgLen ?? cycleStats?.lastLength ?? 28;
+        const ovulationDay = Math.max(10, Math.min(cycleLen - 10, cycleLen - 14));
+        if (dayInCycle <= 5) return 'Reset Phase';
+        if (isOv || Math.abs(dayInCycle - ovulationDay) <= 1) return 'Expressive Phase';
+        if (dayInCycle < ovulationDay) return 'Rebuilding Phase';
+        return 'Protective Phase';
+      }
+      return estimatePhaseByFlow(summaryISO, entriesSorted) ?? null;
+    })();
 
     return (
-      <div className="mt-6 eb-card">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Selected day</div>
-            <h2 className="mt-1 text-xl font-semibold">{prettyDate(new Date(`${summaryISO}T00:00:00`))}</h2>
-            <div className="mt-2 flex flex-wrap gap-2 text-sm text-[rgb(var(--color-text-secondary))]">
-              {cycleEnabled ? <span className="eb-pill">Phase: {dayPhase}</span> : null}
-              {isPeriod ? <span className="eb-pill">Period window</span> : null}
-              {isFertile ? <span className="eb-pill">Fertile window</span> : null}
-              {isOv ? <span className="eb-pill">Ovulation</span> : null}
-              {sexLogged ? <span className="eb-pill">Intimacy logged</span> : null}
-              {experimentStatus ? <span className="eb-pill">{experimentStatus}</span> : null}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/30"
+          aria-label="Close"
+          onClick={() => setSummaryISO(null)}
+        />
+        <div className="relative w-full max-w-md eb-card p-5 max-h-[85vh] overflow-y-auto">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 text-xl font-semibold">
+              {moodNum ? (
+                <span aria-label={mood ? `Mood: ${mood}` : 'Mood'} title={mood ? `Mood: ${mood}` : 'Mood'}>
+                  <MoodIcon mood={moodNum} className="text-[rgb(var(--color-accent))] opacity-80" size={20} />
+                </span>
+              ) : null}
+              <span>Day summary</span>
             </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => onOpenCheckIn(summaryISO)}
-            className="eb-btn-secondary inline-flex items-center gap-2"
-          >
-            <PlusCircle className="w-4 h-4" />
-            {e ? 'Open check-in' : 'Add check-in'}
-          </button>
-        </div>
-
-        {!e ? (
-          <div className="mt-5 eb-inset rounded-2xl p-4">
-            <div className="font-semibold">No check-in recorded</div>
-            <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Tap add check-in to log how you felt on this day.</p>
-          </div>
-        ) : (
-          <>
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="eb-inset rounded-2xl p-4">
-                <div className="text-xs text-[rgb(var(--color-text-secondary))]">Mood</div>
-                <div className="mt-1 flex items-center gap-2 font-semibold">
-                  {moodNum ? <MoodIcon mood={moodNum} className="text-[rgb(var(--color-accent))] opacity-80" size={18} /> : null}
-                  <span>{mood ?? 'Not logged'}</span>
-                </div>
-              </div>
-              <div className="eb-inset rounded-2xl p-4">
-                <div className="text-xs text-[rgb(var(--color-text-secondary))]">Notable metrics</div>
-                <div className="mt-1 font-semibold">{topRows.length ? `${topRows.length} logged` : 'No sliders logged'}</div>
-              </div>
-              <div className="eb-inset rounded-2xl p-4">
-                <div className="text-xs text-[rgb(var(--color-text-secondary))]">Sleep details</div>
-                <div className="mt-1 font-semibold">{hasSleepDetails ? 'Logged' : 'None added'}</div>
-              </div>
+            <div className="text-sm text-[rgb(var(--color-text-secondary))]">
+              {prettyDate(new Date(`${summaryISO}T00:00:00`))}
             </div>
+            {summaryPhase ? (
+              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{summaryPhase}</div>
+            ) : null}
+            {mood ? (
+              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Mood: {mood}</div>
+            ) : null}
+          </div>
 
-            {topRows.length ? (
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {topRows.map((r) => (
-                  <div key={r.label} className="flex items-center justify-between rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3">
-                    <span className="text-[rgb(var(--color-text-secondary))]">{r.label}</span>
-                    <span className="font-medium">{r.value}</span>
-                  </div>
+          {!hasEntry ? (
+            <div className="mb-4 eb-inset rounded-2xl p-4">
+              <div className="font-medium">No check-in recorded.</div>
+              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Tap below to log how you felt on this day.</div>
+            </div>
+          ) : null}
+
+          {(() => {
+            const pills: Array<{ key: string; text: string }> = [];
+            if (isPeriod) pills.push({ key: 'period', text: 'Period day' });
+            if (isFertile) pills.push({ key: 'fertile', text: isOv ? 'Ovulation day' : 'Fertile window' });
+            if (sexLogged) pills.push({ key: 'sex', text: 'Sex logged' });
+            if (experimentActive) pills.push({ key: 'experiment', text: 'Experiment active' });
+            for (const inf of influences) pills.push({ key: `inf:${inf}`, text: inf });
+
+            return pills.length ? (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {pills.map((p) => (
+                  <span key={p.key} className="eb-pill">
+                    {p.text}
+                  </span>
                 ))}
               </div>
-            ) : null}
+            ) : null;
+          })()}
 
-            {influences.length ? (
-              <div className="mt-5">
-                <div className="text-sm font-semibold mb-2">Context</div>
-                <div className="flex flex-wrap gap-2">
-                  {influences.map((inf) => (
-                    <span key={inf} className="eb-pill">{inf}</span>
-                  ))}
+          {topRows.length ? (
+            <div className="mb-4 space-y-2">
+              {topRows.map((r) => (
+                <div key={r.label} className="flex items-center justify-between">
+                  <span className="text-[rgb(var(--color-text-secondary))]">{r.label}</span>
+                  <span className="font-medium">{r.value}</span>
                 </div>
-              </div>
-            ) : null}
+              ))}
+            </div>
+          ) : hasEntry ? (
+            <div className="mb-4 text-sm text-[rgb(var(--color-text-secondary))]">No symptom sliders were logged for this day.</div>
+          ) : null}
 
-            {hasSleepDetails ? (
-              <div className="mt-5 eb-inset rounded-2xl p-4">
-                <div className="text-sm font-semibold mb-3">Sleep details</div>
+          <button
+            type="button"
+            disabled={!hasSleepDetails}
+            onClick={() => {
+              if (!hasSleepDetails) return;
+              setSleepPeekOpen((v) => !v);
+            }}
+            className={
+              'mb-4 w-full flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm ' +
+              (hasSleepDetails ? 'cursor-pointer' : 'opacity-60 cursor-default')
+            }
+          >
+            <div className="text-[rgb(var(--color-text-secondary))]">Sleep details</div>
+            <div className="flex items-center gap-2">
+              <span className={hasSleepDetails ? 'font-medium' : 'text-[rgb(var(--color-text-secondary))]'}>
+                {hasSleepDetails ? 'Logged' : 'Not today'}
+              </span>
+              <ChevronRight
+                className={`w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform ${
+                  sleepPeekOpen ? 'rotate-90' : ''
+                }`}
+              />
+            </div>
+          </button>
+
+          {sleepPeekOpen ? (
+            <div className="mb-4 eb-inset rounded-2xl p-4">
+              {hasSleepDetails ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-[rgb(var(--color-text-secondary))]">Night-time awakenings</span>
-                    <span className="font-medium">{typeof sd?.timesWoke === 'number' ? (sd.timesWoke === 3 ? '3+' : String(sd.timesWoke)) : '—'}</span>
+                    <span className="font-medium">
+                      {typeof sd?.timesWoke === 'number' ? (sd.timesWoke === 3 ? '3+' : String(sd.timesWoke)) : '—'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[rgb(var(--color-text-secondary))]">Trouble falling asleep</span>
@@ -620,20 +670,54 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                     <span className="font-medium">{sd?.wokeTooEarly ? 'Yes' : 'No'}</span>
                   </div>
                 </div>
-              </div>
-            ) : null}
+              ) : (
+                <div className="text-sm text-[rgb(var(--color-text-secondary))]">Nothing extra logged for this day.</div>
+              )}
+            </div>
+          ) : null}
 
-            {note ? (
-              <div className="mt-5">
-                <div className="text-sm font-semibold mb-1">Notes</div>
-                <div className="text-sm text-[rgb(var(--color-text-secondary))] whitespace-pre-wrap">{note}</div>
-              </div>
-            ) : null}
-          </>
-        )}
+          {note ? (
+            <div className="mb-4 text-sm whitespace-pre-wrap">
+              <div className="font-semibold mb-1">Note</div>
+              <div className="text-[rgb(var(--color-text-secondary))]">{note}</div>
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              className="w-full eb-btn-primary"
+              onClick={() => {
+                const iso = summaryISO;
+                setSummaryISO(null);
+                onOpenCheckIn(iso);
+              }}
+            >
+              {hasEntry ? 'Edit check-in' : 'Log check-in'}
+            </button>
+            <button type="button" className="w-full eb-btn-secondary" onClick={() => setSummaryISO(null)}>
+              Close
+            </button>
+          </div>
+        </div>
       </div>
     );
-  }, [summaryISO, byISO, cycleEnabled, entriesSorted, experiment, fertilityEnabled, fertileSet, onOpenCheckIn, ovulationSet, periodSet, userData.enabledModules]);
+  }, [
+    summaryISO,
+    byISO,
+    userData.enabledModules,
+    sleepPeekOpen,
+    periodSet,
+    fertileSet,
+    predictedOvulationSet,
+    fertilityEnabled,
+    onOpenCheckIn,
+    cycleStarts,
+    avgLen,
+    cycleStats?.lastLength,
+    entriesSorted,
+    experiment,
+  ]);
 
   const cycleEditModal = useMemo(() => {
     if (!editISO) return null;
@@ -643,7 +727,7 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
     const flow = typeof flowVal === 'number' ? flowVal : 0;
     const isBleeding = flow > 0;
     const isStart = Boolean(e?.cycleStartOverride);
-    const isOv = fertilityEnabled && ovulationSet.has(editISO);
+    const isOv = fertilityEnabled && predictedOvulationSet.has(editISO);
 
     const ensureEntry = () => {
       if (e) return e;
@@ -694,6 +778,13 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       const now = new Date().toISOString();
       const next = { ...base, ovulationOverride: v, updatedAt: now };
       upsertEntry(next);
+      onUpdateUser((prev: any) => {
+        const current = Array.isArray(prev?.ovulationOverrideISOs) ? prev.ovulationOverrideISOs.filter((iso: string) => iso !== editISO) : [];
+        return {
+          ...prev,
+          ovulationOverrideISOs: v ? [...current, editISO].sort() : current,
+        };
+      });
     };
 
     return (
@@ -749,7 +840,7 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
         </div>
       </div>
     );
-  }, [editISO, byISO, fertilityEnabled, ovulationSet, entriesSorted, upsertEntry]);
+  }, [editISO, byISO, fertilityEnabled, predictedOvulationSet, entriesSorted, upsertEntry, onUpdateUser]);
 
   const showLegend = cycleEnabled || fertilityEnabled;
 
@@ -759,16 +850,18 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       <div className="eb-page-inner">
         <div className="mb-6">
           <h1 className="mb-2">Calendar</h1>
-          <p className="text-[rgb(var(--color-text-secondary))]">Tap any day to review it. Use Overlay to spot patterns across the month.</p>
-        </div>
-        {cycleEnabled ? (
-          <div className="mb-4 eb-inset rounded-2xl p-4">
-            <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Rhythm context</div>
-            <div className="mt-1 font-semibold">Current phase: {todayPhaseLabel}</div>
-            <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">The calendar helps you see how this month lines up with your check-ins and cycle timing.</div>
+          <p className="text-[rgb(var(--color-text-secondary))]">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
+          <div className="mt-4 inline-flex max-w-full items-start gap-3 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white/75 px-4 py-3">
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Current rhythm</div>
+              <div className="mt-1 font-semibold">{rhythmContextLabel}</div>
+              <div className="text-sm text-[rgb(var(--color-text-secondary))]">
+                {rhythmTiming.currentDay ? `Day ${rhythmTiming.currentDay} in phase` : 'Still learning the timing'}
+              </div>
+              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{shortPhaseCue(rhythmModel.phaseKey)}</div>
+            </div>
           </div>
-        ) : null}
-
+        </div>
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <button
@@ -787,20 +880,9 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
           <div className="flex items-center gap-2">
             <div className="text-sm text-[rgb(var(--color-text-secondary))]">Overlay</div>
             <select className="eb-input !py-2 !h-10" value={overlayKey} onChange={(e) => setOverlayKey(e.target.value as any)}>
-              <option value="mood">Overall mood</option>
-              <option value="stress">Stress</option>
-              <option value="energy">Energy</option>
-              <option value="sleep">Sleep</option>
-              <option value="pain">Pain</option>
-              <option value="bloating">Bloating</option>
-              <option value="focus">Clarity</option>
-              <option value="fatigue">Fatigue</option>
-              <option value="brainFog">Brain fog</option>
-              <option value="nightSweats">Night sweats</option>
-              <option value="hairShedding">Hair shedding</option>
-              <option value="facialSpots">Facial spots</option>
-              <option value="cysts">Cysts</option>
-              <option value="flow">Bleeding/spotting</option>
+              {availableOverlayKeys.map((key) => (
+                <option key={key} value={key}>{overlayLabel(key)}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -829,6 +911,8 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
 
             const influences = influencesFromEntry(entry);
             const hasInfluences = influences.length > 0;
+            const hasSex = Boolean((entry as any)?.events?.sex);
+            const hasExperiment = isExperimentActiveOnISO(experiment, iso);
 
             return (
               <button
@@ -850,7 +934,15 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                 <div className="flex items-start justify-between">
                   <div className={`text-sm font-medium ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
 
-                  <div className="relative w-[22px] h-[14px] flex items-center justify-end">
+                  <div className="relative w-[30px] h-[14px] flex items-center justify-end gap-1">
+                    {hasSex && (
+                      <span
+                        className="absolute top-0 right-3 inline-block rounded-full"
+                        style={{ width: 7, height: 7, background: 'rgb(var(--color-accent) / 0.8)', boxShadow: '0 0 0 2px rgb(var(--color-surface))' }}
+                        aria-label="Sex logged"
+                        title="Sex logged"
+                      />
+                    )}
                     {hasInfluences && (
                       <span className="absolute top-0 right-0">
                         <InfluenceMark size={9} title={influences.join(', ')} />
@@ -859,18 +951,6 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                   </div>
 
                   {isToday && <div className="eb-today-badge">Today</div>}
-                </div>
-
-                <div className="absolute left-2 bottom-5 flex items-center gap-1">
-                  {entry ? (
-                    <span className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary-dark)/0.70)]" title="Check-in recorded" aria-label="Check-in recorded" />
-                  ) : null}
-                  {Boolean(entry?.events?.sex) ? (
-                    <span className="w-2.5 h-2.5 rounded-[3px] bg-[rgb(var(--color-accent)/0.85)]" title="Intimacy logged" aria-label="Intimacy logged" />
-                  ) : null}
-                  {formatExperimentStatus(experiment, iso) ? (
-                    <span className="w-2.5 h-2.5 rounded-full border border-[rgb(var(--color-primary-dark)/0.65)] bg-white" title="Experiment active" aria-label="Experiment active" />
-                  ) : null}
                 </div>
 
                 {/* Symptom overlay bar (only when data exists for this day) */}
@@ -883,21 +963,22 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                   />
                 )}
 
-                {fertilityEnabled && ovulationSet.has(iso) && (
+                {/* Cycle start is editable, but we intentionally do not show a "Start" pill on tiles.
+                   It caused visual collisions and lowered trust when heuristics shifted. */}
+
+                {fertilityEnabled && predictedOvulationSet.has(iso) && (
                   <div className="absolute right-2 bottom-6 text-[10px] px-1.5 py-0.5 rounded-md bg-[rgb(var(--color-accent)/0.14)] border border-[rgb(var(--color-accent)/0.55)] text-[rgb(var(--color-primary-dark))]">Ov</div>
+                )}
+                {hasExperiment && (
+                  <div className="absolute left-2 bottom-5 text-[10px] px-1.5 py-0.5 rounded-md bg-[rgb(var(--color-primary-light)/0.24)] border border-[rgb(var(--color-primary)/0.30)] text-[rgb(var(--color-primary-dark))]">Exp</div>
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Day detail */}
-        {summaryISO ? selectedDayPanel : (
-          <div className="mt-6 eb-card">
-            <div className="font-semibold">Tap a day to review it</div>
-            <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">You will see the phase, logged symptoms, notes, and any experiment context for that day here.</p>
-          </div>
-        )}
+        {/* Day summary (tap a day) */}
+        {summaryModal}
 
 
         {/* Cycle edit sheet */}
@@ -930,22 +1011,17 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary-dark)/0.70)]" />
-                <span>Check-in recorded</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-[3px] bg-[rgb(var(--color-accent)/0.85)]" />
-                <span>Intimacy logged</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full border border-[rgb(var(--color-primary-dark)/0.65)] bg-white" />
-                <span>Experiment active</span>
-              </div>
-              <div className="flex items-center gap-2">
                 <InfluenceMark size={9} title="Other influences" />
                 <span>Other influences</span>
               </div>
-
+              <div className="flex items-center gap-2">
+                <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: 'rgb(var(--color-accent) / 0.8)' }} />
+                <span>Sex logged</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[rgb(var(--color-primary-light)/0.24)] border border-[rgb(var(--color-primary)/0.30)] text-[rgb(var(--color-primary-dark))]">Exp</span>
+                <span>Experiment active</span>
+              </div>
 
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1">

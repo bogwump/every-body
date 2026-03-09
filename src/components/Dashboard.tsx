@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Calendar, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload, CheckCircle2 } from 'lucide-react';
+import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 
 import type { DashboardMetric, SymptomKey, UserData, UserGoal } from '../types';
-import { useEntries } from '../lib/appStore';
+import { useEntries, useExperiment } from '../lib/appStore';
 import { buildHomepageHeroModel, computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
 import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
@@ -103,6 +103,42 @@ function buildWeekSeries(dateISOs: string[], entriesByDate: Map<string, any>, me
 }
 
 
+type DashboardTileProps = {
+  title: string;
+  subtitle: string;
+  cta?: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+};
+
+function DashboardTile({ title, subtitle, cta, icon, onClick }: DashboardTileProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="eb-card hover:shadow-md transition-all text-left group h-full flex flex-col justify-start"
+    >
+      <div className="flex items-start gap-4 w-full h-full">
+        <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
+          <div className="text-[rgb(var(--color-primary))]">{icon}</div>
+        </div>
+
+        <div className="min-w-0 flex-1 flex flex-col items-start h-full">
+          <h3 className="font-semibold mb-1">{title}</h3>
+          <p className="text-sm text-[rgba(0,0,0,0.65)]">{subtitle}</p>
+          {cta ? (
+            <span className="mt-auto pt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))]">
+              {cta} <ArrowRight className="w-4 h-4" />
+            </span>
+          ) : null}
+        </div>
+
+        <ChevronRight className="w-5 h-5 text-[rgba(0,0,0,0.45)] group-hover:text-[rgba(0,0,0,0.65)] mt-1" />
+      </div>
+    </button>
+  );
+}
+
 export function Dashboard({
   userName,
   userGoal,
@@ -111,7 +147,8 @@ export function Dashboard({
   onUpdateUserData,
   onOpenCheckIn,
 }: DashboardProps) {
-  const { entries: entriesAll, upsertEntry } = useEntries();
+  const { entries: entriesAll } = useEntries();
+  const { experiment } = useExperiment();
   const entriesSorted = useMemo(() => sortByDateAsc(entriesAll), [entriesAll]);
 
   const todayISO = isoToday();
@@ -439,28 +476,6 @@ export function Dashboard({
         </div>
 
 
-
-        {highestMoment ? (
-          <CompanionMomentCard
-            moment={highestMoment}
-            onNavigate={onNavigate}
-            onDismiss={() => setMomentRefresh((value) => value + 1)}
-          />
-        ) : entriesSorted.length < 3 ? (
-          <div className="eb-card mb-6">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">For you</div>
-                <h3 className="mt-1 mb-1">You’re building your rhythm</h3>
-                <p className="text-sm text-[rgba(0,0,0,0.68)]">A few more check-ins will help this start turning into more personalised insights.</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         {/* HERO: Symptom tracking */}
 
         <div className="eb-card eb-hero eb-hero-surface rounded-2xl p-6 relative">
@@ -478,8 +493,7 @@ export function Dashboard({
           <button
             type="button"
             onClick={() => onNavigate('rhythm')}
-            className="absolute top-4 right-12 z-10 text-sm eb-hero-on-dark-muted hover:eb-hero-on-dark transition"
-            title="View full rhythm"
+            className="absolute top-4 right-12 z-10 text-sm text-white/85 hover:text-white transition"
           >
             View full rhythm
           </button>
@@ -513,9 +527,73 @@ export function Dashboard({
           </div>
         </div>
 
+        {highestMoment ? (
+          <CompanionMomentCard
+            moment={highestMoment}
+            onNavigate={onNavigate}
+            onDismiss={() => setMomentRefresh((value) => value + 1)}
+          />
+        ) : entriesSorted.length < 3 ? (
+          <div className="eb-card mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Companion</div>
+                <h3 className="mt-1 mb-1">You’re building your rhythm</h3>
+                <p className="text-sm text-[rgba(0,0,0,0.68)]">A few more check-ins will help this turn into more personal reflections and experiments that actually fit you.</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="eb-card">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+              <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Today</div>
+              <h3 className="mt-1 mb-1">{checkedInToday ? 'Today is logged' : 'Today is ready for a check-in'}</h3>
+              <p className="text-sm text-[rgba(0,0,0,0.68)]">
+                {checkedInToday
+                  ? 'You have already logged today. Reopen it if anything changed.'
+                  : 'A quick check-in today helps the app make better sense of what matters right now.'}
+              </p>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="eb-inset rounded-2xl p-3">
+                  <div className="text-xs text-[rgb(var(--color-text-secondary))]">Status</div>
+                  <div className="mt-1 font-semibold">{checkedInToday ? 'Logged today' : 'Not logged yet'}</div>
+                </div>
+                <div className="eb-inset rounded-2xl p-3">
+                  <div className="text-xs text-[rgb(var(--color-text-secondary))]">Days tracked</div>
+                  <div className="mt-1 font-semibold">{daysTracked}</div>
+                </div>
+                {experiment && !(experiment as any)?.outcome?.completedAtISO ? (
+                  <div className="eb-inset rounded-2xl p-3 sm:col-span-2">
+                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Active experiment</div>
+                    <div className="mt-1 font-semibold">{(experiment as any)?.title || 'Your experiment'}</div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                <button type="button" className="eb-btn-primary" onClick={() => onOpenCheckIn(todayISO)}>
+                  {checkedInToday ? "Open today’s check-in" : "Do today’s check-in"}
+                </button>
+                <button type="button" className="eb-btn-secondary" onClick={() => onNavigate('calendar')}>
+                  Open calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Restore from backup nudge (only when there is no data yet) */}
         {daysTracked === 0 ? (
-          <div className="eb-card mb-6">
+          <div className="eb-card">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
                 <Upload className="w-5 h-5 text-[rgb(var(--color-primary))]" />
@@ -561,98 +639,48 @@ export function Dashboard({
           </div>
         ) : null}
 
-        {/* Quick actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
-          <div className="eb-card">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Today</div>
-                <h3 className="mt-1 mb-1">{checkedInToday ? 'Today is logged' : 'Ready for a quick check-in?'}</h3>
-                <p className="text-sm text-[rgba(0,0,0,0.68)]">
-                  {checkedInToday
-                    ? 'You have already logged today. You can reopen it if anything changed.'
-                    : 'A quick check-in keeps Home useful and helps the rest of the app stay personal.'}
-                </p>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="eb-inset rounded-2xl p-3">
-                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Status</div>
-                    <div className="mt-1 font-semibold">{checkedInToday ? 'Logged today' : 'Not logged yet'}</div>
-                  </div>
-                  <div className="eb-inset rounded-2xl p-3">
-                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Days tracked</div>
-                    <div className="mt-1 font-semibold">{daysTracked}</div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => onOpenCheckIn(todayISO)}
-                    className="eb-btn inline-flex items-center gap-2"
-                  >
-                    {checkedInToday ? "Open today's check-in" : "Do today's check-in"}
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('calendar')}
-                    className="eb-btn-secondary inline-flex items-center gap-2"
-                  >
-                    Open calendar
-                  </button>
-                </div>
-              </div>
+        <div className="eb-card">
+          <div className="flex items-start gap-4 w-full h-full">
+            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
-          </div>
-
-          <div className="eb-card">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Snapshot</div>
-                <h3 className="mt-1 mb-1">What looks most useful right now</h3>
-                {quickHookLines.length > 0 ? (
-                  <div className="space-y-2">
-                    {quickHookLines.slice(0, 2).map((l, idx) => (
-                      <p key={idx} className="text-sm text-[rgba(0,0,0,0.72)]">{l}</p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-[rgba(0,0,0,0.72)]">Log a few days and this will start to highlight what is changing.</p>
-                )}
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="eb-inset rounded-2xl p-3">
-                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
-                    <div className="mt-1 font-semibold">{insightsReady ? 'Ready' : `${insightsRemaining} to unlock`}</div>
-                  </div>
-                  <div className="eb-inset rounded-2xl p-3">
-                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Best next page</div>
-                    <div className="mt-1 font-semibold">{insightsReady ? 'Insights' : 'Calendar'}</div>
-                  </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Snapshot</div>
+              <h3 className="mt-1 mb-2">What looks most useful right now</h3>
+              {quickHookLines.length > 0 ? (
+                <div className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
+                  {quickHookLines.map((l, idx) => (
+                    <div key={idx}>{l}</div>
+                  ))}
                 </div>
+              ) : (
+                <p className="text-sm text-[rgba(0,0,0,0.75)]">
+                  Log a few days and your first patterns will show up here.
+                </p>
+              )}
 
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => (insightsReady ? onNavigate('insights') : onNavigate('calendar'))}
-                    className="inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
-                  >
-                    {insightsReady ? 'View insights' : 'Review recent days'} <ArrowRight className="w-4 h-4" />
-                  </button>
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="eb-inset rounded-2xl p-3">
+                  <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
+                  <div className="mt-1 font-semibold">{insightsReady ? 'Ready' : `${insightsRemaining} to unlock`}</div>
+                </div>
+                <div className="eb-inset rounded-2xl p-3">
+                  <div className="text-xs text-[rgb(var(--color-text-secondary))]">Best next page</div>
+                  <div className="mt-1 font-semibold">{insightsReady ? 'Insights' : 'Check-in'}</div>
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => (insightsReady ? onNavigate('insights') : onOpenCheckIn(todayISO))}
+                className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+              >
+                {insightsReady ? 'View insights' : "Do today’s check-in"} <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Current trends snapshot */}
         <div className="eb-card">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
@@ -701,9 +729,10 @@ export function Dashboard({
               </select>
             ))}
           </div>
-          <p className="text-sm mt-3 text-[rgb(var(--color-text-secondary))]">Dots appear from day 1 and the line stays connected across missed days so the overall shape is still easy to read.</p>
+          <p className="text-sm mt-3">
+            You will see dots from day 1. Lines connect across missed days so you can still spot the overall trend.
+          </p>
         </div>
-
         {/* Tip for today */}
         <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
           <div className="flex items-start gap-4 w-full h-full">
