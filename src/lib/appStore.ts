@@ -110,11 +110,11 @@ export async function initSelfHealingStorage() {
   if (didHydrateFromIDB) return;
   didHydrateFromIDB = true;
   try {
-    const restored = await hydrateFromIDB(Array.from(STORAGE_KEYS));
+    const restored = await hydrateFromIDB(Array.from(BACKUP_KEYS as readonly string[]));
     if (restored) {
       // Clear parsed cache so hooks re-parse the restored raw JSON
-      for (const k of STORAGE_KEYS) parsedCache.delete(k);
-      for (const k of STORAGE_KEYS) emitKey(k);
+      for (const k of BACKUP_KEYS) parsedCache.delete(k);
+      for (const k of BACKUP_KEYS) emitKey(k);
     }
   } catch {
     // ignore

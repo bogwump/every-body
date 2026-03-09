@@ -43,6 +43,7 @@ import { EBDialogContent } from './EBDialog';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
 import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
+import { getConfidencePhrase } from '../lib/confidenceCopy';
 
 interface InsightsProps {
   userData: UserData;
