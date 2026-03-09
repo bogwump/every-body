@@ -926,7 +926,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-x-2 gap-y-1.5 sm:gap-y-2">
           {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d) => (
             <div key={d} className="text-xs text-[rgb(var(--color-text-secondary))] px-1">{d}</div>
           ))}
@@ -968,7 +968,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                   else setSummaryISO(iso);
                 }}
                 className={`relative rounded-2xl border text-left p-2 min-h-[64px] transition shadow-sm active:scale-[0.99] ${
-                  inMonth ? 'bg-white border-[rgba(0,0,0,0.08)] hover:shadow-md hover:-translate-y-[1px]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.04)]'
+                  inMonth ? 'bg-white border-[rgba(0,0,0,0.08)] hover:shadow-md hover:-translate-y-[1px]' : 'bg-white border-[rgba(0,0,0,0.04)]'
                 } ${isToday ? 'outline outline-2 outline-[rgb(var(--color-primary-dark))] outline-offset-0' : ''} ${isFertile ? 'eb-fertile' : ''}`}
                 style={{
                   // IMPORTANT: our CSS vars store space-separated RGB values (e.g. "132 155 130").
