@@ -4,7 +4,7 @@ import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, 
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries } from '../lib/appStore';
-import { computeCycleStats, sortByDateAsc } from '../lib/analytics';
+import { computeCycleStats, estimatePhaseByFlow, sortByDateAsc } from '../lib/analytics';
 
 type Props = {
   userData: UserData;
@@ -353,6 +353,26 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
 
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
   const fertilityEnabled = Boolean(userData.fertilityMode) && cycleEnabled;
+  const currentPhase = useMemo(() => {
+    if (!cycleEnabled) return null;
+    return estimatePhaseByFlow(todayISO, entriesSorted);
+  }, [cycleEnabled, todayISO, entriesSorted]);
+  const currentPhaseStart = useMemo(() => {
+    if (!currentPhase) return null;
+    for (let i = entriesSorted.length - 1; i >= 0; i -= 1) {
+      const iso = entriesSorted[i]?.dateISO;
+      if (!iso) continue;
+      const phase = estimatePhaseByFlow(iso, entriesSorted);
+      if (phase !== currentPhase) {
+        return i < entriesSorted.length - 1 ? entriesSorted[i + 1]?.dateISO ?? null : null;
+      }
+    }
+    return entriesSorted[0]?.dateISO ?? null;
+  }, [currentPhase, entriesSorted]);
+  const currentPhaseDay = useMemo(() => {
+    if (!currentPhase || !currentPhaseStart) return null;
+    return Math.max(1, daysBetweenISO(currentPhaseStart, todayISO) + 1);
+  }, [currentPhase, currentPhaseStart, todayISO]);
 
   const ovulationSet = useMemo(() => {
     const list = Array.isArray(userData.ovulationOverrideISOs)
@@ -475,7 +495,9 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       }
     }
     return s;
-  }, [fertilityEnabled, cycleStarts, avgLen, periodSet, ovulationSet]);  const summaryModal = useMemo(() => {
+  }, [fertilityEnabled, cycleStarts, avgLen, periodSet, ovulationSet]);
+
+  const summaryModal = useMemo(() => {
     if (!summaryISO) return null;
     const e = byISO.get(summaryISO);
     const influences = influencesFromEntry(e);
@@ -554,13 +576,32 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
             ) : null;
           })()}
 
+          {!e ? (
+            <div className="mb-4 rounded-2xl border border-dashed border-neutral-200 bg-[rgba(0,0,0,0.02)] px-4 py-4">
+              <div className="font-medium">No check-in recorded</div>
+              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
+                Tap edit check-in to add how you felt on this day.
+              </div>
+            </div>
+          ) : null}
+
+          {(isPeriod || isFertile || isOv) ? (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {isPeriod ? <span className="eb-pill">Period window</span> : null}
+              {isFertile ? <span className="eb-pill">Fertile window</span> : null}
+              {isOv ? <span className="eb-pill">Ovulation marked</span> : null}
+            </div>
+          ) : null}
+
           <div className="mb-4 space-y-2">
-            {topRows.map((r) => (
+            {topRows.length ? topRows.map((r) => (
               <div key={r.label} className="flex items-center justify-between">
                 <span className="text-[rgb(var(--color-text-secondary))]">{r.label}</span>
                 <span className="font-medium">{r.value}</span>
               </div>
-            ))}
+            )) : e ? (
+              <div className="text-sm text-[rgb(var(--color-text-secondary))]">No symptom detail was logged for this day.</div>
+            ) : null}
           </div>
 
           <button
@@ -630,7 +671,7 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                 onOpenCheckIn(iso);
               }}
             >
-              Edit check-in
+              Add or edit check-in
             </button>
             <button type="button" className="w-full eb-btn-secondary" onClick={() => setSummaryISO(null)}>
               Close
@@ -776,7 +817,24 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       <div className="eb-page-inner">
         <div className="mb-6">
           <h1 className="mb-2">Calendar</h1>
-          <p className="text-[rgb(var(--color-text-secondary))]">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
+          <p className="text-[rgb(var(--color-text-secondary))]">Review what happened on each day, then tap to add or update a check-in.</p>
+        </div>
+
+        <div className="eb-card mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Current rhythm</div>
+              <h3 className="mt-1 mb-1">{currentPhase ? `${currentPhase} phase` : 'Build your rhythm over time'}</h3>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                {currentPhase && currentPhaseDay
+                  ? `Today looks like day ${currentPhaseDay} of this phase.`
+                  : 'As you log days, your calendar will become easier to read at a glance.'}
+              </p>
+            </div>
+            <button type="button" className="eb-btn-secondary" onClick={() => onNavigate('rhythm')}>
+              Open rhythm
+            </button>
+          </div>
         </div>
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
@@ -956,9 +1014,7 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
 </div>
 
             <div className="mt-4 text-sm text-[rgb(var(--color-text-secondary))]">
-              Tip: switch overlay to{' '}
-              <span className="font-medium">Overall mood</span>{' '}
-              to spot good and difficult patches across the month.
+              Tip: switch overlay to <span className="font-medium">Overall mood</span> or <span className="font-medium">Sleep</span> to compare patches across the month.
             </div>
           </>
         )}

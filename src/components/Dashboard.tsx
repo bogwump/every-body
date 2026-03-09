@@ -597,26 +597,41 @@ export function Dashboard({
           </div>
         ) : null}
 
-        {/* Action cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <DashboardTile
-    title="Nice work keeping up the habit"
-    subtitle="Little check-ins add up."
-    cta="Open calendar"
-    icon={<Sparkles className="w-5 h-5" />}
-    onClick={() => onNavigate('calendar')}
-  />
+        {/* Quick check-in */}
+        <div className="eb-card">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+              <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Quick check-in</div>
+              <h3 className="mt-1 mb-1">{checkedInToday ? 'Today is logged' : 'How are you feeling today?'}</h3>
+              <p className="text-sm text-[rgba(0,0,0,0.68)]">
+                {checkedInToday
+                  ? 'You can review today in Calendar or update your check-in.'
+                  : 'Log today in a couple of taps and keep your rhythm picture current.'}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="eb-btn-primary"
+                  onClick={() => onOpenCheckIn(todayISO)}
+                >
+                  {checkedInToday ? "Update today" : "Do today's check-in"}
+                </button>
+                <button
+                  type="button"
+                  className="eb-btn-secondary"
+                  onClick={() => onNavigate('calendar')}
+                >
+                  Open calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
-  <DashboardTile
-    title="Guide"
-    subtitle="Start with a daily check-in. After a few days you can spot early patterns, and after a week it gets even clearer."
-    cta="Open History"
-    icon={<Lightbulb className="w-5 h-5" />}
-    onClick={() => onNavigate('history')}
-  />
-</div>
-
-{/* Insights + week at a glance */}
+{/* Current trends + week at a glance */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="eb-card">
             <div className="flex items-start gap-4 w-full h-full">
@@ -624,7 +639,7 @@ export function Dashboard({
                 <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
               <div className="min-w-0">
-                <h3 className="mb-2">Your early insights</h3>
+                <h3 className="mb-2">Current trends</h3>
                 {quickHookLines.length > 0 ? (
                   <ul className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
                     {quickHookLines.map((l, idx) => (
@@ -666,7 +681,7 @@ export function Dashboard({
           <div className="eb-card">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
-                <h3 className="mb-1">Your week at a glance</h3>
+                <h3 className="mb-1">This week at a glance</h3>
                 <p className="text-xs text-[rgb(var(--color-text-secondary))]">Pick 3 metrics to show</p>
               </div>
             </div>
@@ -718,43 +733,6 @@ export function Dashboard({
           </div>
         </div>
 
-        {/* Tip for today */}
-        <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
-          <div className="flex items-start gap-4 w-full h-full">
-            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
-              <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-            </div>
-            <div className="relative min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={() => setTipOffset((v) => v + 1)}
-                // Chrome can sometimes let later-flowing text overlap and steal the click.
-                // Keep this above the header/text.
-                className="text-sm text-[rgb(var(--color-primary))] hover:underline absolute top-0 right-0 z-10"
-              >
-                Another tip
-              </button>
-
-              <h3 className="mb-1 pr-24">Tip for today</h3>
-              <p className="text-sm font-semibold pr-24">{tip.title}</p>
-
-              <p className="text-sm text-[rgba(0,0,0,0.75)] mt-2">{tip.body}</p>
-
-              {tip.cta ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (tip.cta?.screen === 'check-in') onOpenCheckIn(todayISO);
-                    else onNavigate(tip.cta.screen);
-                  }}
-                  className="mt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
-                >
-                  {tip.cta.label} <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
