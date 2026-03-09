@@ -1,9 +1,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, Frown } from 'lucide-react';
+import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, Frown, PlusCircle } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
-import { useEntries } from '../lib/appStore';
+import { useEntries, useExperiment } from '../lib/appStore';
 import { computeCycleStats, estimatePhaseByFlow, sortByDateAsc } from '../lib/analytics';
 
 type Props = {
@@ -141,6 +141,23 @@ function moodLabel(m?: number): string | null {
 }
 
 
+function phaseLabel(phase: string | null): string {
+  if (!phase) return 'Unknown';
+  if (phase === 'Follicular') return 'Rebuilding';
+  if (phase === 'Ovulation') return 'Ovulation';
+  if (phase === 'Luteal') return 'Protective';
+  if (phase === 'Menstrual') return 'Rest';
+  return phase;
+}
+
+function formatExperimentStatus(experiment: any, dateISO: string): string | null {
+  if (!experiment?.startDateISO || !experiment?.durationDays) return null;
+  const endISO = addDaysISO(experiment.startDateISO, Math.max(0, Number(experiment.durationDays) - 1));
+  if (dateISO < experiment.startDateISO || dateISO > endISO) return null;
+  return `Experiment active · day ${Math.max(1, daysBetweenISO(experiment.startDateISO, dateISO) + 1)} of ${experiment.durationDays}`;
+}
+
+
 function MoodIcon({ mood, className, size = 20 }: { mood?: number; className?: string; size?: number }) {
   if (mood === 1) return <Frown className={className} width={size} height={size} aria-hidden="true" />;
   if (mood === 2) return <Meh className={className} width={size} height={size} aria-hidden="true" />;
@@ -264,6 +281,7 @@ function overlayLabel(key: SymptomKey | 'mood'): string {
 
 export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser }: Props) {
   const { entries, upsertEntry } = useEntries();
+  const { experiment } = useExperiment();
   const entriesSorted = useMemo(() => sortByDateAsc(entries), [entries]);
 
   const cycleStats = useMemo(() => computeCycleStats(entriesSorted), [entriesSorted]);
@@ -319,13 +337,6 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
   const [editMode, setEditMode] = useState(false);
   const [editISO, setEditISO] = useState<string | null>(null);
   const [summaryISO, setSummaryISO] = useState<string | null>(null);
-  const [sleepPeekOpen, setSleepPeekOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    // Reset the sleep details peek when switching days or closing.
-    setSleepPeekOpen(false);
-  }, [summaryISO]);
-
 
   const monthStart = startOfMonth(monthCursor);
   const monthEnd = endOfMonth(monthCursor);
@@ -352,27 +363,9 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
   const todayISO = toISO(new Date());
 
   const cycleEnabled = userData.cycleTrackingMode === 'cycle';
+  const todayPhaseRaw = cycleEnabled ? estimatePhaseByFlow(todayISO, entriesSorted) : null;
+  const todayPhaseLabel = phaseLabel(todayPhaseRaw);
   const fertilityEnabled = Boolean(userData.fertilityMode) && cycleEnabled;
-  const currentPhase = useMemo(() => {
-    if (!cycleEnabled) return null;
-    return estimatePhaseByFlow(todayISO, entriesSorted);
-  }, [cycleEnabled, todayISO, entriesSorted]);
-  const currentPhaseStart = useMemo(() => {
-    if (!currentPhase) return null;
-    for (let i = entriesSorted.length - 1; i >= 0; i -= 1) {
-      const iso = entriesSorted[i]?.dateISO;
-      if (!iso) continue;
-      const phase = estimatePhaseByFlow(iso, entriesSorted);
-      if (phase !== currentPhase) {
-        return i < entriesSorted.length - 1 ? entriesSorted[i + 1]?.dateISO ?? null : null;
-      }
-    }
-    return entriesSorted[0]?.dateISO ?? null;
-  }, [currentPhase, entriesSorted]);
-  const currentPhaseDay = useMemo(() => {
-    if (!currentPhase || !currentPhaseStart) return null;
-    return Math.max(1, daysBetweenISO(currentPhaseStart, todayISO) + 1);
-  }, [currentPhase, currentPhaseStart, todayISO]);
 
   const ovulationSet = useMemo(() => {
     const list = Array.isArray(userData.ovulationOverrideISOs)
@@ -497,13 +490,16 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
     return s;
   }, [fertilityEnabled, cycleStarts, avgLen, periodSet, ovulationSet]);
 
-  const summaryModal = useMemo(() => {
+  const selectedDayPanel = useMemo(() => {
     if (!summaryISO) return null;
     const e = byISO.get(summaryISO);
     const influences = influencesFromEntry(e);
     const note = typeof (e as any)?.notes === 'string' ? String((e as any).notes).trim() : '';
     const moodNum = (e as any)?.mood as number | undefined;
     const mood = moodLabel(moodNum);
+    const dayPhaseRaw = cycleEnabled ? estimatePhaseByFlow(summaryISO, entriesSorted) : null;
+    const dayPhase = phaseLabel(dayPhaseRaw);
+    const experimentStatus = formatExperimentStatus(experiment, summaryISO);
 
     const sd = (e as any)?.sleepDetails as any;
     const hasSleepDetails = !!(
@@ -520,7 +516,6 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       return '—';
     };
 
-    // Up to 5 logged metrics from enabled modules
     const enabled = Array.isArray(userData.enabledModules) ? (userData.enabledModules as SymptomKey[]) : [];
     const rows: Array<{ label: string; value: string }> = [];
     for (const k of enabled) {
@@ -529,115 +524,92 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       const v = vRaw > 10 ? Math.round(vRaw / 10) : vRaw;
       rows.push({ label: overlayLabel(k), value: `${clamp(v, 0, 10)}/10` });
     }
-    const topRows = rows.slice(0, 5);
+    const topRows = rows.slice(0, 6);
 
     const isPeriod = periodSet.has(summaryISO);
     const isFertile = fertileSet.has(summaryISO);
     const isOv = fertilityEnabled && ovulationSet.has(summaryISO);
+    const sexLogged = Boolean((e as any)?.events?.sex);
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <button
-          type="button"
-          className="absolute inset-0 bg-black/30"
-          aria-label="Close"
-          onClick={() => setSummaryISO(null)}
-        />
-        <div className="relative w-full max-w-md eb-card p-5">
-          <div className="mb-4">
-            <div className="flex items-center gap-2 text-xl font-semibold">
-              {moodNum ? (
-                <span aria-label={mood ? `Mood: ${mood}` : 'Mood'} title={mood ? `Mood: ${mood}` : 'Mood'}>
-                  <MoodIcon mood={moodNum} className="text-[rgb(var(--color-accent))] opacity-80" size={20} />
-                </span>
-              ) : null}
-              <span>Day summary</span>
-            </div>
-            <div className="text-sm text-[rgb(var(--color-text-secondary))]">
-              {prettyDate(new Date(`${summaryISO}T00:00:00`))}
-            </div>
-            {mood ? (
-              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Mood: {mood}</div>
-            ) : null}
-          </div>
-
-          {(() => {
-            const items: Array<{ key: string; text: string; title?: string }> = [];
-            for (const inf of influences) items.push({ key: `inf:${inf}`, text: inf });
-
-            return items.length ? (
-              <div className="mb-4 flex flex-wrap gap-2">
-                {items.map((p) => (
-                  <span key={p.key} className="eb-pill" title={p.title} aria-label={p.title ?? p.text}>
-                    {p.text}
-                  </span>
-                ))}
-              </div>
-            ) : null;
-          })()}
-
-          {!e ? (
-            <div className="mb-4 rounded-2xl border border-dashed border-neutral-200 bg-[rgba(0,0,0,0.02)] px-4 py-4">
-              <div className="font-medium">No check-in recorded</div>
-              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
-                Tap edit check-in to add how you felt on this day.
-              </div>
-            </div>
-          ) : null}
-
-          {(isPeriod || isFertile || isOv) ? (
-            <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mt-6 eb-card">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Selected day</div>
+            <h2 className="mt-1 text-xl font-semibold">{prettyDate(new Date(`${summaryISO}T00:00:00`))}</h2>
+            <div className="mt-2 flex flex-wrap gap-2 text-sm text-[rgb(var(--color-text-secondary))]">
+              {cycleEnabled ? <span className="eb-pill">Phase: {dayPhase}</span> : null}
               {isPeriod ? <span className="eb-pill">Period window</span> : null}
               {isFertile ? <span className="eb-pill">Fertile window</span> : null}
-              {isOv ? <span className="eb-pill">Ovulation marked</span> : null}
+              {isOv ? <span className="eb-pill">Ovulation</span> : null}
+              {sexLogged ? <span className="eb-pill">Intimacy logged</span> : null}
+              {experimentStatus ? <span className="eb-pill">{experimentStatus}</span> : null}
             </div>
-          ) : null}
-
-          <div className="mb-4 space-y-2">
-            {topRows.length ? topRows.map((r) => (
-              <div key={r.label} className="flex items-center justify-between">
-                <span className="text-[rgb(var(--color-text-secondary))]">{r.label}</span>
-                <span className="font-medium">{r.value}</span>
-              </div>
-            )) : e ? (
-              <div className="text-sm text-[rgb(var(--color-text-secondary))]">No symptom detail was logged for this day.</div>
-            ) : null}
           </div>
-
           <button
             type="button"
-            disabled={!hasSleepDetails}
-            onClick={() => {
-              if (!hasSleepDetails) return;
-              setSleepPeekOpen((v) => !v);
-            }}
-            className={
-              'mb-4 w-full flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm ' +
-              (hasSleepDetails ? 'cursor-pointer' : 'opacity-60 cursor-default')
-            }
+            onClick={() => onOpenCheckIn(summaryISO)}
+            className="eb-btn-secondary inline-flex items-center gap-2"
           >
-            <div className="text-[rgb(var(--color-text-secondary))]">Sleep details</div>
-            <div className="flex items-center gap-2">
-              <span className={hasSleepDetails ? 'font-medium' : 'text-[rgb(var(--color-text-secondary))]'}>
-                {hasSleepDetails ? 'Logged' : 'Not today'}
-              </span>
-              <ChevronRight
-                className={`w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform ${
-                  sleepPeekOpen ? 'rotate-90' : ''
-                }`}
-              />
-            </div>
+            <PlusCircle className="w-4 h-4" />
+            {e ? 'Open check-in' : 'Add check-in'}
           </button>
+        </div>
 
-          {sleepPeekOpen ? (
-            <div className="mb-4 eb-inset rounded-2xl p-4">
-              {hasSleepDetails ? (
+        {!e ? (
+          <div className="mt-5 eb-inset rounded-2xl p-4">
+            <div className="font-semibold">No check-in recorded</div>
+            <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Tap add check-in to log how you felt on this day.</p>
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="eb-inset rounded-2xl p-4">
+                <div className="text-xs text-[rgb(var(--color-text-secondary))]">Mood</div>
+                <div className="mt-1 flex items-center gap-2 font-semibold">
+                  {moodNum ? <MoodIcon mood={moodNum} className="text-[rgb(var(--color-accent))] opacity-80" size={18} /> : null}
+                  <span>{mood ?? 'Not logged'}</span>
+                </div>
+              </div>
+              <div className="eb-inset rounded-2xl p-4">
+                <div className="text-xs text-[rgb(var(--color-text-secondary))]">Notable metrics</div>
+                <div className="mt-1 font-semibold">{topRows.length ? `${topRows.length} logged` : 'No sliders logged'}</div>
+              </div>
+              <div className="eb-inset rounded-2xl p-4">
+                <div className="text-xs text-[rgb(var(--color-text-secondary))]">Sleep details</div>
+                <div className="mt-1 font-semibold">{hasSleepDetails ? 'Logged' : 'None added'}</div>
+              </div>
+            </div>
+
+            {topRows.length ? (
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {topRows.map((r) => (
+                  <div key={r.label} className="flex items-center justify-between rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3">
+                    <span className="text-[rgb(var(--color-text-secondary))]">{r.label}</span>
+                    <span className="font-medium">{r.value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {influences.length ? (
+              <div className="mt-5">
+                <div className="text-sm font-semibold mb-2">Context</div>
+                <div className="flex flex-wrap gap-2">
+                  {influences.map((inf) => (
+                    <span key={inf} className="eb-pill">{inf}</span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {hasSleepDetails ? (
+              <div className="mt-5 eb-inset rounded-2xl p-4">
+                <div className="text-sm font-semibold mb-3">Sleep details</div>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-[rgb(var(--color-text-secondary))]">Night-time awakenings</span>
-                    <span className="font-medium">
-                      {typeof sd?.timesWoke === 'number' ? (sd.timesWoke === 3 ? '3+' : String(sd.timesWoke)) : '—'}
-                    </span>
+                    <span className="font-medium">{typeof sd?.timesWoke === 'number' ? (sd.timesWoke === 3 ? '3+' : String(sd.timesWoke)) : '—'}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[rgb(var(--color-text-secondary))]">Trouble falling asleep</span>
@@ -648,50 +620,20 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                     <span className="font-medium">{sd?.wokeTooEarly ? 'Yes' : 'No'}</span>
                   </div>
                 </div>
-              ) : (
-                <div className="text-sm text-[rgb(var(--color-text-secondary))]">Nothing extra logged for this day.</div>
-              )}
-            </div>
-          ) : null}
+              </div>
+            ) : null}
 
-          {note ? (
-            <div className="mb-4 text-sm whitespace-pre-wrap">
-              <div className="font-semibold mb-1">Note</div>
-              <div className="text-[rgb(var(--color-text-secondary))]">{note}</div>
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              className="w-full eb-btn-primary"
-              onClick={() => {
-                const iso = summaryISO;
-                setSummaryISO(null);
-                onOpenCheckIn(iso);
-              }}
-            >
-              Add or edit check-in
-            </button>
-            <button type="button" className="w-full eb-btn-secondary" onClick={() => setSummaryISO(null)}>
-              Close
-            </button>
-          </div>
-        </div>
+            {note ? (
+              <div className="mt-5">
+                <div className="text-sm font-semibold mb-1">Notes</div>
+                <div className="text-sm text-[rgb(var(--color-text-secondary))] whitespace-pre-wrap">{note}</div>
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
     );
-  }, [
-    summaryISO,
-    byISO,
-    userData.enabledModules,
-    userData.sleepDetailsEnabled,
-    sleepPeekOpen,
-    periodSet,
-    fertileSet,
-    ovulationSet,
-    fertilityEnabled,
-    onOpenCheckIn,
-  ]);
+  }, [summaryISO, byISO, cycleEnabled, entriesSorted, experiment, fertilityEnabled, fertileSet, onOpenCheckIn, ovulationSet, periodSet, userData.enabledModules]);
 
   const cycleEditModal = useMemo(() => {
     if (!editISO) return null;
@@ -817,25 +759,16 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
       <div className="eb-page-inner">
         <div className="mb-6">
           <h1 className="mb-2">Calendar</h1>
-          <p className="text-[rgb(var(--color-text-secondary))]">Review what happened on each day, then tap to add or update a check-in.</p>
+          <p className="text-[rgb(var(--color-text-secondary))]">Tap any day to review it. Use Overlay to spot patterns across the month.</p>
         </div>
-
-        <div className="eb-card mb-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Current rhythm</div>
-              <h3 className="mt-1 mb-1">{currentPhase ? `${currentPhase} phase` : 'Build your rhythm over time'}</h3>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {currentPhase && currentPhaseDay
-                  ? `Today looks like day ${currentPhaseDay} of this phase.`
-                  : 'As you log days, your calendar will become easier to read at a glance.'}
-              </p>
-            </div>
-            <button type="button" className="eb-btn-secondary" onClick={() => onNavigate('rhythm')}>
-              Open rhythm
-            </button>
+        {cycleEnabled ? (
+          <div className="mb-4 eb-inset rounded-2xl p-4">
+            <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Rhythm context</div>
+            <div className="mt-1 font-semibold">Current phase: {todayPhaseLabel}</div>
+            <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">The calendar helps you see how this month lines up with your check-ins and cycle timing.</div>
           </div>
-        </div>
+        ) : null}
+
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <button
@@ -928,6 +861,18 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                   {isToday && <div className="eb-today-badge">Today</div>}
                 </div>
 
+                <div className="absolute left-2 bottom-5 flex items-center gap-1">
+                  {entry ? (
+                    <span className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary-dark)/0.70)]" title="Check-in recorded" aria-label="Check-in recorded" />
+                  ) : null}
+                  {Boolean(entry?.events?.sex) ? (
+                    <span className="w-2.5 h-2.5 rounded-[3px] bg-[rgb(var(--color-accent)/0.85)]" title="Intimacy logged" aria-label="Intimacy logged" />
+                  ) : null}
+                  {formatExperimentStatus(experiment, iso) ? (
+                    <span className="w-2.5 h-2.5 rounded-full border border-[rgb(var(--color-primary-dark)/0.65)] bg-white" title="Experiment active" aria-label="Experiment active" />
+                  ) : null}
+                </div>
+
                 {/* Symptom overlay bar (only when data exists for this day) */}
                 {raw != null && (
                   <div
@@ -938,9 +883,6 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                   />
                 )}
 
-                {/* Cycle start is editable, but we intentionally do not show a "Start" pill on tiles.
-                   It caused visual collisions and lowered trust when heuristics shifted. */}
-
                 {fertilityEnabled && ovulationSet.has(iso) && (
                   <div className="absolute right-2 bottom-6 text-[10px] px-1.5 py-0.5 rounded-md bg-[rgb(var(--color-accent)/0.14)] border border-[rgb(var(--color-accent)/0.55)] text-[rgb(var(--color-primary-dark))]">Ov</div>
                 )}
@@ -949,8 +891,13 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
           })}
         </div>
 
-        {/* Day summary (tap a day) */}
-        {summaryModal}
+        {/* Day detail */}
+        {summaryISO ? selectedDayPanel : (
+          <div className="mt-6 eb-card">
+            <div className="font-semibold">Tap a day to review it</div>
+            <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">You will see the phase, logged symptoms, notes, and any experiment context for that day here.</p>
+          </div>
+        )}
 
 
         {/* Cycle edit sheet */}
@@ -983,6 +930,18 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
                 </div>
               )}
               <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[rgb(var(--color-primary-dark)/0.70)]" />
+                <span>Check-in recorded</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-[3px] bg-[rgb(var(--color-accent)/0.85)]" />
+                <span>Intimacy logged</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full border border-[rgb(var(--color-primary-dark)/0.65)] bg-white" />
+                <span>Experiment active</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <InfluenceMark size={9} title="Other influences" />
                 <span>Other influences</span>
               </div>
@@ -1014,7 +973,9 @@ function isAllowedOverlayKey(v: any): v is OverlayKey {
 </div>
 
             <div className="mt-4 text-sm text-[rgb(var(--color-text-secondary))]">
-              Tip: switch overlay to <span className="font-medium">Overall mood</span> or <span className="font-medium">Sleep</span> to compare patches across the month.
+              Tip: switch overlay to{' '}
+              <span className="font-medium">Overall mood</span>{' '}
+              to spot good and difficult patches across the month.
             </div>
           </>
         )}

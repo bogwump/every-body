@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload } from 'lucide-react';
+import { Calendar, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload, CheckCircle2 } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -102,42 +102,6 @@ function buildWeekSeries(dateISOs: string[], entriesByDate: Map<string, any>, me
   });
 }
 
-
-type DashboardTileProps = {
-  title: string;
-  subtitle: string;
-  cta?: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-};
-
-function DashboardTile({ title, subtitle, cta, icon, onClick }: DashboardTileProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="eb-card hover:shadow-md transition-all text-left group h-full flex flex-col justify-start"
-    >
-      <div className="flex items-start gap-4 w-full h-full">
-        <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
-          <div className="text-[rgb(var(--color-primary))]">{icon}</div>
-        </div>
-
-        <div className="min-w-0 flex-1 flex flex-col items-start h-full">
-          <h3 className="font-semibold mb-1">{title}</h3>
-          <p className="text-sm text-[rgba(0,0,0,0.65)]">{subtitle}</p>
-          {cta ? (
-            <span className="mt-auto pt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))]">
-              {cta} <ArrowRight className="w-4 h-4" />
-            </span>
-          ) : null}
-        </div>
-
-        <ChevronRight className="w-5 h-5 text-[rgba(0,0,0,0.45)] group-hover:text-[rgba(0,0,0,0.65)] mt-1" />
-      </div>
-    </button>
-  );
-}
 
 export function Dashboard({
   userName,
@@ -597,175 +561,186 @@ export function Dashboard({
           </div>
         ) : null}
 
-       
-{/* Tip for today */}
-<div className="eb-card">
-  <div className="flex items-start gap-4">
-    <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
-      <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-    </div>
-    <div className="min-w-0 flex-1">
-      <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Tip for today</div>
-      <h3 className="mt-1 mb-1">{tip.title}</h3>
-      <p className="text-sm text-[rgba(0,0,0,0.75)]">{tip.body}</p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {tip.cta ? (
-          <button
-            type="button"
-            className="eb-btn-secondary"
-            onClick={() => onNavigate(tip.cta.screen)}
-          >
-            {tip.cta.label}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="eb-btn-secondary"
-          onClick={() => setTipOffset((v) => v + 1)}
-        >
-          Another tip
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
+        {/* Quick actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
+          <div className="eb-card">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Today</div>
+                <h3 className="mt-1 mb-1">{checkedInToday ? 'Today is logged' : 'Ready for a quick check-in?'}</h3>
+                <p className="text-sm text-[rgba(0,0,0,0.68)]">
+                  {checkedInToday
+                    ? 'You have already logged today. You can reopen it if anything changed.'
+                    : 'A quick check-in keeps Home useful and helps the rest of the app stay personal.'}
+                </p>
 
-{/* Quick check-in */}
-        <div className="eb-card">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
-              <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Quick check-in</div>
-              <h3 className="mt-1 mb-1">{checkedInToday ? 'Today is logged' : 'How are you feeling today?'}</h3>
-              <p className="text-sm text-[rgba(0,0,0,0.68)]">
-                {checkedInToday
-                  ? 'You can review today in Calendar or update your check-in.'
-                  : 'Log today in a couple of taps and keep your rhythm picture current.'}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="eb-btn-primary"
-                  onClick={() => onOpenCheckIn(todayISO)}
-                >
-                  {checkedInToday ? "Update today" : "Do today's check-in"}
-                </button>
-                <button
-                  type="button"
-                  className="eb-btn-secondary"
-                  onClick={() => onNavigate('calendar')}
-                >
-                  Open calendar
-                </button>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="eb-inset rounded-2xl p-3">
+                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Status</div>
+                    <div className="mt-1 font-semibold">{checkedInToday ? 'Logged today' : 'Not logged yet'}</div>
+                  </div>
+                  <div className="eb-inset rounded-2xl p-3">
+                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Days tracked</div>
+                    <div className="mt-1 font-semibold">{daysTracked}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onOpenCheckIn(todayISO)}
+                    className="eb-btn inline-flex items-center gap-2"
+                  >
+                    {checkedInToday ? "Open today's check-in" : "Do today's check-in"}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('calendar')}
+                    className="eb-btn-secondary inline-flex items-center gap-2"
+                  >
+                    Open calendar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-{/* Current trends + week at a glance */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="eb-card">
-            <div className="flex items-start gap-4 w-full h-full">
+            <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
                 <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
-              <div className="min-w-0">
-                <h3 className="mb-2">Current trends</h3>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Snapshot</div>
+                <h3 className="mt-1 mb-1">What looks most useful right now</h3>
                 {quickHookLines.length > 0 ? (
-                  <ul className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
-                    {quickHookLines.map((l, idx) => (
-                      <li key={idx}>{l}</li>
+                  <div className="space-y-2">
+                    {quickHookLines.slice(0, 2).map((l, idx) => (
+                      <p key={idx} className="text-sm text-[rgba(0,0,0,0.72)]">{l}</p>
                     ))}
-                  </ul>
+                  </div>
                 ) : (
-                  <p className="text-sm text-[rgba(0,0,0,0.75)]">
-                    Log a few days and your first patterns will show up here.
-                  </p>
+                  <p className="text-sm text-[rgba(0,0,0,0.72)]">Log a few days and this will start to highlight what is changing.</p>
                 )}
 
-                {daysTracked > 0 ? (
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="eb-inset rounded-2xl p-3">
-                      <div className="text-xs text-[rgb(var(--color-text-secondary))]">Days logged</div>
-                      <div className="mt-1 font-semibold">{daysTracked}</div>
-                    </div>
-                    <div className="eb-inset rounded-2xl p-3">
-                      <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
-                      <div className="mt-1 font-semibold">
-                        {insightsReady ? 'Unlocked' : `${insightsRemaining} to unlock`}
-                      </div>
-                    </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="eb-inset rounded-2xl p-3">
+                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
+                    <div className="mt-1 font-semibold">{insightsReady ? 'Ready' : `${insightsRemaining} to unlock`}</div>
                   </div>
-                ) : null}
+                  <div className="eb-inset rounded-2xl p-3">
+                    <div className="text-xs text-[rgb(var(--color-text-secondary))]">Best next page</div>
+                    <div className="mt-1 font-semibold">{insightsReady ? 'Insights' : 'Calendar'}</div>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => (insightsReady ? onNavigate('insights') : onOpenCheckIn(todayISO))}
-                  className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
-                >
-                  {insightsReady ? 'View insights' : 'Do today’s check-in'} <ArrowRight className="w-4 h-4" />
-                </button>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => (insightsReady ? onNavigate('insights') : onNavigate('calendar'))}
+                    className="inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+                  >
+                    {insightsReady ? 'View insights' : 'Review recent days'} <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="eb-card">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <h3 className="mb-1">This week at a glance</h3>
-                <p className="text-xs text-[rgb(var(--color-text-secondary))]">Pick 3 metrics to show</p>
-              </div>
-            </div>
-            <div style={{ width: '100%', height: 220 }}>
-              <ResponsiveContainer>
-                <LineChart data={weekSeries} margin={{ top: 10, right: 10, left: -12, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis domain={[0, 10]} width={32} tickMargin={6} />
-                  <Tooltip />
-                  <Legend />
-                  {chartMetrics.map((m, idx) => (
-                    <Line
-                      key={m}
-                      type="monotone"
-                      dataKey={m}
-                      name={METRIC_LABELS[m]}
-                      stroke={MIXED_CHART_PALETTE[idx % MIXED_CHART_PALETTE.length]}
-                      strokeWidth={2}
-                      connectNulls
-                      dot={{ r: 3 }}
-                      isAnimationActive={false}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Metric pickers (bottom row) */}
-            <div className="mt-4 flex flex-col sm:flex-row gap-2">
-              {[0, 1, 2].map((idx) => (
-                <select
-                  key={idx}
-                  className="eb-input !py-2 !px-3 !text-sm flex-1"
-                  value={chartMetrics[idx as 0 | 1 | 2]}
-                  onChange={(e) => setChartMetric(idx as 0 | 1 | 2, e.target.value as DashboardMetric)}
-                >
-                  {availableMetrics.map((m) => (
-                    <option key={m} value={m}>
-                      {METRIC_LABELS[m]}
-                    </option>
-                  ))}
-                </select>
-              ))}
-            </div>
-            <p className="text-sm mt-3">
-              You will see dots from day 1. Lines connect across missed days so you can still spot the overall trend.
-            </p>
           </div>
         </div>
 
+        {/* Current trends snapshot */}
+        <div className="eb-card">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 className="mb-1">Your week at a glance</h3>
+              <p className="text-xs text-[rgb(var(--color-text-secondary))]">A small trend snapshot. Pick 3 metrics to show.</p>
+            </div>
+          </div>
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer>
+              <LineChart data={weekSeries} margin={{ top: 10, right: 10, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis domain={[0, 10]} width={32} tickMargin={6} />
+                <Tooltip />
+                <Legend />
+                {chartMetrics.map((m, idx) => (
+                  <Line
+                    key={m}
+                    type="monotone"
+                    dataKey={m}
+                    name={METRIC_LABELS[m]}
+                    stroke={MIXED_CHART_PALETTE[idx % MIXED_CHART_PALETTE.length]}
+                    strokeWidth={2}
+                    connectNulls
+                    dot={{ r: 3 }}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            {[0, 1, 2].map((idx) => (
+              <select
+                key={idx}
+                className="eb-input !py-2 !px-3 !text-sm flex-1"
+                value={chartMetrics[idx as 0 | 1 | 2]}
+                onChange={(e) => setChartMetric(idx as 0 | 1 | 2, e.target.value as DashboardMetric)}
+              >
+                {availableMetrics.map((m) => (
+                  <option key={m} value={m}>
+                    {METRIC_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+            ))}
+          </div>
+          <p className="text-sm mt-3 text-[rgb(var(--color-text-secondary))]">Dots appear from day 1 and the line stays connected across missed days so the overall shape is still easy to read.</p>
+        </div>
+
+        {/* Tip for today */}
+        <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
+          <div className="flex items-start gap-4 w-full h-full">
+            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+              <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+            </div>
+            <div className="relative min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => setTipOffset((v) => v + 1)}
+                // Chrome can sometimes let later-flowing text overlap and steal the click.
+                // Keep this above the header/text.
+                className="text-sm text-[rgb(var(--color-primary))] hover:underline absolute top-0 right-0 z-10"
+              >
+                Another tip
+              </button>
+
+              <h3 className="mb-1 pr-24">Tip for today</h3>
+              <p className="text-sm font-semibold pr-24">{tip.title}</p>
+
+              <p className="text-sm text-[rgba(0,0,0,0.75)] mt-2">{tip.body}</p>
+
+              {tip.cta ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tip.cta?.screen === 'check-in') onOpenCheckIn(todayISO);
+                    else onNavigate(tip.cta.screen);
+                  }}
+                  className="mt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+                >
+                  {tip.cta.label} <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
