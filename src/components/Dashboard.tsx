@@ -630,7 +630,7 @@ export function Dashboard({
   </div>
 </div>
 
-/* Quick check-in */
+{/* Quick check-in */}
         <div className="eb-card">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
