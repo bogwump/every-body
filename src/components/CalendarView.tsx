@@ -205,7 +205,7 @@ function getCalendarMarkers(args: {
 
   return markers
     .sort((a, b) => a.priority - b.priority)
-    .slice(0, 2);
+    .slice(0, 3);
 }
 
 function MoodIcon({ mood, className, size = 20 }: { mood?: number; className?: string; size?: number }) {
@@ -901,8 +901,8 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between gap-3 sm:justify-start">
             <button
               type="button"
               className="eb-btn-secondary"
@@ -916,9 +916,9 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:justify-end">
             <div className="text-sm text-[rgb(var(--color-text-secondary))]">Overlay</div>
-            <select className="eb-input !py-2 !h-10" value={overlayKey} onChange={(e) => setOverlayKey(e.target.value as any)}>
+            <select className="eb-input !h-10 !py-2" value={overlayKey} onChange={(e) => setOverlayKey(e.target.value as any)}>
               {availableOverlayKeys.map((key) => (
                 <option key={key} value={key}>{overlayLabel(key)}</option>
               ))}
@@ -942,8 +942,9 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
 
             // Overlay bar intensity
             const raw = getOverlayValue(entry, overlayKey);
+            const hasOverlay = raw != null && raw > 0;
             let barOpacity = 0;
-            if (raw != null) {
+            if (hasOverlay) {
               barOpacity = overlayKey === 'mood' ? (raw / 3) * 0.55 : (raw / 10) * 0.55;
               barOpacity = clamp(barOpacity, 0.12, 0.55);
             }
@@ -966,20 +967,20 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                   if (editMode) setEditISO(iso);
                   else setSummaryISO(iso);
                 }}
-                className={`relative rounded-2xl border text-left p-2 min-h-[58px] transition shadow-sm active:scale-[0.99] ${
+                className={`relative rounded-2xl border text-left p-2 min-h-[64px] transition shadow-sm active:scale-[0.99] ${
                   inMonth ? 'bg-white border-[rgba(0,0,0,0.08)] hover:shadow-md hover:-translate-y-[1px]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.04)]'
-                } ${isToday ? 'ring-2 ring-[rgb(var(--color-primary)/0.45)] border-[rgb(var(--color-primary)/0.35)]' : ''} ${isFertile ? 'eb-fertile' : ''}`}
+                } ${isToday ? 'outline outline-2 outline-[rgb(var(--color-primary-dark))] outline-offset-0' : ''} ${isFertile ? 'eb-fertile' : ''}`}
                 style={{
                   // IMPORTANT: our CSS vars store space-separated RGB values (e.g. "132 155 130").
                   // Use the modern `rgb(R G B / a)` syntax (NOT rgba(var(--color-*), a)).
                   background: isPeriod ? `rgb(var(--color-primary-dark) / 0.16)` : undefined,
                 }}
               >
-                <div className="flex h-full min-h-[42px] flex-col">
+                <div className="flex h-full min-h-[48px] flex-col">
                   <div className="flex items-start justify-between gap-2">
                     <div className={`text-sm font-medium leading-none ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
 
-                    <div className="flex min-h-[12px] items-center justify-end gap-1 text-[rgb(var(--color-primary-dark))]">
+                    <div className="flex min-h-[12px] flex-col items-end justify-start gap-1 text-[rgb(var(--color-primary-dark))] sm:flex-row sm:items-center sm:justify-end">
                       {dayMarkers.map((marker) => (
                         <span
                           key={marker.key}
@@ -993,13 +994,9 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                     </div>
                   </div>
 
-                  {isToday && (
-                    <div className="mt-1 text-[10px] font-medium text-[rgb(var(--color-primary-dark))]">Today</div>
-                  )}
-
                   {/* Symptom overlay bar (only when data exists for this day) */}
                   <div className="mt-auto pt-3">
-                    {raw != null && (
+                    {hasOverlay && (
                       <div
                         className="h-1 rounded-full"
                         style={{ background: `rgb(var(--color-primary) / ${barOpacity})` }}
@@ -1040,7 +1037,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                     className="w-4 h-3 rounded-md"
                     style={{
                       background: 'rgb(var(--color-accent) / 0.14)',
-                      border: '2px solid rgb(var(--color-accent) / 0.45)',
+                      border: '2px solid rgb(var(--color-accent) / 0.32)',
                       boxShadow: 'inset 0 0 0 1px rgb(var(--color-accent) / 0.08)',
                     }}
                   />
