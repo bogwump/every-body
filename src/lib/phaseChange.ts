@@ -1,12 +1,21 @@
 import type { CheckInEntry, UserData } from '../types';
 import { getRhythmModel, isoToday, sortByDateAsc } from './analytics';
 import { createMoment } from './companionMoments';
-import { getCurrentPhaseEntry, getPhaseElapsedDays, savePhaseHistory, type PhaseHistoryEntry, type PhaseHistoryPhase, updatePhaseHistory } from './phaseHistory';
+import {
+  getCurrentPhaseEntry,
+  getPhaseElapsedDays,
+  savePhaseHistory,
+  type PhaseHistoryEntry,
+  type PhaseHistoryPhase,
+  updatePhaseHistory,
+} from './phaseHistory';
 
 const LAST_DETECTED_PHASE_KEY = 'everybody:v2:last_detected_phase';
 const RHYTHM_PHASE_STATE_KEY = 'everybody:v2:rhythm_phase_state';
 const RECENT_PHASE_CHANGE_KEY = 'everybody:v2:recent_phase_change';
 const RECENT_PHASE_CHANGE_MAX_AGE_MS = 1000 * 60 * 60 * 72;
+const CONFIRMED_HISTORY_MIN_DAYS = 21;
+const CANDIDATE_CONFIRMATION_DAYS = 2;
 
 const PHASE_ORDER = ['reset', 'rebuilding', 'expressive', 'protective'] as const;
 const MIN_PHASE_DAYS: Record<string, number> = {
@@ -29,6 +38,8 @@ export type RhythmPhaseState = {
   estimatedPhaseStartedAt: string | null;
   confirmedPhase: string | null;
   confirmedPhaseStartedAt: string | null;
+  candidateConfirmedPhase: string | null;
+  candidateConfirmedSince: string | null;
   phaseConfidence: PhaseConfidenceState;
   historyLockLevel: HistoryLockLevel;
   updatedAt: string;
@@ -91,6 +102,8 @@ export function getRhythmPhaseState(): RhythmPhaseState | null {
   const estimatedPhaseStartedAt = isISODate(parsed.estimatedPhaseStartedAt) ? parsed.estimatedPhaseStartedAt : null;
   const confirmedPhase = typeof parsed.confirmedPhase === 'string' ? parsed.confirmedPhase : null;
   const confirmedPhaseStartedAt = isISODate(parsed.confirmedPhaseStartedAt) ? parsed.confirmedPhaseStartedAt : null;
+  const candidateConfirmedPhase = typeof parsed.candidateConfirmedPhase === 'string' ? parsed.candidateConfirmedPhase : null;
+  const candidateConfirmedSince = isISODate(parsed.candidateConfirmedSince) ? parsed.candidateConfirmedSince : null;
   const phaseConfidence = ((): PhaseConfidenceState => {
     const value = String((parsed as any).phaseConfidence || 'low');
     if (value === 'very_low' || value === 'low' || value === 'moderate' || value === 'high') return value;
@@ -108,6 +121,8 @@ export function getRhythmPhaseState(): RhythmPhaseState | null {
     estimatedPhaseStartedAt,
     confirmedPhase,
     confirmedPhaseStartedAt,
+    candidateConfirmedPhase,
+    candidateConfirmedSince,
     phaseConfidence,
     historyLockLevel,
     updatedAt,
@@ -174,10 +189,26 @@ function countDistinctLoggedDays(entries: CheckInEntry[]): number {
   ).size;
 }
 
+function countDistinctLoggedDaysOnOrAfter(entries: CheckInEntry[], startISO: string): number {
+  return new Set(
+    (entries ?? [])
+      .map((entry) => {
+        const iso = (entry as any)?.dateISO ?? (entry as any)?.date;
+        return isISODate(iso) && iso >= startISO ? iso : null;
+      })
+      .filter((value): value is string => Boolean(value))
+  ).size;
+}
+
+function hasCandidateSupport(entries: CheckInEntry[], candidateSince: string | null): boolean {
+  if (!candidateSince) return false;
+  return countDistinctLoggedDaysOnOrAfter(entries, candidateSince) >= CANDIDATE_CONFIRMATION_DAYS;
+}
+
 function derivePhaseConfidence(args: { daysLogged: number; hasAnchor: boolean; hasConfirmedHistory: boolean }): PhaseConfidenceState {
   const { daysLogged, hasAnchor, hasConfirmedHistory } = args;
   if (hasAnchor) return 'high';
-  if (daysLogged >= 14 && hasConfirmedHistory) return 'high';
+  if (daysLogged >= CONFIRMED_HISTORY_MIN_DAYS && hasConfirmedHistory) return 'high';
   if (daysLogged >= 7) return 'moderate';
   if (daysLogged >= 3) return 'low';
   return 'very_low';
@@ -185,7 +216,7 @@ function derivePhaseConfidence(args: { daysLogged: number; hasAnchor: boolean; h
 
 function deriveHistoryLockLevel(args: { daysLogged: number; hasAnchor: boolean; hasConfirmedHistory: boolean }): HistoryLockLevel {
   const { daysLogged, hasAnchor, hasConfirmedHistory } = args;
-  if (hasAnchor || (hasConfirmedHistory && daysLogged >= 14)) return 'confirmed';
+  if (hasAnchor || (hasConfirmedHistory && daysLogged >= CONFIRMED_HISTORY_MIN_DAYS)) return 'confirmed';
   if (daysLogged >= 7) return 'stabilising';
   return 'provisional';
 }
@@ -213,23 +244,17 @@ function buildPhaseState(args: {
       ? refISO
       : null;
 
-  let confirmedPhase = previousConfirmed ?? previousState?.confirmedPhase ?? null;
-  let confirmedPhaseStartedAt = previousState?.confirmedPhaseStartedAt ?? (confirmedPhase ? refISO : null);
-
-  if (historyLockLevel === 'confirmed' && proposedPhase) {
-    confirmedPhase = proposedPhase;
-    if (confirmedPhase !== (previousState?.confirmedPhase ?? previousConfirmed ?? null)) {
-      confirmedPhaseStartedAt = refISO;
-    } else {
-      confirmedPhaseStartedAt = previousState?.confirmedPhaseStartedAt ?? confirmedPhaseStartedAt ?? refISO;
-    }
-  }
+  const confirmedPhase = previousConfirmed ?? previousState?.confirmedPhase ?? null;
+  const confirmedPhaseStartedAt = previousState?.confirmedPhaseStartedAt ?? (confirmedPhase ? refISO : null);
+  const preserveCandidate = historyLockLevel === 'confirmed';
 
   return {
     estimatedPhase,
     estimatedPhaseStartedAt,
     confirmedPhase,
     confirmedPhaseStartedAt,
+    candidateConfirmedPhase: preserveCandidate ? previousState?.candidateConfirmedPhase ?? null : null,
+    candidateConfirmedSince: preserveCandidate ? previousState?.candidateConfirmedSince ?? null : null,
     phaseConfidence,
     historyLockLevel,
     updatedAt: refISO,
@@ -357,15 +382,66 @@ export function applyPhaseChangeForEntries(args: {
   };
 
   if (nextState.historyLockLevel === 'confirmed') {
+    const hasImmediateAnchor = rhythmModel.source === 'override' || rhythmModel.source === 'bleed';
+    const previousCandidate = previousState?.candidateConfirmedPhase ?? null;
+    const previousCandidateSince = previousState?.candidateConfirmedSince ?? null;
+
     if (previousConfirmed && proposedPhase === previousConfirmed) {
       restoreMissingPhaseHistory(previousConfirmed, refISO);
+      nextState.candidateConfirmedPhase = null;
+      nextState.candidateConfirmedSince = null;
+      validation.reason = 'same_confirmed_phase';
+    } else if (!proposedPhase) {
+      nextState.candidateConfirmedPhase = null;
+      nextState.candidateConfirmedSince = null;
+    } else if (hasImmediateAnchor) {
+      validation = validatePhaseTransition({
+        previousPhase: previousConfirmed,
+        proposedPhase,
+        refISO,
+      });
+      nextState.candidateConfirmedPhase = null;
+      nextState.candidateConfirmedSince = null;
+    } else if (!previousConfirmed) {
+      if (previousCandidate === proposedPhase && hasCandidateSupport(args.nextEntries, previousCandidateSince)) {
+        validation = validatePhaseTransition({
+          previousPhase: previousConfirmed,
+          proposedPhase,
+          refISO,
+        });
+        if (validation.changed) {
+          nextState.candidateConfirmedPhase = null;
+          nextState.candidateConfirmedSince = null;
+        } else {
+          nextState.candidateConfirmedPhase = proposedPhase;
+          nextState.candidateConfirmedSince = previousCandidateSince ?? refISO;
+        }
+      } else {
+        nextState.candidateConfirmedPhase = proposedPhase;
+        nextState.candidateConfirmedSince = previousCandidate === proposedPhase ? previousCandidateSince ?? refISO : refISO;
+        validation.reason = 'awaiting_confirmation_window';
+      }
+    } else if (previousCandidate === proposedPhase && hasCandidateSupport(args.nextEntries, previousCandidateSince)) {
+      validation = validatePhaseTransition({
+        previousPhase: previousConfirmed,
+        proposedPhase,
+        refISO,
+      });
+      if (validation.changed) {
+        nextState.candidateConfirmedPhase = null;
+        nextState.candidateConfirmedSince = null;
+      } else if (validation.reason === 'blocked_minimum_phase_days') {
+        nextState.candidateConfirmedPhase = proposedPhase;
+        nextState.candidateConfirmedSince = previousCandidateSince ?? refISO;
+      } else {
+        nextState.candidateConfirmedPhase = null;
+        nextState.candidateConfirmedSince = null;
+      }
+    } else {
+      nextState.candidateConfirmedPhase = proposedPhase;
+      nextState.candidateConfirmedSince = previousCandidate === proposedPhase ? previousCandidateSince ?? refISO : refISO;
+      validation.reason = 'awaiting_confirmation_window';
     }
-
-    validation = validatePhaseTransition({
-      previousPhase: previousConfirmed,
-      proposedPhase,
-      refISO,
-    });
 
     nextState.confirmedPhase = validation.acceptedPhase ?? nextState.confirmedPhase ?? null;
     if (nextState.confirmedPhase && validation.changed) {
@@ -375,7 +451,16 @@ export function applyPhaseChangeForEntries(args: {
     }
   } else {
     const previousEstimated = previousState?.estimatedPhase ?? previousConfirmed;
-    if (previousEstimated && proposedPhase && previousEstimated !== proposedPhase && !isAdjacentPhase(previousEstimated, proposedPhase)) {
+    nextState.candidateConfirmedPhase = null;
+    nextState.candidateConfirmedSince = null;
+
+    if (
+      nextState.historyLockLevel === 'stabilising' &&
+      previousEstimated &&
+      proposedPhase &&
+      previousEstimated !== proposedPhase &&
+      !isAdjacentPhase(previousEstimated, proposedPhase)
+    ) {
       nextState.estimatedPhase = previousEstimated;
       nextState.estimatedPhaseStartedAt = previousState?.estimatedPhaseStartedAt ?? refISO;
       validation.reason = 'blocked_non_adjacent_estimate';
@@ -407,6 +492,8 @@ export function applyPhaseChangeForEntries(args: {
     transitionReason: validation.reason,
     estimatedPhase: nextState.estimatedPhase,
     confirmedPhase: nextState.confirmedPhase,
+    candidateConfirmedPhase: nextState.candidateConfirmedPhase,
+    candidateConfirmedSince: nextState.candidateConfirmedSince,
     phaseConfidence: nextState.phaseConfidence,
     historyLockLevel: nextState.historyLockLevel,
   };
