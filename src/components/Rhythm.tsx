@@ -6,6 +6,7 @@ import { useEntries, useExperimentHistory } from '../lib/appStore';
 import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
 import { getExperimentLearnings, getWhatsComingPredictions } from '../lib/rhythmPredictions';
 import { getPhaseHistory } from '../lib/phaseHistory';
+import { getRhythmPhaseState } from '../lib/phaseChange';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
 
@@ -479,6 +480,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
     const sci = meta.sci;
     const soft = meta.soft;
 
+    const phaseState = getRhythmPhaseState();
     const starts = rm.starts;
     const cycleLen = rm.cycleLen;
     const dayInCycle = rm.dayInCycle;
@@ -519,6 +521,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
       soft,
       confidence,
       source,
+      phaseState,
       reasons,
       daysToNext,
       nextPhaseKey,
@@ -604,6 +607,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
           phaseSubtitle={/phase$/i.test(String(computed.sci).trim()) ? String(computed.sci).trim() : `${computed.sci} phase`}
           phaseDescription={phaseOneLiner(phaseKey, (((userData ?? {}) as any).goal ?? null) as any)}
           confidenceLabel={computed.confidence}
+          phaseStatusLabel={computed.phaseState?.historyLockLevel === 'confirmed' ? 'Confirmed phase' : 'Estimated phase'}
           phaseIcon={phaseIcon}
         />
 

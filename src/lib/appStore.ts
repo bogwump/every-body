@@ -24,6 +24,7 @@ export const BACKUP_KEYS = [
   "everybody:v2:discovered_patterns",
   "everybody:v2:insights_hero_rotation",
   "everybody:v2:last_detected_phase",
+  "everybody:v2:rhythm_phase_state",
   "everybody:v2:recent_phase_change",
   "everybody:v2:phase_history",
   "everybody:v2:companion_moments",

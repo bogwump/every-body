@@ -4,6 +4,7 @@ import { createMoment } from './companionMoments';
 import { getCurrentPhaseEntry, getPhaseElapsedDays, savePhaseHistory, type PhaseHistoryEntry, type PhaseHistoryPhase, updatePhaseHistory } from './phaseHistory';
 
 const LAST_DETECTED_PHASE_KEY = 'everybody:v2:last_detected_phase';
+const RHYTHM_PHASE_STATE_KEY = 'everybody:v2:rhythm_phase_state';
 const RECENT_PHASE_CHANGE_KEY = 'everybody:v2:recent_phase_change';
 const RECENT_PHASE_CHANGE_MAX_AGE_MS = 1000 * 60 * 60 * 72;
 
@@ -17,6 +18,19 @@ const MIN_PHASE_DAYS: Record<string, number> = {
 
 export type StoredPhase = {
   phase: string;
+  updatedAt: string;
+};
+
+export type PhaseConfidenceState = 'very_low' | 'low' | 'moderate' | 'high';
+export type HistoryLockLevel = 'provisional' | 'stabilising' | 'confirmed';
+
+export type RhythmPhaseState = {
+  estimatedPhase: string | null;
+  estimatedPhaseStartedAt: string | null;
+  confirmedPhase: string | null;
+  confirmedPhaseStartedAt: string | null;
+  phaseConfidence: PhaseConfidenceState;
+  historyLockLevel: HistoryLockLevel;
   updatedAt: string;
 };
 
@@ -69,6 +83,41 @@ export function setStoredPhase(phase: string, updatedAt?: string) {
   });
 }
 
+export function getRhythmPhaseState(): RhythmPhaseState | null {
+  const parsed = readJson<RhythmPhaseState>(RHYTHM_PHASE_STATE_KEY);
+  if (!isObject(parsed)) return null;
+
+  const estimatedPhase = typeof parsed.estimatedPhase === 'string' ? parsed.estimatedPhase : null;
+  const estimatedPhaseStartedAt = isISODate(parsed.estimatedPhaseStartedAt) ? parsed.estimatedPhaseStartedAt : null;
+  const confirmedPhase = typeof parsed.confirmedPhase === 'string' ? parsed.confirmedPhase : null;
+  const confirmedPhaseStartedAt = isISODate(parsed.confirmedPhaseStartedAt) ? parsed.confirmedPhaseStartedAt : null;
+  const phaseConfidence = ((): PhaseConfidenceState => {
+    const value = String((parsed as any).phaseConfidence || 'low');
+    if (value === 'very_low' || value === 'low' || value === 'moderate' || value === 'high') return value;
+    return 'low';
+  })();
+  const historyLockLevel = ((): HistoryLockLevel => {
+    const value = String((parsed as any).historyLockLevel || 'provisional');
+    if (value === 'provisional' || value === 'stabilising' || value === 'confirmed') return value;
+    return 'provisional';
+  })();
+  const updatedAt = isISODate(parsed.updatedAt) ? parsed.updatedAt : isoToday();
+
+  return {
+    estimatedPhase,
+    estimatedPhaseStartedAt,
+    confirmedPhase,
+    confirmedPhaseStartedAt,
+    phaseConfidence,
+    historyLockLevel,
+    updatedAt,
+  };
+}
+
+export function setRhythmPhaseState(next: RhythmPhaseState) {
+  writeJson(RHYTHM_PHASE_STATE_KEY, next);
+}
+
 function getPhaseIndex(phase: string | null | undefined): number {
   if (!phase) return -1;
   return PHASE_ORDER.indexOf(phase as (typeof PHASE_ORDER)[number]);
@@ -79,6 +128,23 @@ function isNextForwardPhase(previousPhase: string, nextPhase: string): boolean {
   const nextIndex = getPhaseIndex(nextPhase);
   if (prevIndex < 0 || nextIndex < 0) return false;
   return (prevIndex + 1) % PHASE_ORDER.length === nextIndex;
+}
+
+function previousPhaseInOrder(phase: string | null | undefined): string | null {
+  const idx = getPhaseIndex(phase);
+  if (idx < 0) return null;
+  return PHASE_ORDER[(idx + PHASE_ORDER.length - 1) % PHASE_ORDER.length];
+}
+
+function nextPhaseInOrder(phase: string | null | undefined): string | null {
+  const idx = getPhaseIndex(phase);
+  if (idx < 0) return null;
+  return PHASE_ORDER[(idx + 1) % PHASE_ORDER.length];
+}
+
+function isAdjacentPhase(previousPhase: string | null | undefined, nextPhase: string | null | undefined): boolean {
+  if (!previousPhase || !nextPhase) return false;
+  return nextPhase === nextPhaseInOrder(previousPhase) || nextPhase === previousPhaseInOrder(previousPhase);
 }
 
 function minimumDaysForPhase(phase: string | null | undefined): number {
@@ -95,6 +161,79 @@ function restoreMissingPhaseHistory(currentPhase: string, refISO: string) {
   const seededStart = isISODate(stored.updatedAt) && stored.updatedAt <= refISO ? stored.updatedAt : refISO;
   const seeded: PhaseHistoryEntry[] = [{ phase: currentPhase as PhaseHistoryPhase, startDate: seededStart }];
   savePhaseHistory(seeded);
+}
+
+function countDistinctLoggedDays(entries: CheckInEntry[]): number {
+  return new Set(
+    (entries ?? [])
+      .map((entry) => {
+        const iso = (entry as any)?.dateISO ?? (entry as any)?.date;
+        return isISODate(iso) ? iso : null;
+      })
+      .filter((value): value is string => Boolean(value))
+  ).size;
+}
+
+function derivePhaseConfidence(args: { daysLogged: number; hasAnchor: boolean; hasConfirmedHistory: boolean }): PhaseConfidenceState {
+  const { daysLogged, hasAnchor, hasConfirmedHistory } = args;
+  if (hasAnchor) return 'high';
+  if (daysLogged >= 14 && hasConfirmedHistory) return 'high';
+  if (daysLogged >= 7) return 'moderate';
+  if (daysLogged >= 3) return 'low';
+  return 'very_low';
+}
+
+function deriveHistoryLockLevel(args: { daysLogged: number; hasAnchor: boolean; hasConfirmedHistory: boolean }): HistoryLockLevel {
+  const { daysLogged, hasAnchor, hasConfirmedHistory } = args;
+  if (hasAnchor || (hasConfirmedHistory && daysLogged >= 14)) return 'confirmed';
+  if (daysLogged >= 7) return 'stabilising';
+  return 'provisional';
+}
+
+function buildPhaseState(args: {
+  previousState: RhythmPhaseState | null;
+  previousConfirmed: string | null;
+  proposedPhase: string | null;
+  detectedSource: string;
+  daysLogged: number;
+  refISO: string;
+}): RhythmPhaseState {
+  const { previousState, previousConfirmed, proposedPhase, detectedSource, daysLogged, refISO } = args;
+  const hasConfirmedHistory = Boolean(previousConfirmed || getCurrentPhaseEntry());
+  const hasAnchor = detectedSource === 'override' || detectedSource === 'bleed';
+  const phaseConfidence = derivePhaseConfidence({ daysLogged, hasAnchor, hasConfirmedHistory });
+  const historyLockLevel = deriveHistoryLockLevel({ daysLogged, hasAnchor, hasConfirmedHistory });
+
+  const previousEstimated = previousState?.estimatedPhase ?? previousConfirmed ?? null;
+  const estimatedPhase = proposedPhase ?? previousEstimated;
+  const estimatedPhaseStartedAt =
+    estimatedPhase && estimatedPhase === previousEstimated
+      ? previousState?.estimatedPhaseStartedAt ?? refISO
+      : estimatedPhase
+      ? refISO
+      : null;
+
+  let confirmedPhase = previousConfirmed ?? previousState?.confirmedPhase ?? null;
+  let confirmedPhaseStartedAt = previousState?.confirmedPhaseStartedAt ?? (confirmedPhase ? refISO : null);
+
+  if (historyLockLevel === 'confirmed' && proposedPhase) {
+    confirmedPhase = proposedPhase;
+    if (confirmedPhase !== (previousState?.confirmedPhase ?? previousConfirmed ?? null)) {
+      confirmedPhaseStartedAt = refISO;
+    } else {
+      confirmedPhaseStartedAt = previousState?.confirmedPhaseStartedAt ?? confirmedPhaseStartedAt ?? refISO;
+    }
+  }
+
+  return {
+    estimatedPhase,
+    estimatedPhaseStartedAt,
+    confirmedPhase,
+    confirmedPhaseStartedAt,
+    phaseConfidence,
+    historyLockLevel,
+    updatedAt: refISO,
+  };
 }
 
 export function detectPhaseChange(previousPhase: string | null | undefined, currentPhase: string | null | undefined): boolean {
@@ -147,12 +286,10 @@ export function getDetectedPhaseKey(entries: CheckInEntry[], userData: UserData,
 }
 
 function getConfirmedPreviousPhase(previousEntries: CheckInEntry[], userData: UserData, refISO: string): string | null {
-  return (
-    getCurrentPhaseEntry()?.phase ??
-    getStoredPhase()?.phase ??
-    getDetectedPhaseKey(previousEntries, userData, refISO) ??
-    null
-  );
+  void previousEntries;
+  void userData;
+  void refISO;
+  return getCurrentPhaseEntry()?.phase ?? getRhythmPhaseState()?.confirmedPhase ?? getStoredPhase()?.phase ?? null;
 }
 
 function validatePhaseTransition(args: {
@@ -194,33 +331,73 @@ export function applyPhaseChangeForEntries(args: {
   refISO?: string;
 }) {
   const refISO = todayISOOr(args.refISO);
-  const proposedPhase = getDetectedPhaseKey(args.nextEntries, args.userData, refISO);
+  const rhythmModel = getRhythmModel(sortByDateAsc(args.nextEntries), args.userData, refISO);
+  const proposedPhase = rhythmModel.phaseKey ?? null;
+  const previousState = getRhythmPhaseState();
   const previousConfirmed = getConfirmedPreviousPhase(args.previousEntries, args.userData, refISO);
+  const daysLogged = countDistinctLoggedDays(args.nextEntries);
 
-  if (previousConfirmed && proposedPhase === previousConfirmed) {
-    restoreMissingPhaseHistory(previousConfirmed, refISO);
-  }
-
-  const validation = validatePhaseTransition({
-    previousPhase: previousConfirmed,
+  const nextState = buildPhaseState({
+    previousState,
+    previousConfirmed,
     proposedPhase,
+    detectedSource: rhythmModel.source,
+    daysLogged,
     refISO,
   });
 
-  const currentPhase = validation.acceptedPhase;
+  let validation: {
+    acceptedPhase: string | null;
+    changed: boolean;
+    reason: string;
+  } = {
+    acceptedPhase: previousConfirmed,
+    changed: false,
+    reason: nextState.historyLockLevel === 'confirmed' ? 'no_proposed_phase' : 'estimate_only',
+  };
+
+  if (nextState.historyLockLevel === 'confirmed') {
+    if (previousConfirmed && proposedPhase === previousConfirmed) {
+      restoreMissingPhaseHistory(previousConfirmed, refISO);
+    }
+
+    validation = validatePhaseTransition({
+      previousPhase: previousConfirmed,
+      proposedPhase,
+      refISO,
+    });
+
+    nextState.confirmedPhase = validation.acceptedPhase ?? nextState.confirmedPhase ?? null;
+    if (nextState.confirmedPhase && validation.changed) {
+      nextState.confirmedPhaseStartedAt = refISO;
+    } else if (nextState.confirmedPhase && !nextState.confirmedPhaseStartedAt) {
+      nextState.confirmedPhaseStartedAt = refISO;
+    }
+  } else {
+    const previousEstimated = previousState?.estimatedPhase ?? previousConfirmed;
+    if (previousEstimated && proposedPhase && previousEstimated !== proposedPhase && !isAdjacentPhase(previousEstimated, proposedPhase)) {
+      nextState.estimatedPhase = previousEstimated;
+      nextState.estimatedPhaseStartedAt = previousState?.estimatedPhaseStartedAt ?? refISO;
+      validation.reason = 'blocked_non_adjacent_estimate';
+    }
+  }
+
+  const currentPhase = validation.acceptedPhase ?? nextState.confirmedPhase ?? nextState.estimatedPhase ?? null;
   const changed = validation.changed;
 
-  if (currentPhase) {
-    if (changed && previousConfirmed && previousConfirmed !== currentPhase) {
-      setRecentPhaseChange(currentPhase, refISO);
-      updatePhaseHistory(currentPhase, refISO);
-      createMoment({ type: 'phase_change', date: refISO, data: { phase: currentPhase } });
+  if (nextState.confirmedPhase) {
+    if (changed && previousConfirmed && previousConfirmed !== nextState.confirmedPhase) {
+      setRecentPhaseChange(nextState.confirmedPhase, refISO);
+      updatePhaseHistory(nextState.confirmedPhase, refISO);
+      createMoment({ type: 'phase_change', date: refISO, data: { phase: nextState.confirmedPhase } });
     } else if (!getCurrentPhaseEntry()) {
-      restoreMissingPhaseHistory(currentPhase, refISO);
-      if (!getCurrentPhaseEntry()) updatePhaseHistory(currentPhase, refISO);
+      restoreMissingPhaseHistory(nextState.confirmedPhase, refISO);
+      if (!getCurrentPhaseEntry()) updatePhaseHistory(nextState.confirmedPhase, refISO);
     }
-    setStoredPhase(currentPhase, refISO);
+    setStoredPhase(nextState.confirmedPhase, refISO);
   }
+
+  setRhythmPhaseState(nextState);
 
   return {
     changed,
@@ -228,6 +405,10 @@ export function applyPhaseChangeForEntries(args: {
     currentPhase,
     proposedPhase,
     transitionReason: validation.reason,
+    estimatedPhase: nextState.estimatedPhase,
+    confirmedPhase: nextState.confirmedPhase,
+    phaseConfidence: nextState.phaseConfidence,
+    historyLockLevel: nextState.historyLockLevel,
   };
 }
 

@@ -6,6 +6,7 @@ export function RhythmPhaseHeader(props: {
   phaseSubtitle: string;
   description: string;
   confidenceLabel: string;
+  phaseStatusLabel?: string;
   timingCopy?: string;
   progressPercent?: number;
 }) {
@@ -17,6 +18,7 @@ export function RhythmPhaseHeader(props: {
             <div className="text-white">{props.icon}</div>
           </div>
           <div className="min-w-0">
+            {props.phaseStatusLabel ? <div className="mb-1 text-[11px] uppercase tracking-[0.18em] text-white/65">{props.phaseStatusLabel}</div> : null}
             <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">{props.phaseTitle}</h3>
             <div className="eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{props.phaseSubtitle}</div>
           </div>
