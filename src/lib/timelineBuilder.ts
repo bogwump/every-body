@@ -96,6 +96,30 @@ function tidySentence(text: string, fallback: string): string {
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
+
+function confidenceSnapshotText(confidence: unknown): string {
+  if (typeof confidence === 'number') {
+    if (confidence >= 0.85) return 'It had started to look fairly reliable at the time.';
+    if (confidence >= 0.65) return 'It had started to look more consistent at the time.';
+    if (confidence >= 0.45) return 'It was still early, but repeatable enough to save.';
+    return 'It was still emerging, but worth keeping in view.';
+  }
+
+  const value = String(confidence || '').toLowerCase();
+  if (value === 'high') return 'It had started to look fairly reliable at the time.';
+  if (value === 'moderate' || value === 'medium') return 'It had started to look more consistent at the time.';
+  if (value === 'low') return 'It was still early, but repeatable enough to save.';
+  if (value === 'very_low') return 'It was still emerging, but worth keeping in view.';
+  return '';
+}
+
+function discoveryEvidenceText(confidence: unknown): string {
+  const snapshot = confidenceSnapshotText(confidence);
+  return snapshot
+    ? `Saved when this pattern first looked strong enough to keep in your history. ${snapshot}`
+    : 'Saved when this pattern first looked strong enough to keep in your history.';
+}
+
 function metricsSummary(metrics: unknown): string {
   const list = Array.isArray(metrics) ? metrics.map((metric) => metricLabel(String(metric))).filter(Boolean) : [];
   return list;
@@ -241,7 +265,7 @@ function buildPatternEvents(): TimelineEvent[] {
       date: item.firstDetected,
       title: 'Pattern discovered',
       description: described.description,
-      evidence: `Saved when this pattern first looked strong enough to keep in your history.${item.confidence ? ` Discovery confidence was ${item.confidence}.` : ''}`,
+      evidence: discoveryEvidenceText(item.confidence),
       signals: described.signals,
       confidence: item.confidence,
       source: 'insights' as const,

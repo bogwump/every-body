@@ -85,15 +85,15 @@ export function History({ onNavigate }: HistoryProps) {
 
   return (
     <div className="px-4 pt-6 pb-28 md:px-8 md:pb-10 max-w-5xl mx-auto space-y-6">
-      <section className="eb-card">
+      <section className="eb-hero-surface eb-hero-on-dark rounded-3xl p-6 shadow-lg overflow-hidden">
         <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-accent)/0.18)] text-[rgb(var(--color-primary))] flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-2xl bg-[rgba(255,255,255,0.18)] border border-[rgba(255,255,255,0.18)] text-white flex items-center justify-center shrink-0">
             <Clock3 className="w-5 h-5" />
           </div>
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-[0.2em] text-[rgb(var(--color-text-secondary))]">History</div>
-            <h1 className="mt-1">Your story so far</h1>
-            <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs uppercase tracking-[0.2em] text-white/75">History</div>
+            <h1 className="mt-1 text-white">Your story so far</h1>
+            <p className="mt-3 text-sm text-white/85">
               {summary.patterns} pattern{summary.patterns === 1 ? '' : 's'} discovered · {summary.helpfulExperiments} experiment{summary.helpfulExperiments === 1 ? '' : 's'} looked helpful · {summary.phaseChanges} phase shift{summary.phaseChanges === 1 ? '' : 's'} recorded
             </p>
           </div>
@@ -110,8 +110,8 @@ export function History({ onNavigate }: HistoryProps) {
                 className={[
                   'px-4 py-2 rounded-full text-sm transition-colors border',
                   active
-                    ? 'bg-[rgb(var(--color-primary)/0.12)] text-[rgb(var(--color-primary))] border-[rgb(var(--color-primary)/0.22)]'
-                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-secondary))] border-[rgb(228_228_231_/_0.8)] hover:text-[rgb(var(--color-text))]'
+                    ? 'bg-white/20 text-white border-white/25'
+                    : 'bg-white/8 text-white/85 border-white/18 hover:bg-white/12 hover:text-white'
                 ].join(' ')}
               >
                 {item.label}
