@@ -27,6 +27,7 @@ function iconForEvent(type: TimelineEvent['type']) {
     case 'phase_change':
       return RefreshCw;
     case 'pattern_discovered':
+    case 'pattern_strengthened':
       return Sparkles;
     case 'helpful_pattern':
       return Heart;
@@ -40,6 +41,16 @@ function iconForEvent(type: TimelineEvent['type']) {
     default:
       return Clock3;
   }
+}
+
+function confidenceLabel(value?: string): string | null {
+  if (!value) return null;
+  const text = String(value).toLowerCase();
+  if (text === 'very_low') return 'Very low confidence';
+  if (text === 'low') return 'Low confidence';
+  if (text === 'moderate' || text === 'medium') return 'Moderate confidence';
+  if (text === 'high') return 'High confidence';
+  return null;
 }
 
 function setPageFocus(target?: string) {
@@ -134,6 +145,7 @@ export function History({ onNavigate }: HistoryProps) {
               </div>
               {group.events.map((event) => {
                 const Icon = iconForEvent(event.type);
+                const confidence = confidenceLabel(event.confidence);
                 return (
                   <article key={event.id} className="eb-card">
                     <div className="flex items-start gap-4">
@@ -148,6 +160,16 @@ export function History({ onNavigate }: HistoryProps) {
                             {event.evidence ? (
                               <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
                                 <span className="font-medium text-[rgb(var(--color-text))]">Why this is here:</span> {event.evidence}
+                              </p>
+                            ) : null}
+                            {event.signals && event.signals.length ? (
+                              <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                                <span className="font-medium text-[rgb(var(--color-text))]">Signals involved:</span> {event.signals.join(' • ')}
+                              </p>
+                            ) : null}
+                            {confidence ? (
+                              <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                                <span className="font-medium text-[rgb(var(--color-text))]">Confidence:</span> {confidence}
                               </p>
                             ) : null}
                           </div>
