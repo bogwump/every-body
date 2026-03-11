@@ -142,9 +142,14 @@ export function History({ onNavigate }: HistoryProps) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
+                          <div className="min-w-0 max-w-3xl">
                             <h3>{event.title}</h3>
-                            <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">{event.description}</p>
+                            <p className="mt-2 text-sm text-[rgb(var(--color-text))]">{event.description}</p>
+                            {event.evidence ? (
+                              <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                                <span className="font-medium text-[rgb(var(--color-text))]">Why this is here:</span> {event.evidence}
+                              </p>
+                            ) : null}
                           </div>
                           <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">{fmtDate(event.date)}</div>
                         </div>

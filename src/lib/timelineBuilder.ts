@@ -19,6 +19,7 @@ export type TimelineEvent = {
   date: string;
   title: string;
   description: string;
+  evidence?: string;
   source: 'phase' | 'insights' | 'experiments' | 'rhythm' | 'moments';
   actionLabel?: string;
   actionTarget?: string;
@@ -62,40 +63,117 @@ function phaseDescription(phase: string): string {
   }
 }
 
+function toTitleCase(text: string): string {
+  return String(text || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function metricLabel(metric: string): string {
+  const map: Record<string, string> = {
+    mood: 'mood',
+    sleep: 'sleep',
+    energy: 'energy',
+    fatigue: 'fatigue',
+    stress: 'stress',
+    brainFog: 'brain fog',
+    appetite: 'appetite',
+    pain: 'pain',
+    flow: 'bleeding',
+    digestion: 'digestion',
+    anxiety: 'anxiety',
+    irritability: 'irritability',
+  };
+  return map[metric] || String(metric).replace(/^custom:/, '').replace(/([A-Z])/g, ' $1').toLowerCase();
+}
+
+function tidySentence(text: string, fallback: string): string {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return fallback;
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+function metricsSummary(metrics: unknown): string {
+  const list = Array.isArray(metrics) ? metrics.map((metric) => metricLabel(String(metric))).filter(Boolean) : [];
+  if (!list.length) return 'your chosen focus area';
+  if (list.length === 1) return list[0];
+  if (list.length === 2) return `${list[0]} and ${list[1]}`;
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
+function describeSignalId(signalId: string): string {
+  const id = String(signalId || '').toLowerCase();
+  if (id.includes('sleep_before_bleed')) return 'Sleep tends to dip before bleeding starts.';
+  if (id.includes('stress') && id.includes('sleep')) return 'Stress and sleep often move together.';
+  if (id.includes('brainfog') || id.includes('brain_fog')) return 'Brain fog has started to show a repeat pattern.';
+  if (id.includes('night') && id.includes('sweat')) return 'Night sweats have started to show a repeat pattern.';
+  if (id.includes('weekday') && id.includes('brainfog')) return 'Brain fog has started to show a mid-week pattern.';
+  if (id.includes('weekday')) return 'One of your symptoms has started to show a day-of-week pattern.';
+  if (id.includes('trend')) return 'One of your symptoms has started to shift over time.';
+  if (id.includes('phase')) {
+    const metricGuess = id
+      .split(/[:_-]/)
+      .find((part) => ['sleep', 'energy', 'mood', 'stress', 'pain', 'brainfog', 'fatigue', 'appetite'].includes(part));
+    if (metricGuess) return `${toTitleCase(metricLabel(metricGuess))} tends to shift with your rhythm.`;
+  }
+  return 'One of your signals has started to look more repeatable over time.';
+}
+
+function helpfulEvidenceText(item: { evidenceCount?: number; experimentIds?: string[]; confidence?: string }): string {
+  const count = Number(item.evidenceCount || 0);
+  const experiments = Array.isArray(item.experimentIds) ? item.experimentIds.filter(Boolean).length : 0;
+  if (count > 0) {
+    return `Based on ${count} helpful experiment result${count === 1 ? '' : 's'}${experiments > count ? ' and related tracking history' : ''}.`;
+  }
+  if (item.confidence === 'high' || item.confidence === 'moderate') {
+    return 'Based on past experiment results that looked helpful.';
+  }
+  return 'Based on experiment history and symptom logs.';
+}
+
 function mapMomentToEvent(moment: CompanionMoment): TimelineEvent | null {
-  const data = (moment.data && typeof moment.data === 'object') ? moment.data : {};
+  const data = moment.data && typeof moment.data === 'object' ? moment.data : {};
   switch (moment.type) {
-    case 'new_pattern':
+    case 'new_pattern': {
+      const signalText = typeof (data as any).body === 'string' && String((data as any).body).trim()
+        ? tidySentence(String((data as any).body), 'A repeat pattern has started to look meaningful enough to keep in view.')
+        : describeSignalId(String((data as any).signalId || ''));
       return {
         id: `moment:${moment.id}`,
         type: 'pattern_discovered',
         date: moment.date,
-        title: typeof (data as any).title === 'string' ? String((data as any).title) : 'New pattern spotted',
-        description: typeof (data as any).body === 'string' ? String((data as any).body) : 'A repeat pattern has started to look meaningful enough to keep in view.',
+        title: 'Pattern discovered',
+        description: signalText,
+        evidence: 'Saved from a companion update when this pattern first started to stand out.',
         source: 'moments',
-        actionLabel: 'View insights',
+        actionLabel: 'Open related insight',
         actionTarget: 'insights',
         metadata: { signalId: (data as any).signalId },
       };
-    case 'helpful_pattern_detected':
+    }
+    case 'helpful_pattern_detected': {
+      const body = typeof (data as any).body === 'string' ? String((data as any).body) : '';
       return {
         id: `moment:${moment.id}`,
         type: 'helpful_pattern',
         date: moment.date,
-        title: typeof (data as any).title === 'string' ? String((data as any).title) : 'Something that seems to help',
-        description: typeof (data as any).body === 'string' ? String((data as any).body) : 'Your past experiments have started pointing to something that may help here.',
+        title: 'Helpful pattern identified',
+        description: tidySentence(body, 'A past experiment or pattern looked worth keeping in mind.'),
+        evidence: 'Saved from a companion update based on earlier experiments and tracking history.',
         source: 'moments',
-        actionLabel: 'View insights',
+        actionLabel: 'Review helpful insight',
         actionTarget: 'insights',
         metadata: { signalId: (data as any).signalId },
       };
+    }
     case 'rhythm_shift':
       return {
         id: `moment:${moment.id}`,
         type: 'rhythm_shift',
         date: moment.date,
         title: typeof (data as any).title === 'string' ? String((data as any).title) : 'Rhythm shift noticed',
-        description: typeof (data as any).body === 'string' ? String((data as any).body) : 'Something about your rhythm has looked a little different lately.',
+        description: tidySentence(typeof (data as any).body === 'string' ? String((data as any).body) : '', 'Something about your rhythm has looked a little different lately.'),
+        evidence: 'Based on recent rhythm timing and phase history.',
         source: 'rhythm',
         actionLabel: 'Open rhythm',
         actionTarget: 'rhythm',
@@ -117,6 +195,7 @@ function buildPhaseEvents(): TimelineEvent[] {
         date,
         title: `Entered ${phaseLabelFromKey(phase)}`,
         description: phaseDescription(phase),
+        evidence: 'Based on your saved phase history.',
         source: 'phase' as const,
         actionLabel: 'Open rhythm',
         actionTarget: 'rhythm',
@@ -135,10 +214,11 @@ function buildPatternEvents(): TimelineEvent[] {
     id: `discovery:${item.id}:${item.firstDetected}`,
     type: 'pattern_discovered' as const,
     date: item.firstDetected,
-    title: 'New pattern spotted',
-    description: 'One of your signals has started to look more repeatable over time.',
+    title: 'Pattern discovered',
+    description: describeSignalId(item.id),
+    evidence: 'Saved when this pattern first looked strong enough to keep in your history.',
     source: 'insights' as const,
-    actionLabel: 'View insights',
+    actionLabel: 'Open related insight',
     actionTarget: 'insights',
     metadata: {
       signalId: item.id,
@@ -160,16 +240,18 @@ function buildHelpfulPatternEvents(): TimelineEvent[] {
       id: `helpful:${item.signal}:${item.intervention}:${item.lastEvidenceDate || ''}`,
       type: 'helpful_pattern' as const,
       date: item.lastEvidenceDate || '9999-12-31',
-      title: 'Something that seems to help',
-      description: item.text,
+      title: 'Helpful pattern identified',
+      description: tidySentence(item.text, 'A past experiment or pattern looked worth keeping in mind.'),
+      evidence: helpfulEvidenceText(item),
       source: 'experiments' as const,
-      actionLabel: 'View insights',
+      actionLabel: 'Review helpful insight',
       actionTarget: 'insights',
       metadata: {
         signal: item.signal,
         intervention: item.intervention,
         confidence: item.confidence,
         evidenceCount: item.evidenceCount,
+        experimentIds: item.experimentIds,
       },
     }));
 
@@ -178,6 +260,14 @@ function buildHelpfulPatternEvents(): TimelineEvent[] {
     .filter((event): event is TimelineEvent => Boolean(event) && event.type === 'helpful_pattern');
 
   return [...helpful, ...fromMoments];
+}
+
+function outcomeLabel(status?: string): string {
+  if (status === 'helped') return 'helpful';
+  if (status === 'notReally') return 'slightly helpful';
+  if (status === 'stopped') return 'stopped early';
+  if (status === 'abandoned') return 'unclear';
+  return 'unclear';
 }
 
 function buildExperimentEvents(): TimelineEvent[] {
@@ -191,19 +281,21 @@ function buildExperimentEvents(): TimelineEvent[] {
     const startDateISO = String(item?.startDateISO || '').slice(0, 10);
     const completedAtISO = datePart(item?.outcome?.completedAtISO);
     const status = String(item?.outcome?.status || '');
-    const digestSummary = typeof item?.outcome?.digest?.summarySentence === 'string' ? item.outcome.digest.summarySentence : '';
+    const digestSummary = typeof item?.outcome?.digest?.summarySentence === 'string' ? String(item.outcome.digest.summarySentence) : '';
+    const metrics = metricsSummary(item?.metrics);
 
     if (experimentId && isISODate(startDateISO)) {
       events.push({
         id: `experiment-started:${experimentId}:${startDateISO}`,
         type: 'experiment_started',
         date: startDateISO,
-        title: 'Experiment started',
-        description: `${title} started as a small test to see what might help.`,
+        title: `${title} started`,
+        description: `This experiment was set up to explore ${metrics}.`,
+        evidence: `Started as a ${item?.durationDays || 0}-day test${item?.durationDays ? '' : ''} based on your experiment plan.`,
         source: 'experiments',
-        actionLabel: 'View insights',
+        actionLabel: 'View experiment setup',
         actionTarget: 'insights:experiments',
-        metadata: { experimentId, title },
+        metadata: { experimentId, title, metrics: item?.metrics },
       });
     }
 
@@ -212,26 +304,32 @@ function buildExperimentEvents(): TimelineEvent[] {
         id: `experiment-completed:${experimentId}:${completedAtISO}`,
         type: 'experiment_completed',
         date: completedAtISO,
-        title: 'Experiment completed',
-        description: `${title} finished.${digestSummary ? ` ${digestSummary}` : ''}`,
+        title: `${title} completed`,
+        description: digestSummary
+          ? tidySentence(digestSummary, `${title} finished.`)
+          : `${title} finished with a ${outcomeLabel(status)} result.`,
+        evidence: `Result logged as ${outcomeLabel(status)} for ${metrics}.`,
         source: 'experiments',
-        actionLabel: 'View results',
+        actionLabel: 'View experiment result',
         actionTarget: 'insights:experiments',
-        metadata: { experimentId, title, status },
+        metadata: { experimentId, title, status, metrics: item?.metrics },
       });
     }
 
-    if (experimentId && isISODate(completedAtISO) && status === 'helped') {
+    if (experimentId && isISODate(completedAtISO) && (status === 'helped' || status === 'notReally')) {
       events.push({
         id: `experiment-helped:${experimentId}:${completedAtISO}:history`,
         type: 'experiment_helped',
         date: completedAtISO,
-        title: 'Experiment looked helpful',
-        description: digestSummary || `${title} seemed to support this area for you.`,
+        title: `${title} looked ${status === 'helped' ? 'helpful' : 'slightly helpful'}`,
+        description: digestSummary
+          ? tidySentence(digestSummary, `${title} looked worth remembering.`)
+          : `${title} appeared to support ${metrics}.`,
+        evidence: `Taken from the experiment result you saved for ${metrics}.`,
         source: 'experiments',
-        actionLabel: 'View results',
+        actionLabel: 'View experiment result',
         actionTarget: 'insights:experiments',
-        metadata: { experimentId, title },
+        metadata: { experimentId, title, status, metrics: item?.metrics },
       });
     }
   });
@@ -243,19 +341,21 @@ function buildExperimentEvents(): TimelineEvent[] {
     if (item.result !== 'helpful' && item.result !== 'slightly_helpful') return;
     const matching = history.find((entry) => String(entry?.experimentId || '').trim() === experimentId);
     const title = String(matching?.title || 'Your experiment').trim() || 'Your experiment';
+    const metrics = metricsSummary(matching?.metrics);
     const desc = item.result === 'helpful'
-      ? `${title} looked helpful enough to be worth remembering.`
-      : `${title} seemed a little helpful, even if the signal was still early.`;
+      ? `${title} appeared to support ${metrics}.`
+      : `${title} showed an early signal that may support ${metrics}.`;
     events.push({
       id: `experiment-helped:${experimentId}:${date}:outcome`,
       type: 'experiment_helped',
       date,
-      title: 'Experiment looked helpful',
+      title: `${title} looked ${item.result === 'helpful' ? 'helpful' : 'slightly helpful'}`,
       description: desc,
+      evidence: 'Taken from your saved experiment outcome.',
       source: 'experiments',
-      actionLabel: 'View results',
+      actionLabel: 'View experiment result',
       actionTarget: 'insights:experiments',
-      metadata: { experimentId, title, result: item.result },
+      metadata: { experimentId, title, result: item.result, metrics: matching?.metrics },
     });
   });
 
@@ -306,8 +406,6 @@ export function filterTimelineEvents(events: TimelineEvent[], filter: TimelineFi
   if (filter === 'rhythm') return events.filter((event) => event.type === 'phase_change' || event.type === 'rhythm_shift');
   return events;
 }
-
-
 
 export function countPatternEvents(events: TimelineEvent[]): number {
   return events.filter((event) => event.type === 'pattern_discovered').length;
