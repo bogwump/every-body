@@ -300,20 +300,13 @@ function Slider10({
   const dragValueRef = useRef(clamp(value, 0, 10));
   const draggingRef = useRef(false);
 
-  const applyFill = useCallback((next: number) => {
-    const node = inputRef.current;
-    if (!node) return;
-    node.style.setProperty('--eb-range-fill', `${clamp(next, 0, 10) * 10}%`);
-  }, []);
-
   useEffect(() => {
     if (!draggingRef.current) {
       const next = clamp(value, 0, 10);
       setDraftValue(next);
       dragValueRef.current = next;
-      applyFill(next);
     }
-  }, [value, applyFill]);
+  }, [value]);
 
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
@@ -350,10 +343,9 @@ function Slider10({
   const updateVisual = useCallback((next: number) => {
     const safe = clamp(next, 0, 10);
     dragValueRef.current = safe;
-    applyFill(safe);
     setDraftValue((prev) => (prev === safe ? prev : safe));
     onPreviewChange?.(safe);
-  }, [applyFill, onPreviewChange]);
+  }, [onPreviewChange]);
 
   const commitCurrent = useCallback(() => {
     draggingRef.current = false;
@@ -361,13 +353,54 @@ function Slider10({
     onCommit(safe);
   }, [onCommit]);
 
+  const setFromClientX = useCallback((clientX: number) => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    const x = Math.min(rect.right, Math.max(rect.left, clientX));
+    const ratio = rect.width ? (x - rect.left) / rect.width : 0;
+    updateVisual(Math.round(ratio * 10));
+  }, [updateVisual]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e as any).isPrimary === false) return;
+    draggingRef.current = true;
+    setFromClientX(e.clientX);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    setFromClientX(e.clientX);
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    setFromClientX(e.clientX);
+    commitCurrent();
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+  };
+
+  const onPointerCancel = () => {
+    if (!draggingRef.current) return;
+    commitCurrent();
+  };
+
+  const pct = `${(draftValue / 10) * 100}%`;
   const bubbleLeftPx = trackWidth > 0
     ? ((trackWidth - thumbWidth) * (draftValue / 10)) + (thumbWidth / 2)
     : thumbWidth / 2;
 
   return (
     <div>
-      <div ref={wrapRef} className="eb-range-wrap">
+      <div
+        ref={wrapRef}
+        className="eb-range-wrap"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+      >
         <div className="eb-range-value-bubble" aria-hidden="true" style={{ left: `${bubbleLeftPx}px` }}>
           {draftValue}
         </div>
@@ -379,26 +412,17 @@ function Slider10({
           max={10}
           step={1}
           value={draftValue}
-          onPointerDown={() => {
-            draggingRef.current = true;
-          }}
-          onInput={(e) => {
-            const next = parseInt((e.target as HTMLInputElement).value, 10);
-            updateVisual(next);
-          }}
           onChange={(e) => {
             const next = parseInt(e.target.value, 10);
             updateVisual(next);
           }}
-          onPointerUp={commitCurrent}
-          onPointerCancel={commitCurrent}
           onMouseUp={commitCurrent}
           onTouchEnd={commitCurrent}
           className="eb-range w-full"
           style={{
             accentColor: 'rgb(var(--color-primary))',
             color: 'rgb(var(--color-primary))',
-            ['--eb-range-fill' as any]: `${draftValue * 10}%`,
+            ['--eb-range-fill' as any]: pct,
           }}
           aria-label="slider"
         />
@@ -1161,19 +1185,19 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
               return (
                 <div key={key} className="eb-card rounded-[1.5rem] p-4 border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-center justify-between gap-3 mb-1.5">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] border border-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
-                        <Icon className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-medium leading-tight">{meta.label}</div>
-                        {meta.hint ? (
-                          <div className="text-sm text-[rgb(var(--color-text-secondary))] mt-0.5">{meta.hint}</div>
-                        ) : null}
-                      </div>
+                  <div className="flex items-start gap-3 mb-1.5">
+                    <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] border border-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
+                      <Icon className="w-5 h-5 text-[rgb(var(--color-primary))]" />
                     </div>
-                    <div className="shrink-0 text-sm font-semibold text-[rgb(var(--color-primary-dark))]">{current}/10</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <div className="font-medium leading-tight">{meta.label}</div>
+                        <div className="shrink-0 text-sm font-semibold text-[rgb(var(--color-primary-dark))]">{current}/10</div>
+                      </div>
+                      {meta.hint ? (
+                        <div className="text-sm text-[rgb(var(--color-text-secondary))] mt-0.5 pr-0">{meta.hint}</div>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">{formatYesterdayValue(prevVal)}</div>
