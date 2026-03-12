@@ -8,7 +8,7 @@ export function RhythmSupportBubble(props: { title?: string; body: string }) {
         <Leaf className="w-4 h-4 !text-[rgb(var(--color-primary-dark))]" />
         <span>{props.title ?? 'Gentle reminder'}</span>
       </div>
-      <p className="mt-2 leading-6 text-sm !text-neutral-800" style={{ color: 'rgba(0,0,0,0.72)' }}>{props.body}</p>
+      <p className="mt-2 leading-6 text-sm !text-neutral-800 whitespace-pre-line" style={{ color: 'rgba(0,0,0,0.72)' }}>{props.body}</p>
     </div>
   );
 }

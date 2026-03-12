@@ -9,6 +9,7 @@ import { getHelpfulPatternsFromExperiments } from './experimentLearning';
 import { getExperimentSuggestionSuppression, getWeeklyReflectionMoment, shouldSuppressCompanionMoment } from './companionLogic';
 import { getConfidencePhrase } from './confidenceCopy';
 import { phaseLabelFromKey } from './phaseChange';
+import { getResurfacingPatternMoment } from './patternIntelligence';
 
 function hasMomentWithId(id: string): boolean {
   return getCompanionMoments().some((moment) => moment.id === id);
@@ -116,6 +117,21 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
     }
   }
 
+  const resurfacing = getResurfacingPatternMoment(entries, userData);
+  if (resurfacing && !hasMomentWithId(`resurface:${resurfacing.key}`) && !shouldSuppressCompanionMoment({ type: 'encouragement', refISO, cooldownDays: 7, dismissalCooldownDays: 12, signalId: resurfacing.key })) {
+    createMoment({
+      id: `resurface:${resurfacing.key}`,
+      type: 'encouragement',
+      date: refISO,
+      data: {
+        signalId: resurfacing.key,
+        title: resurfacing.title,
+        body: resurfacing.body,
+      },
+    });
+    return;
+  }
+
   const helpfulPattern = getHelpfulPatternsFromExperiments().filter((item) => item.confidence !== 'low')[0] ?? null;
   if (helpfulPattern && !active.some((moment) => moment.type === 'helpful_pattern_detected') && !shouldSuppressCompanionMoment({ type: 'helpful_pattern_detected', refISO, cooldownDays: 10, dismissalCooldownDays: 14, signalId: helpfulPattern.signal })) {
     const helpfulDate = helpfulPattern.lastEvidenceDate || refISO;
@@ -192,7 +208,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
     return;
   }
 
-  const reflection = getWeeklyReflectionMoment(entries, refISO);
+  const reflection = getWeeklyReflectionMoment(entries, refISO, userData);
   if (reflection && !shouldSuppressCompanionMoment({ type: reflection.type, refISO, cooldownDays: 6, dismissalCooldownDays: 10 })) {
     createMoment({
       id: reflection.id,

@@ -44,6 +44,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
+import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
   userData: UserData;
@@ -1239,38 +1240,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         // still avoid anything "body <-> body"
         !((p.kindA === 'physio' || p.kindA === 'hormonal') && (p.kindB === 'physio' || p.kindB === 'hormonal'));
 
-      const lagLine = (() => {
-        const candidates: Array<{ lead: string; follow: string; lag: number; score: number; n: number }> = [];
-        for (const lag of [1, 2]) {
-          const xsAB: number[] = [];
-          const ysAB: number[] = [];
-          for (let i = 0; i + lag < entriesSorted.length; i++) {
-            const av = valueForMetric(entriesSorted[i], p.aKey);
-            const bv = valueForMetric(entriesSorted[i + lag], p.bKey);
-            if (typeof av === 'number' && typeof bv === 'number') { xsAB.push(av); ysAB.push(bv); }
-          }
-          if (xsAB.length >= 6) {
-            const rAB = pearsonCorrelation(xsAB, ysAB);
-            if (Number.isFinite(rAB)) candidates.push({ lead: p.a, follow: p.b, lag, score: Math.abs(rAB), n: xsAB.length });
-          }
-
-          const xsBA: number[] = [];
-          const ysBA: number[] = [];
-          for (let i = 0; i + lag < entriesSorted.length; i++) {
-            const bv = valueForMetric(entriesSorted[i], p.bKey);
-            const av = valueForMetric(entriesSorted[i + lag], p.aKey);
-            if (typeof bv === 'number' && typeof av === 'number') { xsBA.push(bv); ysBA.push(av); }
-          }
-          if (xsBA.length >= 6) {
-            const rBA = pearsonCorrelation(xsBA, ysBA);
-            if (Number.isFinite(rBA)) candidates.push({ lead: p.b, follow: p.a, lag, score: Math.abs(rBA), n: xsBA.length });
-          }
-        }
-        const best = candidates.sort((a, b) => b.score - a.score)[0];
-        if (!best) return null;
-        if (best.score < Math.abs(p.r) + 0.08) return null;
-        return `${best.lead} has sometimes shown up before ${best.follow.toLowerCase()} by about ${best.lag} day${best.lag === 1 ? '' : 's'}.`;
-      })();
+      const lagPattern = getLagPatternForPair(entriesSorted, p.aKey, p.bKey, userData);
+      const lagLine = lagPattern && lagPattern.score >= Math.abs(p.r) + 0.05
+        ? (lagPattern.direction === 'inverse'
+            ? `When ${lagPattern.leadLabel.toLowerCase()} rises, ${lagPattern.followLabel.toLowerCase()} often dips ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`
+            : `${lagPattern.leadLabel} has often been followed by ${lagPattern.followLabel.toLowerCase()} ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`)
+        : null;
+      const contextLine = getPatternContextForSignal({ metrics: [p.aKey, p.bKey], confidence, direction: p.r >= 0 ? 'together' : 'inverse' });
 
       const why = [
         `You logged both metrics on ${p.n} day${p.n === 1 ? '' : 's'}.`,
@@ -1279,12 +1255,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           ? `This is calculated from your recent logs and will update as you add more days.`
           : `This is an early signal. With only a few days logged, it may change as you add more data.`,
         lagLine,
+        contextLine,
         hormonalInvolved
           ? `Hormones can influence lots of symptoms at once, so treat this as a prompt to notice patterns, not a diagnosis.`
           : `Correlation does not mean one causes the other.`,
       ].filter(Boolean);
 
-      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why };
+      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why, lagPattern, contextLine };
     });
   }, [deepReady, entriesSorted, selected, userData, allMetricKeys]);
 
@@ -1462,6 +1439,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   type HeroInsightItem = {
     id: string;
     text: string;
+    contextLine?: string | null;
+    repeatLine?: string | null;
     isNewPattern: boolean;
   };
 
@@ -1548,12 +1527,35 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     markPatternsDiscovered(unseen);
   }, [heroSignals]);
 
+  const patternMemory = useMemo(() => buildPatternMemory(entriesAllSorted, userData), [entriesAllSorted, userData]);
+
   const heroInsightState = useMemo(() => {
     const items: HeroInsightItem[] = heroSignals.map((signal) => ({
       id: signal.id,
       text: copyForInsightSignal(signal),
+      contextLine: getPatternContextForSignal(signal),
+      repeatLine: getRepeatPatternLine(getPatternRecordForSignal(signal, patternMemory)),
       isNewPattern: signal.isNewPattern,
     }));
+
+    const strongestConnection = corrPairs.find((pair) => Boolean(pair.lagPattern));
+    if (strongestConnection && items.length < 3) {
+      const lag = strongestConnection.lagPattern;
+      const connectionText = lag
+        ? (lag.direction === 'inverse'
+            ? `When ${lag.leadLabel.toLowerCase()} has been higher, ${lag.followLabel.toLowerCase()} has often dipped ${lag.lagDays === 1 ? 'the next day' : `about ${lag.lagDays} days later`}.`
+            : `${lag.leadLabel} has often been followed by ${lag.followLabel.toLowerCase()} ${lag.lagDays === 1 ? 'the next day' : `about ${lag.lagDays} days later`}.`)
+        : null;
+      if (connectionText) {
+        items.push({
+          id: `hero-connection:${strongestConnection.aKey}:${strongestConnection.bKey}`,
+          text: connectionText,
+          contextLine: getPatternContextForSignal({ metrics: [strongestConnection.aKey, strongestConnection.bKey], confidence: strongestConnection.confidence === 'high' ? 'high' : strongestConnection.confidence === 'medium' ? 'medium' : 'low' }),
+          repeatLine: getRepeatPatternLine(getPatternRecordForLag(lag ?? null, patternMemory)),
+          isNewPattern: false,
+        });
+      }
+    }
 
     const lowDataOnly = heroSignals.every((signal) => signal.type === 'low_data');
 
@@ -1565,16 +1567,18 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           ? `A reflective read on the patterns that have been showing up around your ${String(currentInsightsPhase).toLowerCase()} phase.`
           : 'A reflective read on the patterns your recent check-ins have been starting to show.',
       items: items.length
-        ? items
+        ? items.slice(0, 3)
         : [
             {
               id: 'hero-fallback',
               text: 'We will start spotting clearer trends after a few more check-ins.',
+              contextLine: null,
+              repeatLine: null,
               isNewPattern: false,
             },
           ],
     };
-  }, [currentInsightsPhase, heroSignals]);
+  }, [currentInsightsPhase, heroSignals, patternMemory, corrPairs]);
 
   const strongPatternSignals = useMemo(
     () => getTopInsights(entriesAllSorted, userData, 8, selected).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low' && signal.strength !== 'weak'),
@@ -3365,7 +3369,9 @@ const tryNextPrompts = useMemo(() => {
                         <span>New pattern spotted</span>
                       </div>
                     ) : null}
-                    <span className="text-[rgba(0,0,0,0.65)]">{item.text}</span>
+                    <div className="text-[rgba(0,0,0,0.65)]">{item.text}</div>
+                    {item.contextLine ? <div className="mt-1 text-xs text-[rgba(0,0,0,0.58)]">{item.contextLine}</div> : null}
+                    {item.repeatLine ? <div className="mt-1 text-xs font-medium text-[rgba(0,0,0,0.60)]">{item.repeatLine}</div> : null}
                   </div>
                 ))
               ) : (
@@ -3377,7 +3383,7 @@ const tryNextPrompts = useMemo(() => {
           <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
             <div className="text-sm font-semibold text-black">Over the next few days you might notice</div>
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.68)]">
-              {bodyWeatherLines.slice(0, 2).map((line) => (
+              {bodyWeatherLines.slice(0, 3).map((line) => (
                 <div key={line} className="leading-6">• {line}</div>
               ))}
             </div>
@@ -3430,15 +3436,29 @@ const tryNextPrompts = useMemo(() => {
         ) : (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             {corrPairs.slice(0, 3).map((p, idx) => {
-              const title = `${p.a} + ${p.b}`;
-              const supportingLine = p.r > 0
-                ? `${p.a} and ${p.b.toLowerCase()} have often risen together.`
-                : `${p.a} and ${p.b.toLowerCase()} have often moved in opposite directions.`;
+              const chainTarget = p.lagPattern
+                ? corrPairs.find((other) => other !== p && other.lagPattern && String(other.lagPattern.leadKey) === String(p.lagPattern.followKey))
+                : null;
+              const title = p.lagPattern
+                ? chainTarget?.lagPattern
+                  ? `${p.lagPattern.leadLabel} → ${p.lagPattern.followLabel} → ${chainTarget.lagPattern.followLabel}`
+                  : `${p.lagPattern.leadLabel} → ${p.lagPattern.followLabel}`
+                : `${p.a} + ${p.b}`;
+              const supportingLine = p.lagPattern
+                ? chainTarget?.lagPattern
+                  ? `${p.lagPattern.leadLabel} has often been followed by ${p.lagPattern.followLabel.toLowerCase()}. When ${p.lagPattern.followLabel.toLowerCase()} dips, ${chainTarget.lagPattern.followLabel.toLowerCase()} tends to shift ${chainTarget.lagPattern.lagDays === 1 ? 'the next day' : `about ${chainTarget.lagPattern.lagDays} days later`}.`
+                  : p.lagPattern.direction === 'inverse'
+                    ? `When ${p.lagPattern.leadLabel.toLowerCase()} rises, ${p.lagPattern.followLabel.toLowerCase()} often dips ${p.lagPattern.lagDays === 1 ? 'the next day' : `about ${p.lagPattern.lagDays} days later`}.`
+                    : `${p.lagPattern.leadLabel} has often been followed by ${p.lagPattern.followLabel.toLowerCase()} ${p.lagPattern.lagDays === 1 ? 'the next day' : `about ${p.lagPattern.lagDays} days later`}.`
+                : p.r > 0
+                  ? `${p.a} and ${p.b.toLowerCase()} have often risen together.`
+                  : `${p.a} and ${p.b.toLowerCase()} have often moved in opposite directions.`;
 
               return (
                 <div key={idx} className="eb-inset rounded-2xl p-5 flex flex-col min-h-[170px]">
                   <div className="text-sm font-semibold">{title}</div>
                   <div className="mt-2 text-sm eb-muted">{supportingLine}</div>
+                  {p.contextLine ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
                   <div className="flex-1" />
                   <details className="mt-3 rounded-2xl border border-neutral-200 bg-white/60 px-3 py-2">
                     <summary className="cursor-pointer text-sm font-medium">Why am I seeing this?</summary>

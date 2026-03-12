@@ -1,7 +1,11 @@
 import React, { useMemo } from 'react';
 import type { CheckInEntry, UserData } from '../types';
-import { getRhythmLowDataNudge, getRhythmLowDataPatternLines, getRhythmPatternLines, getRhythmSupportNudge, type RhythmPhaseKey } from '../lib/rhythmCopy';
+import { getRhythmLowDataPatternLines, getRhythmPatternLines, type RhythmPhaseKey } from '../lib/rhythmCopy';
 import { getRhythmTimingModel } from '../lib/rhythmTiming';
+import { getBodyWeatherLines } from '../lib/companionLogic';
+import { getTopInsights } from '../lib/insightEngine';
+import { estimatePhaseByFlow } from '../lib/analytics';
+import { isoTodayLocal } from '../lib/date';
 import { RhythmPatternBubble } from './RhythmPatternBubble';
 import { RhythmPhaseHeader } from './RhythmPhaseHeader';
 import { RhythmSupportBubble } from './RhythmSupportBubble';
@@ -30,15 +34,19 @@ export function RhythmHero(props: {
 
   const timingModel = useMemo(() => getRhythmTimingModel(props.entries, props.userData), [props.entries, props.userData]);
 
-  const supportNudge = useMemo(() => {
-    if (lowData) return getRhythmLowDataNudge();
-    return getRhythmSupportNudge({
-      phaseKey: props.phaseKey,
-      strongestSignal: patternState.strongestSignal,
-      userData: props.userData,
+  const predictionBody = useMemo(() => {
+    if (lowData) return 'A few more check-ins will help this turn into a more personal prediction window.';
+    const currentPhase = estimatePhaseByFlow(isoTodayLocal(), props.entries);
+    const strongSignals = getTopInsights(props.entries, props.userData, 8).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low');
+    const lines = getBodyWeatherLines({
       entries: props.entries,
-    });
-  }, [lowData, props.phaseKey, patternState.strongestSignal, props.userData, props.entries]);
+      userData: props.userData,
+      currentPhase,
+      heroSignals: strongSignals.slice(0, 3),
+      strongPatternSignals: strongSignals,
+    }).slice(0, 3);
+    return lines.map((line) => `• ${line}`).join('\n');
+  }, [lowData, props.entries, props.userData]);
 
   return (
     <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-6 sm:p-8 overflow-hidden shadow-sm space-y-4">
@@ -59,7 +67,7 @@ export function RhythmHero(props: {
         isLowData={lowData}
       />
 
-      <RhythmSupportBubble body={supportNudge} />
+      <RhythmSupportBubble title="Over the next few days you might notice" body={predictionBody} />
     </div>
   );
 }

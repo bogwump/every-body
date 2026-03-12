@@ -3,6 +3,7 @@ import type { InsightSignal } from './insightEngine';
 import { getCompanionMoments, type CompanionMoment, type CompanionMomentType } from './companionMoments';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
 import { getExperimentLearnings, getWhatsComingPredictions } from './rhythmPredictions';
+import { getCycleAwarePredictionLines, getPatternContextForSignal, getWeeklyPatternReflection } from './patternIntelligence';
 
 export type CompanionDataStage = 'very_new' | 'building' | 'settling' | 'established';
 
@@ -214,25 +215,37 @@ export function getBodyWeatherLines(args: {
   if (predictiveLine && !lines.includes(predictiveLine)) lines.push(predictiveLine);
 
   if (lines.length < 2) {
-    const signalLine = getSignalForecastLine(strongPatternSignals[0] ?? heroSignals.find((item) => item.type !== 'low_data'), userData);
+    const signal = strongPatternSignals[0] ?? heroSignals.find((item) => item.type !== 'low_data');
+    const signalLine = getSignalForecastLine(signal, userData);
     if (signalLine && !lines.includes(signalLine)) lines.push(signalLine);
+    const contextLine = signal ? getPatternContextForSignal(signal) : null;
+    if (contextLine && !lines.includes(contextLine)) lines.push(contextLine);
   }
 
   if (lines.length < 2 && helpful) {
     lines.push(`${helpful.shortText} That may be worth leaning on again over the next few days.`);
   }
 
-  if (!lines.length) {
+  const enriched = getCycleAwarePredictionLines({
+    entries,
+    userData,
+    phase: currentPhase,
+    heroSignals,
+    strongSignals: strongPatternSignals,
+    existingLines: lines,
+  });
+
+  if (!enriched.length) {
     if (stage === 'very_new') {
       return ['A few more check-ins will help this section turn into a more personal body weather read.'];
     }
     return ['A few more days of logs will help me make this forecast feel more personal.'];
   }
 
-  return lines.slice(0, 2);
+  return enriched.slice(0, 5);
 }
 
-export function getWeeklyReflectionMoment(entries: CheckInEntry[], refISO: string): { id: string; title: string; body: string; type: CompanionMomentType } | null {
+export function getWeeklyReflectionMoment(entries: CheckInEntry[], refISO: string, userData?: UserData): { id: string; title: string; body: string; type: CompanionMomentType } | null {
   const distinctDays = getDistinctLoggedDays(entries);
   const milestones = [7, 14, 21, 30];
   const milestone = milestones.find((value) => distinctDays === value);
@@ -245,15 +258,18 @@ export function getWeeklyReflectionMoment(entries: CheckInEntry[], refISO: strin
     milestone === 21 ? 'Your rhythm is getting easier to read' :
     'You have built a stronger baseline';
 
-  const body =
+  const reflection = userData ? getWeeklyPatternReflection(entries, userData) : { lines: [], repeatLine: null };
+  const base =
     stage === 'building' ? 'You have enough check-ins now for early patterns to feel a little more trustworthy.' :
     stage === 'settling' ? 'Patterns are repeating a bit more now, so the app can be calmer and more specific.' :
     'With a stronger baseline in place, small changes and experiments should be easier to interpret.';
+  const detail = reflection.lines.length ? ` This week, ${reflection.lines.join(' ')}` : '';
+  const repeat = reflection.repeatLine ? ` ${reflection.repeatLine}` : '';
 
   return {
     id: `weekly-reflection:${milestone}:${refISO}`,
     title,
-    body,
+    body: `${base}${detail}${repeat}`.trim(),
     type: milestone >= 30 ? 'unlock_milestone' : 'encouragement',
   };
 }
