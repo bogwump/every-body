@@ -26,6 +26,7 @@ import type { CheckInEntry, SymptomKey, UserData, ExperimentPlan, InsightMetricK
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { EBDialogContent } from "./EBDialog";
 import { isoToday } from '../lib/analytics';
+import { SYMPTOM_META } from '../lib/symptomMeta';
 import { isoFromDateLocal } from '../lib/date';
 import { useEntries, useExperiment } from '../lib/appStore';
 import { applyPhaseChangeForEntries, phaseLabelFromKey } from '../lib/phaseChange';
@@ -70,7 +71,7 @@ const moodIcons: Array<{ value: 1 | 2 | 3; icon: React.ElementType; label: strin
 
 // Stored symptom values are now treated as 0–10.
 // (Calendar + analytics already normalise if older entries used 0–100.)
-const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; hint?: string }> = {
+const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; hint?: string; leftLabel?: string; rightLabel?: string }> = {
   energy: { label: 'Energy', icon: Battery, hint: 'How much fuel you have in the tank' },
   motivation: { label: 'Motivation', icon: Battery, hint: 'Drive and willingness to do things' },
   sleep: { label: 'Sleep quality', icon: Moon, hint: 'Quality of sleep, not just hours' },
@@ -106,6 +107,11 @@ const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; h
   nightSweats: { label: 'Night sweats', icon: Moon, hint: 'Waking sweaty at night' },
   restlessLegs: { label: 'Restless legs', icon: Moon, hint: 'Need to move your legs or unsettled legs at night' },
 };
+
+for (const key of Object.keys(sliderMeta) as SymptomKey[]) {
+  sliderMeta[key].leftLabel = SYMPTOM_META[key]?.leftLabel;
+  sliderMeta[key].rightLabel = SYMPTOM_META[key]?.rightLabel;
+}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -581,8 +587,9 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
     // Normalise all tracked sliders to 0–10
     for (const k of enabledSliders) {
-      const v = normalise10((values as any)?.[k]);
-      nextValues[k] = v;
+      const raw = (values as any)?.[k];
+      if (typeof raw === 'number') nextValues[k] = normalise10(raw);
+      else delete nextValues[k];
     }
 
     const nextEvents: any = {};
@@ -603,9 +610,9 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     // Custom symptom values (0–10)
     const nextCustomValues: Record<string, number> = { ...((existingEntry as any)?.customValues ?? {}), ...(customValues ?? {}) };
     for (const s of enabledCustom) {
-      const v = normalise10((customValues as any)?.[s.id]);
-      if (v == null) continue;
-      nextCustomValues[s.id] = v;
+      const raw = (customValues as any)?.[s.id];
+      if (typeof raw === 'number') nextCustomValues[s.id] = normalise10(raw);
+      else delete nextCustomValues[s.id];
     }
 
 
@@ -899,7 +906,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
               <h3 className="mb-1">Your check-in</h3>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">Tap what changed and keep moving.</p>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">Tap anything that changed.</p>
             </div>
             <button
               type="button"
@@ -913,8 +920,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           </div>
 
           {customiseOpen && (
-            <div className="mb-5 rounded-3xl border border-[rgb(var(--color-primary)/0.12)] bg-[rgb(var(--color-accent)/0.08)] p-4">
-              <div className="flex items-center gap-2 rounded-2xl border border-[rgba(0,0,0,0.06)] bg-white px-3 py-2.5">
+            <div className="mb-5 rounded-3xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-accent)/0.10)] p-4 shadow-[0_8px_20px_rgb(var(--color-primary-dark)/0.05)]">
+              <div className="flex items-center gap-2 rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-surface))] px-3 py-2.5">
                 <Search className="w-4 h-4 text-[rgb(var(--color-text-secondary))]" />
                 <input
                   type="text"
@@ -933,7 +940,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                       <button
                         key={`${item.kind}:${item.key}`}
                         type="button"
-                        className="w-full rounded-2xl border border-[rgba(0,0,0,0.05)] bg-white px-3 py-3 text-left transition hover:border-[rgb(var(--color-primary)/0.18)]"
+                        className="w-full rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-surface))] px-3 py-3 text-left transition hover:border-[rgb(var(--color-primary)/0.18)]"
                         onClick={() => {
                           if (item.kind === 'builtIn') {
                             const symptomKey = item.key as SymptomKey;
@@ -995,45 +1002,54 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
             </div>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {orderedSliders.map((key) => {
               if (userData.sleepDetailsEnabled && key === 'nightSweats') return null;
               const meta = sliderMeta[key];
               const Icon = meta.icon;
-              const current = normalise10((values as any)?.[key]);
+              const rawCurrent = (values as any)?.[key];
+              const current = typeof rawCurrent === 'number' ? normalise10(rawCurrent) : null;
               const prevRaw = (prevEntry as any)?.values?.[key];
               const prevVal = typeof prevRaw === 'number' ? normalise10(prevRaw) : null;
 
               return (
-                <div key={key} className="rounded-3xl border border-[rgba(0,0,0,0.05)] bg-white px-4 py-4 shadow-[0_10px_26px_rgba(0,0,0,0.03)]">
-                  <div className="flex items-start justify-between gap-3">
+                <div key={key} className="rounded-3xl border border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] px-4 py-4 shadow-[0_12px_28px_rgb(var(--color-primary-dark)/0.08)]">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-center gap-3">
-                      <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--color-accent)/0.18)]">
-                        <Icon className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-accent)/0.16)]">
+                        <Icon className="h-[18px] w-[18px] text-[rgb(var(--color-primary))]" />
                       </div>
                       <div className="min-w-0">
                         <div className="truncate font-medium text-[rgb(var(--color-text))]">{meta.label}</div>
-                        <div className="mt-1 text-xs text-[rgb(var(--color-text-secondary))]">
-                          {prevVal != null ? `Yesterday ${prevVal}/10` : 'Not logged yesterday'}
-                        </div>
                       </div>
                     </div>
-                    <div className="shrink-0 rounded-full bg-[rgb(var(--color-primary)/0.08)] px-2.5 py-1 text-xs font-semibold text-[rgb(var(--color-primary-dark))]">
-                      {current}/10
+                    <div className="shrink-0 rounded-full border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-primary)/0.10)] px-2.5 py-1 text-xs font-semibold text-[rgb(var(--color-primary-dark))]">
+                      {current != null ? `${current}/10` : '—'}
                     </div>
+                  </div>
+
+                  <div className="mt-2 text-xs text-[rgb(var(--color-text-secondary))]">
+                    {prevVal != null ? `Yesterday ${prevVal}/10` : 'Not logged yesterday'}
                   </div>
 
                   <div className="mt-3">
                     <SymptomScale
                       value={current}
                       previousValue={prevVal}
-                      onChange={(n) => setValues((prev) => ({ ...prev, [key]: n }))}
+                      onChange={(n) => setValues((prev) => {
+                        const next = { ...prev };
+                        if (typeof n === 'number') next[key] = n;
+                        else delete (next as any)[key];
+                        return next;
+                      })}
                       ariaLabel={meta.label}
+                      leftLabel={meta.leftLabel}
+                      rightLabel={meta.rightLabel}
                     />
                   </div>
 
                   {key === 'sleep' && userData.sleepDetailsEnabled ? (
-                    <details className="mt-4 rounded-2xl border border-[rgba(0,0,0,0.05)] bg-[rgb(var(--color-surface))] overflow-hidden group">
+                    <details className="mt-4 overflow-hidden rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-accent)/0.10)] group">
                       <summary className="list-none cursor-pointer select-none px-3 py-2.5 flex items-center justify-between">
                         <span className="text-sm font-medium">Sleep details</span>
                         <ChevronRight className="w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
@@ -1101,23 +1117,25 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                         <div>
                           <div className="text-sm font-medium mb-2">Night sweats</div>
                           {userData.enabledModules.includes('nightSweats') ? (
-                            <div className="mt-2 rounded-2xl border border-[rgba(0,0,0,0.05)] bg-white p-3">
+                            <div className="mt-2 rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-surface))] p-3 shadow-[inset_0_1px_0_rgb(var(--color-primary)/0.04)]">
                               {(() => {
                                 const raw = (values as any)?.nightSweats;
-                                const nsVal = typeof raw === 'number' ? normalise10(raw) : 0;
+                                const nsVal = typeof raw === 'number' ? normalise10(raw) : null;
                                 const nsPrevRaw = (prevEntry as any)?.values?.nightSweats;
                                 const nsPrevVal = typeof nsPrevRaw === 'number' ? normalise10(nsPrevRaw) : null;
                                 return (
                                   <>
                                     <div className="mb-3 flex items-center justify-between gap-3 text-xs text-[rgb(var(--color-text-secondary))]">
                                       <span>Tracked here for speed</span>
-                                      <span>{nsVal}/10</span>
+                                      <span>{nsVal != null ? `${nsVal}/10` : '—'}</span>
                                     </div>
                                     <SymptomScale
                                       value={nsVal}
                                       previousValue={nsPrevVal}
-                                      onChange={(n) => setValues((prev) => ({ ...prev, nightSweats: n }))}
+                                      onChange={(n) => setValues((prev) => { const next = { ...prev }; if (typeof n === 'number') next.nightSweats = n; else delete (next as any).nightSweats; return next; })}
                                       ariaLabel="Night sweats"
+                                      leftLabel="None"
+                                      rightLabel="Severe"
                                     />
                                   </>
                                 );
@@ -1147,29 +1165,37 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
             <div className="space-y-3">
               {orderedCustom.map((s) => {
-                const current = typeof (customValues as any)?.[s.id] === 'number' ? normalise10((customValues as any)[s.id]) : 5;
+                const current = typeof (customValues as any)?.[s.id] === 'number' ? normalise10((customValues as any)[s.id]) : null;
                 const prevRaw = (prevEntry as any)?.customValues?.[s.id];
                 const prevVal = typeof prevRaw === 'number' ? normalise10(prevRaw) : null;
                 return (
-                  <div key={s.id} className="rounded-3xl border border-[rgba(0,0,0,0.05)] bg-white px-4 py-4 shadow-[0_10px_26px_rgba(0,0,0,0.03)]">
-                    <div className="flex items-start justify-between gap-3">
+                  <div key={s.id} className="rounded-3xl border border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] px-4 py-4 shadow-[0_12px_28px_rgb(var(--color-primary-dark)/0.08)]">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate font-medium text-[rgb(var(--color-text))]">{s.label}</div>
-                        <div className="mt-1 text-xs text-[rgb(var(--color-text-secondary))]">
-                          {prevVal != null ? `Yesterday ${prevVal}/10` : 'Not logged yesterday'}
-                        </div>
                       </div>
-                      <div className="shrink-0 rounded-full bg-[rgb(var(--color-primary)/0.08)] px-2.5 py-1 text-xs font-semibold text-[rgb(var(--color-primary-dark))]">
-                        {current}/10
+                      <div className="shrink-0 rounded-full border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-primary)/0.10)] px-2.5 py-1 text-xs font-semibold text-[rgb(var(--color-primary-dark))]">
+                        {current != null ? `${current}/10` : '—'}
                       </div>
+                    </div>
+
+                    <div className="mt-2 text-xs text-[rgb(var(--color-text-secondary))]">
+                      {prevVal != null ? `Yesterday ${prevVal}/10` : 'Not logged yesterday'}
                     </div>
 
                     <div className="mt-3">
                       <SymptomScale
                         value={current}
                         previousValue={prevVal}
-                        onChange={(n) => setCustomValues((prev) => ({ ...prev, [s.id]: n }))}
+                        onChange={(n) => setCustomValues((prev) => {
+                          const next = { ...prev };
+                          if (typeof n === 'number') next[s.id] = n;
+                          else delete next[s.id];
+                          return next;
+                        })}
                         ariaLabel={s.label}
+                        leftLabel="Low"
+                        rightLabel="High"
                       />
                     </div>
                   </div>

@@ -5,32 +5,49 @@ function clamp(n: number, min: number, max: number) {
 }
 
 function dotOpacity(index: number) {
-  return 0.18 + index * 0.075;
+  return 0.24 + index * 0.055;
 }
 
 export interface SymptomScaleProps {
-  value: number;
-  onChange: (value: number) => void;
+  value?: number | null;
+  onChange: (value: number | undefined) => void;
   previousValue?: number | null;
   ariaLabel: string;
+  leftLabel?: string;
+  rightLabel?: string;
 }
 
-export function SymptomScale({ value, onChange, previousValue = null, ariaLabel }: SymptomScaleProps) {
+export function SymptomScale({
+  value,
+  onChange,
+  previousValue = null,
+  ariaLabel,
+  leftLabel,
+  rightLabel,
+}: SymptomScaleProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const pointerStateRef = useRef({ active: false, pointerId: -1, dragging: false });
-  const safeValue = clamp(Math.round(value), 0, 10);
-  const safePrevious = typeof previousValue === 'number' ? clamp(Math.round(previousValue), 0, 10) : null;
+  const safeValue = typeof value === 'number' ? clamp(Math.round(value), 1, 10) : null;
+  const safePrevious = typeof previousValue === 'number' ? clamp(Math.round(previousValue), 1, 10) : null;
 
   const dots = useMemo(() => Array.from({ length: 10 }, (_, i) => i + 1), []);
 
   const getValueFromClientX = (clientX: number) => {
     const wrap = wrapRef.current;
-    if (!wrap) return safeValue;
+    if (!wrap) return safeValue ?? 1;
     const rect = wrap.getBoundingClientRect();
     const relative = clamp(clientX - rect.left, 0, rect.width);
     const segment = rect.width / 10;
-    if (!segment) return safeValue;
+    if (!segment) return safeValue ?? 1;
     return clamp(Math.round(relative / segment + 0.5), 1, 10);
+  };
+
+  const commitValue = (next: number, allowClear = false) => {
+    if (allowClear && safeValue === next) {
+      onChange(undefined);
+      return;
+    }
+    if (next !== safeValue) onChange(next);
   };
 
   const commitFromPointer = (clientX: number) => {
@@ -42,25 +59,27 @@ export function SymptomScale({ value, onChange, previousValue = null, ariaLabel 
     <div className="w-full">
       <div
         ref={wrapRef}
-        className="flex items-center gap-1.5 select-none touch-pan-y"
+        className="flex items-center gap-2 select-none touch-pan-y"
         role="slider"
         aria-label={ariaLabel}
-        aria-valuemin={0}
+        aria-valuemin={1}
         aria-valuemax={10}
-        aria-valuenow={safeValue}
+        aria-valuenow={safeValue ?? 0}
+        aria-valuetext={safeValue ? `${safeValue} out of 10` : 'Not set'}
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
             e.preventDefault();
-            onChange(clamp(safeValue + 1, 0, 10));
+            onChange(clamp((safeValue ?? 0) + 1, 1, 10));
           }
           if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
             e.preventDefault();
-            onChange(clamp(safeValue - 1, 0, 10));
+            if (safeValue == null || safeValue <= 1) onChange(undefined);
+            else onChange(clamp(safeValue - 1, 1, 10));
           }
-          if (e.key === 'Home') {
+          if (e.key === 'Home' || e.key === 'Backspace' || e.key === 'Delete') {
             e.preventDefault();
-            onChange(0);
+            onChange(undefined);
           }
           if (e.key === 'End') {
             e.preventDefault();
@@ -81,56 +100,47 @@ export function SymptomScale({ value, onChange, previousValue = null, ariaLabel 
         onPointerUp={(e) => {
           const state = pointerStateRef.current;
           if (state.pointerId !== e.pointerId) return;
-          commitFromPointer(e.clientX);
+          if (!state.dragging) {
+            commitValue(getValueFromClientX(e.clientX), true);
+          }
           pointerStateRef.current = { active: false, pointerId: -1, dragging: false };
         }}
         onPointerCancel={() => {
           pointerStateRef.current = { active: false, pointerId: -1, dragging: false };
         }}
       >
-        <button
-          type="button"
-          className={[
-            'shrink-0 h-9 min-w-9 rounded-full border text-[11px] font-semibold transition-all',
-            safeValue === 0
-              ? 'border-[rgb(var(--color-primary-dark)/0.2)] bg-[rgb(var(--color-primary-light)/0.16)] text-[rgb(var(--color-primary-dark))] shadow-sm'
-              : 'border-[rgba(0,0,0,0.08)] bg-white text-[rgb(var(--color-text-secondary))]'
-          ].join(' ')}
-          onClick={() => onChange(0)}
-          aria-label={`${ariaLabel} 0 out of 10`}
-        >
-          0
-        </button>
-
         {dots.map((dot) => {
-          const active = dot <= safeValue && safeValue > 0;
+          const active = safeValue != null && dot <= safeValue;
           const previousHere = safePrevious === dot;
+          const selectedHere = safeValue === dot;
           return (
             <button
               key={dot}
               type="button"
-              className="relative h-10 flex-1 min-w-0 rounded-full transition-transform active:scale-[0.98]"
-              onClick={() => onChange(dot)}
+              className="relative h-11 flex-1 min-w-0 rounded-full transition-transform active:scale-[0.98]"
+              onClick={() => commitValue(dot, true)}
               aria-label={`${ariaLabel} ${dot} out of 10`}
+              aria-pressed={selectedHere}
             >
               <span
                 className={[
                   'absolute left-1/2 top-1/2 block rounded-full border transition-all',
                   active
                     ? 'shadow-sm border-transparent'
-                    : 'border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-primary-light)/0.08)]'
+                    : 'border-[rgb(var(--color-primary)/0.34)] bg-[rgb(var(--color-primary-light)/0.18)]'
                 ].join(' ')}
                 style={{
-                  width: active ? '1.15rem' : '1rem',
-                  height: active ? '1.15rem' : '1rem',
+                  width: selectedHere ? '1.3rem' : '1.12rem',
+                  height: selectedHere ? '1.3rem' : '1.12rem',
                   transform: 'translate(-50%, -50%)',
                   background: active ? `rgb(var(--color-primary) / ${dotOpacity(dot)})` : undefined,
+                  boxShadow: selectedHere ? '0 0 0 1px rgb(var(--color-primary-dark) / 0.18)' : undefined,
                 }}
               />
-              {previousHere && !active ? (
+              {previousHere && !selectedHere ? (
                 <span
-                  className="absolute left-1/2 top-1/2 block rounded-full border border-[rgb(var(--color-primary-dark)/0.32)]"
-                  style={{ width: '1.35rem', height: '1.35rem', transform: 'translate(-50%, -50%)' }}
+                  className="absolute left-1/2 top-1/2 block rounded-full border border-[rgb(var(--color-primary-dark)/0.42)]"
+                  style={{ width: '1.55rem', height: '1.55rem', transform: 'translate(-50%, -50%)' }}
                   aria-hidden="true"
                 />
               ) : null}
@@ -138,6 +148,13 @@ export function SymptomScale({ value, onChange, previousValue = null, ariaLabel 
           );
         })}
       </div>
+
+      {(leftLabel || rightLabel) ? (
+        <div className="mt-2 flex items-center justify-between px-0.5 text-[11px] font-medium text-[rgb(var(--color-text-secondary))]">
+          <span>{leftLabel ?? ''}</span>
+          <span>{rightLabel ?? ''}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
