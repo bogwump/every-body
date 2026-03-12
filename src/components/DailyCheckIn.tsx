@@ -300,13 +300,20 @@ function Slider10({
   const dragValueRef = useRef(clamp(value, 0, 10));
   const draggingRef = useRef(false);
 
+  const applyFill = useCallback((next: number) => {
+    const node = inputRef.current;
+    if (!node) return;
+    node.style.setProperty('--eb-range-fill', `${clamp(next, 0, 10) * 10}%`);
+  }, []);
+
   useEffect(() => {
     if (!draggingRef.current) {
       const next = clamp(value, 0, 10);
       setDraftValue(next);
       dragValueRef.current = next;
+      applyFill(next);
     }
-  }, [value]);
+  }, [value, applyFill]);
 
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
@@ -343,9 +350,10 @@ function Slider10({
   const updateVisual = useCallback((next: number) => {
     const safe = clamp(next, 0, 10);
     dragValueRef.current = safe;
+    applyFill(safe);
     setDraftValue((prev) => (prev === safe ? prev : safe));
     onPreviewChange?.(safe);
-  }, [onPreviewChange]);
+  }, [applyFill, onPreviewChange]);
 
   const commitCurrent = useCallback(() => {
     draggingRef.current = false;
@@ -353,54 +361,13 @@ function Slider10({
     onCommit(safe);
   }, [onCommit]);
 
-  const setFromClientX = useCallback((clientX: number) => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const rect = wrap.getBoundingClientRect();
-    const x = Math.min(rect.right, Math.max(rect.left, clientX));
-    const ratio = rect.width ? (x - rect.left) / rect.width : 0;
-    updateVisual(Math.round(ratio * 10));
-  }, [updateVisual]);
-
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if ((e as any).isPrimary === false) return;
-    draggingRef.current = true;
-    setFromClientX(e.clientX);
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    setFromClientX(e.clientX);
-  };
-
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    setFromClientX(e.clientX);
-    commitCurrent();
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
-  };
-
-  const onPointerCancel = () => {
-    if (!draggingRef.current) return;
-    commitCurrent();
-  };
-
-  const pct = `${(draftValue / 10) * 100}%`;
   const bubbleLeftPx = trackWidth > 0
     ? ((trackWidth - thumbWidth) * (draftValue / 10)) + (thumbWidth / 2)
     : thumbWidth / 2;
 
   return (
     <div>
-      <div
-        ref={wrapRef}
-        className="eb-range-wrap"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
-      >
+      <div ref={wrapRef} className="eb-range-wrap">
         <div className="eb-range-value-bubble" aria-hidden="true" style={{ left: `${bubbleLeftPx}px` }}>
           {draftValue}
         </div>
@@ -412,17 +379,26 @@ function Slider10({
           max={10}
           step={1}
           value={draftValue}
+          onPointerDown={() => {
+            draggingRef.current = true;
+          }}
+          onInput={(e) => {
+            const next = parseInt((e.target as HTMLInputElement).value, 10);
+            updateVisual(next);
+          }}
           onChange={(e) => {
             const next = parseInt(e.target.value, 10);
             updateVisual(next);
           }}
+          onPointerUp={commitCurrent}
+          onPointerCancel={commitCurrent}
           onMouseUp={commitCurrent}
           onTouchEnd={commitCurrent}
           className="eb-range w-full"
           style={{
             accentColor: 'rgb(var(--color-primary))',
             color: 'rgb(var(--color-primary))',
-            ['--eb-range-fill' as any]: pct,
+            ['--eb-range-fill' as any]: `${draftValue * 10}%`,
           }}
           aria-label="slider"
         />
