@@ -7,8 +7,6 @@ export type SymptomMeta = {
   kind: SymptomKind;
   /** True for symptoms that are commonly hormone-driven (helps keep insights safe). */
   hormonal: boolean;
-  leftLabel?: string;
-  rightLabel?: string;
 };
 
 // Keep this intentionally simple and conservative.
@@ -20,8 +18,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'How much fuel you have in the tank',
     kind: 'state',
     hormonal: false,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   motivation: {
     key: 'motivation',
@@ -29,8 +25,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Drive and willingness to do things',
     kind: 'state',
     hormonal: true,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   sleep: {
     key: 'sleep',
@@ -38,8 +32,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Quality of sleep, not just hours',
     kind: 'state',
     hormonal: false,
-    leftLabel: 'Poor',
-    rightLabel: 'Great',
   },
   insomnia: {
     key: 'insomnia',
@@ -47,8 +39,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Trouble falling or staying asleep',
     kind: 'state',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   restlessLegs: {
     key: 'restlessLegs',
@@ -56,8 +46,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Urge to move your legs or uncomfortable sensations at night',
     kind: 'physio',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   stress: {
     key: 'stress',
@@ -65,8 +53,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Mental pressure or feeling on edge',
     kind: 'state',
     hormonal: false,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   anxiety: {
     key: 'anxiety',
@@ -74,8 +60,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Worry, racing thoughts',
     kind: 'state',
     hormonal: false,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   irritability: {
     key: 'irritability',
@@ -83,8 +67,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Short fuse, feeling snappy',
     kind: 'state',
     hormonal: true,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   focus: {
     key: 'focus',
@@ -92,8 +74,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Concentration and mental sharpness',
     kind: 'state',
     hormonal: false,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   bloating: {
     key: 'bloating',
@@ -101,8 +81,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Fullness or swollen belly feeling',
     kind: 'physio',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   digestion: {
     key: 'digestion',
@@ -110,8 +88,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Gut comfort and regularity',
     kind: 'physio',
     hormonal: false,
-    leftLabel: 'Poor',
-    rightLabel: 'Great',
   },
   nausea: {
     key: 'nausea',
@@ -119,8 +95,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Sick or queasy feeling',
     kind: 'physio',
     hormonal: false,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   constipation: {
     key: 'constipation',
@@ -128,8 +102,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Hard stools or difficulty going',
     kind: 'physio',
     hormonal: false,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   diarrhoea: {
     key: 'diarrhoea',
@@ -137,8 +109,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Loose stools or urgent bathroom trips',
     kind: 'physio',
     hormonal: false,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   pain: {
     key: 'pain',
@@ -146,8 +116,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Overall body pain or aches',
     kind: 'physio',
     hormonal: false,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   headache: {
     key: 'headache',
@@ -155,8 +123,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Head pain or pressure',
     kind: 'physio',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   migraine: {
     key: 'migraine',
@@ -164,8 +130,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Migraine-type headache (light/sound sensitivity, nausea etc)',
     kind: 'physio',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   backPain: {
     key: 'backPain',
@@ -173,8 +137,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Lower or upper back pain',
     kind: 'physio',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   cramps: {
     key: 'cramps',
@@ -182,8 +144,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Lower belly cramps or spasms',
     kind: 'physio',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   jointPain: {
     key: 'jointPain',
@@ -191,8 +151,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Stiff or sore joints',
     kind: 'physio',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   flow: {
     key: 'flow',
@@ -200,8 +158,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Bleeding or spotting level',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Heavy',
   },
   hairShedding: {
     key: 'hairShedding',
@@ -209,8 +165,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'More hair loss than usual',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   facialSpots: {
     key: 'facialSpots',
@@ -218,8 +172,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Breakouts or spots on face',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'Clear',
-    rightLabel: 'Severe',
   },
   cysts: {
     key: 'cysts',
@@ -227,8 +179,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Painful lumps or cystic spots',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   skinDryness: {
     key: 'skinDryness',
@@ -236,8 +186,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Dry, itchy, or sensitive skin',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'Comfortable',
-    rightLabel: 'Severe',
   },
   brainFog: {
     key: 'brainFog',
@@ -245,8 +193,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Foggy thinking, forgetfulness',
     kind: 'state',
     hormonal: true,
-    leftLabel: 'Clear',
-    rightLabel: 'Severe',
   },
   fatigue: {
     key: 'fatigue',
@@ -254,8 +200,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Heavy tiredness or drained feeling',
     kind: 'state',
     hormonal: true,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   dizziness: {
     key: 'dizziness',
@@ -263,8 +207,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Light-headed or unsteady',
     kind: 'physio',
     hormonal: false,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   appetite: {
     key: 'appetite',
@@ -272,8 +214,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Hunger and cravings',
     kind: 'state',
     hormonal: true,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   libido: {
     key: 'libido',
@@ -281,8 +221,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Interest in sex',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'Low',
-    rightLabel: 'High',
   },
   breastTenderness: {
     key: 'breastTenderness',
@@ -290,8 +228,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Sore or tender breasts',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   hotFlushes: {
     key: 'hotFlushes',
@@ -299,8 +235,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Sudden heat and flushing',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
   nightSweats: {
     key: 'nightSweats',
@@ -308,8 +242,6 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     description: 'Waking sweaty at night',
     kind: 'hormonal',
     hormonal: true,
-    leftLabel: 'None',
-    rightLabel: 'Severe',
   },
 };
 

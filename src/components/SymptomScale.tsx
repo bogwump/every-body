@@ -1,11 +1,11 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function dotOpacity(index: number) {
-  return 0.24 + index * 0.055;
+function dotFillAlpha(index: number) {
+  return 0.18 + index * 0.06;
 }
 
 export interface SymptomScaleProps {
@@ -26,7 +26,8 @@ export function SymptomScale({
   rightLabel,
 }: SymptomScaleProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const pointerStateRef = useRef({ active: false, pointerId: -1, dragging: false });
+  const pointerStateRef = useRef({ active: false, pointerId: -1, dragging: false, startX: 0, suppressClick: false });
+  const [animatingDot, setAnimatingDot] = useState<number | null>(null);
   const safeValue = typeof value === 'number' ? clamp(Math.round(value), 1, 10) : null;
   const safePrevious = typeof previousValue === 'number' ? clamp(Math.round(previousValue), 1, 10) : null;
 
@@ -42,7 +43,15 @@ export function SymptomScale({
     return clamp(Math.round(relative / segment + 0.5), 1, 10);
   };
 
+  const triggerTapAnimation = (dot: number) => {
+    setAnimatingDot(dot);
+    window.setTimeout(() => {
+      setAnimatingDot((current) => (current === dot ? null : current));
+    }, 150);
+  };
+
   const commitValue = (next: number, allowClear = false) => {
+    triggerTapAnimation(next);
     if (allowClear && safeValue === next) {
       onChange(undefined);
       return;
@@ -52,14 +61,17 @@ export function SymptomScale({
 
   const commitFromPointer = (clientX: number) => {
     const next = getValueFromClientX(clientX);
-    if (next !== safeValue) onChange(next);
+    if (next !== safeValue) {
+      triggerTapAnimation(next);
+      onChange(next);
+    }
   };
 
   return (
     <div className="w-full">
       <div
         ref={wrapRef}
-        className="flex items-center gap-2 select-none touch-pan-y"
+        className="flex items-center gap-2.5 select-none touch-pan-y"
         role="slider"
         aria-label={ariaLabel}
         aria-valuemin={1}
@@ -87,60 +99,81 @@ export function SymptomScale({
           }
         }}
         onPointerDown={(e) => {
-          pointerStateRef.current = { active: true, pointerId: e.pointerId, dragging: false };
+          pointerStateRef.current = {
+            active: true,
+            pointerId: e.pointerId,
+            dragging: false,
+            startX: e.clientX,
+            suppressClick: false,
+          };
           (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
-          commitFromPointer(e.clientX);
         }}
         onPointerMove={(e) => {
           const state = pointerStateRef.current;
           if (!state.active || state.pointerId !== e.pointerId) return;
-          state.dragging = true;
-          commitFromPointer(e.clientX);
+          if (Math.abs(e.clientX - state.startX) > 6) {
+            state.dragging = true;
+            state.suppressClick = true;
+          }
+          if (state.dragging) commitFromPointer(e.clientX);
         }}
         onPointerUp={(e) => {
           const state = pointerStateRef.current;
           if (state.pointerId !== e.pointerId) return;
-          if (!state.dragging) {
-            commitValue(getValueFromClientX(e.clientX), true);
+          if (state.dragging) {
+            e.preventDefault();
+            commitFromPointer(e.clientX);
           }
-          pointerStateRef.current = { active: false, pointerId: -1, dragging: false };
+          pointerStateRef.current = { active: false, pointerId: -1, dragging: false, startX: 0, suppressClick: state.suppressClick };
+          window.setTimeout(() => {
+            pointerStateRef.current.suppressClick = false;
+          }, 0);
         }}
         onPointerCancel={() => {
-          pointerStateRef.current = { active: false, pointerId: -1, dragging: false };
+          pointerStateRef.current = { active: false, pointerId: -1, dragging: false, startX: 0, suppressClick: false };
         }}
       >
         {dots.map((dot) => {
           const active = safeValue != null && dot <= safeValue;
           const previousHere = safePrevious === dot;
           const selectedHere = safeValue === dot;
+          const pulsing = animatingDot === dot;
           return (
             <button
               key={dot}
               type="button"
-              className="relative h-11 flex-1 min-w-0 rounded-full transition-transform active:scale-[0.98]"
-              onClick={() => commitValue(dot, true)}
+              className="relative h-11 flex-1 min-w-0 rounded-full"
+              onClick={(e) => {
+                if (pointerStateRef.current.suppressClick) {
+                  e.preventDefault();
+                  return;
+                }
+                commitValue(dot, true);
+              }}
               aria-label={`${ariaLabel} ${dot} out of 10`}
               aria-pressed={selectedHere}
             >
               <span
-                className={[
-                  'absolute left-1/2 top-1/2 block rounded-full border transition-all',
-                  active
-                    ? 'shadow-sm border-transparent'
-                    : 'border-[rgb(var(--color-primary)/0.34)] bg-[rgb(var(--color-primary-light)/0.18)]'
-                ].join(' ')}
+                className="absolute left-1/2 top-1/2 block rounded-full border"
                 style={{
-                  width: selectedHere ? '1.3rem' : '1.12rem',
-                  height: selectedHere ? '1.3rem' : '1.12rem',
-                  transform: 'translate(-50%, -50%)',
-                  background: active ? `rgb(var(--color-primary) / ${dotOpacity(dot)})` : undefined,
-                  boxShadow: selectedHere ? '0 0 0 1px rgb(var(--color-primary-dark) / 0.18)' : undefined,
+                  width: selectedHere ? '1.38rem' : '1.16rem',
+                  height: selectedHere ? '1.38rem' : '1.16rem',
+                  transform: `translate(-50%, -50%) scale(${pulsing ? 1.1 : 1})`,
+                  transition: 'transform 150ms cubic-bezier(0.22, 1, 0.36, 1), background-color 140ms ease, border-color 140ms ease, width 140ms ease, height 140ms ease, box-shadow 140ms ease',
+                  background: active ? `rgb(var(--color-primary) / ${selectedHere ? 0.92 : dotFillAlpha(dot)})` : 'rgb(var(--color-surface))',
+                  borderColor: active ? `rgb(var(--color-primary) / ${selectedHere ? 0.96 : 0.55})` : 'rgb(var(--color-primary) / 0.42)',
+                  boxShadow: selectedHere ? '0 8px 18px rgb(var(--color-primary-dark) / 0.16)' : 'none',
                 }}
               />
               {previousHere && !selectedHere ? (
                 <span
-                  className="absolute left-1/2 top-1/2 block rounded-full border border-[rgb(var(--color-primary-dark)/0.42)]"
-                  style={{ width: '1.55rem', height: '1.55rem', transform: 'translate(-50%, -50%)' }}
+                  className="absolute left-1/2 top-1/2 block rounded-full border"
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    transform: 'translate(-50%, -50%)',
+                    borderColor: 'rgb(var(--color-primary-dark) / 0.30)',
+                  }}
                   aria-hidden="true"
                 />
               ) : null}
@@ -150,7 +183,7 @@ export function SymptomScale({
       </div>
 
       {(leftLabel || rightLabel) ? (
-        <div className="mt-2 flex items-center justify-between px-0.5 text-[11px] font-medium text-[rgb(var(--color-text-secondary))]">
+        <div className="mt-3 flex items-center justify-between px-0.5 text-[11px] font-medium text-[rgb(var(--color-text-secondary)/0.92)]">
           <span>{leftLabel ?? ''}</span>
           <span>{rightLabel ?? ''}</span>
         </div>
