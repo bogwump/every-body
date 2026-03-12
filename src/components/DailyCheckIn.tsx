@@ -1185,22 +1185,22 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
               return (
                 <div key={key} className="eb-card rounded-[1.5rem] p-4 border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-start gap-3 mb-1.5">
-                    <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] border border-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
-                      <Icon className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <div className="font-medium leading-tight">{meta.label}</div>
-                        <div className="shrink-0 text-sm font-semibold text-[rgb(var(--color-primary-dark))]">{current}/10</div>
+                  <div className="flex items-center justify-between gap-3 mb-1.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] border border-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
+                        <Icon className="w-5 h-5 text-[rgb(var(--color-primary))]" />
                       </div>
-                      {meta.hint ? (
-                        <div className="text-sm text-[rgb(var(--color-text-secondary))] mt-0.5 pr-0">{meta.hint}</div>
-                      ) : null}
+                      <div className="min-w-0">
+                        <div className="font-medium leading-tight">{meta.label}</div>
+                        {meta.hint ? (
+                          <div className="text-sm text-[rgb(var(--color-text-secondary))] mt-0.5">{meta.hint}</div>
+                        ) : null}
+                      </div>
                     </div>
+                    <div className="shrink-0 text-sm font-semibold text-[rgb(var(--color-primary-dark))]">{current}/10</div>
                   </div>
 
-                  <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">{formatYesterdayValue(prevVal)}</div>
+                  <div className="ml-14 text-xs text-[rgb(var(--color-text-secondary))] mb-1.5">{formatYesterdayValue(prevVal)}</div>
 
                   <Slider10
                     value={current}
