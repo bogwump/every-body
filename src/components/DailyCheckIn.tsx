@@ -353,14 +353,10 @@ function Slider10({
   };
 
   const pct = `${(draftValue / 10) * 100}%`;
+  const bubblePct = `${draftValue * 10}%`;
 
   return (
     <div>
-      <div className="flex items-center justify-between text-[11px] font-medium tracking-[0.01em] text-[rgb(var(--color-text-secondary))] px-1 mb-2">
-        <span>{leftLabel ?? 'None'}</span>
-        <span>{rightLabel ?? 'Severe'}</span>
-      </div>
-
       <div
         ref={wrapRef}
         className="eb-range-wrap"
@@ -368,7 +364,12 @@ function Slider10({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        style={{ ['--eb-slider-pct' as any]: bubblePct }}
       >
+        <div className="eb-range-value-bubble" aria-hidden="true">
+          {draftValue}
+        </div>
+
         <input
           ref={inputRef}
           type="range"
@@ -392,10 +393,16 @@ function Slider10({
         />
       </div>
 
-      <div className="flex items-center justify-between text-[11px] text-[rgb(var(--color-text-secondary))] px-1 mt-2">
-        <span>0</span>
+      <div className="flex items-center justify-between text-[11px] text-[rgb(var(--color-text-secondary))] px-1 mt-1 leading-none">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span>0</span>
+          <span className="font-medium tracking-[0.01em]">{leftLabel ?? 'None'}</span>
+        </div>
         <span>5</span>
-        <span>10</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-medium tracking-[0.01em]">{rightLabel ?? 'Severe'}</span>
+          <span>10</span>
+        </div>
       </div>
     </div>
   );
@@ -1141,8 +1148,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
               const prevVal = typeof prevRaw === 'number' ? normalise10(prevRaw) : null;
 
               return (
-                <div key={key} className="eb-card rounded-[1.5rem] p-5 border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-center justify-between gap-3 mb-2">
+                <div key={key} className="eb-card rounded-[1.5rem] p-4 border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
+                  <div className="flex items-center justify-between gap-3 mb-1.5">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] border border-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
                         <Icon className="w-5 h-5 text-[rgb(var(--color-primary))]" />
@@ -1157,7 +1164,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                     <div className="shrink-0 text-sm font-semibold text-[rgb(var(--color-primary-dark))]">{current}/10</div>
                   </div>
 
-                  <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-3">{formatYesterdayValue(prevVal)}</div>
+                  <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">{formatYesterdayValue(prevVal)}</div>
 
                   <Slider10
                     value={current}
@@ -1168,7 +1175,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                   />
 
                   {key === 'sleep' && userData.sleepDetailsEnabled ? (
-                    <details className="mt-4 rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-primary-light)/0.14)] overflow-hidden group">
+                    <details className="mt-3 rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-primary-light)/0.14)] overflow-hidden group">
                       <summary className="list-none cursor-pointer select-none px-4 py-3 flex items-center justify-between">
                         <span className="text-sm font-medium">Sleep details</span>
                         <ChevronRight className="w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
@@ -1289,8 +1296,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                   const current = typeof (customValues as any)?.[s.id] === 'number' ? (customValues as any)[s.id] : 5;
                   const prevVal = normalise10((prevEntry as any)?.customValues?.[s.id]);
                   return (
-                    <div key={s.id} className="eb-card rounded-[1.5rem] p-5 border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
-                      <div className="flex items-start justify-between gap-3 mb-2">
+                    <div key={s.id} className="eb-card rounded-[1.5rem] p-4 border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
+                      <div className="flex items-start justify-between gap-3 mb-1.5">
                         <div className="min-w-0">
                           <div className="font-semibold leading-tight">{s.label}</div>
                           <div className="text-sm text-[rgb(var(--color-text-secondary))] mt-0.5">Your custom symptom</div>
@@ -1298,7 +1305,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                         <div className="text-sm font-semibold text-[rgb(var(--color-primary-dark))]">{current}/10</div>
                       </div>
 
-                      <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-3">{formatYesterdayValue(prevVal)}</div>
+                      <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-2">{formatYesterdayValue(prevVal)}</div>
 
                       <Slider10
                         value={current}
