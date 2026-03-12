@@ -19,7 +19,6 @@ import {
   Legend,
 } from 'recharts';
 import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
-import { CompanionMomentHistory } from './CompanionMomentHistory';
 import { TryNextCard, type TryNextItem } from './TryNextCard';
 import { WhatsHelpingCard } from './WhatsHelpingCard';
 import { getMomentHistory } from '../lib/companionMoments';
@@ -1702,6 +1701,35 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   );
   const helpfulHeroLine = helpfulPatterns[0]?.text ?? null;
 
+  const bodyWeatherLines = useMemo(() => {
+    const phaseLineMap: Partial<Record<CyclePhase, string>> = {
+      Menstrual: 'A slower, more comfort-led few days may suit you better.',
+      Follicular: 'You may notice a little more lift or forward momentum building.',
+      Ovulation: 'You may feel a bit more outward-facing or able to use your energy.',
+      Luteal: 'Sleep, stress, or sensitivity may need a little more support than usual.',
+    };
+
+    const metricLine = (() => {
+      const signal = strongPatternSignals[0] ?? heroSignals.find((item) => item.type !== 'low_data');
+      const metric = signal?.metrics?.[0];
+      if (!metric) return null;
+      const label = labelFor(metric as any, userData);
+      if (metric === 'sleep') return 'Sleep may be one of the first things to feel a bit different, so keep evenings gentle if you can.';
+      if (metric === 'energy') return 'Energy may feel changeable, so a steadier pace could help over the next few days.';
+      if (metric === 'stress') return 'Stress may show up in your body quite quickly, so leaving a little breathing room may help.';
+      if (metric === 'brainFog') return 'Brain fog may feel a little louder than usual, so simpler days may land better.';
+      if (metric === 'fatigue') return 'Fatigue may creep in faster than you expect, so it may help to keep things a touch lighter.';
+      return `${label} may be worth keeping an eye on over the next few days.`;
+    })();
+
+    const lines = [
+      currentInsightsPhase ? phaseLineMap[currentInsightsPhase] ?? null : null,
+      metricLine,
+    ].filter((line): line is string => Boolean(line));
+
+    return lines.length ? lines.slice(0, 2) : ['A few more check-ins will help this section turn into a more personal body weather read.'];
+  }, [currentInsightsPhase, heroSignals, strongPatternSignals, userData]);
+
   const CUSTOM_EXPERIMENT_MAX_METRICS = 5;
   const [preOpenExperimentConfirm, setPreOpenExperimentConfirm] = useState<
     null | {
@@ -2249,6 +2277,8 @@ const uniq = new Map<string, (typeof items)[number]>();
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [openHistoryCardId, setOpenHistoryCardId] = useState<string | null>(null);
+  const [suggestedExperimentsOpen, setSuggestedExperimentsOpen] = useState(false);
+  const [dataEvidenceOpen, setDataEvidenceOpen] = useState(false);
 
   const daysBetweenIso = (fromIso: string, toIso: string) => {
     try {
@@ -3324,12 +3354,14 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          {helpfulHeroLine ? (
-            <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
-              <div className="text-sm font-semibold text-black">What&apos;s been helping</div>
-              <div className="mt-1 text-sm text-[rgba(0,0,0,0.68)]">{helpfulHeroLine}</div>
+          <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
+            <div className="text-sm font-semibold text-black">Over the next few days you might notice</div>
+            <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.68)]">
+              {bodyWeatherLines.slice(0, 2).map((line) => (
+                <div key={line} className="leading-6">• {line}</div>
+              ))}
             </div>
-          ) : null}
+          </div>
 
           <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
             <div className="text-sm font-semibold text-black">Explore deeper insights</div>
@@ -3337,9 +3369,12 @@ const tryNextPrompts = useMemo(() => {
               <button
                 type="button"
                 className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
-                onClick={() => scrollToInsightsSection('eb-sleep-trend')}
+                onClick={() => {
+                  setDataEvidenceOpen(true);
+                  scrollToInsightsSection('eb-insights-settings');
+                }}
               >
-                See sleep trend
+                See your data
               </button>
               <button
                 type="button"
@@ -3360,60 +3395,57 @@ const tryNextPrompts = useMemo(() => {
         </div>
       </div>
 
-      <CompanionMomentHistory moments={companionMomentHistory} onSelectMoment={handleCompanionMomentSelect} />
-
       <WhatsHelpingCard items={helpfulPatterns.map((item) => item.text)} />
 
-      {/* Highlights + Top findings carousel */}
-      <div id="eb-full-insights" className="eb-card">
+      <div className="eb-card">
         <div className="eb-card-header">
           <div>
-            <div className="eb-card-title">Top findings</div>
-            <div className="eb-card-sub">The "headline" signals from your recent data.</div>
+            <div className="eb-card-title">Connections in your body</div>
+            <div className="eb-card-sub">A simple read on which things have been moving together lately.</div>
           </div>
-          <Sparkles className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
         </div>
 
-        {!deepReady && (
-          <div className="mt-2 text-sm eb-muted">
-            The deep dive gets better at {minDaysForDeep} days in this timeframe. Keep logging. You are close.
+        {corrPairs.length < 1 ? (
+          <div className="mt-2 text-sm eb-muted">Log a few days with the same metrics to reveal relationships.</div>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {corrPairs.slice(0, 3).map((p, idx) => {
+              const title = `${p.a} → ${p.b}`;
+              const supportingLine = p.r > 0
+                ? `${p.a} and ${p.b.toLowerCase()} have often been rising together.`
+                : `${p.a} has often been followed by lower ${p.b.toLowerCase()}.`;
+
+              return (
+                <div key={idx} className="eb-inset rounded-2xl p-5 flex flex-col min-h-[170px]">
+                  <div className="text-sm font-semibold">{title}</div>
+                  <div className="mt-2 text-sm eb-muted">{supportingLine}</div>
+                  <div className="flex-1" />
+                  <details className="mt-3 rounded-2xl border border-neutral-200 bg-white/60 px-3 py-2">
+                    <summary className="cursor-pointer text-sm font-medium">Why am I seeing this?</summary>
+                    <div className="mt-2 text-sm eb-muted space-y-1">
+                      {(p.why ?? []).map((w, i) => (
+                        <div key={i}>{w}</div>
+                      ))}
+                      <div className="pt-1 text-xs eb-muted">Patterns are a hint, not proof.</div>
+                    </div>
+                  </details>
+                  <div className="pt-4 flex items-center justify-between gap-2">
+                    {p.allowSuggestedExperiment ? (
+                      <button type="button" className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 text-sm" onClick={() => openExperiment([p.aKey, p.bKey])}>
+                        <FlaskConical className="w-4 h-4" />
+                        Try 3-day experiment
+                      </button>
+                    ) : p.hormonalInvolved ? (
+                      <div className="text-sm eb-muted">Track for one more cycle.</div>
+                    ) : (
+                      <div className="text-sm eb-muted">Keep logging for a clearer signal.</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-
-        <div className="mt-4">
-          <Carousel opts={{ align: 'start' }} className="w-full">
-            <CarouselContent>
-              {findings.map((f, idx) => (
-                <CarouselItem key={idx} className="basis-full md:basis-1/2">
-                  <div className="eb-inset rounded-2xl p-5 h-full">
-                    <div className="text-sm font-semibold">{f.title}</div>
-                    <div className="mt-1 text-sm eb-muted">{f.body}</div>
-                    {f.supportSuggestion ? (
-                      <div className="mt-3 eb-inset rounded-2xl p-3">
-                        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[rgba(0,0,0,0.55)]">What could help</div>
-                        <div className="mt-1 text-sm eb-muted">{f.supportSuggestion}</div>
-                      </div>
-                    ) : null}
-
-                    <div className="mt-3 flex flex-wrap gap-2 justify-end">
-                      {f.metrics?.slice(0, 2).map((m) => (
-                        <span key={String(m)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.04)' }}>
-                          {labelFor(m, userData)}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-4 flex justify-end">
-                      {renderExperimentCTA(f)}
-                    </div>
-                  </div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselPrevious className="flex opacity-70" />
-            <CarouselNext className="flex opacity-70" />
-          </Carousel>
-        </div>
       </div>
 
       <TryNextCard
@@ -3422,126 +3454,6 @@ const tryNextPrompts = useMemo(() => {
         onSave={saveSignalExperiment}
         onDismiss={dismissSignalExperiment}
       />
-
-      {/* Sleep Insights (optional) */}
-      {sleepInsightsOn ? (
-        <div id="eb-sleep-trend" className="eb-card p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0 self-start">
-              <Moon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="mb-0.5">Sleep</h2>
-                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">{sleepGentleHint}</p>
-                </div>
-
-                <button type="button" className="eb-btn eb-btn-secondary shrink-0" onClick={() => setSleepExploreOpen(true)}>
-                  Explore sleep
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
-                Extra sleep details logged on <span className="font-medium">{sleepExtrasCount}</span> day{sleepExtrasCount === 1 ? '' : 's'}.
-              </div>
-            </div>
-          </div>
-
-
-          <div className="mt-4 h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
-                <Tooltip />
-                <Line type="monotone" dataKey="sleep" dot={false} stroke={chartColors.primary} strokeWidth={2} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Explore modal */}
-          <Dialog open={sleepExploreOpen} onOpenChange={setSleepExploreOpen}>
-            <EBDialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
-              <DialogHeader>
-                <DialogTitle>Sleep explorer</DialogTitle>
-                <DialogDescription>
-                  A simple timeline view, with an optional overlay marker for what was going on that day.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="mt-4 eb-inset rounded-2xl p-4 overflow-hidden">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-medium">Influence overlay</div>
-                  <select
-                    className="eb-input !w-auto !py-2 text-sm"
-                    value={sleepOverlayKey}
-                    onChange={(e) => setSleepOverlayKey(e.target.value)}
-                    aria-label="Influence overlay"
-                  >
-                    <option value="">None</option>
-                    {sleepOverlayOptions.map((k) => (
-                      <option key={k} value={k}>
-                        {otherInfluenceLabel(k)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="mt-4 h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={sleepSeriesWithOverlay} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
-                      <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
-                      <Tooltip
-                        content={({ active, payload, label }) => {
-                          if (!active || !payload || payload.length === 0) return null;
-                          const p: any = payload[0]?.payload;
-                          const sleepVal = typeof p?.sleep === 'number' ? p.sleep : null;
-                          const overlay = p?.overlay;
-                          return (
-                            <div className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm shadow">
-                              <div className="font-medium">{label}</div>
-                              {sleepVal !== null && <div>Sleep: {sleepVal}/10</div>}
-                              {overlay && <div>{overlay}</div>}
-                            </div>
-                          );
-                        }}
-                      />
-                      <Line type="monotone" dataKey="sleep" dot={false} stroke={chartColors.primary} strokeWidth={2} />
-
-                      {sleepOverlayKey ? (
-                        <Scatter dataKey="overlayMarker" fill={chartColors.primaryDark} />
-                      ) : null}
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
-                  Tip: the dots are just markers. Your sleep line is the main thing.
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end">
-                <button
-                  autoFocus
-                  type="button"
-                  className="eb-btn eb-btn-secondary"
-                  onClick={() => setSleepExploreOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </EBDialogContent>
-          </Dialog>
-        </div>
-      ) : null}
-
-      
 
 {/* Experiment dialog */}
       <Dialog open={experimentOpen} onOpenChange={setExperimentOpen}>
@@ -3948,6 +3860,575 @@ const tryNextPrompts = useMemo(() => {
         </EBDialogContent>
       </Dialog>
 
+      {/* Experiments */}
+      <div id="eb-experiments" className="eb-card">
+        <div className="eb-card-header">
+          <div>
+            <div className="eb-card-title">Your experiments</div>
+            <div className="eb-card-sub">Your current experiment, experiment history, and anything you may want to revisit.</div>
+          </div>
+          <FlaskConical className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+        </div>
+
+        {/* Gentle colour splash + context */}
+        <div className="mt-4 eb-inset rounded-2xl p-5 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+          <div className="text-sm font-semibold">Keep it simple</div>
+          <div className="mt-1 text-sm text-neutral-800">
+            Pick one small change, keep everything else roughly the same, and track a few measures for a short time.
+          </div>
+        </div>
+
+        <div className="mt-4">{renderActiveExperimentCard()}</div>
+
+        <div className="mt-6 eb-inset rounded-2xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Run your own experiment</div>
+              <div className="mt-1 text-sm eb-muted">Name it first, then pick one small thing to change and what you’ll measure. Start simple. You can always change it later.</div>
+            </div>
+            <button
+              type="button"
+              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center sm:self-auto self-stretch"
+              onClick={openCustomExperiment}
+            >
+              <FlaskConical className="w-4 h-4" />
+              Create experiment
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 eb-inset rounded-2xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Past experiments</div>
+              <div className="mt-1 text-sm eb-muted">Past experiments, what helped, and anything you might want to rerun.</div>
+            </div>
+            <button
+              type="button"
+              className="eb-btn eb-btn-secondary"
+              onClick={() => setHistoryOpen((prev) => !prev)}
+            >
+              {historyOpen ? 'Hide past experiments' : 'Open your experiments'}
+            </button>
+          </div>
+
+          {historyOpen ? (
+            Array.isArray(experimentHistory) && experimentHistory.length > 0 ? (
+              <div className="mt-4">
+                <Carousel opts={{ align: 'start' }} className="w-full">
+                  <CarouselContent>
+                    {(experimentHistory as any[]).slice(0, 20).map((item: any) => {
+                      const id = String(item?.experimentId || item?.title || Math.random());
+                      const outcomeStatus = String(item?.outcome?.status || '');
+                      const outcomeLabel = outcomeStatus === 'helped' ? 'Helped' : outcomeStatus === 'notReally' ? 'Not really' : outcomeStatus === 'abandoned' ? 'Didn’t finish' : 'Stopped early';
+                      const completedDate = fmtDateUi(isoDatePartFromDateTime(item?.outcome?.completedAtISO) || item?.startDateISO, true);
+                      const metrics = Array.isArray(item?.metrics) ? item.metrics.slice(0, 4) : [];
+                      const digest = item?.outcome?.digest;
+                      const isOpen = openHistoryCardId === id;
+                      return (
+                        <CarouselItem key={id} className="basis-full md:basis-1/2">
+                          <div className="eb-inset rounded-2xl p-5 h-full flex flex-col">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-semibold">{item?.title || 'Past experiment'}</div>
+                                <div className="mt-1 text-sm eb-muted">Completed {completedDate}</div>
+                              </div>
+                              <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>{outcomeLabel}</span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {metrics.map((k: any) => (
+                                <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                                  {labelFor(k as any, userData)}
+                                </span>
+                              ))}
+                            </div>
+
+                            {isOpen ? (
+                              <div className="mt-4 rounded-2xl border border-black/8 bg-white p-4 text-sm">
+                                <div className="font-medium">What happened</div>
+                                <div className="mt-1 eb-muted">Started {fmtDateUi(String(item?.startDateISO || ''), true)} · {Number(item?.durationDays ?? 3)} day(s)</div>
+                                {digest?.quick?.metrics?.length ? (
+                                  <div className="mt-3 space-y-2">
+                                    {digest.quick.metrics.slice(0, 3).map((m: any) => (
+                                      <div key={String(m?.key)} className="text-sm eb-muted">
+                                        <span className="font-medium text-neutral-900">{labelFor(m?.key as any, userData)}:</span>{' '}
+                                        {typeof m?.beforeAvg === 'number' ? m.beforeAvg.toFixed(1) : '–'}/10 before · {typeof m?.duringAvg === 'number' ? m.duringAvg.toFixed(1) : '–'}/10 during
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {item?.outcome?.note ? (
+                                  <div className="mt-3 rounded-xl border border-black/8 bg-black/3 p-3 whitespace-pre-wrap eb-muted">{item.outcome.note}</div>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            <div className="flex-1" />
+                            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setOpenHistoryCardId((prev) => prev === id ? null : id)}>
+                                {isOpen ? 'Hide details' : 'View results'}
+                              </button>
+                              <button type="button" className="eb-btn eb-btn-primary" onClick={() => rerunHistoryExperiment(item)}>
+                                Re-run experiment
+                              </button>
+                            </div>
+                          </div>
+                        </CarouselItem>
+                      );
+                    })}
+                  </CarouselContent>
+                  <CarouselPrevious className="flex opacity-70" />
+                  <CarouselNext className="flex opacity-70" />
+                </Carousel>
+              </div>
+            ) : (
+              <div className="mt-4 text-sm eb-muted">No completed experiments yet.</div>
+            )
+          ) : null}
+        </div>
+      </div>
+
+      <div className="eb-card">
+        <div className="eb-card-header">
+          <div>
+            <div className="eb-card-title">Suggested experiments</div>
+            <div className="eb-card-sub">Broader ideas to explore when you want a few more options.</div>
+          </div>
+          <FlaskConical className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+        </div>
+
+        <div className="mt-4 eb-inset rounded-2xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Open suggested experiments</div>
+              <div className="mt-1 text-sm eb-muted">This keeps the page lighter until you want a deeper list of ideas.</div>
+            </div>
+            <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setSuggestedExperimentsOpen((prev) => !prev)}>
+              {suggestedExperimentsOpen ? 'Hide suggestions' : 'See suggestions'}
+            </button>
+          </div>
+
+          {suggestedExperimentsOpen ? (
+            <div className="mt-4">
+              {visibleTryNextPrompts.length > 0 ? (
+                <div>
+                  <div className="text-sm font-semibold">Try next</div>
+                  <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
+                  <div className="mt-3">
+                    <Carousel opts={{ align: 'start' }} className="w-full">
+                      <CarouselContent>
+                        {visibleTryNextPrompts.map((p) => (
+                          <CarouselItem key={p.id} className="basis-full md:basis-1/2">
+                            <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="text-sm font-semibold">{p.title}</div>
+                                <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
+                              </div>
+                              <div className="mt-2 text-sm font-medium text-neutral-900">{p.suggestion}</div>
+                              <div className="mt-2 text-sm eb-muted">{p.description}</div>
+                              <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
+                              {whyOpen?.[p.id] ? (
+                                <div className="mt-2 text-sm eb-muted">
+                                  {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
+                                  <ul className="list-disc pl-5 space-y-1">
+                                    {(p.why || []).slice(1, 3).map((w, idx) => (
+                                      <li key={`${p.id}-why-${idx}`}>{w}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                                {p.metrics.slice(0, 5).map((k) => (
+                                  <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                                ))}
+                              </div>
+                              <div className="flex-1" />
+                              <div className="mt-4 flex items-center justify-end gap-3">
+                                <button type="button" className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2" onClick={() => openTryNextPrompt(p as any)}>
+                                  <FlaskConical className="w-4 h-4" />
+                                  Set up {p.durationDays || 3}-day experiment
+                                </button>
+                              </div>
+                            </div>
+                          </CarouselItem>
+                        ))}
+                      </CarouselContent>
+                      <CarouselPrevious className="flex opacity-70" />
+                      <CarouselNext className="flex opacity-70" />
+                    </Carousel>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className={visibleTryNextPrompts.length ? 'mt-6' : ''}>
+                <div className="text-sm font-semibold">When the signal is strong</div>
+                <div className="mt-1 text-sm eb-muted">These start to appear as you log more days together.</div>
+                {visibleSuggestedExperiments.length === 0 ? (
+                  <div className="mt-3 eb-inset rounded-2xl p-5 text-sm eb-muted !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
+                    To generate these, the app needs overlap between a behaviour like sleep, caffeine, or late nights and how you feel. If you are mainly logging body symptoms, try switching on Sleep or Stress for a few days and this section will start to fill up.
+                  </div>
+                ) : (
+                  <div className="mt-3">
+                    <Carousel opts={{ align: 'start' }} className="w-full">
+                      <CarouselContent>
+                        {visibleSuggestedExperiments.map((s) => {
+                          const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
+                          return (
+                            <CarouselItem key={s.id} className="basis-full md:basis-1/2">
+                              <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="text-sm font-semibold">{s.title}</div>
+                                  <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
+                                </div>
+                                <div className="mt-2 text-sm eb-muted">{s.body}</div>
+                                <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                                  {s.metrics.slice(0, 3).map((k) => (
+                                    <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                                  ))}
+                                </div>
+                                <div className="flex-1" />
+                                <div className="mt-4 flex justify-end">
+                                  <button type="button" className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2" onClick={() => openExperiment(s.metrics)}>
+                                    <FlaskConical className="w-4 h-4" />
+                                    Try a 3-day experiment
+                                  </button>
+                                </div>
+                              </div>
+                            </CarouselItem>
+                          );
+                        })}
+                      </CarouselContent>
+                      <CarouselPrevious className="flex opacity-70" />
+                      <CarouselNext className="flex opacity-70" />
+                    </Carousel>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Your settings */}
+      <div
+        id="eb-insights-settings"
+        className="insights-settings-card bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30 shadow-sm"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="mb-1">Data &amp; settings</h3>
+            <p className="text-[rgba(0,0,0,0.75)]">
+              Keep it simple: 3-5 metrics gives you the cleanest signals, then open your graphs only when you want the evidence view.
+            </p>
+          </div>
+
+          
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2 items-center">
+          {TIMEFRAMES.map((t) => (
+            <button key={t.key} className={chipClass(timeframe === t.key)} onClick={() => setTimeframe(t.key)}>
+              {t.label}
+            </button>
+          ))}</div>
+
+        <div className="mt-5 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+          <div className="text-xs text-[rgb(var(--color-primary))]">Selected metrics</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {selected.length ? (
+              selected.map((m) => (
+                <span
+                  key={String(m)}
+                  className="inline-flex items-center rounded-full px-3 py-1 text-sm"
+                  style={{
+                    background: 'rgba(255,255,255,0.50)',
+                    border: '1px solid rgba(255,255,255,0.55)',
+                    color: 'rgba(0,0,0,0.82)',
+                  }}
+                >
+                  {labelFor(m, userData)}
+                </span>
+              ))
+            ) : (
+              <div className="text-sm mt-1 text-[rgba(0,0,0,0.72)]">Pick a few metrics to get started.</div>
+            )}
+          </div>
+          </div>
+
+          <div className="shrink-0 flex flex-wrap gap-2 justify-end">
+            <button type="button" className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-sm text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium" onClick={() => setDataEvidenceOpen((prev) => !prev)}>
+              {dataEvidenceOpen ? 'Hide your data' : 'See your data'}
+            </button>
+            <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-sm text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
+              >
+                Change metrics
+              </button>
+            </DialogTrigger>
+            <EBDialogContent
+
+              title="Choose metrics to analyse"
+
+              description="Select up to 6 metrics to personalise your insights."
+
+              className="w-[92vw] max-w-[420px] sm:max-w-lg rounded-2xl p-0 overflow-hidden max-h-[80vh]"
+
+            >
+
+              <div className="flex max-h-[80vh] flex-col">
+
+                <div className="flex items-start justify-between gap-3 border-b border-black/10 p-4">
+
+                  <div className="min-w-0">
+
+                    <div className="text-lg font-semibold">Choose metrics to analyse (max 6)</div>
+
+                    <div className="mt-1 text-sm eb-muted">Select up to 6 metrics to personalise your insights.</div>
+
+                  </div>
+
+
+                  <DialogClose asChild>
+
+                    <button
+
+                      type="button"
+
+                      className="shrink-0 rounded-full border border-black/10 px-3 py-1 text-sm eb-muted hover:bg-black/5"
+
+                    >
+
+                      Close
+
+                    </button>
+
+                  </DialogClose>
+
+                </div>
+
+
+                <div className="min-h-0 overflow-y-auto p-4">
+
+                  <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
+
+
+                  <div className="mt-3 flex flex-wrap gap-2 justify-end">
+
+                    <button type="button" className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
+
+                      Mood
+
+                    </button>
+
+
+                    {selectableKeys.map((k) => (
+
+                      <button
+
+                        type="button"
+
+                        key={k}
+
+                        className={chipClass(selected.includes(k))}
+
+                        onClick={() => toggleMetric(k)}
+
+                        title={labelFor(k, userData)}
+
+                      >
+
+                        {labelFor(k, userData)}
+
+                      </button>
+
+                    ))}
+
+                  </div>
+
+
+                  <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your &quot;top 3&quot; and stick with them for a week.</div>
+
+                </div>
+
+              </div>
+
+            </EBDialogContent>
+          </Dialog>
+          </div>
+        </div>
+
+      </div>
+
+
+      {dataEvidenceOpen ? (
+        <div className="space-y-6">
+          <div id="eb-full-insights" className="eb-card">
+            <div className="eb-card-header">
+              <div>
+                <div className="eb-card-title">Your data view</div>
+                <div className="eb-card-sub">The evidence underneath the story, ready when you want it.</div>
+              </div>
+              <Sparkles className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+            </div>
+
+            {!deepReady ? (
+              <div className="mt-2 text-sm eb-muted">The deeper evidence gets better at {minDaysForDeep} days in this timeframe. Keep logging. You are close.</div>
+            ) : null}
+
+            <div className="mt-4">
+              <Carousel opts={{ align: 'start' }} className="w-full">
+                <CarouselContent>
+                  {findings.map((f, idx) => (
+                    <CarouselItem key={idx} className="basis-full md:basis-1/2">
+                      <div className="eb-inset rounded-2xl p-5 h-full">
+                        <div className="text-sm font-semibold">{f.title}</div>
+                        <div className="mt-1 text-sm eb-muted">{f.body}</div>
+                        {f.supportSuggestion ? (
+                          <div className="mt-3 eb-inset rounded-2xl p-3">
+                            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[rgba(0,0,0,0.55)]">What could help</div>
+                            <div className="mt-1 text-sm eb-muted">{f.supportSuggestion}</div>
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                          {f.metrics?.slice(0, 2).map((m) => (
+                            <span key={String(m)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.04)' }}>{labelFor(m, userData)}</span>
+                          ))}
+                        </div>
+                        <div className="mt-4 flex justify-end">{renderExperimentCTA(f)}</div>
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="flex opacity-70" />
+                <CarouselNext className="flex opacity-70" />
+              </Carousel>
+            </div>
+          </div>
+      {/* Sleep Insights (optional) */}
+      {sleepInsightsOn ? (
+        <div id="eb-sleep-trend" className="eb-card p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0 self-start">
+              <Moon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="mb-0.5">Sleep</h2>
+                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">{sleepGentleHint}</p>
+                </div>
+
+                <button type="button" className="eb-btn eb-btn-secondary shrink-0" onClick={() => setSleepExploreOpen(true)}>
+                  Explore sleep
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
+                Extra sleep details logged on <span className="font-medium">{sleepExtrasCount}</span> day{sleepExtrasCount === 1 ? '' : 's'}.
+              </div>
+            </div>
+          </div>
+
+
+          <div className="mt-4 h-44">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={sleepSeries} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
+                <Tooltip />
+                <Line type="monotone" dataKey="sleep" dot={false} stroke={chartColors.primary} strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Explore modal */}
+          <Dialog open={sleepExploreOpen} onOpenChange={setSleepExploreOpen}>
+            <EBDialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
+              <DialogHeader>
+                <DialogTitle>Sleep explorer</DialogTitle>
+                <DialogDescription>
+                  A simple timeline view, with an optional overlay marker for what was going on that day.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="mt-4 eb-inset rounded-2xl p-4 overflow-hidden">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-medium">Influence overlay</div>
+                  <select
+                    className="eb-input !w-auto !py-2 text-sm"
+                    value={sleepOverlayKey}
+                    onChange={(e) => setSleepOverlayKey(e.target.value)}
+                    aria-label="Influence overlay"
+                  >
+                    <option value="">None</option>
+                    {sleepOverlayOptions.map((k) => (
+                      <option key={k} value={k}>
+                        {otherInfluenceLabel(k)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-4 h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={sleepSeriesWithOverlay} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
+                      <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={30} />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload || payload.length === 0) return null;
+                          const p: any = payload[0]?.payload;
+                          const sleepVal = typeof p?.sleep === 'number' ? p.sleep : null;
+                          const overlay = p?.overlay;
+                          return (
+                            <div className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm shadow">
+                              <div className="font-medium">{label}</div>
+                              {sleepVal !== null && <div>Sleep: {sleepVal}/10</div>}
+                              {overlay && <div>{overlay}</div>}
+                            </div>
+                          );
+                        }}
+                      />
+                      <Line type="monotone" dataKey="sleep" dot={false} stroke={chartColors.primary} strokeWidth={2} />
+
+                      {sleepOverlayKey ? (
+                        <Scatter dataKey="overlayMarker" fill={chartColors.primaryDark} />
+                      ) : null}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
+                  Tip: the dots are just markers. Your sleep line is the main thing.
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  autoFocus
+                  type="button"
+                  className="eb-btn eb-btn-secondary"
+                  onClick={() => setSleepExploreOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </EBDialogContent>
+          </Dialog>
+        </div>
+      ) : null}
+
+      
+
       {/* Trends */}
       <div className="eb-card">
         <div className="eb-card-header">
@@ -4338,425 +4819,9 @@ const tryNextPrompts = useMemo(() => {
         </div>
       </div>
 
-      {/* Experiments */}
-      <div id="eb-experiments" className="eb-card">
-        <div className="eb-card-header">
-          <div>
-            <div className="eb-card-title">Experiments</div>
-            <div className="eb-card-sub">
-              Tiny tests to learn what helps. Maturity: <b>{experimentsMaturity.label}</b> · {experimentsMaturity.hint}
-            </div>
-          </div>
-          <FlaskConical className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+
         </div>
-
-        {/* Gentle colour splash + context */}
-        <div className="mt-4 eb-inset rounded-2xl p-5 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
-          <div className="text-sm font-semibold">Keep it simple</div>
-          <div className="mt-1 text-sm text-neutral-800">
-            Pick one small change, keep everything else roughly the same, and track a few measures for a short time.
-          </div>
-        </div>
-
-        <div className="mt-4">{renderActiveExperimentCard()}</div>
-
-        <div className="mt-4">
-          <div className="text-sm font-semibold">Suggested experiments</div>
-          <div className="mt-1 text-sm eb-muted">Two lanes: quick "Try next" nudges from your recent patterns, and deeper ideas when the signal is strong.</div>
-
-          {/* Try next: pattern-aware prompts (Option B) */}
-          {visibleTryNextPrompts.length > 0 && (
-            <div className="mt-3">
-              <div className="text-sm font-semibold">Try next</div>
-              <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
-              <div className="mt-3">
-                <Carousel opts={{ align: 'start' }} className="w-full">
-                  <CarouselContent>
-                    {visibleTryNextPrompts.map((p) => (
-                      <CarouselItem key={p.id} className="basis-full md:basis-1/2">
-                        <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="text-sm font-semibold">{p.title}</div>
-                            <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
-                          </div>
-
-                          <div className="mt-2 text-sm font-medium text-neutral-900">
-                            {p.suggestion}
-                          </div>
-
-                          <div className="mt-2 text-sm eb-muted">
-                            {p.description}
-                          </div>
-
-                          <button
-                            type="button"
-                            className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100"
-                            onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}
-                          >
-                            Why this suggestion?
-                          </button>
-
-                          {whyOpen?.[p.id] && (
-                            <div className="mt-2 text-sm eb-muted">
-                              {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
-                              <ul className="list-disc pl-5 space-y-1">
-                                {(p.why || []).slice(1, 3).map((w, idx) => (
-                                  <li key={`${p.id}-why-${idx}`}>{w}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          <div className="mt-3 flex flex-wrap gap-2 justify-end">
-                            {p.metrics.slice(0, 5).map((k) => (
-                              <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>
-                                {labelFor(k as any, userData)}
-                              </span>
-                            ))}
-                          </div>
-
-                          <div className="flex-1" />
-
-	                          <div className="mt-4 flex items-center justify-end gap-3">
-	                            <button
-                              type="button"
-                              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
-                              onClick={() => openTryNextPrompt(p as any)}
-                            >
-                              <FlaskConical className="w-4 h-4" />
-                              Set up {p.durationDays || 3}-day experiment
-                            </button>
-                          </div>
-                        </div>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious className="flex opacity-70" />
-                  <CarouselNext className="flex opacity-70" />
-                </Carousel>
-              </div>
-            </div>
-          )}
-
-          {/* Strong signal: existing confidence-gated suggestions */}
-          <div className={visibleTryNextPrompts.length ? 'mt-6' : 'mt-3'}>
-            <div className="text-sm font-semibold">When the signal is strong</div>
-            <div className="mt-1 text-sm eb-muted">These start to appear as you log more days together.</div>
-
-            {visibleSuggestedExperiments.length === 0 ? (
-              <div className="mt-3 eb-inset rounded-2xl p-5 text-sm eb-muted !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
-                To generate these, the app needs overlap between a behaviour (like sleep, caffeine, late nights) and how you feel. If you are mainly logging body symptoms, try switching on Sleep or Stress for a few days and this section will start to fill up.
-              </div>
-            ) : (
-              <div className="mt-3">
-                <Carousel opts={{ align: 'start' }} className="w-full">
-                  <CarouselContent>
-                    {visibleSuggestedExperiments.map((s) => {
-                      const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
-                      return (
-                        <CarouselItem key={s.id} className="basis-full md:basis-1/2">
-                          <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="text-sm font-semibold">{s.title}</div>
-                              <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>
-                                {conf}
-                              </span>
-                            </div>
-                            <div className="mt-2 text-sm eb-muted">{s.body}</div>
-
-                            <div className="mt-3 flex flex-wrap gap-2 justify-end">
-                              {s.metrics.slice(0, 3).map((k) => (
-                                <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>
-                                  {labelFor(k as any, userData)}
-                                </span>
-                              ))}
-                            </div>
-
-                            <div className="flex-1" />
-
-                            <div className="mt-4 flex justify-end">
-                              <button
-                                type="button"
-                                className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
-                                onClick={() => openExperiment(s.metrics)}
-                              >
-                                <FlaskConical className="w-4 h-4" />
-                                Try a 3-day experiment
-                              </button>
-                            </div>
-                          </div>
-                        </CarouselItem>
-                      );
-                    })}
-                  </CarouselContent>
-                  <CarouselPrevious className="flex opacity-70" />
-                  <CarouselNext className="flex opacity-70" />
-                </Carousel>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-6 eb-inset rounded-2xl p-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold">Run your own experiment</div>
-              <div className="mt-1 text-sm eb-muted">Name it first, then pick one small thing to change and what you’ll measure. Start simple. You can always change it later.</div>
-            </div>
-            <button
-              type="button"
-              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center sm:self-auto self-stretch"
-              onClick={openCustomExperiment}
-            >
-              <FlaskConical className="w-4 h-4" />
-              Create experiment
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-6 eb-inset rounded-2xl p-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold">Past experiments</div>
-              <div className="mt-1 text-sm eb-muted">Revisit what you tried, what helped, and what you might want to rerun.</div>
-            </div>
-            <button
-              type="button"
-              className="eb-btn eb-btn-secondary"
-              onClick={() => setHistoryOpen((prev) => !prev)}
-            >
-              {historyOpen ? 'Hide past experiments' : 'Revisit past experiments'}
-            </button>
-          </div>
-
-          {historyOpen ? (
-            Array.isArray(experimentHistory) && experimentHistory.length > 0 ? (
-              <div className="mt-4">
-                <Carousel opts={{ align: 'start' }} className="w-full">
-                  <CarouselContent>
-                    {(experimentHistory as any[]).slice(0, 20).map((item: any) => {
-                      const id = String(item?.experimentId || item?.title || Math.random());
-                      const outcomeStatus = String(item?.outcome?.status || '');
-                      const outcomeLabel = outcomeStatus === 'helped' ? 'Helped' : outcomeStatus === 'notReally' ? 'Not really' : outcomeStatus === 'abandoned' ? 'Didn’t finish' : 'Stopped early';
-                      const completedDate = fmtDateUi(isoDatePartFromDateTime(item?.outcome?.completedAtISO) || item?.startDateISO, true);
-                      const metrics = Array.isArray(item?.metrics) ? item.metrics.slice(0, 4) : [];
-                      const digest = item?.outcome?.digest;
-                      const isOpen = openHistoryCardId === id;
-                      return (
-                        <CarouselItem key={id} className="basis-full md:basis-1/2">
-                          <div className="eb-inset rounded-2xl p-5 h-full flex flex-col">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-semibold">{item?.title || 'Past experiment'}</div>
-                                <div className="mt-1 text-sm eb-muted">Completed {completedDate}</div>
-                              </div>
-                              <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>{outcomeLabel}</span>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {metrics.map((k: any) => (
-                                <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
-                                  {labelFor(k as any, userData)}
-                                </span>
-                              ))}
-                            </div>
-
-                            {isOpen ? (
-                              <div className="mt-4 rounded-2xl border border-black/8 bg-white p-4 text-sm">
-                                <div className="font-medium">What happened</div>
-                                <div className="mt-1 eb-muted">Started {fmtDateUi(String(item?.startDateISO || ''), true)} · {Number(item?.durationDays ?? 3)} day(s)</div>
-                                {digest?.quick?.metrics?.length ? (
-                                  <div className="mt-3 space-y-2">
-                                    {digest.quick.metrics.slice(0, 3).map((m: any) => (
-                                      <div key={String(m?.key)} className="text-sm eb-muted">
-                                        <span className="font-medium text-neutral-900">{labelFor(m?.key as any, userData)}:</span>{' '}
-                                        {typeof m?.beforeAvg === 'number' ? m.beforeAvg.toFixed(1) : '–'}/10 before · {typeof m?.duringAvg === 'number' ? m.duringAvg.toFixed(1) : '–'}/10 during
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-                                {item?.outcome?.note ? (
-                                  <div className="mt-3 rounded-xl border border-black/8 bg-black/3 p-3 whitespace-pre-wrap eb-muted">{item.outcome.note}</div>
-                                ) : null}
-                              </div>
-                            ) : null}
-
-                            <div className="flex-1" />
-                            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setOpenHistoryCardId((prev) => prev === id ? null : id)}>
-                                {isOpen ? 'Hide details' : 'View results'}
-                              </button>
-                              <button type="button" className="eb-btn eb-btn-primary" onClick={() => rerunHistoryExperiment(item)}>
-                                Re-run experiment
-                              </button>
-                            </div>
-                          </div>
-                        </CarouselItem>
-                      );
-                    })}
-                  </CarouselContent>
-                  <CarouselPrevious className="flex opacity-70" />
-                  <CarouselNext className="flex opacity-70" />
-                </Carousel>
-              </div>
-            ) : (
-              <div className="mt-4 text-sm eb-muted">No completed experiments yet.</div>
-            )
-          ) : null}
-        </div>
-      </div>
-
-      {/* Your settings */}
-      <div
-        id="eb-insights-settings"
-        className="insights-settings-card bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30 shadow-sm"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="mb-1">Your settings</h3>
-            <p className="text-[rgba(0,0,0,0.75)]">
-              Keep it simple: 3-5 metrics gives you the cleanest signals.
-            </p>
-          </div>
-
-          
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2 items-center">
-          {TIMEFRAMES.map((t) => (
-            <button key={t.key} className={chipClass(timeframe === t.key)} onClick={() => setTimeframe(t.key)}>
-              {t.label}
-            </button>
-          ))}</div>
-
-        <div className="mt-5 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-          <div className="text-xs text-[rgb(var(--color-primary))]">Selected metrics</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {selected.length ? (
-              selected.map((m) => (
-                <span
-                  key={String(m)}
-                  className="inline-flex items-center rounded-full px-3 py-1 text-sm"
-                  style={{
-                    background: 'rgba(255,255,255,0.50)',
-                    border: '1px solid rgba(255,255,255,0.55)',
-                    color: 'rgba(0,0,0,0.82)',
-                  }}
-                >
-                  {labelFor(m, userData)}
-                </span>
-              ))
-            ) : (
-              <div className="text-sm mt-1 text-[rgba(0,0,0,0.72)]">Pick a few metrics to get started.</div>
-            )}
-          </div>
-          </div>
-
-          <div className="shrink-0">
-            <Dialog>
-            <DialogTrigger asChild>
-              <button
-                type="button"
-                className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-sm text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
-              >
-                Change metrics
-              </button>
-            </DialogTrigger>
-            <EBDialogContent
-
-              title="Choose metrics to analyse"
-
-              description="Select up to 6 metrics to personalise your insights."
-
-              className="w-[92vw] max-w-[420px] sm:max-w-lg rounded-2xl p-0 overflow-hidden max-h-[80vh]"
-
-            >
-
-              <div className="flex max-h-[80vh] flex-col">
-
-                <div className="flex items-start justify-between gap-3 border-b border-black/10 p-4">
-
-                  <div className="min-w-0">
-
-                    <div className="text-lg font-semibold">Choose metrics to analyse (max 6)</div>
-
-                    <div className="mt-1 text-sm eb-muted">Select up to 6 metrics to personalise your insights.</div>
-
-                  </div>
-
-
-                  <DialogClose asChild>
-
-                    <button
-
-                      type="button"
-
-                      className="shrink-0 rounded-full border border-black/10 px-3 py-1 text-sm eb-muted hover:bg-black/5"
-
-                    >
-
-                      Close
-
-                    </button>
-
-                  </DialogClose>
-
-                </div>
-
-
-                <div className="min-h-0 overflow-y-auto p-4">
-
-                  <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
-
-
-                  <div className="mt-3 flex flex-wrap gap-2 justify-end">
-
-                    <button type="button" className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
-
-                      Mood
-
-                    </button>
-
-
-                    {selectableKeys.map((k) => (
-
-                      <button
-
-                        type="button"
-
-                        key={k}
-
-                        className={chipClass(selected.includes(k))}
-
-                        onClick={() => toggleMetric(k)}
-
-                        title={labelFor(k, userData)}
-
-                      >
-
-                        {labelFor(k, userData)}
-
-                      </button>
-
-                    ))}
-
-                  </div>
-
-
-                  <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your &quot;top 3&quot; and stick with them for a week.</div>
-
-                </div>
-
-              </div>
-
-            </EBDialogContent>
-          </Dialog>
-          </div>
-        </div>
-
-      </div>
-
+      ) : null}
 
 
     </div>

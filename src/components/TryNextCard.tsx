@@ -21,8 +21,8 @@ export function TryNextCard(props: {
     <div className="eb-card">
       <div className="eb-card-header">
         <div>
-          <div className="eb-card-title">Try this next</div>
-          <div className="eb-card-sub">A small next step based on what has been standing out.</div>
+          <div className="eb-card-title">A small thing to try</div>
+          <div className="eb-card-sub">A gentle next step based on what has been standing out.</div>
         </div>
         <FlaskConical className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
       </div>
