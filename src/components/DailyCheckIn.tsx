@@ -16,6 +16,9 @@ import {
   Pencil,
   FlaskConical,
   Leaf,
+  SlidersHorizontal,
+  Search,
+  Plus,
 } from 'lucide-react';
 
 import type { CheckInEntry, SymptomKey, UserData, ExperimentPlan, InsightMetricKey } from '../types';
@@ -184,6 +187,96 @@ function SwitchRow({
       </button>
     </div>
   );
+}
+
+type SymptomCandidate = {
+  kind: 'builtIn' | 'custom';
+  key: string;
+  label: string;
+  hint?: string;
+  icon?: React.ElementType;
+};
+
+const CORE_SYMPTOMS: SymptomKey[] = ['sleep', 'energy'];
+
+function symptomDefaultValue(key: SymptomKey): number {
+  if (key === 'flow' || key === 'nightSweats') return 0;
+  return 5;
+}
+
+function isRecentlyTouchedValue(value: unknown, key: SymptomKey) {
+  if (typeof value !== 'number') return false;
+  return normalise10(value) !== symptomDefaultValue(key);
+}
+
+function compareDateISO(a: string, b: string) {
+  return a.localeCompare(b);
+}
+
+function buildPriorityMaps(entries: CheckInEntry[], activeDateISO: string, enabledSliders: SymptomKey[], enabledCustomIds: string[]) {
+  const earlierEntries = [...entries]
+    .filter((entry) => compareDateISO(entry.dateISO, activeDateISO) < 0)
+    .sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+
+  const yesterdayTouched = new Set<string>();
+  const recentTouched = new Set<string>();
+
+  const yesterday = earlierEntries[0] ?? null;
+  if (yesterday) {
+    for (const key of enabledSliders) {
+      if (isRecentlyTouchedValue((yesterday as any)?.values?.[key], key)) yesterdayTouched.add(key);
+    }
+    for (const id of enabledCustomIds) {
+      if (typeof (yesterday as any)?.customValues?.[id] === 'number') yesterdayTouched.add(`custom:${id}`);
+    }
+  }
+
+  const recentEntries = earlierEntries.slice(0, 7);
+  for (const entry of recentEntries) {
+    for (const key of enabledSliders) {
+      if (isRecentlyTouchedValue((entry as any)?.values?.[key], key)) recentTouched.add(key);
+    }
+    for (const id of enabledCustomIds) {
+      if (typeof (entry as any)?.customValues?.[id] === 'number') recentTouched.add(`custom:${id}`);
+    }
+  }
+
+  return { yesterdayTouched, recentTouched };
+}
+
+function sortBuiltInSymptoms(keys: SymptomKey[], maps: { yesterdayTouched: Set<string>; recentTouched: Set<string> }) {
+  const coreSet = new Set(CORE_SYMPTOMS);
+  return [...keys].sort((a, b) => {
+    const aCore = coreSet.has(a) ? 1 : 0;
+    const bCore = coreSet.has(b) ? 1 : 0;
+    if (aCore !== bCore) return bCore - aCore;
+
+    const aYesterday = maps.yesterdayTouched.has(a) ? 1 : 0;
+    const bYesterday = maps.yesterdayTouched.has(b) ? 1 : 0;
+    if (aYesterday !== bYesterday) return bYesterday - aYesterday;
+
+    const aRecent = maps.recentTouched.has(a) ? 1 : 0;
+    const bRecent = maps.recentTouched.has(b) ? 1 : 0;
+    if (aRecent !== bRecent) return bRecent - aRecent;
+
+    return 0;
+  });
+}
+
+function sortCustomSymptoms<T extends { id: string }>(items: T[], maps: { yesterdayTouched: Set<string>; recentTouched: Set<string> }) {
+  return [...items].sort((a, b) => {
+    const aKey = `custom:${a.id}`;
+    const bKey = `custom:${b.id}`;
+    const aYesterday = maps.yesterdayTouched.has(aKey) ? 1 : 0;
+    const bYesterday = maps.yesterdayTouched.has(bKey) ? 1 : 0;
+    if (aYesterday !== bYesterday) return bYesterday - aYesterday;
+
+    const aRecent = maps.recentTouched.has(aKey) ? 1 : 0;
+    const bRecent = maps.recentTouched.has(bKey) ? 1 : 0;
+    if (aRecent !== bRecent) return bRecent - aRecent;
+
+    return a.id.localeCompare(b.id);
+  });
 }
 
 function Slider10({
@@ -372,6 +465,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
   const [values, setValues] = useState<Partial<Record<SymptomKey, number>>>({});
   const [customValues, setCustomValues] = useState<Record<string, number>>({});
+  const [customiseOpen, setCustomiseOpen] = useState(false);
+  const [symptomSearch, setSymptomSearch] = useState('');
 
   const [sleepDetails, setSleepDetails] = useState<{
     timesWoke: 0 | 1 | 2 | 3;
@@ -446,17 +541,16 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     const defaults: Partial<Record<SymptomKey, number>> = {};
     for (const k of userData.enabledModules) {
       if (!sliderMeta[k]) continue;
-      // default 5/10 for most symptoms, 0 for flow
-      // IMPORTANT: Night sweats can be tucked inside Sleep details.
-      // If the user doesn't open that section, a mid-point default can create accidental false positives.
-      defaults[k] = k === 'flow' ? 0 : k === 'nightSweats' ? 0 : 5;
+      const prevRaw = (prevEntry as any)?.values?.[k];
+      defaults[k] = typeof prevRaw === 'number' ? normalise10(prevRaw) : symptomDefaultValue(k);
     }
     setValues(defaults);
 
     const customDefaults: Record<string, number> = {};
     for (const s of (userData.customSymptoms ?? [])) {
       if (!s?.enabled) continue;
-      customDefaults[s.id] = 5;
+      const prevRaw = (prevEntry as any)?.customValues?.[s.id];
+      customDefaults[s.id] = typeof prevRaw === 'number' ? normalise10(prevRaw) : 5;
     }
     setCustomValues(customDefaults);
 
@@ -477,7 +571,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     setEventsState({});
     setExerciseIntensity(null);
     setInfluencesOpen(false);
-  }, [existingEntry, userData.enabledModules, userData.customSymptoms, activeDateISO]);
+  }, [existingEntry, prevEntry, userData.enabledModules, userData.customSymptoms, activeDateISO]);
 
   // If someone turns Sleep details on/off mid-check-in, update just the sleep panel
   // without wiping anything else (like your ticked influences).
@@ -507,31 +601,50 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     return (userData.customSymptoms ?? []).filter((s) => s && s.enabled && typeof s.label === 'string' && s.label.trim());
   }, [userData.customSymptoms]);
 
-  // If an experiment is active, pin the experiment metrics to the top for the 3 days.
-  const orderedSliders = useMemo(() => {
-    if (!experimentStatus || experimentStatus.done) return enabledSliders;
-    const focus = (experimentStatus.ex.metrics ?? []) as any[];
-    const focusKeys = focus.filter((k) => typeof k === 'string' && k !== 'mood' && !String(k).startsWith('custom:')) as SymptomKey[];
-    if (!focusKeys.length) return enabledSliders;
+  const priorityMaps = useMemo(() => {
+    return buildPriorityMaps(entries, activeDateISO, enabledSliders, enabledCustom.map((item) => item.id));
+  }, [entries, activeDateISO, enabledSliders, enabledCustom]);
 
-    const set = new Set(focusKeys);
-    const pinned = enabledSliders.filter((k) => set.has(k));
-    const rest = enabledSliders.filter((k) => !set.has(k));
-    return [...pinned, ...rest];
-  }, [enabledSliders, experimentStatus]);
+  const orderedSliders = useMemo(() => sortBuiltInSymptoms(enabledSliders, priorityMaps), [enabledSliders, priorityMaps]);
 
-  const orderedCustom = useMemo(() => {
-    if (!experimentStatus || experimentStatus.done) return enabledCustom;
-    const focus = (experimentStatus.ex.metrics ?? []) as any[];
-    const focusIds = focus
-      .filter((k) => typeof k === 'string' && String(k).startsWith('custom:'))
-      .map((k) => String(k).replace('custom:', ''));
-    if (!focusIds.length) return enabledCustom;
-    const set = new Set(focusIds);
-    const pinned = enabledCustom.filter((s) => set.has(s.id));
-    const rest = enabledCustom.filter((s) => !set.has(s.id));
-    return [...pinned, ...rest];
-  }, [enabledCustom, experimentStatus]);
+  const orderedCustom = useMemo(() => sortCustomSymptoms(enabledCustom, priorityMaps), [enabledCustom, priorityMaps]);
+
+  const availableBuiltInCandidates = useMemo<SymptomCandidate[]>(() => {
+    const enabled = new Set(userData.enabledModules);
+    return (Object.keys(sliderMeta) as SymptomKey[])
+      .filter((key) => key !== 'focus' && !enabled.has(key))
+      .map((key) => ({
+        kind: 'builtIn',
+        key,
+        label: sliderMeta[key].label,
+        hint: sliderMeta[key].hint,
+        icon: sliderMeta[key].icon,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [userData.enabledModules]);
+
+  const availableCustomCandidates = useMemo<SymptomCandidate[]>(() => {
+    return (userData.customSymptoms ?? [])
+      .filter((item) => item && !item.enabled && item.label.trim())
+      .map((item) => ({
+        kind: 'custom',
+        key: item.id,
+        label: item.label,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [userData.customSymptoms]);
+
+  const symptomCandidates = useMemo(() => {
+    const query = symptomSearch.trim().toLowerCase();
+    const all = [...availableBuiltInCandidates, ...availableCustomCandidates];
+    if (!query) return all.slice(0, 12);
+    return all
+      .filter((item) => {
+        const hay = `${item.label} ${item.hint ?? ''}`.toLowerCase();
+        return hay.includes(query);
+      })
+      .slice(0, 12);
+  }, [availableBuiltInCandidates, availableCustomCandidates, symptomSearch]);
 
 
   const allNotes = useMemo(() => {
@@ -919,19 +1032,104 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
         {/* Sliders */}
         <div className="eb-card p-6 mb-6">
-          <div className="flex items-center justify-between gap-3 mb-1">
-            <h3 className="mb-0">Your check-in</h3>
-            {onNavigate && (
-              <button
-                type="button"
-                className="text-sm text-[rgb(var(--color-primary))] hover:underline inline-flex items-center gap-1"
-                onClick={() => onNavigate('profile')}
-              >
-                Customise <ChevronRight className="w-4 h-4" />
-              </button>
-            )}
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="mb-1">Your check-in</h3>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">Only what you choose to track.</p>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 inline-flex items-center gap-2 rounded-full border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-accent)/0.16)] px-3 py-2 text-sm font-medium text-[rgb(var(--color-primary-dark))]"
+              onClick={() => setCustomiseOpen((prev) => !prev)}
+              aria-expanded={customiseOpen}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Customise
+            </button>
           </div>
-          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-5">Only what you choose to track.</p>
+
+          {customiseOpen && (
+            <div className="mb-5 rounded-3xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-accent)/0.10)] p-4 shadow-[0_8px_20px_rgb(var(--color-primary-dark)/0.05)]">
+              <div className="flex items-center gap-2 rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-surface))] px-3 py-2.5">
+                <Search className="w-4 h-4 text-[rgb(var(--color-text-secondary))]" />
+                <input
+                  type="text"
+                  value={symptomSearch}
+                  onChange={(e) => setSymptomSearch(e.target.value)}
+                  placeholder="Search symptoms"
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-[rgb(var(--color-text-secondary))]"
+                />
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {symptomCandidates.length > 0 ? (
+                  symptomCandidates.map((item) => {
+                    const Icon = item.icon ?? Plus;
+                    return (
+                      <button
+                        key={`${item.kind}:${item.key}`}
+                        type="button"
+                        className="w-full rounded-2xl border border-[rgb(var(--color-primary)/0.16)] bg-[rgb(var(--color-surface))] px-3 py-3 text-left shadow-[0_10px_24px_rgb(var(--color-primary-dark)/0.05)] transition hover:border-[rgb(var(--color-primary)/0.22)]"
+                        onClick={() => {
+                          if (item.kind === 'builtIn') {
+                            const symptomKey = item.key as SymptomKey;
+                            onUpdateUserData((prev) => {
+                              if (prev.enabledModules.includes(symptomKey)) return prev;
+                              return { ...prev, enabledModules: [...prev.enabledModules, symptomKey] };
+                            });
+                            setValues((prev) => ({
+                              ...prev,
+                              [symptomKey]: typeof prev[symptomKey] === 'number'
+                                ? prev[symptomKey]
+                                : typeof (prevEntry as any)?.values?.[symptomKey] === 'number'
+                                  ? normalise10((prevEntry as any).values[symptomKey])
+                                  : symptomDefaultValue(symptomKey),
+                            }));
+                          } else {
+                            onUpdateUserData((prev) => ({
+                              ...prev,
+                              customSymptoms: (prev.customSymptoms ?? []).map((s) =>
+                                s.id === item.key ? { ...s, enabled: true } : s
+                              ),
+                            }));
+                            setCustomValues((prev) => ({
+                              ...prev,
+                              [item.key]: typeof prev[item.key] === 'number'
+                                ? prev[item.key]
+                                : typeof (prevEntry as any)?.customValues?.[item.key] === 'number'
+                                  ? normalise10((prevEntry as any).customValues[item.key])
+                                  : 5,
+                            }));
+                          }
+                          setSymptomSearch('');
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex items-center gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-accent)/0.18)] text-[rgb(var(--color-primary))]">
+                              <Icon className="w-4 h-4" />
+                            </span>
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium text-[rgb(var(--color-text))]">{item.label}</div>
+                              {item.hint ? <div className="truncate text-xs text-[rgb(var(--color-text-secondary))]">{item.hint}</div> : null}
+                            </div>
+                          </div>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--color-primary)/0.08)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-primary-dark))]">
+                            <Plus className="w-3.5 h-3.5" />
+                            Add
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-[rgb(var(--color-primary)/0.16)] bg-[rgb(var(--color-surface))] px-3 py-4 text-sm text-[rgb(var(--color-text-secondary))]">
+                    No matching symptoms yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-5">
             {orderedSliders.map((key) => {
