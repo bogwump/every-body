@@ -295,31 +295,9 @@ function Slider10({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [draftValue, setDraftValue] = useState(() => clamp(value, 0, 10));
-  const [trackWidth, setTrackWidth] = useState(0);
   const dragValueRef = useRef(clamp(value, 0, 10));
   const draggingRef = useRef(false);
-  const thumbWidth = 32;
-
-  useLayoutEffect(() => {
-    const node = wrapRef.current;
-    if (!node) return;
-
-    const updateWidth = () => {
-      setTrackWidth(node.clientWidth || 0);
-    };
-
-    updateWidth();
-
-    const ResizeObs = (window as any).ResizeObserver;
-    if (ResizeObs) {
-      const observer = new ResizeObs(() => updateWidth());
-      observer.observe(node);
-      return () => observer.disconnect();
-    }
-
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
+  const [trackMetrics, setTrackMetrics] = useState({ width: 0, thumbWidth: 32 });
 
   useEffect(() => {
     if (!draggingRef.current) {
@@ -328,6 +306,37 @@ function Slider10({
       dragValueRef.current = next;
     }
   }, [value]);
+
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    const updateMetrics = () => {
+      const styles = window.getComputedStyle(wrap);
+      const thumbVar = styles.getPropertyValue('--eb-thumb-width').trim();
+      const parsedThumb = Number.parseFloat(thumbVar);
+      const thumbWidth = Number.isFinite(parsedThumb) ? parsedThumb : 32;
+      setTrackMetrics({
+        width: wrap.clientWidth,
+        thumbWidth,
+      });
+    };
+
+    updateMetrics();
+
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => updateMetrics())
+      : null;
+
+    resizeObserver?.observe(wrap);
+    window.addEventListener('resize', updateMetrics);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updateMetrics);
+    };
+  }, []);
 
   const updateVisual = useCallback((next: number) => {
     const safe = clamp(next, 0, 10);
@@ -376,8 +385,8 @@ function Slider10({
   };
 
   const pct = `${(draftValue / 10) * 100}%`;
-  const bubbleLeft = trackWidth > 0
-    ? (thumbWidth / 2) + ((trackWidth - thumbWidth) * (draftValue / 10))
+  const bubbleLeft = trackMetrics.width > 0
+    ? ((trackMetrics.width - trackMetrics.thumbWidth) * (draftValue / 10)) + (trackMetrics.thumbWidth / 2)
     : 0;
 
   return (
