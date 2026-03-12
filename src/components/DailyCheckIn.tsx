@@ -428,13 +428,13 @@ function Slider10({
         />
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center text-[11px] text-[rgb(var(--color-text-secondary))] px-1 mt-1 leading-none">
-        <div className="flex items-center gap-1.5 min-w-0 justify-self-start">
+      <div className="flex items-center justify-between text-[11px] text-[rgb(var(--color-text-secondary))] px-1 mt-1 leading-none">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span>0</span>
           <span className="font-medium tracking-[0.01em]">{leftLabel ?? 'None'}</span>
         </div>
-        <span className="justify-self-center">5</span>
-        <div className="flex items-center gap-1.5 min-w-0 justify-self-end">
+        <span>5</span>
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className="font-medium tracking-[0.01em]">{rightLabel ?? 'Severe'}</span>
           <span>10</span>
         </div>
