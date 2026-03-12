@@ -416,13 +416,13 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   --eb-thumb-height: 20px;
   --eb-bubble-gap: 6px;
   position: relative;
-  padding: 30px 0 0;
+  padding: 40px 0 0;
   touch-action: none;
 }
 
 .eb-range-value-bubble{
   position: absolute;
-  top: 0;
+  top: 8px;
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
@@ -507,7 +507,11 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
     --eb-thumb-width: 34px;
     --eb-thumb-height: 22px;
     --eb-bubble-gap: 10px;
-    padding: 34px 0 0;
+    padding: 46px 0 0;
+  }
+
+  .eb-range-value-bubble{
+    top: 12px;
   }
 }
 
