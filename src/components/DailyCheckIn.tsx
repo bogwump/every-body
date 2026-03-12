@@ -67,40 +67,40 @@ const moodIcons: Array<{ value: 1 | 2 | 3; icon: React.ElementType; label: strin
 
 // Stored symptom values are now treated as 0–10.
 // (Calendar + analytics already normalise if older entries used 0–100.)
-const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; hint?: string }> = {
-  energy: { label: 'Energy', icon: Battery, hint: 'How much fuel you have in the tank' },
-  motivation: { label: 'Motivation', icon: Battery, hint: 'Drive and willingness to do things' },
-  sleep: { label: 'Sleep quality', icon: Moon, hint: 'Quality of sleep, not just hours' },
-  insomnia: { label: 'Insomnia', icon: Moon, hint: 'Trouble falling or staying asleep' },
-  stress: { label: 'Stress', icon: Zap, hint: 'Mental pressure or feeling on edge' },
-  anxiety: { label: 'Anxiety', icon: Zap, hint: 'Worry, racing thoughts' },
-  irritability: { label: 'Irritability', icon: Zap, hint: 'Short fuse, feeling snappy' },
-  focus: { label: 'Focus', icon: Brain, hint: 'Concentration and mental sharpness' },
-  bloating: { label: 'Bloating', icon: Wind, hint: 'Fullness or swollen belly feeling' },
-  digestion: { label: 'Digestion', icon: Wind, hint: 'Gut comfort and regularity' },
-  nausea: { label: 'Nausea', icon: Wind, hint: 'Sick or queasy feeling' },
-  acidReflux: { label: 'Acid reflux', icon: Wind, hint: 'Heartburn or reflux symptoms' },
-  constipation: { label: 'Constipation', icon: Wind, hint: 'Hard stools or difficulty going' },
-  diarrhoea: { label: 'Diarrhoea', icon: Wind, hint: 'Loose stools or urgency' },
-  pain: { label: 'Pain', icon: Heart, hint: 'Overall body pain or aches' },
-  headache: { label: 'Headache', icon: Brain, hint: 'Head pain or pressure' },
-  migraine: { label: 'Migraine', icon: Brain, hint: 'Migraine-type headache' },
-  backPain: { label: 'Back pain', icon: Heart, hint: 'Upper or lower back pain' },
-  cramps: { label: 'Cramps', icon: Heart, hint: 'Lower belly cramps or spasms' },
-  jointPain: { label: 'Joint pain', icon: Heart, hint: 'Stiff or sore joints' },
-  flow: { label: 'Bleeding / spotting (optional)', icon: Droplet, hint: 'Bleeding or spotting level' },
-  hairShedding: { label: 'Hair shedding', icon: Sparkles, hint: 'More hair loss than usual' },
-  facialSpots: { label: 'Facial spots', icon: Sparkles, hint: 'Breakouts or spots on face' },
-  cysts: { label: 'Cysts', icon: Heart, hint: 'Painful lumps or cystic spots' },
-  skinDryness: { label: 'Skin dryness', icon: Sparkles, hint: 'Dry, itchy, or sensitive skin' },
-  brainFog: { label: 'Brain fog', icon: Brain, hint: 'Foggy thinking, forgetfulness' },
-  fatigue: { label: 'Fatigue', icon: Battery, hint: 'Heavy tiredness or drained feeling' },
-  dizziness: { label: 'Dizziness', icon: Brain, hint: 'Light-headed or unsteady' },
-  appetite: { label: 'Appetite', icon: Battery, hint: 'Hunger and cravings' },
-  libido: { label: 'Libido', icon: Heart, hint: 'Interest in sex' },
-  breastTenderness: { label: 'Breast tenderness', icon: Heart, hint: 'Sore or tender breasts' },
-  hotFlushes: { label: 'Hot flushes', icon: Sparkles, hint: 'Sudden heat and flushing' },
-  nightSweats: { label: 'Night sweats', icon: Moon, hint: 'Waking sweaty at night' },
+const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; hint?: string; leftLabel?: string; rightLabel?: string }> = {
+  energy: { label: 'Energy', icon: Battery, hint: 'How much fuel you have in the tank', leftLabel: 'Low', rightLabel: 'High' },
+  motivation: { label: 'Motivation', icon: Battery, hint: 'Drive and willingness to do things', leftLabel: 'Low', rightLabel: 'High' },
+  sleep: { label: 'Sleep quality', icon: Moon, hint: 'Quality of sleep, not just hours', leftLabel: 'Poor', rightLabel: 'Great' },
+  insomnia: { label: 'Insomnia', icon: Moon, hint: 'Trouble falling or staying asleep', leftLabel: 'None', rightLabel: 'Severe' },
+  stress: { label: 'Stress', icon: Zap, hint: 'Mental pressure or feeling on edge', leftLabel: 'Calm', rightLabel: 'High' },
+  anxiety: { label: 'Anxiety', icon: Zap, hint: 'Worry, racing thoughts', leftLabel: 'None', rightLabel: 'Severe' },
+  irritability: { label: 'Irritability', icon: Zap, hint: 'Short fuse, feeling snappy', leftLabel: 'Calm', rightLabel: 'Snappy' },
+  focus: { label: 'Focus', icon: Brain, hint: 'Concentration and mental sharpness', leftLabel: 'Foggy', rightLabel: 'Sharp' },
+  bloating: { label: 'Bloating', icon: Wind, hint: 'Fullness or swollen belly feeling', leftLabel: 'None', rightLabel: 'Severe' },
+  digestion: { label: 'Digestion', icon: Wind, hint: 'Gut comfort and regularity', leftLabel: 'Poor', rightLabel: 'Great' },
+  nausea: { label: 'Nausea', icon: Wind, hint: 'Sick or queasy feeling', leftLabel: 'None', rightLabel: 'Severe' },
+  acidReflux: { label: 'Acid reflux', icon: Wind, hint: 'Heartburn or reflux symptoms', leftLabel: 'None', rightLabel: 'Severe' },
+  constipation: { label: 'Constipation', icon: Wind, hint: 'Hard stools or difficulty going', leftLabel: 'None', rightLabel: 'Severe' },
+  diarrhoea: { label: 'Diarrhoea', icon: Wind, hint: 'Loose stools or urgency', leftLabel: 'None', rightLabel: 'Severe' },
+  pain: { label: 'Pain', icon: Heart, hint: 'Overall body pain or aches', leftLabel: 'None', rightLabel: 'Severe' },
+  headache: { label: 'Headache', icon: Brain, hint: 'Head pain or pressure', leftLabel: 'None', rightLabel: 'Severe' },
+  migraine: { label: 'Migraine', icon: Brain, hint: 'Migraine-type headache', leftLabel: 'None', rightLabel: 'Severe' },
+  backPain: { label: 'Back pain', icon: Heart, hint: 'Upper or lower back pain', leftLabel: 'None', rightLabel: 'Severe' },
+  cramps: { label: 'Cramps', icon: Heart, hint: 'Lower belly cramps or spasms', leftLabel: 'None', rightLabel: 'Severe' },
+  jointPain: { label: 'Joint pain', icon: Heart, hint: 'Stiff or sore joints', leftLabel: 'None', rightLabel: 'Severe' },
+  flow: { label: 'Bleeding / spotting (optional)', icon: Droplet, hint: 'Bleeding or spotting level', leftLabel: 'None', rightLabel: 'Heavy' },
+  hairShedding: { label: 'Hair shedding', icon: Sparkles, hint: 'More hair loss than usual', leftLabel: 'None', rightLabel: 'Severe' },
+  facialSpots: { label: 'Facial spots', icon: Sparkles, hint: 'Breakouts or spots on face', leftLabel: 'Clear', rightLabel: 'Severe' },
+  cysts: { label: 'Cysts', icon: Heart, hint: 'Painful lumps or cystic spots', leftLabel: 'None', rightLabel: 'Severe' },
+  skinDryness: { label: 'Skin dryness', icon: Sparkles, hint: 'Dry, itchy, or sensitive skin', leftLabel: 'None', rightLabel: 'Severe' },
+  brainFog: { label: 'Brain fog', icon: Brain, hint: 'Foggy thinking, forgetfulness', leftLabel: 'Clear', rightLabel: 'Severe' },
+  fatigue: { label: 'Fatigue', icon: Battery, hint: 'Heavy tiredness or drained feeling', leftLabel: 'None', rightLabel: 'Severe' },
+  dizziness: { label: 'Dizziness', icon: Brain, hint: 'Light-headed or unsteady', leftLabel: 'None', rightLabel: 'Severe' },
+  appetite: { label: 'Appetite', icon: Battery, hint: 'Hunger and cravings', leftLabel: 'Low', rightLabel: 'High' },
+  libido: { label: 'Libido', icon: Heart, hint: 'Interest in sex', leftLabel: 'Low', rightLabel: 'High' },
+  breastTenderness: { label: 'Breast tenderness', icon: Heart, hint: 'Sore or tender breasts', leftLabel: 'None', rightLabel: 'Severe' },
+  hotFlushes: { label: 'Hot flushes', icon: Sparkles, hint: 'Sudden heat and flushing', leftLabel: 'None', rightLabel: 'Severe' },
+  nightSweats: { label: 'Night sweats', icon: Moon, hint: 'Waking sweaty at night', leftLabel: 'None', rightLabel: 'Severe' },
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -112,6 +112,24 @@ function normalise10(v: any): number {
   // Support older 0–100 values
   const scaled = v > 10 ? Math.round(v / 10) : v;
   return clamp(scaled, 0, 10);
+}
+
+function formatYesterdayValue(v: number | null | undefined): string {
+  if (v == null) return 'Yesterday not logged';
+  return v <= 0 ? 'Yesterday none' : `Yesterday ${v}/10`;
+}
+
+function directionLabelsForCustom(label: string): { leftLabel: string; rightLabel: string } {
+  const lower = label.toLowerCase();
+  if (lower.includes('sleep')) return { leftLabel: 'Poor', rightLabel: 'Great' };
+  if (lower.includes('energy') || lower.includes('motivation') || lower.includes('appetite') || lower.includes('libido')) {
+    return { leftLabel: 'Low', rightLabel: 'High' };
+  }
+  if (lower.includes('focus') || lower.includes('clarity') || lower.includes('brain fog')) {
+    return { leftLabel: 'Low', rightLabel: 'High' };
+  }
+  if (lower.includes('bleed') || lower.includes('spot')) return { leftLabel: 'None', rightLabel: 'Heavy' };
+  return { leftLabel: 'None', rightLabel: 'Severe' };
 }
 
 
@@ -170,118 +188,93 @@ function SwitchRow({
 
 function Slider10({
   value,
-  onChange,
+  onPreviewChange,
+  onCommit,
   leftLabel,
   rightLabel,
 }: {
   value: number;
-  onChange: (n: number) => void;
+  onPreviewChange?: (n: number) => void;
+  onCommit: (n: number) => void;
   leftLabel?: string;
   rightLabel?: string;
 }) {
-  const v = clamp(value, 0, 10);
-  const pct = (v / 10) * 100;
-
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [bubbleLeftPx, setBubbleLeftPx] = useState<number | null>(null);
+  const [draftValue, setDraftValue] = useState(() => clamp(value, 0, 10));
+  const dragValueRef = useRef(clamp(value, 0, 10));
+  const draggingRef = useRef(false);
 
-  const recomputeBubble = useCallback(() => {
+  useEffect(() => {
+    if (!draggingRef.current) {
+      const next = clamp(value, 0, 10);
+      setDraftValue(next);
+      dragValueRef.current = next;
+    }
+  }, [value]);
+
+  const updateVisual = useCallback((next: number) => {
+    const safe = clamp(next, 0, 10);
+    dragValueRef.current = safe;
+    setDraftValue((prev) => (prev === safe ? prev : safe));
+    onPreviewChange?.(safe);
+  }, [onPreviewChange]);
+
+  const commitCurrent = useCallback(() => {
+    draggingRef.current = false;
+    const safe = clamp(dragValueRef.current, 0, 10);
+    onCommit(safe);
+  }, [onCommit]);
+
+  const setFromClientX = useCallback((clientX: number) => {
     const wrap = wrapRef.current;
-    const input = inputRef.current;
-    if (!wrap || !input) return;
-
-    const w = wrap.clientWidth;
-    if (!w) return;
-
-    // Thumb size comes from CSS so mobile/desktop stay in sync.
-    const cs = window.getComputedStyle(input);
-    const thumbVar = cs.getPropertyValue('--eb-thumb-size').trim();
-    const thumb = thumbVar.endsWith('px') ? parseFloat(thumbVar) : Number(thumbVar);
-    const thumbSize = Number.isFinite(thumb) && thumb > 0 ? thumb : 22;
-
-    const ratio = v / 10;
-    const usable = Math.max(0, w - thumbSize);
-    setBubbleLeftPx(ratio * usable + thumbSize / 2);
-  }, [v]);
-
-  useLayoutEffect(() => {
-    recomputeBubble();
-    const wrap = wrapRef.current;
-    if (!wrap || !hasResizeObserver()) return;
-    const ResizeObserverCtor = (window as any).ResizeObserver as typeof ResizeObserver;
-    const ro = new ResizeObserverCtor(() => recomputeBubble());
-    ro.observe(wrap);
-    return () => ro.disconnect();
-  }, [recomputeBubble]);
-
-  const setFromClientX = (clientX: number) => {
-    const el = inputRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
     const x = Math.min(rect.right, Math.max(rect.left, clientX));
     const ratio = rect.width ? (x - rect.left) / rect.width : 0;
-    const next = Math.round(ratio * 10);
-    onChange(clamp(next, 0, 10));
-  };
+    updateVisual(Math.round(ratio * 10));
+  }, [updateVisual]);
 
-  // Prevent accidental slider changes while the user is scrolling on mobile.
-  // Strategy:
-  // - Only "jump to value" on a deliberate tap (minimal movement).
-  // - Ignore onChange updates if the gesture becomes a vertical scroll.
-  const gestureRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    scroll: boolean;
-  }>({ active: false, startX: 0, startY: 0, scroll: false });
-
-  const onWrapPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e as any).isPrimary === false) return;
-    gestureRef.current = { active: true, startX: e.clientX, startY: e.clientY, scroll: false };
+    draggingRef.current = true;
+    setFromClientX(e.clientX);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
   };
 
-  const onWrapPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const g = gestureRef.current;
-    if (!g.active || g.scroll) return;
-    const dx = Math.abs(e.clientX - g.startX);
-    const dy = Math.abs(e.clientY - g.startY);
-    // If the user is moving mostly vertically, treat as scroll and do not update values.
-    if (dy > 8 && dy > dx) g.scroll = true;
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    setFromClientX(e.clientX);
   };
 
-  const onWrapPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    const g = gestureRef.current;
-    if (!g.active) return;
-    const dx = Math.abs(e.clientX - g.startX);
-    const dy = Math.abs(e.clientY - g.startY);
-    const isTap = !g.scroll && dx < 10 && dy < 10;
-    gestureRef.current.active = false;
-    gestureRef.current.scroll = false;
-
-    // Allow "tap anywhere on track" without interfering with normal page scrolling.
-    if (isTap) setFromClientX(e.clientX);
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    setFromClientX(e.clientX);
+    commitCurrent();
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
   };
+
+  const onPointerCancel = () => {
+    if (!draggingRef.current) return;
+    commitCurrent();
+  };
+
+  const pct = `${(draftValue / 10) * 100}%`;
 
   return (
-    <div className="relative pt-4">
-      <div
-        className="absolute top-1 text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--color-surface))] shadow-sm border border-[rgb(228_228_231_/_0.6)] text-[rgb(var(--color-text))]"
-        style={{ left: bubbleLeftPx != null ? `${bubbleLeftPx}px` : `${pct}%`, transform: 'translateX(-50%)' }}
-        aria-hidden="true"
-      >
-        {v}
+    <div>
+      <div className="flex items-center justify-between text-[11px] font-medium tracking-[0.01em] text-[rgb(var(--color-text-secondary))] px-1 mb-2">
+        <span>{leftLabel ?? 'None'}</span>
+        <span>{rightLabel ?? 'Severe'}</span>
       </div>
+
       <div
         ref={wrapRef}
         className="eb-range-wrap"
-        onPointerDown={onWrapPointerDown}
-        onPointerMove={onWrapPointerMove}
-        onPointerUp={onWrapPointerUp}
-        onPointerCancel={() => {
-          gestureRef.current.active = false;
-          gestureRef.current.scroll = false;
-        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
       >
         <input
           ref={inputRef}
@@ -289,27 +282,27 @@ function Slider10({
           min={0}
           max={10}
           step={1}
-          value={v}
+          value={draftValue}
           onChange={(e) => {
-            // If the user is scrolling, ignore accidental slider movement.
-            if (gestureRef.current.scroll) return;
-            onChange(parseInt(e.target.value, 10));
+            const next = parseInt(e.target.value, 10);
+            updateVisual(next);
           }}
+          onMouseUp={commitCurrent}
+          onTouchEnd={commitCurrent}
           className="eb-range w-full"
           style={{
-            // Keep slider colour consistent (avoid band-based shifts at higher values).
             accentColor: 'rgb(var(--color-primary))',
             color: 'rgb(var(--color-primary))',
-            // Used by CSS for a smooth animated fill
-            ['--eb-range-fill' as any]: `${pct}%`,
+            ['--eb-range-fill' as any]: pct,
           }}
           aria-label="slider"
         />
       </div>
-      <div className="flex items-center justify-between text-xs text-[rgb(var(--color-text-secondary))] -mt-1 px-1">
-        <span>{leftLabel ?? '0'}</span>
+
+      <div className="flex items-center justify-between text-[11px] text-[rgb(var(--color-text-secondary))] px-1 mt-2">
+        <span>0</span>
         <span>5</span>
-        <span>{rightLabel ?? '10'}</span>
+        <span>10</span>
       </div>
     </div>
   );
@@ -950,38 +943,35 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
               const prevVal = typeof prevRaw === 'number' ? normalise10(prevRaw) : null;
 
               return (
-                <div key={key} className="rounded-2xl border border-[rgba(0,0,0,0.06)] p-4 bg-white">
-                  <div className="flex items-center justify-between gap-3 mb-3">
+                <div key={key} className="eb-card rounded-[1.5rem] p-5 border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
+                  <div className="flex items-center justify-between gap-3 mb-2">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center">
+                      <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] border border-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
                         <Icon className="w-5 h-5 text-[rgb(var(--color-primary))]" />
                       </div>
                       <div className="min-w-0">
-                        <div className="font-medium">{meta.label}</div>
+                        <div className="font-medium leading-tight">{meta.label}</div>
                         {meta.hint ? (
-                          <div className="text-xs text-[rgb(var(--color-text-secondary))]">{meta.hint}</div>
+                          <div className="text-sm text-[rgb(var(--color-text-secondary))] mt-0.5">{meta.hint}</div>
                         ) : null}
-                        <div className="text-xs text-[rgb(var(--color-text-secondary))]">
-                          {current}/10
-                          {prevVal != null ? (
-                            <span className="ml-2">• Yesterday: {prevVal}/10</span>
-                          ) : null}
-                        </div>
                       </div>
                     </div>
-                    <div className="text-sm font-medium text-[rgb(var(--color-text-secondary))]">{current}</div>
+                    <div className="shrink-0 text-sm font-semibold text-[rgb(var(--color-primary-dark))]">{current}/10</div>
                   </div>
+
+                  <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-3">{formatYesterdayValue(prevVal)}</div>
 
                   <Slider10
                     value={current}
-                    onChange={(n) => setValues((prev) => ({ ...prev, [key]: n }))}
-                    leftLabel={key === 'flow' ? '0' : '0'}
-                    rightLabel={key === 'flow' ? '10' : '10'}
+                    onPreviewChange={(n) => setValues((prev) => (prev[key] === n ? prev : { ...prev, [key]: n }))}
+                    onCommit={(n) => setValues((prev) => ({ ...prev, [key]: n }))}
+                    leftLabel={meta.leftLabel}
+                    rightLabel={meta.rightLabel}
                   />
 
                   {key === 'sleep' && userData.sleepDetailsEnabled ? (
-                    <details className="mt-4 rounded-xl border border-[rgba(0,0,0,0.06)] bg-[rgba(0,0,0,0.02)] overflow-hidden group">
-                      <summary className="list-none cursor-pointer select-none px-3 py-2 flex items-center justify-between">
+                    <details className="mt-4 rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-primary-light)/0.14)] overflow-hidden group">
+                      <summary className="list-none cursor-pointer select-none px-4 py-3 flex items-center justify-between">
                         <span className="text-sm font-medium">Sleep details</span>
                         <ChevronRight className="w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
                       </summary>
@@ -1059,9 +1049,10 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                                     <div className="mt-2">
                                       <Slider10
                                         value={nsVal}
-                                        onChange={(n) => setValues((prev) => ({ ...prev, nightSweats: n }))}
-                                        leftLabel="0"
-                                        rightLabel="10"
+                                        onPreviewChange={(n) => setValues((prev) => (prev.nightSweats === n ? prev : { ...prev, nightSweats: n }))}
+                                        onCommit={(n) => setValues((prev) => ({ ...prev, nightSweats: n }))}
+                                        leftLabel={sliderMeta.nightSweats.leftLabel}
+                                        rightLabel={sliderMeta.nightSweats.rightLabel}
                                       />
                                     </div>
                                   </>
@@ -1100,24 +1091,23 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                   const current = typeof (customValues as any)?.[s.id] === 'number' ? (customValues as any)[s.id] : 5;
                   const prevVal = normalise10((prevEntry as any)?.customValues?.[s.id]);
                   return (
-                    <div key={s.id} className="eb-card p-5">
-                      <div className="flex items-start justify-between gap-3 mb-3">
+                    <div key={s.id} className="eb-card rounded-[1.5rem] p-5 border-[rgb(var(--color-primary)/0.18)] bg-[rgb(var(--color-surface))] shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
+                      <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="min-w-0">
-                          <div className="font-semibold">{s.label}</div>
-                          {prevVal != null ? (
-                            <div className="text-xs text-[rgb(var(--color-text-secondary))] mt-1">Yesterday: {prevVal}/10</div>
-                          ) : (
-                            <div className="text-xs text-[rgb(var(--color-text-secondary))] mt-1">Yesterday: not logged</div>
-                          )}
+                          <div className="font-semibold leading-tight">{s.label}</div>
+                          <div className="text-sm text-[rgb(var(--color-text-secondary))] mt-0.5">Your custom symptom</div>
                         </div>
-                        <div className="text-sm font-medium text-[rgb(var(--color-text-secondary))]">{current}</div>
+                        <div className="text-sm font-semibold text-[rgb(var(--color-primary-dark))]">{current}/10</div>
                       </div>
+
+                      <div className="text-xs text-[rgb(var(--color-text-secondary))] mb-3">{formatYesterdayValue(prevVal)}</div>
 
                       <Slider10
                         value={current}
-                        onChange={(n) => setCustomValues((prev) => ({ ...prev, [s.id]: n }))}
-                        leftLabel="0"
-                        rightLabel="10"
+                        onPreviewChange={(n) => setCustomValues((prev) => (prev[s.id] === n ? prev : { ...prev, [s.id]: n }))}
+                        onCommit={(n) => setCustomValues((prev) => ({ ...prev, [s.id]: n }))}
+                        leftLabel={directionLabelsForCustom(s.label).leftLabel}
+                        rightLabel={directionLabelsForCustom(s.label).rightLabel}
                       />
                     </div>
                   );
