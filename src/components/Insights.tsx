@@ -3410,10 +3410,10 @@ const tryNextPrompts = useMemo(() => {
         ) : (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             {corrPairs.slice(0, 3).map((p, idx) => {
-              const title = `${p.a} → ${p.b}`;
+              const title = `${p.a} + ${p.b}`;
               const supportingLine = p.r > 0
-                ? `${p.a} and ${p.b.toLowerCase()} have often been rising together.`
-                : `${p.a} has often been followed by lower ${p.b.toLowerCase()}.`;
+                ? `${p.a} and ${p.b.toLowerCase()} have often risen together.`
+                : `${p.a} and ${p.b.toLowerCase()} have often moved in opposite directions.`;
 
               return (
                 <div key={idx} className="eb-inset rounded-2xl p-5 flex flex-col min-h-[170px]">
@@ -4670,75 +4670,6 @@ const tryNextPrompts = useMemo(() => {
         )}
       </div>
 
-      {/* Correlations (soft) */}
-      <div className="eb-card">
-        <div className="eb-card-header">
-          <div>
-            <div className="eb-card-title">What moves together</div>
-            <div className="eb-card-sub">A softer view of correlations.</div>
-          </div>
-        </div>
-
-        {corrPairs.length < 1 ? (
-          <div className="mt-2 text-sm eb-muted">Log a few days with the same metrics to reveal relationships.</div>
-        ) : (
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {corrPairs.slice(0, 4).map((p, idx) => {
-              // Avoid "weak/strong" language early on - keep it inviting.
-              const confLabel =
-                p.confidence === 'high' ? 'Clearer pattern' : p.confidence === 'medium' ? 'Possible pattern' : 'Emerging pattern';
-              const direction = p.r > 0 ? 'move together' : 'move in opposite directions';
-              const opener = p.confidence === 'low' ? 'There may be an emerging pattern where' : 'There may be a pattern where';
-              const safeCopy = p.hormonalInvolved
-                ? `${opener} these ${direction}. This could reflect stress, lifestyle, or hormonal changes.`
-                : `${opener} these ${direction}.`;
-
-              return (
-                <div key={idx} className="eb-inset rounded-2xl p-5 flex flex-col min-h-[170px]">
-                  <div className="text-sm font-semibold">
-                    {p.a} + {p.b}
-                  </div>
-                  <div className="mt-1 text-xs eb-muted">
-                    {confLabel} Â· based on {p.n} days logged together
-                  </div>
-                  <div className="mt-2 text-sm eb-muted">{safeCopy}</div>
-
-                  {/* Spacer to keep "Why am I seeing this?" in a stable spot near the bottom */}
-                  <div className="flex-1" />
-
-                  <details className="mt-3 rounded-2xl border border-neutral-200 bg-white/60 px-3 py-2">
-                    <summary className="cursor-pointer text-sm font-medium">Why am I seeing this?</summary>
-                    <div className="mt-2 text-sm eb-muted space-y-1">
-                      {(p.why ?? []).map((w, i) => (
-                        <div key={i}>{w}</div>
-                      ))}
-                      <div className="pt-1 text-xs eb-muted">Patterns are a hint, not proof.</div>
-                    </div>
-                  </details>
-
-                  <div className="pt-4 flex items-center justify-between gap-2">
-                    {p.allowSuggestedExperiment ? (
-                      <button
-                        type="button"
-                        className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 text-sm"
-                        onClick={() => openExperiment([p.aKey, p.bKey])}
-                      >
-                        <FlaskConical className="w-4 h-4" />
-                        Try 3-day experiment
-                      </button>
-                    ) : p.hormonalInvolved ? (
-                      <div className="text-sm eb-muted">Track for one more cycle.</div>
-                    ) : (
-                      <div className="text-sm eb-muted">Keep logging for a clearer signal.</div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
       {/* Relationship explorer removed */}
 
       {/* Weekday pattern */}
@@ -4789,35 +4720,7 @@ const tryNextPrompts = useMemo(() => {
         </div>
       </div>
 
-      {/* Quick actions */}
-      <div className="eb-card">
-        <div className="eb-card-header">
-          <div>
-            <div className="eb-card-title">Quick actions</div>
-            <div className="eb-card-sub">Use insights to drive the next best action, not perfection.</div>
-          </div>
-        </div>
 
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button
-            className="eb-inset rounded-2xl p-5 text-left hover:opacity-95 transition flex flex-col"
-            onClick={() => {
-              const last = entriesAllSorted[entriesAllSorted.length - 1];
-              if (last && onOpenCheckIn) onOpenCheckIn(last.dateISO);
-            }}
-          >
-            <div className="text-sm font-semibold flex items-center justify-between gap-2">
-              Edit your latest log <ArrowRight className="w-4 h-4" />
-            </div>
-            <div className="mt-1 text-sm eb-muted">Small edits make your insights cleaner.</div>
-          </button>
-
-          <div id="eb-active-experiment" className="eb-inset rounded-2xl p-6">
-            <div className="text-sm font-semibold">Keep it light</div>
-            <div className="mt-1 text-sm eb-muted">If you feel overwhelmed, switch off a symptom or two in Profile. You can always switch them back on.</div>
-          </div>
-        </div>
-      </div>
 
 
         </div>
