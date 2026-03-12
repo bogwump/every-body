@@ -295,8 +295,31 @@ function Slider10({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [draftValue, setDraftValue] = useState(() => clamp(value, 0, 10));
+  const [trackWidth, setTrackWidth] = useState(0);
   const dragValueRef = useRef(clamp(value, 0, 10));
   const draggingRef = useRef(false);
+  const thumbWidth = 32;
+
+  useLayoutEffect(() => {
+    const node = wrapRef.current;
+    if (!node) return;
+
+    const updateWidth = () => {
+      setTrackWidth(node.clientWidth || 0);
+    };
+
+    updateWidth();
+
+    const ResizeObs = (window as any).ResizeObserver;
+    if (ResizeObs) {
+      const observer = new ResizeObs(() => updateWidth());
+      observer.observe(node);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
   useEffect(() => {
     if (!draggingRef.current) {
@@ -353,7 +376,9 @@ function Slider10({
   };
 
   const pct = `${(draftValue / 10) * 100}%`;
-  const bubblePct = `${draftValue * 10}%`;
+  const bubbleLeft = trackWidth > 0
+    ? (thumbWidth / 2) + ((trackWidth - thumbWidth) * (draftValue / 10))
+    : 0;
 
   return (
     <div>
@@ -364,9 +389,12 @@ function Slider10({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        style={{ ['--eb-slider-pct' as any]: bubblePct }}
       >
-        <div className="eb-range-value-bubble" aria-hidden="true">
+        <div
+          className="eb-range-value-bubble"
+          aria-hidden="true"
+          style={{ left: `${bubbleLeft}px` }}
+        >
           {draftValue}
         </div>
 
