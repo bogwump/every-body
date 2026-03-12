@@ -415,14 +415,14 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   --eb-thumb-width: 32px;
   --eb-thumb-height: 20px;
   position: relative;
-  padding: 22px 0 0;
+  padding: 8px 0 0;
   touch-action: none;
 }
 
 .eb-range-value-bubble{
   position: absolute;
   top: 0;
-  transform: translate(-50%, 0);
+  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -434,12 +434,12 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   background: rgb(var(--color-surface));
   color: rgb(var(--color-primary-dark));
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  transition: left 80ms linear;
   font-size: 14px;
   line-height: 1;
   font-weight: 600;
   pointer-events: none;
   white-space: nowrap;
+  transition: left 90ms linear;
 }
 
 .eb-range{
@@ -504,14 +504,13 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
     --eb-track-height: 10px;
     --eb-thumb-width: 34px;
     --eb-thumb-height: 22px;
-    padding: 18px 0 0;
+    padding: 4px 0 0;
   }
 
   .eb-range-value-bubble{
     top: -2px;
   }
 }
-
 
 /* Insights page hero/settings tweaks */
 .insights-hero-bubble {

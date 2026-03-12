@@ -307,33 +307,34 @@ function Slider10({
     }
   }, [value]);
 
-
-  useLayoutEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-
+  useEffect(() => {
     const updateMetrics = () => {
+      const wrap = wrapRef.current;
+      if (!wrap) return;
       const styles = window.getComputedStyle(wrap);
-      const thumbVar = styles.getPropertyValue('--eb-thumb-width').trim();
-      const parsedThumb = Number.parseFloat(thumbVar);
-      const thumbWidth = Number.isFinite(parsedThumb) ? parsedThumb : 32;
-      setTrackMetrics({
-        width: wrap.clientWidth,
-        thumbWidth,
+      const thumbWidthRaw = styles.getPropertyValue('--eb-thumb-width').trim();
+      const thumbWidth = Number.parseFloat(thumbWidthRaw) || 32;
+      const width = wrap.clientWidth || wrap.getBoundingClientRect().width || 0;
+      setTrackMetrics((prev) => {
+        if (Math.abs(prev.width - width) < 0.5 && Math.abs(prev.thumbWidth - thumbWidth) < 0.5) return prev;
+        return { width, thumbWidth };
       });
     };
 
     updateMetrics();
 
-    const resizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => updateMetrics())
-      : null;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
 
-    resizeObserver?.observe(wrap);
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => updateMetrics());
+      observer.observe(wrap);
+    }
+
     window.addEventListener('resize', updateMetrics);
-
     return () => {
-      resizeObserver?.disconnect();
+      observer?.disconnect();
       window.removeEventListener('resize', updateMetrics);
     };
   }, []);
@@ -385,7 +386,7 @@ function Slider10({
   };
 
   const pct = `${(draftValue / 10) * 100}%`;
-  const bubbleLeft = trackMetrics.width > 0
+  const bubbleLeftPx = trackMetrics.width > 0
     ? ((trackMetrics.width - trackMetrics.thumbWidth) * (draftValue / 10)) + (trackMetrics.thumbWidth / 2)
     : 0;
 
@@ -402,7 +403,7 @@ function Slider10({
         <div
           className="eb-range-value-bubble"
           aria-hidden="true"
-          style={{ left: `${bubbleLeft}px` }}
+          style={{ left: `${bubbleLeftPx}px` }}
         >
           {draftValue}
         </div>
