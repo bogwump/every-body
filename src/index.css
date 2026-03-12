@@ -414,8 +414,9 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   --eb-track-height: 8px;
   --eb-thumb-width: 32px;
   --eb-thumb-height: 20px;
+  --eb-bubble-gap: 6px;
   position: relative;
-  padding: 8px 0 0;
+  padding: 40px 0 0;
   touch-action: none;
 }
 
@@ -439,7 +440,8 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   font-weight: 600;
   pointer-events: none;
   white-space: nowrap;
-  transition: left 90ms linear;
+  transition: left 80ms linear;
+  bottom: calc((var(--eb-thumb-height) + var(--eb-track-height)) / 2 + var(--eb-bubble-gap));
 }
 
 .eb-range{
@@ -504,11 +506,8 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
     --eb-track-height: 10px;
     --eb-thumb-width: 34px;
     --eb-thumb-height: 22px;
-    padding: 4px 0 0;
-  }
-
-  .eb-range-value-bubble{
-    top: -2px;
+    --eb-bubble-gap: 10px;
+    padding: 46px 0 0;
   }
 }
 

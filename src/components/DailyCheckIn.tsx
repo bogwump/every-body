@@ -295,9 +295,10 @@ function Slider10({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [draftValue, setDraftValue] = useState(() => clamp(value, 0, 10));
+  const [trackWidth, setTrackWidth] = useState(0);
+  const [thumbWidth, setThumbWidth] = useState(32);
   const dragValueRef = useRef(clamp(value, 0, 10));
   const draggingRef = useRef(false);
-  const [trackMetrics, setTrackMetrics] = useState({ width: 0, thumbWidth: 32 });
 
   useEffect(() => {
     if (!draggingRef.current) {
@@ -307,35 +308,35 @@ function Slider10({
     }
   }, [value]);
 
-  useEffect(() => {
-    const updateMetrics = () => {
-      const wrap = wrapRef.current;
-      if (!wrap) return;
-      const styles = window.getComputedStyle(wrap);
-      const thumbWidthRaw = styles.getPropertyValue('--eb-thumb-width').trim();
-      const thumbWidth = Number.parseFloat(thumbWidthRaw) || 32;
-      const width = wrap.clientWidth || wrap.getBoundingClientRect().width || 0;
-      setTrackMetrics((prev) => {
-        if (Math.abs(prev.width - width) < 0.5 && Math.abs(prev.thumbWidth - thumbWidth) < 0.5) return prev;
-        return { width, thumbWidth };
-      });
-    };
-
-    updateMetrics();
-
+  useLayoutEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
 
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(() => updateMetrics());
-      observer.observe(wrap);
+    const measure = () => {
+      const rect = wrap.getBoundingClientRect();
+      setTrackWidth(rect.width || 0);
+      try {
+        const styles = window.getComputedStyle(wrap);
+        const rawThumb = parseFloat(styles.getPropertyValue('--eb-thumb-width'));
+        if (Number.isFinite(rawThumb) && rawThumb > 0) {
+          setThumbWidth(rawThumb);
+        }
+      } catch {}
+    };
+
+    measure();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof window !== 'undefined' && hasResizeObserver()) {
+      ro = new ResizeObserver(() => measure());
+      ro.observe(wrap);
+    } else if (typeof window !== 'undefined') {
+      window.addEventListener('resize', measure);
     }
 
-    window.addEventListener('resize', updateMetrics);
     return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', updateMetrics);
+      if (ro) ro.disconnect();
+      else if (typeof window !== 'undefined') window.removeEventListener('resize', measure);
     };
   }, []);
 
@@ -386,9 +387,9 @@ function Slider10({
   };
 
   const pct = `${(draftValue / 10) * 100}%`;
-  const bubbleLeftPx = trackMetrics.width > 0
-    ? ((trackMetrics.width - trackMetrics.thumbWidth) * (draftValue / 10)) + (trackMetrics.thumbWidth / 2)
-    : 0;
+  const bubbleLeftPx = trackWidth > 0
+    ? ((trackWidth - thumbWidth) * (draftValue / 10)) + (thumbWidth / 2)
+    : thumbWidth / 2;
 
   return (
     <div>
@@ -400,11 +401,7 @@ function Slider10({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
       >
-        <div
-          className="eb-range-value-bubble"
-          aria-hidden="true"
-          style={{ left: `${bubbleLeftPx}px` }}
-        >
+        <div className="eb-range-value-bubble" aria-hidden="true" style={{ left: `${bubbleLeftPx}px` }}>
           {draftValue}
         </div>
 
@@ -445,6 +442,7 @@ function Slider10({
     </div>
   );
 }
+
 
 export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateISO, onNavigate, onDismiss }: DailyCheckInProps) {
   const safeBlur = () => {
