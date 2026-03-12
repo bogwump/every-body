@@ -43,6 +43,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
+import { getBodyWeatherLines } from '../lib/companionLogic';
 
 interface InsightsProps {
   userData: UserData;
@@ -1226,6 +1227,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     return base.map((p) => {
       const hormonalInvolved = isHormonalMetric(p.aKey, userData) || isHormonalMetric(p.bKey, userData);
       const confidence = confidenceFrom(Math.abs(p.r), p.n);
+      const maturity = p.n >= 12 && Math.abs(p.r) >= 0.65
+        ? 'more consistent pattern'
+        : p.n >= 8 && Math.abs(p.r) >= 0.5
+          ? 'repeating pattern'
+          : 'emerging pattern';
       const allowSuggestedExperiment =
         (p.kindA === 'behaviour' || p.kindB === 'behaviour') &&
         // avoid suggesting experiments when the relationship is based on very few points
@@ -1233,17 +1239,52 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         // still avoid anything "body <-> body"
         !((p.kindA === 'physio' || p.kindA === 'hormonal') && (p.kindB === 'physio' || p.kindB === 'hormonal'));
 
+      const lagLine = (() => {
+        const candidates: Array<{ lead: string; follow: string; lag: number; score: number; n: number }> = [];
+        for (const lag of [1, 2]) {
+          const xsAB: number[] = [];
+          const ysAB: number[] = [];
+          for (let i = 0; i + lag < entriesSorted.length; i++) {
+            const av = valueForMetric(entriesSorted[i], p.aKey);
+            const bv = valueForMetric(entriesSorted[i + lag], p.bKey);
+            if (typeof av === 'number' && typeof bv === 'number') { xsAB.push(av); ysAB.push(bv); }
+          }
+          if (xsAB.length >= 6) {
+            const rAB = pearsonCorrelation(xsAB, ysAB);
+            if (Number.isFinite(rAB)) candidates.push({ lead: p.a, follow: p.b, lag, score: Math.abs(rAB), n: xsAB.length });
+          }
+
+          const xsBA: number[] = [];
+          const ysBA: number[] = [];
+          for (let i = 0; i + lag < entriesSorted.length; i++) {
+            const bv = valueForMetric(entriesSorted[i], p.bKey);
+            const av = valueForMetric(entriesSorted[i + lag], p.aKey);
+            if (typeof bv === 'number' && typeof av === 'number') { xsBA.push(bv); ysBA.push(av); }
+          }
+          if (xsBA.length >= 6) {
+            const rBA = pearsonCorrelation(xsBA, ysBA);
+            if (Number.isFinite(rBA)) candidates.push({ lead: p.b, follow: p.a, lag, score: Math.abs(rBA), n: xsBA.length });
+          }
+        }
+        const best = candidates.sort((a, b) => b.score - a.score)[0];
+        if (!best) return null;
+        if (best.score < Math.abs(p.r) + 0.08) return null;
+        return `${best.lead} has sometimes shown up before ${best.follow.toLowerCase()} by about ${best.lag} day${best.lag === 1 ? '' : 's'}.`;
+      })();
+
       const why = [
         `You logged both metrics on ${p.n} day${p.n === 1 ? '' : 's'}.`,
+        `This currently looks like a ${maturity}.`,
         deepReady
           ? `This is calculated from your recent logs and will update as you add more days.`
           : `This is an early signal. With only a few days logged, it may change as you add more data.`,
+        lagLine,
         hormonalInvolved
           ? `Hormones can influence lots of symptoms at once, so treat this as a prompt to notice patterns, not a diagnosis.`
           : `Correlation does not mean one causes the other.`,
       ].filter(Boolean);
 
-      return { ...p, hormonalInvolved, confidence, allowSuggestedExperiment, why };
+      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why };
     });
   }, [deepReady, entriesSorted, selected, userData, allMetricKeys]);
 
@@ -1701,34 +1742,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   );
   const helpfulHeroLine = helpfulPatterns[0]?.text ?? null;
 
-  const bodyWeatherLines = useMemo(() => {
-    const phaseLineMap: Partial<Record<CyclePhase, string>> = {
-      Menstrual: 'A slower, more comfort-led few days may suit you better.',
-      Follicular: 'You may notice a little more lift or forward momentum building.',
-      Ovulation: 'You may feel a bit more outward-facing or able to use your energy.',
-      Luteal: 'Sleep, stress, or sensitivity may need a little more support than usual.',
-    };
-
-    const metricLine = (() => {
-      const signal = strongPatternSignals[0] ?? heroSignals.find((item) => item.type !== 'low_data');
-      const metric = signal?.metrics?.[0];
-      if (!metric) return null;
-      const label = labelFor(metric as any, userData);
-      if (metric === 'sleep') return 'Sleep may be one of the first things to feel a bit different, so keep evenings gentle if you can.';
-      if (metric === 'energy') return 'Energy may feel changeable, so a steadier pace could help over the next few days.';
-      if (metric === 'stress') return 'Stress may show up in your body quite quickly, so leaving a little breathing room may help.';
-      if (metric === 'brainFog') return 'Brain fog may feel a little louder than usual, so simpler days may land better.';
-      if (metric === 'fatigue') return 'Fatigue may creep in faster than you expect, so it may help to keep things a touch lighter.';
-      return `${label} may be worth keeping an eye on over the next few days.`;
-    })();
-
-    const lines = [
-      currentInsightsPhase ? phaseLineMap[currentInsightsPhase] ?? null : null,
-      metricLine,
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.length ? lines.slice(0, 2) : ['A few more check-ins will help this section turn into a more personal body weather read.'];
-  }, [currentInsightsPhase, heroSignals, strongPatternSignals, userData]);
+  const bodyWeatherLines = useMemo(() => getBodyWeatherLines({
+    entries: entriesAllSorted as any,
+    userData,
+    currentPhase: currentInsightsPhase as any,
+    heroSignals,
+    strongPatternSignals,
+  }), [currentInsightsPhase, entriesAllSorted, heroSignals, strongPatternSignals, userData]);
 
   const CUSTOM_EXPERIMENT_MAX_METRICS = 5;
   const [preOpenExperimentConfirm, setPreOpenExperimentConfirm] = useState<

@@ -6,6 +6,7 @@ import { createMoment, getActiveMoments, getCompanionMoments, getHighestPriority
 import { generateExperimentSuggestions, getExperimentForSignal, rankExperimentSuggestions } from './experimentSuggestions';
 import { detectLongCycle, detectShortCycle, detectUnusualPhaseLength } from './rhythmDiagnostics';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
+import { getExperimentSuggestionSuppression, getWeeklyReflectionMoment, shouldSuppressCompanionMoment } from './companionLogic';
 import { getConfidencePhrase } from './confidenceCopy';
 import { phaseLabelFromKey } from './phaseChange';
 
@@ -65,13 +66,14 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
   if (currentTopPriority === 'phase_change') return;
 
   const experimentHistory = readExperimentHistory();
+  const experimentSuggestionSuppression = getExperimentSuggestionSuppression(refISO);
   const latestCompleted = experimentHistory
     .filter((item) => item?.outcome?.completedAtISO)
     .sort((a, b) => String(b?.outcome?.completedAtISO || '').localeCompare(String(a?.outcome?.completedAtISO || '')))[0] ?? null;
   if (latestCompleted) {
     const completedDate = String(latestCompleted?.outcome?.completedAtISO || '').slice(0, 10);
     const momentId = `experiment-result:${String(latestCompleted?.experimentId || latestCompleted?.title || 'latest')}:${completedDate}`;
-    if (completedDate && completedDate >= refISO && !hasMomentWithId(momentId) && !active.some((moment) => moment.type === 'experiment_result_ready')) {
+    if (completedDate && completedDate >= refISO && !hasMomentWithId(momentId) && !active.some((moment) => moment.type === 'experiment_result_ready') && !shouldSuppressCompanionMoment({ type: 'experiment_result_ready', refISO, cooldownDays: 7, dismissalCooldownDays: 10, experimentId: String(latestCompleted?.experimentId || '') })) {
       createMoment({
         id: momentId,
         type: 'experiment_result_ready',
@@ -95,7 +97,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
     .slice()
     .sort((a, b) => b.firstDetected.localeCompare(a.firstDetected));
   const latestDiscovery = discovered[0] ?? null;
-  if (latestDiscovery && latestDiscovery.firstDetected >= refISO && !hasMomentWithId(`pattern:${latestDiscovery.id}:${latestDiscovery.firstDetected}`)) {
+  if (latestDiscovery && latestDiscovery.firstDetected >= refISO && !hasMomentWithId(`pattern:${latestDiscovery.id}:${latestDiscovery.firstDetected}`) && !shouldSuppressCompanionMoment({ type: 'new_pattern', refISO, cooldownDays: 6, dismissalCooldownDays: 12, signalId: latestDiscovery.id })) {
     const signal = getTopInsights(entries, userData, 8).find((item) => item.id === latestDiscovery.id);
     if (signal) {
       const copy = patternCopy(signal);
@@ -115,7 +117,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
   }
 
   const helpfulPattern = getHelpfulPatternsFromExperiments().filter((item) => item.confidence !== 'low')[0] ?? null;
-  if (helpfulPattern && !active.some((moment) => moment.type === 'helpful_pattern_detected')) {
+  if (helpfulPattern && !active.some((moment) => moment.type === 'helpful_pattern_detected') && !shouldSuppressCompanionMoment({ type: 'helpful_pattern_detected', refISO, cooldownDays: 10, dismissalCooldownDays: 14, signalId: helpfulPattern.signal })) {
     const helpfulDate = helpfulPattern.lastEvidenceDate || refISO;
     const helpfulId = `helpful:${helpfulPattern.signal}:${helpfulPattern.evidenceCount}:${helpfulDate}`;
     if (!hasMomentWithId(helpfulId)) {
@@ -135,7 +137,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
 
   const strongestSignal = getTopInsights(entries, userData, 6).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low');
   const topSuggestion = rankExperimentSuggestions(generateExperimentSuggestions(strongestSignal))[0] ?? null;
-  if (topSuggestion && !active.some((moment) => moment.type === 'experiment_suggestion')) {
+  if (topSuggestion && !experimentSuggestionSuppression.active && !experimentSuggestionSuppression.recentCompletion && !active.some((moment) => moment.type === 'experiment_suggestion') && !shouldSuppressCompanionMoment({ type: 'experiment_suggestion', refISO, cooldownDays: 7, dismissalCooldownDays: 14, experimentId: String(topSuggestion.experimentId || '') })) {
     const sourceSignal = strongestSignal.find((signal) => `experiment:${signal.id}` === topSuggestion.id) ?? null;
     const linkedExperiment = sourceSignal ? getExperimentForSignal(sourceSignal) : null;
     createMoment({
@@ -158,7 +160,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
   }
 
   const diagnostic = detectUnusualPhaseLength(refISO) ?? detectShortCycle() ?? detectLongCycle();
-  if (diagnostic && !active.some((moment) => moment.type === 'rhythm_shift')) {
+  if (diagnostic && !active.some((moment) => moment.type === 'rhythm_shift') && !shouldSuppressCompanionMoment({ type: 'rhythm_shift', refISO, cooldownDays: 5, dismissalCooldownDays: 8 })) {
     const body = diagnostic.type === 'long_phase'
       ? `Your ${phaseLabelFromKey(diagnostic.phase)} has been lasting a little longer than usual recently.`
       : diagnostic.type === 'short_cycle'
@@ -177,7 +179,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
   }
 
   const milestone = logsMilestone(entries);
-  if (milestone) {
+  if (milestone && !shouldSuppressCompanionMoment({ type: milestone.id.startsWith('unlock') ? 'unlock_milestone' : 'encouragement', refISO, cooldownDays: 6, dismissalCooldownDays: 10 })) {
     createMoment({
       id: milestone.id,
       type: milestone.id.startsWith('unlock') ? 'unlock_milestone' : 'encouragement',
@@ -185,6 +187,20 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
       data: {
         title: milestone.title,
         body: milestone.body,
+      },
+    });
+    return;
+  }
+
+  const reflection = getWeeklyReflectionMoment(entries, refISO);
+  if (reflection && !shouldSuppressCompanionMoment({ type: reflection.type, refISO, cooldownDays: 6, dismissalCooldownDays: 10 })) {
+    createMoment({
+      id: reflection.id,
+      type: reflection.type,
+      date: refISO,
+      data: {
+        title: reflection.title,
+        body: reflection.body,
       },
     });
   }

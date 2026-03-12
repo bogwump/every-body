@@ -1,5 +1,7 @@
 import type { InsightSignal } from './insightEngine';
 import { getExperimentHistoryContext } from './experimentLearning';
+import { getExperimentSuggestionSuppression } from './companionLogic';
+import { isoTodayLocal } from './date';
 
 export type ExperimentSuggestion = {
   id: string;
@@ -88,6 +90,8 @@ function suggestionForSignal(signal: InsightSignal): ExperimentSuggestion | null
 }
 
 export function generateExperimentSuggestions(signals: InsightSignal[]): ExperimentSuggestion[] {
+  const suppression = getExperimentSuggestionSuppression(isoTodayLocal());
+  if (suppression.active || suppression.recentCompletion) return [];
   const out: ExperimentSuggestion[] = [];
   const seen = new Set<string>();
   for (const signal of signals) {
