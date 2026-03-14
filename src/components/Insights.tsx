@@ -1075,6 +1075,15 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const [patternFeedbackTick, setPatternFeedbackTick] = useState(0);
 
+  const currentInsightsPhase = useMemo(() => {
+    if (userData.cycleTrackingMode !== 'cycle' || !entriesAllSorted.length) return null;
+    try {
+      return estimatePhaseByFlow(isoTodayLocal(), entriesAllSorted) as CyclePhase | null;
+    } catch {
+      return null;
+    }
+  }, [entriesAllSorted, userData.cycleTrackingMode]);
+
   const metricPairSignals = useMemo(
     () => filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 12, selected)).filter((signal) => signal.type === 'metric_pair'),
     [entriesAllSorted, selected, userData, patternFeedbackTick],
@@ -1605,15 +1614,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   // --- UI helpers ---
   const metricsSummary = selected.map((k) => labelFor(k, userData)).join(' • ');
-
-  const currentInsightsPhase = useMemo(() => {
-    if (userData.cycleTrackingMode !== 'cycle' || !entriesAllSorted.length) return null;
-    try {
-      return estimatePhaseByFlow(isoTodayLocal(), entriesAllSorted) as CyclePhase | null;
-    } catch {
-      return null;
-    }
-  }, [entriesAllSorted, userData.cycleTrackingMode]);
 
   type HeroInsightItem = {
     id: string;
