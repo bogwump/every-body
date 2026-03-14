@@ -1613,6 +1613,16 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     isNewPattern: boolean;
   };
 
+  const metricPairSignals = useMemo(
+    () => filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 12, selected)).filter((signal) => signal.type === 'metric_pair'),
+    [entriesAllSorted, selected, userData, patternFeedbackTick],
+  );
+
+  const heroSignals = useMemo(
+    () => selectStableHeroInsights(filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 6, selected)), 3),
+    [entriesAllSorted, selected, userData, patternFeedbackTick],
+  );
+
   const copyForInsightSignal = (signal: InsightSignal): string => {
     const labels = metricLabelsForSignal(signal, userData);
     const primary = labels[0] ?? 'This pattern';
@@ -1684,16 +1694,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         return 'We will start spotting clearer trends after a few more check-ins.';
     }
   };
-
-  const metricPairSignals = useMemo(
-    () => filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 12, selected)).filter((signal) => signal.type === 'metric_pair'),
-    [entriesAllSorted, selected, userData, patternFeedbackTick],
-  );
-
-  const heroSignals = useMemo(
-    () => selectStableHeroInsights(filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 6, selected)), 3),
-    [entriesAllSorted, selected, userData, patternFeedbackTick],
-  );
 
   useEffect(() => {
     const unseen = heroSignals.filter((signal) => signal.isNewPattern);
