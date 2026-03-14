@@ -44,7 +44,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
-import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern } from '../lib/patternFeedback';
+import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern } from '../lib/patternFeedback';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
@@ -1275,7 +1275,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const handlePatternFeedback = (kind: 'yes' | 'no' | 'unsure', pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }) => {
     const confidenceScore = pair.confidence === 'high' ? 0.82 : pair.confidence === 'medium' ? 0.66 : 0.5;
     const args = {
-      id: `pattern:${[String(pair.aKey), String(pair.bKey)].sort().join('|')}`,
+      id: getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey),
       metrics: [pair.aKey, pair.bKey],
       previousScore: pair.quality,
       confidence: confidenceScore,
@@ -3496,7 +3496,7 @@ const tryNextPrompts = useMemo(() => {
                       <div className="pt-1 text-xs eb-muted">Patterns are a hint, not proof.</div>
                     </div>
                   </details>
-                  {shouldPromptPatternFeedback(`pattern:${[String(p.aKey), String(p.bKey)].sort().join('|')}`, p.feedback?.status === 'confirmed') ? (
+                  {shouldPromptPatternFeedback(getPatternFeedbackIdFromMetrics(p.aKey, p.bKey), p.feedback?.status === 'confirmed') ? (
                     <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
                       <div className="text-sm font-medium">Does this match your experience?</div>
                       <div className="mt-3 flex flex-wrap gap-2">
