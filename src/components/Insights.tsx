@@ -1075,6 +1075,16 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const [patternFeedbackTick, setPatternFeedbackTick] = useState(0);
 
+  const metricPairSignals = useMemo(
+    () => filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 12, selected)).filter((signal) => signal.type === 'metric_pair'),
+    [entriesAllSorted, selected, userData, patternFeedbackTick],
+  );
+
+  const heroSignals = useMemo(
+    () => selectStableHeroInsights(filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 6, selected)), 3),
+    [entriesAllSorted, selected, userData, patternFeedbackTick],
+  );
+
   // --- Correlations list (for soft display + report) ---
   const corrPairs = useMemo(() => {
     const allowEarlyBehaviourState = entriesSorted.length >= 4;
@@ -1612,16 +1622,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     repeatLine?: string | null;
     isNewPattern: boolean;
   };
-
-  const metricPairSignals = useMemo(
-    () => filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 12, selected)).filter((signal) => signal.type === 'metric_pair'),
-    [entriesAllSorted, selected, userData, patternFeedbackTick],
-  );
-
-  const heroSignals = useMemo(
-    () => selectStableHeroInsights(filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 6, selected)), 3),
-    [entriesAllSorted, selected, userData, patternFeedbackTick],
-  );
 
   const copyForInsightSignal = (signal: InsightSignal): string => {
     const labels = metricLabelsForSignal(signal, userData);
