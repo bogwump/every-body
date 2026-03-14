@@ -44,7 +44,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
-import { filterSignalsByPatternFeedback } from '../lib/patternFeedback';
+import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern } from '../lib/patternFeedback';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
@@ -1073,6 +1073,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     });
   }, [selected, entriesSorted, entriesAllSorted, days, userData, userData.enabledModules]);
 
+  const [patternFeedbackTick, setPatternFeedbackTick] = useState(0);
+
   // --- Correlations list (for soft display + report) ---
   const corrPairs = useMemo(() => {
     const allowEarlyBehaviourState = entriesSorted.length >= 4;
@@ -1223,7 +1225,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       out = computePairs(limited);
     }
 
-    const base = out.slice(0, 6);
+    const filtered = out.filter((pair) => !isSuppressedPair(pair.aKey, pair.bKey, pair.quality));
+
+    const base = filtered.slice(0, 6);
 
     // Enrich for UI copy (keeps render simple + avoids undefined refs when logic changes).
     return base.map((p) => {
@@ -1262,9 +1266,31 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           : `Correlation does not mean one causes the other.`,
       ].filter(Boolean);
 
-      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why, lagPattern, contextLine };
+      const feedback = getFeedbackForMetrics(p.aKey, p.bKey);
+      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why, lagPattern, contextLine, feedback };
     });
-  }, [deepReady, entriesSorted, selected, userData, allMetricKeys]);
+  }, [deepReady, entriesSorted, selected, userData, allMetricKeys, patternFeedbackTick]);
+
+
+  const handlePatternFeedback = (kind: 'yes' | 'no' | 'unsure', pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }) => {
+    const confidenceScore = pair.confidence === 'high' ? 0.82 : pair.confidence === 'medium' ? 0.66 : 0.5;
+    const args = {
+      id: `pattern:${[String(pair.aKey), String(pair.bKey)].sort().join('|')}`,
+      metrics: [pair.aKey, pair.bKey],
+      previousScore: pair.quality,
+      confidence: confidenceScore,
+    };
+
+    if (kind === 'no') {
+      suppressPattern(args);
+    } else if (kind === 'yes') {
+      confirmPattern(args);
+    } else {
+      markPatternUnsure(args);
+    }
+
+    setPatternFeedbackTick((value) => value + 1);
+  };
 
   // --- Relationship explorer ---
   const [scatterX, setScatterX] = useState<SymptomKey | 'mood'>(() => selected[0] ?? 'mood');
@@ -3470,6 +3496,39 @@ const tryNextPrompts = useMemo(() => {
                       <div className="pt-1 text-xs eb-muted">Patterns are a hint, not proof.</div>
                     </div>
                   </details>
+                  {shouldPromptPatternFeedback(`pattern:${[String(p.aKey), String(p.bKey)].sort().join('|')}`, p.feedback?.status === 'confirmed') ? (
+                    <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
+                      <div className="text-sm font-medium">Does this match your experience?</div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition-all"
+                          onClick={() => handlePatternFeedback('yes', p)}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition-all"
+                          onClick={() => handlePatternFeedback('unsure', p)}
+                        >
+                          Not sure
+                        </button>
+                        <button
+                          type="button"
+                          className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition-all"
+                          onClick={() => handlePatternFeedback('no', p)}
+                        >
+                          No
+                        </button>
+                      </div>
+                    </div>
+                  ) : p.feedback?.status === 'confirmed' ? (
+                    <div className="mt-4 text-sm eb-muted">Marked by you as a good fit.</div>
+                  ) : p.feedback?.userFeedback === 'unsure' ? (
+                    <div className="mt-4 text-sm eb-muted">Marked by you as not sure yet.</div>
+                  ) : null}
+
                   <div className="pt-4 flex items-center justify-between gap-2">
                     {p.allowSuggestedExperiment ? (
                       <button type="button" className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 text-sm" onClick={() => openExperiment([p.aKey, p.bKey])}>
