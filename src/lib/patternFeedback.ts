@@ -1,9 +1,9 @@
 import type { InsightSignal } from './insightEngine';
 import type { InsightMetricKey } from '../types';
+import type { PatternDriverHint } from './patternDrivers';
 
 export type PatternFeedbackStatus = 'active' | 'suppressed' | 'confirmed';
 export type PatternUserFeedback = 'yes' | 'no' | 'unsure';
-export type PatternDriverHint = 'hormones' | 'stress' | 'nutrition' | 'not_sure';
 
 export interface PatternFeedbackRecord {
   id: string;

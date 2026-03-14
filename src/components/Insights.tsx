@@ -44,7 +44,8 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
-import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
+import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern } from '../lib/patternFeedback';
+import { getSuggestedDriverOptionsForMetrics, type PatternDriverHint } from '../lib/patternDrivers';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
@@ -58,15 +59,10 @@ type Timeframe = 'week' | 'month' | '3months';
 type MetricKey = InsightMetricKey;
 type PendingContradiction = {
   id: string;
+  metrics: InsightMetricKey[];
+  driverOptions: Array<{ key: PatternDriverHint; label: string }>;
   pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high' };
 };
-
-const CONTRADICTION_DRIVER_OPTIONS: Array<{ key: PatternDriverHint; label: string }> = [
-  { key: 'hormones', label: 'Hormones' },
-  { key: 'stress', label: 'Stress' },
-  { key: 'nutrition', label: 'Nutrition' },
-  { key: 'not_sure', label: 'Not sure' },
-];
 
 const TIMEFRAMES: Array<{ key: Timeframe; label: string; days: number }> = [
   { key: 'week', label: '7 days', days: 7 },
@@ -1085,6 +1081,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const [patternFeedbackTick, setPatternFeedbackTick] = useState(0);
   const [pendingContradiction, setPendingContradiction] = useState<PendingContradiction | null>(null);
+  const [optimisticallySuppressedIds, setOptimisticallySuppressedIds] = useState<string[]>([]);
 
   const currentInsightsPhase = useMemo(() => {
     if (userData.cycleTrackingMode !== 'cycle' || !entriesAllSorted.length) return null;
@@ -1420,23 +1417,24 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const ordered = Array.from(byId.values()).sort((a, b) => (b.displayRank ?? 0) - (a.displayRank ?? 0));
     const prioritized: ConnectionCard[] = [];
     const seen = new Set<string>();
+    const hiddenIds = new Set(optimisticallySuppressedIds);
 
     heroMetricPairIds.forEach((id) => {
       const card = byId.get(id);
-      if (!card || seen.has(id)) return;
+      if (!card || seen.has(id) || hiddenIds.has(id)) return;
       seen.add(id);
       prioritized.push(card);
     });
 
     ordered.forEach((card) => {
       const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
-      if (seen.has(id)) return;
+      if (seen.has(id) || hiddenIds.has(id)) return;
       seen.add(id);
       prioritized.push(card);
     });
 
     return prioritized;
-  }, [corrPairs, metricPairSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady]);
+  }, [corrPairs, metricPairSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady, optimisticallySuppressedIds]);
 
   useEffect(() => {
     const seenSignals = connectionCards.slice(0, 3).map((card) => card.sourceSignal).filter(Boolean);
@@ -1455,6 +1453,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     };
 
     if (kind === 'no') {
+      setOptimisticallySuppressedIds((current) => (current.includes(args.id) ? current : [...current, args.id]));
       suppressPattern(args);
     } else if (kind === 'yes') {
       confirmPattern(args);
@@ -1469,9 +1468,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setPatternFeedbackTick((value) => value + 1);
   };
 
-  const openContradictionPrompt = (pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }) => {
+  const openContradictionPrompt = (pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }, metrics: InsightMetricKey[]) => {
     setPendingContradiction({
       id: getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey),
+      metrics,
+      driverOptions: getSuggestedDriverOptionsForMetrics(metrics),
       pair,
     });
   };
@@ -3678,6 +3679,10 @@ const tryNextPrompts = useMemo(() => {
                   {shouldPromptPatternFeedback(getPatternFeedbackIdFromMetrics(p.aKey, p.bKey), p.feedback?.status === 'confirmed') ? (() => {
                     const feedbackId = getPatternFeedbackIdFromMetrics(p.aKey, p.bKey);
                     const contradictionOpen = pendingContradiction?.id === feedbackId;
+                    const contradictionOptions = contradictionOpen ? pendingContradiction.driverOptions : [];
+                    const cardMetrics = p.lagPattern && chainTarget?.lagPattern
+                      ? [p.aKey, p.bKey, chainTarget.lagPattern.followKey as InsightMetricKey]
+                      : [p.aKey, p.bKey];
                     return (
                       <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
                         {!contradictionOpen ? (
@@ -3694,7 +3699,7 @@ const tryNextPrompts = useMemo(() => {
                               <button
                                 type="button"
                                 className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-light)/0.55)] bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-primary-dark))] text-sm font-medium hover:opacity-95 transition-all"
-                                onClick={() => openContradictionPrompt(p)}
+                                onClick={() => openContradictionPrompt(p, cardMetrics)}
                               >
                                 No
                               </button>
@@ -3712,7 +3717,7 @@ const tryNextPrompts = useMemo(() => {
                             <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">This pattern didn’t feel right for you, so we’ll stop surfacing it.</div>
                             <div className="mt-3 text-sm eb-muted">Do you know what tends to drive this instead?</div>
                             <div className="mt-3 flex flex-wrap gap-2">
-                              {CONTRADICTION_DRIVER_OPTIONS.map((option) => (
+                              {contradictionOptions.map((option) => (
                                 <button
                                   key={option.key}
                                   type="button"
