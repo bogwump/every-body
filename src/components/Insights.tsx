@@ -3502,21 +3502,21 @@ const tryNextPrompts = useMemo(() => {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition-all"
+                          className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-dark)/0.18)] bg-[rgb(var(--color-primary-dark))] text-white text-sm font-medium hover:opacity-95 transition-all"
                           onClick={() => handlePatternFeedback('yes', p)}
                         >
                           Yes
                         </button>
                         <button
                           type="button"
-                          className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition-all"
+                          className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
                           onClick={() => handlePatternFeedback('unsure', p)}
                         >
                           Not sure
                         </button>
                         <button
                           type="button"
-                          className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium hover:bg-black/[0.03] transition-all"
+                          className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-light)/0.55)] bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-primary-dark))] text-sm font-medium hover:opacity-95 transition-all"
                           onClick={() => handlePatternFeedback('no', p)}
                         >
                           No
