@@ -1272,6 +1272,148 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [deepReady, entriesSorted, selected, userData, allMetricKeys, patternFeedbackTick]);
 
 
+
+  const connectionCards = useMemo(() => {
+    type ConnectionCard = (typeof corrPairs)[number] & { signalId: string; sourceSignal: InsightSignal; displayRank: number; };
+
+    const makeSignalFromPair = (pair: (typeof corrPairs)[number]): InsightSignal => ({
+      id: `pair-${String(pair.aKey)}-${String(pair.bKey)}`,
+      type: 'metric_pair',
+      score: pair.quality,
+      confidence: pair.confidence,
+      strength: pair.confidence === 'high' ? 'strong' : pair.confidence === 'medium' ? 'moderate' : 'weak',
+      metrics: [pair.aKey, pair.bKey],
+      phase: currentInsightsPhase ?? null,
+      direction: pair.r >= 0 ? 'together' : 'inverse',
+      sampleSize: pair.n,
+      summary: { metric: pair.aKey, otherMetric: pair.bKey, correlation: pair.r },
+    });
+
+    const makeCardFromSignal = (signal: InsightSignal): ConnectionCard | null => {
+      if (signal.type !== 'metric_pair' || !Array.isArray(signal.metrics) || signal.metrics.length < 2) return null;
+      const aKey = signal.metrics[0] as InsightMetricKey;
+      const bKey = signal.metrics[1] as InsightMetricKey;
+      const confidence = signal.confidence === 'high' || signal.confidence === 'medium' ? signal.confidence : 'low';
+      const n = Math.max(Number(signal.sampleSize || 0), 4);
+      const correlation = typeof signal.summary?.correlation === 'number'
+        ? signal.summary.correlation
+        : signal.direction === 'inverse'
+          ? -0.45
+          : 0.45;
+      const kindA = getKindForMetric(aKey, userData);
+      const kindB = getKindForMetric(bKey, userData);
+      const hormonalInvolved = isHormonalMetric(aKey, userData) || isHormonalMetric(bKey, userData);
+      const maturity = n >= 12 && Math.abs(correlation) >= 0.65
+        ? 'more consistent pattern'
+        : n >= 8 && Math.abs(correlation) >= 0.5
+          ? 'repeating pattern'
+          : 'emerging pattern';
+      const allowSuggestedExperiment =
+        (kindA === 'behaviour' || kindB === 'behaviour') &&
+        n >= 4 &&
+        !((kindA === 'physio' || kindA === 'hormonal') && (kindB === 'physio' || kindB === 'hormonal'));
+      const lagPattern = getLagPatternForPair(entriesSorted, aKey, bKey, userData);
+      const lagLine = lagPattern && lagPattern.score >= Math.abs(correlation) + 0.05
+        ? (lagPattern.direction === 'inverse'
+            ? `When ${lagPattern.leadLabel.toLowerCase()} rises, ${lagPattern.followLabel.toLowerCase()} often dips ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`
+            : `${lagPattern.leadLabel} has often been followed by ${lagPattern.followLabel.toLowerCase()} ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`)
+        : null;
+      const contextLine = getPatternContextForSignal(signal);
+      const why = [
+        `You logged both metrics on ${n} day${n === 1 ? '' : 's'}.`,
+        `This currently looks like a ${maturity}.`,
+        deepReady
+          ? `This is calculated from your recent logs and will update as you add more days.`
+          : `This is an early signal. With only a few days logged, it may change as you add more data.`,
+        lagLine,
+        contextLine,
+        hormonalInvolved
+          ? `Hormones can influence lots of symptoms at once, so treat this as a prompt to notice patterns, not a diagnosis.`
+          : `Correlation does not mean one causes the other.`,
+      ].filter(Boolean);
+      const feedback = getFeedbackForMetrics(aKey, bKey);
+      return {
+        a: labelFor(aKey, userData),
+        b: labelFor(bKey, userData),
+        r: correlation,
+        n,
+        aKey,
+        bKey,
+        quality: typeof signal.score === 'number' ? signal.score : qualityScore(Math.abs(correlation), n),
+        kindA,
+        kindB,
+        hormonalInvolved,
+        confidence,
+        maturity,
+        allowSuggestedExperiment,
+        why,
+        lagPattern,
+        contextLine,
+        feedback,
+        signalId: signal.id,
+        sourceSignal: signal,
+        displayRank: typeof signal.score === 'number' ? signal.score : qualityScore(Math.abs(correlation), n),
+      };
+    };
+
+    const byId = new Map<string, ConnectionCard>();
+
+    corrPairs.forEach((pair, index) => {
+      const sourceSignal = makeSignalFromPair(pair);
+      const id = getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey);
+      byId.set(id, {
+        ...pair,
+        signalId: sourceSignal.id,
+        sourceSignal,
+        displayRank: Math.max(0, 100 - index),
+      });
+    });
+
+    metricPairSignals.forEach((signal, index) => {
+      const card = makeCardFromSignal(signal);
+      if (!card) return;
+      const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      const existing = byId.get(id);
+      if (!existing) {
+        byId.set(id, { ...card, displayRank: Math.max(0, 120 - index) });
+        return;
+      }
+      if ((card.displayRank ?? 0) > (existing.displayRank ?? 0)) {
+        byId.set(id, { ...existing, sourceSignal: card.sourceSignal, signalId: card.signalId, displayRank: card.displayRank });
+      }
+    });
+
+    const heroMetricPairIds = heroSignals
+      .filter((signal) => signal.type === 'metric_pair' && Array.isArray(signal.metrics) && signal.metrics.length >= 2)
+      .map((signal) => getPatternFeedbackIdFromMetrics(signal.metrics[0], signal.metrics[1]));
+
+    const ordered = Array.from(byId.values()).sort((a, b) => (b.displayRank ?? 0) - (a.displayRank ?? 0));
+    const prioritized: ConnectionCard[] = [];
+    const seen = new Set<string>();
+
+    heroMetricPairIds.forEach((id) => {
+      const card = byId.get(id);
+      if (!card || seen.has(id)) return;
+      seen.add(id);
+      prioritized.push(card);
+    });
+
+    ordered.forEach((card) => {
+      const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      if (seen.has(id)) return;
+      seen.add(id);
+      prioritized.push(card);
+    });
+
+    return prioritized;
+  }, [corrPairs, metricPairSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady]);
+
+  useEffect(() => {
+    const seenSignals = connectionCards.slice(0, 3).map((card) => card.sourceSignal).filter(Boolean);
+    if (!seenSignals.length) return;
+    markPatternsDiscovered(seenSignals);
+  }, [connectionCards]);
+
   const handlePatternFeedback = (kind: 'yes' | 'no' | 'unsure', pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }) => {
     const confidenceScore = pair.confidence === 'high' ? 0.82 : pair.confidence === 'medium' ? 0.66 : 0.5;
     const args = {
@@ -1543,9 +1685,14 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
   };
 
+  const metricPairSignals = useMemo(
+    () => filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 12, selected)).filter((signal) => signal.type === 'metric_pair'),
+    [entriesAllSorted, selected, userData, patternFeedbackTick],
+  );
+
   const heroSignals = useMemo(
     () => selectStableHeroInsights(filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 6, selected)), 3),
-    [entriesAllSorted, selected, userData],
+    [entriesAllSorted, selected, userData, patternFeedbackTick],
   );
 
   useEffect(() => {
@@ -1565,7 +1712,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       isNewPattern: signal.isNewPattern,
     }));
 
-    const strongestConnection = corrPairs.find((pair) => Boolean(pair.lagPattern));
+    const strongestConnection = connectionCards.find((pair) => Boolean(pair.lagPattern));
     if (strongestConnection && items.length < 3) {
       const lag = strongestConnection.lagPattern;
       const connectionText = lag
@@ -1605,11 +1752,11 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
             },
           ],
     };
-  }, [currentInsightsPhase, heroSignals, patternMemory, corrPairs]);
+  }, [currentInsightsPhase, heroSignals, patternMemory, connectionCards]);
 
   const strongPatternSignals = useMemo(
     () => filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 8, selected)).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low' && signal.strength !== 'weak'),
-    [entriesAllSorted, userData, selected],
+    [entriesAllSorted, userData, selected, patternFeedbackTick],
   );
 
   const [savedActionsVersion, setSavedActionsVersion] = useState(0);
@@ -2286,7 +2433,7 @@ const uniq = new Map<string, (typeof items)[number]>();
       if (!uniq.has(key)) uniq.set(key, it);
     });
     return Array.from(uniq.values()).filter((it) => it.allow).slice(0, 10);
-  }, [corrPairs, findings]);
+  }, [connectionCards, findings]);
 
   // --- Option B: pattern-aware "Try next" prompts ---
   type TryNextPrompt = {
@@ -3458,13 +3605,13 @@ const tryNextPrompts = useMemo(() => {
           </div>
         </div>
 
-        {corrPairs.length < 1 ? (
+        {connectionCards.length < 1 ? (
           <div className="mt-2 text-sm eb-muted">Log a few days with the same metrics to reveal relationships.</div>
         ) : (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {corrPairs.slice(0, 3).map((p, idx) => {
+            {connectionCards.slice(0, 3).map((p, idx) => {
               const chainTarget = p.lagPattern
-                ? corrPairs.find((other) => other !== p && other.lagPattern && String(other.lagPattern.leadKey) === String(p.lagPattern.followKey))
+                ? connectionCards.find((other) => other !== p && other.lagPattern && String(other.lagPattern.leadKey) === String(p.lagPattern.followKey))
                 : null;
               const title = p.lagPattern
                 ? chainTarget?.lagPattern
