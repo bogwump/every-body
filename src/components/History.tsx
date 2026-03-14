@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, CheckCircle2, Clock3, FlaskConical, Heart, RefreshCw, Sparkles } from 'lucide-react';
 import { buildTimelineEvents, filterTimelineEvents, getTimelineSummary, groupEventsByMonth, type TimelineEvent, type TimelineFilter } from '../lib/timelineBuilder';
+import { restorePattern } from '../lib/patternFeedback';
 import { safeFormatISODate } from '../lib/browserSafe';
 
 interface HistoryProps {
@@ -75,8 +76,9 @@ function navigateToTarget(target: string | undefined, onNavigate: (screen: strin
 
 export function History({ onNavigate }: HistoryProps) {
   const [filter, setFilter] = useState<TimelineFilter>('all');
+  const [historyTick, setHistoryTick] = useState(0);
 
-  const events = useMemo(() => buildTimelineEvents(40), []);
+  const events = useMemo(() => buildTimelineEvents(40), [historyTick]);
   const visible = useMemo(() => filterTimelineEvents(events, filter), [events, filter]);
   const summary = useMemo(() => getTimelineSummary(events), [events]);
   const grouped = useMemo(() => groupEventsByMonth(visible), [visible]);
@@ -177,13 +179,38 @@ export function History({ onNavigate }: HistoryProps) {
                         </div>
 
                         {event.actionLabel && event.actionTarget ? (
-                          <div className="mt-4">
+                          <div className="mt-4 flex flex-wrap gap-3">
                             <button
                               type="button"
                               className="eb-btn eb-btn-secondary"
                               onClick={() => navigateToTarget(event.actionTarget, onNavigate)}
                             >
                               {event.actionLabel}
+                            </button>
+                            {event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
+                              <button
+                                type="button"
+                                className="eb-btn eb-btn-secondary"
+                                onClick={() => {
+                                  restorePattern(String(event.metadata?.patternFeedbackId), 0.45);
+                                  setHistoryTick((v) => v + 1);
+                                }}
+                              >
+                                Undo dismissal
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
+                          <div className="mt-4">
+                            <button
+                              type="button"
+                              className="eb-btn eb-btn-secondary"
+                              onClick={() => {
+                                restorePattern(String(event.metadata?.patternFeedbackId), 0.45);
+                                setHistoryTick((v) => v + 1);
+                              }}
+                            >
+                              Undo dismissal
                             </button>
                           </div>
                         ) : null}

@@ -5,6 +5,7 @@ import { getExperimentOutcomes } from './experimentOutcomes';
 import { getDiscoveredPatterns } from './insightEngine';
 import { getPhaseHistory } from './phaseHistory';
 import { phaseLabelFromKey } from './phaseChange';
+import { getPatternFeedback, getPatternFeedbackIdFromMetrics } from './patternFeedback';
 
 export type TimelineEvent = {
   id: string;
@@ -229,6 +230,29 @@ function mapMomentToEvent(moment: CompanionMoment): TimelineEvent | null {
   }
 }
 
+
+function getFeedbackIdFromSignalId(signalId: string): string | null {
+  const match = String(signalId || '').match(/^pair-([^:]+)-([^:]+)$/);
+  if (!match) return null;
+  return getPatternFeedbackIdFromMetrics(match[1], match[2]);
+}
+
+function applyPatternFeedbackToEvent(event: TimelineEvent): TimelineEvent {
+  const signalId = String(event.metadata?.signalId || '');
+  const feedbackId = getFeedbackIdFromSignalId(signalId);
+  const feedback = feedbackId ? getPatternFeedback(feedbackId) : null;
+  if (!feedback) return event;
+  const description = feedback.historyNote
+    ? `${event.description} ${feedback.historyNote}`.trim()
+    : event.description;
+  const metadata = { ...(event.metadata ?? {}), patternFeedbackId: feedback.id, patternDismissed: feedback.status === 'suppressed', patternRestored: feedback.status === 'active' && Boolean(feedback.restoredAt) };
+  return {
+    ...event,
+    description,
+    metadata,
+  };
+}
+
 function buildPhaseEvents(): TimelineEvent[] {
   return getPhaseHistory()
     .map((entry) => {
@@ -305,7 +329,7 @@ function buildPatternEvents(): TimelineEvent[] {
     .map(mapMomentToEvent)
     .filter((event): event is TimelineEvent => Boolean(event) && event.type === 'pattern_discovered');
 
-  return [...base, ...strengthened, ...fromMoments];
+  return [...base, ...strengthened, ...fromMoments].map(applyPatternFeedbackToEvent);
 }
 
 function buildHelpfulPatternEvents(): TimelineEvent[] {

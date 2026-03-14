@@ -1057,7 +1057,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       });
     }
 
-    const strongestSignals = getTopInsights(entriesAllSorted, userData, 8, selected)
+    const strongestSignals = filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 8, selected))
       .filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low')
       .slice(0, 6);
 
@@ -1517,7 +1517,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   };
 
   const heroSignals = useMemo(
-    () => selectStableHeroInsights(getTopInsights(entriesAllSorted, userData, 6, selected), 3),
+    () => selectStableHeroInsights(filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 6, selected)), 3),
     [entriesAllSorted, selected, userData],
   );
 
@@ -1581,7 +1581,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [currentInsightsPhase, heroSignals, patternMemory, corrPairs]);
 
   const strongPatternSignals = useMemo(
-    () => getTopInsights(entriesAllSorted, userData, 8, selected).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low' && signal.strength !== 'weak'),
+    () => filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 8, selected)).filter((signal) => signal.type !== 'low_data' && signal.confidence !== 'low' && signal.strength !== 'weak'),
     [entriesAllSorted, userData, selected],
   );
 

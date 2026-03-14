@@ -4,6 +4,7 @@ import { getCompanionMoments, type CompanionMoment, type CompanionMomentType } f
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
 import { getExperimentLearnings, getWhatsComingPredictions } from './rhythmPredictions';
 import { getCycleAwarePredictionLines, getPatternContextForSignal, getWeeklyPatternReflection } from './patternIntelligence';
+import { filterSignalsByPatternFeedback } from './patternFeedback';
 
 export type CompanionDataStage = 'very_new' | 'building' | 'settling' | 'established';
 
@@ -201,6 +202,8 @@ export function getBodyWeatherLines(args: {
   strongPatternSignals: InsightSignal[];
 }): string[] {
   const { entries, userData, currentPhase, heroSignals, strongPatternSignals } = args;
+  const filteredHeroSignals = filterSignalsByPatternFeedback(heroSignals);
+  const filteredStrongSignals = filterSignalsByPatternFeedback(strongPatternSignals);
   const daysLogged = getDistinctLoggedDays(entries);
   const stage = getCompanionDataStage(daysLogged);
   const lines: string[] = [];
@@ -215,7 +218,7 @@ export function getBodyWeatherLines(args: {
   if (predictiveLine && !lines.includes(predictiveLine)) lines.push(predictiveLine);
 
   if (lines.length < 2) {
-    const signal = strongPatternSignals[0] ?? heroSignals.find((item) => item.type !== 'low_data');
+    const signal = filteredStrongSignals[0] ?? filteredHeroSignals.find((item) => item.type !== 'low_data');
     const signalLine = getSignalForecastLine(signal, userData);
     if (signalLine && !lines.includes(signalLine)) lines.push(signalLine);
     const contextLine = signal ? getPatternContextForSignal(signal) : null;
@@ -230,8 +233,8 @@ export function getBodyWeatherLines(args: {
     entries,
     userData,
     phase: currentPhase,
-    heroSignals,
-    strongSignals: strongPatternSignals,
+    heroSignals: filteredHeroSignals,
+    strongSignals: filteredStrongSignals,
     existingLines: lines,
   });
 

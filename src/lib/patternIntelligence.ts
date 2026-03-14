@@ -2,6 +2,7 @@ import type { CheckInEntry, CyclePhase, InsightMetricKey, UserData } from '../ty
 import type { InsightConfidence, InsightSignal } from './insightEngine';
 import { computeCycleStats, estimatePhaseByFlow, getCycleStarts, pearsonCorrelation, sortByDateAsc } from './analytics';
 import { getTopInsights } from './insightEngine';
+import { filterSignalsByPatternFeedback, isSuppressedPair, getResurfacingNoteForPair } from './patternFeedback';
 
 export type PatternRecord = {
   patternId: string;
@@ -260,7 +261,7 @@ export function buildPatternMemory(entries: CheckInEntry[], userData: UserData):
   const cycles = cycleBuckets(sorted);
   if (cycles.length < 2) return {};
   const currentCycleIndex = cycles[cycles.length - 1]?.cycleIndex ?? 0;
-  const latestSignals = getTopInsights(sorted, userData, 10);
+  const latestSignals = filterSignalsByPatternFeedback(getTopInsights(sorted, userData, 10));
   const records = new Map<string, PatternRecord>();
 
   const upsert = (patternId: string, cycleIndex: number, confidence: InsightConfidence, phaseContext?: string | null) => {
@@ -333,13 +334,16 @@ export function getPatternRecordForSignal(signal: InsightSignal, memory: Record<
 
 export function getStrongestLagPattern(entries: CheckInEntry[], pairs: Array<{ aKey: InsightMetricKey; bKey: InsightMetricKey }>, userData?: UserData): LagPattern | null {
   const candidates = pairs
+    .filter((pair) => !isSuppressedPair(pair.aKey, pair.bKey))
     .map((pair) => detectLagPattern(entries, pair.aKey, pair.bKey, userData))
     .filter((item): item is LagPattern => Boolean(item));
   return candidates.sort((a, b) => b.score - a.score || b.n - a.n)[0] ?? null;
 }
 
 export function getLagPatternForPair(entries: CheckInEntry[], aKey: InsightMetricKey, bKey: InsightMetricKey, userData?: UserData): LagPattern | null {
-  return detectLagPattern(entries, aKey, bKey, userData);
+  const found = detectLagPattern(entries, aKey, bKey, userData);
+  if (!found) return null;
+  return isSuppressedPair(aKey, bKey, found.score) ? null : { ...found, resurfacingNote: getResurfacingNoteForPair(aKey, bKey, found.score) as any };
 }
 
 export function getPatternRecordForLag(lag: LagPattern | null, memory: Record<string, PatternRecord>): PatternRecord | null {
