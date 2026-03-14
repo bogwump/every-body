@@ -44,6 +44,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
+import { filterSignalsByPatternFeedback } from '../lib/patternFeedback';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
