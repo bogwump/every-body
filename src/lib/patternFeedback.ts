@@ -3,6 +3,7 @@ import type { InsightMetricKey } from '../types';
 
 export type PatternFeedbackStatus = 'active' | 'suppressed' | 'confirmed';
 export type PatternUserFeedback = 'yes' | 'no' | 'unsure';
+export type PatternDriverHint = 'hormones' | 'stress' | 'nutrition' | 'not_sure';
 
 export interface PatternFeedbackRecord {
   id: string;
@@ -18,6 +19,7 @@ export interface PatternFeedbackRecord {
   suppressPromptUntil?: string;
   restoredAt?: string;
   historyNote?: string;
+  userDriverHint?: PatternDriverHint;
 }
 
 const PATTERN_FEEDBACK_KEY = 'everybody:v2:pattern_feedback';
@@ -82,7 +84,7 @@ function upsert(record: PatternFeedbackRecord): PatternFeedbackRecord {
   return record;
 }
 
-export function suppressPattern(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; }): PatternFeedbackRecord {
+export function suppressPattern(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; driverHint?: PatternDriverHint; }): PatternFeedbackRecord {
   const today = toISODate();
   const existing = getPatternFeedback(args.id);
   return upsert({
@@ -97,10 +99,11 @@ export function suppressPattern(args: { id: string; patternId?: string; metrics:
     previousScore: typeof args.previousScore === 'number' ? args.previousScore : existing?.previousScore,
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
     historyNote: 'Later marked by you as unlikely.',
+    userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
 }
 
-export function confirmPattern(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; }): PatternFeedbackRecord {
+export function confirmPattern(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; driverHint?: PatternDriverHint; }): PatternFeedbackRecord {
   const today = toISODate();
   const existing = getPatternFeedback(args.id);
   const nextConfidenceBase = typeof args.confidence === 'number' ? args.confidence : existing?.confidence ?? 0.6;
@@ -115,10 +118,11 @@ export function confirmPattern(args: { id: string; patternId?: string; metrics: 
     confidence: Math.min(0.98, nextConfidenceBase + 0.12),
     previousScore: typeof args.previousScore === 'number' ? args.previousScore : existing?.previousScore,
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
+    userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
 }
 
-export function markPatternUnsure(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; }): PatternFeedbackRecord {
+export function markPatternUnsure(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; driverHint?: PatternDriverHint; }): PatternFeedbackRecord {
   const today = toISODate();
   const existing = getPatternFeedback(args.id);
   return upsert({
@@ -132,6 +136,7 @@ export function markPatternUnsure(args: { id: string; patternId?: string; metric
     confidence: typeof args.confidence === 'number' ? args.confidence : existing?.confidence,
     previousScore: typeof args.previousScore === 'number' ? args.previousScore : existing?.previousScore,
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
+    userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
 }
 
@@ -148,6 +153,7 @@ export function restorePattern(id: string, reducedConfidence = 0.45): PatternFee
     restoredAt: today,
     historyNote: 'Restored by you for further observation.',
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
+    userDriverHint: existing.userDriverHint,
   });
 }
 

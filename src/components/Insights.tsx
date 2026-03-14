@@ -44,7 +44,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
-import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern } from '../lib/patternFeedback';
+import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
@@ -56,7 +56,17 @@ interface InsightsProps {
 type Timeframe = 'week' | 'month' | '3months';
 
 type MetricKey = InsightMetricKey;
+type PendingContradiction = {
+  id: string;
+  pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high' };
+};
 
+const CONTRADICTION_DRIVER_OPTIONS: Array<{ key: PatternDriverHint; label: string }> = [
+  { key: 'hormones', label: 'Hormones' },
+  { key: 'stress', label: 'Stress' },
+  { key: 'nutrition', label: 'Nutrition' },
+  { key: 'not_sure', label: 'Not sure' },
+];
 
 const TIMEFRAMES: Array<{ key: Timeframe; label: string; days: number }> = [
   { key: 'week', label: '7 days', days: 7 },
@@ -1074,6 +1084,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [selected, entriesSorted, entriesAllSorted, days, userData, userData.enabledModules]);
 
   const [patternFeedbackTick, setPatternFeedbackTick] = useState(0);
+  const [pendingContradiction, setPendingContradiction] = useState<PendingContradiction | null>(null);
 
   const currentInsightsPhase = useMemo(() => {
     if (userData.cycleTrackingMode !== 'cycle' || !entriesAllSorted.length) return null;
@@ -1433,13 +1444,14 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     markPatternsDiscovered(seenSignals);
   }, [connectionCards]);
 
-  const handlePatternFeedback = (kind: 'yes' | 'no' | 'unsure', pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }) => {
+  const handlePatternFeedback = (kind: 'yes' | 'no' | 'unsure', pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }, driverHint?: PatternDriverHint) => {
     const confidenceScore = pair.confidence === 'high' ? 0.82 : pair.confidence === 'medium' ? 0.66 : 0.5;
     const args = {
       id: getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey),
       metrics: [pair.aKey, pair.bKey],
       previousScore: pair.quality,
       confidence: confidenceScore,
+      driverHint,
     };
 
     if (kind === 'no') {
@@ -1450,7 +1462,27 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       markPatternUnsure(args);
     }
 
+    setPendingContradiction((current) => {
+      if (!current) return null;
+      return current.id === args.id ? null : current;
+    });
     setPatternFeedbackTick((value) => value + 1);
+  };
+
+  const openContradictionPrompt = (pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }) => {
+    setPendingContradiction({
+      id: getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey),
+      pair,
+    });
+  };
+
+  const dismissContradictionPrompt = (feedbackId: string) => {
+    setPendingContradiction((current) => (current?.id === feedbackId ? null : current));
+  };
+
+  const submitContradictionFeedback = (driverHint: PatternDriverHint) => {
+    if (!pendingContradiction) return;
+    handlePatternFeedback('no', pendingContradiction.pair, driverHint);
   };
 
   // --- Relationship explorer ---
@@ -3643,34 +3675,66 @@ const tryNextPrompts = useMemo(() => {
                       <div className="pt-1 text-xs eb-muted">Patterns are a hint, not proof.</div>
                     </div>
                   </details>
-                  {shouldPromptPatternFeedback(getPatternFeedbackIdFromMetrics(p.aKey, p.bKey), p.feedback?.status === 'confirmed') ? (
-                    <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
-                      <div className="text-sm font-medium">Does this match your experience?</div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-dark)/0.18)] bg-[rgb(var(--color-primary-dark))] text-white text-sm font-medium hover:opacity-95 transition-all"
-                          onClick={() => handlePatternFeedback('yes', p)}
-                        >
-                          Yes
-                        </button>
-                        <button
-                          type="button"
-                          className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-light)/0.55)] bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-primary-dark))] text-sm font-medium hover:opacity-95 transition-all"
-                          onClick={() => handlePatternFeedback('no', p)}
-                        >
-                          No
-                        </button>
-                        <button
-                          type="button"
-                          className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
-                          onClick={() => handlePatternFeedback('unsure', p)}
-                        >
-                          Not sure
-                        </button>
+                  {shouldPromptPatternFeedback(getPatternFeedbackIdFromMetrics(p.aKey, p.bKey), p.feedback?.status === 'confirmed') ? (() => {
+                    const feedbackId = getPatternFeedbackIdFromMetrics(p.aKey, p.bKey);
+                    const contradictionOpen = pendingContradiction?.id === feedbackId;
+                    return (
+                      <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
+                        {!contradictionOpen ? (
+                          <>
+                            <div className="text-sm font-medium">Does this match your experience?</div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-dark)/0.18)] bg-[rgb(var(--color-primary-dark))] text-white text-sm font-medium hover:opacity-95 transition-all"
+                                onClick={() => handlePatternFeedback('yes', p)}
+                              >
+                                Yes
+                              </button>
+                              <button
+                                type="button"
+                                className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-light)/0.55)] bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-primary-dark))] text-sm font-medium hover:opacity-95 transition-all"
+                                onClick={() => openContradictionPrompt(p)}
+                              >
+                                No
+                              </button>
+                              <button
+                                type="button"
+                                className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                onClick={() => handlePatternFeedback('unsure', p)}
+                              >
+                                Not sure
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">This pattern didn’t feel right for you, so we’ll stop surfacing it.</div>
+                            <div className="mt-3 text-sm eb-muted">Do you know what tends to drive this instead?</div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {CONTRADICTION_DRIVER_OPTIONS.map((option) => (
+                                <button
+                                  key={option.key}
+                                  type="button"
+                                  className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                  onClick={() => submitContradictionFeedback(option.key)}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              className="mt-3 text-xs font-medium text-[rgb(var(--color-primary-dark))] hover:underline"
+                              onClick={() => dismissContradictionPrompt(feedbackId)}
+                            >
+                              Keep this pattern visible
+                            </button>
+                          </>
+                        )}
                       </div>
-                    </div>
-                  ) : p.feedback?.status === 'confirmed' ? (
+                    );
+                  })() : p.feedback?.status === 'confirmed' ? (
                     <div className="mt-4 text-sm eb-muted">Marked by you as a good fit.</div>
                   ) : p.feedback?.userFeedback === 'unsure' ? (
                     <div className="mt-4 text-sm eb-muted">Marked by you as not sure yet.</div>

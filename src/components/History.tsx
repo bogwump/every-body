@@ -196,7 +196,7 @@ export function History({ onNavigate }: HistoryProps) {
                                   setHistoryTick((v) => v + 1);
                                 }}
                               >
-                                Undo dismissal
+                                Undo correction
                               </button>
                             ) : null}
                           </div>
@@ -210,7 +210,7 @@ export function History({ onNavigate }: HistoryProps) {
                                 setHistoryTick((v) => v + 1);
                               }}
                             >
-                              Undo dismissal
+                              Undo correction
                             </button>
                           </div>
                         ) : null}
