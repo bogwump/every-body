@@ -29,7 +29,7 @@ import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
 import { isMetricInScope } from '../lib/insightsScope';
-import { type InsightSignal, getDiscoveredPatterns, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
+import { type InsightSignal, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
 import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { getSupportSuggestion } from '../lib/patternSupport';
 import { getExperimentForSignal } from '../lib/experimentSuggestions';
@@ -44,8 +44,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
-import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern } from '../lib/patternFeedback';
-import { getSuggestedDriverOptionsForMetrics, type PatternDriverHint } from '../lib/patternDrivers';
+import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
@@ -59,10 +58,15 @@ type Timeframe = 'week' | 'month' | '3months';
 type MetricKey = InsightMetricKey;
 type PendingContradiction = {
   id: string;
-  metrics: InsightMetricKey[];
-  driverOptions: Array<{ key: PatternDriverHint; label: string }>;
   pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high' };
 };
+
+const CONTRADICTION_DRIVER_OPTIONS: Array<{ key: PatternDriverHint; label: string }> = [
+  { key: 'hormones', label: 'Hormones' },
+  { key: 'stress', label: 'Stress' },
+  { key: 'nutrition', label: 'Nutrition' },
+  { key: 'not_sure', label: 'Not sure' },
+];
 
 const TIMEFRAMES: Array<{ key: Timeframe; label: string; days: number }> = [
   { key: 'week', label: '7 days', days: 7 },
@@ -1081,7 +1085,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const [patternFeedbackTick, setPatternFeedbackTick] = useState(0);
   const [pendingContradiction, setPendingContradiction] = useState<PendingContradiction | null>(null);
-  const [optimisticallySuppressedIds, setOptimisticallySuppressedIds] = useState<string[]>([]);
 
   const currentInsightsPhase = useMemo(() => {
     if (userData.cycleTrackingMode !== 'cycle' || !entriesAllSorted.length) return null;
@@ -1417,24 +1420,23 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const ordered = Array.from(byId.values()).sort((a, b) => (b.displayRank ?? 0) - (a.displayRank ?? 0));
     const prioritized: ConnectionCard[] = [];
     const seen = new Set<string>();
-    const hiddenIds = new Set(optimisticallySuppressedIds);
 
     heroMetricPairIds.forEach((id) => {
       const card = byId.get(id);
-      if (!card || seen.has(id) || hiddenIds.has(id)) return;
+      if (!card || seen.has(id)) return;
       seen.add(id);
       prioritized.push(card);
     });
 
     ordered.forEach((card) => {
       const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
-      if (seen.has(id) || hiddenIds.has(id)) return;
+      if (seen.has(id)) return;
       seen.add(id);
       prioritized.push(card);
     });
 
     return prioritized;
-  }, [corrPairs, metricPairSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady, optimisticallySuppressedIds]);
+  }, [corrPairs, metricPairSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady]);
 
   useEffect(() => {
     const seenSignals = connectionCards.slice(0, 3).map((card) => card.sourceSignal).filter(Boolean);
@@ -1453,7 +1455,6 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     };
 
     if (kind === 'no') {
-      setOptimisticallySuppressedIds((current) => (current.includes(args.id) ? current : [...current, args.id]));
       suppressPattern(args);
     } else if (kind === 'yes') {
       confirmPattern(args);
@@ -1468,11 +1469,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     setPatternFeedbackTick((value) => value + 1);
   };
 
-  const openContradictionPrompt = (pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }, metrics: InsightMetricKey[]) => {
+  const openContradictionPrompt = (pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }) => {
     setPendingContradiction({
       id: getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey),
-      metrics,
-      driverOptions: getSuggestedDriverOptionsForMetrics(metrics),
       pair,
     });
   };
@@ -1737,25 +1736,17 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const patternMemory = useMemo(() => buildPatternMemory(entriesAllSorted, userData), [entriesAllSorted, userData]);
 
   const heroInsightState = useMemo(() => {
-    const discoveredToday = new Set(
-      getDiscoveredPatterns()
-        .filter((item) => item.firstDetected === isoTodayLocal())
-        .map((item) => item.id),
-    );
-    const isHeroPatternNew = (id: string, explicitNew: boolean) => explicitNew || discoveredToday.has(id);
-
     const items: HeroInsightItem[] = heroSignals.map((signal) => ({
       id: signal.id,
       text: copyForInsightSignal(signal),
       contextLine: getPatternContextForSignal(signal),
       repeatLine: getRepeatPatternLine(getPatternRecordForSignal(signal, patternMemory)),
-      isNewPattern: isHeroPatternNew(signal.id, signal.isNewPattern),
+      isNewPattern: signal.isNewPattern,
     }));
 
     const strongestConnection = connectionCards.find((pair) => Boolean(pair.lagPattern));
     if (strongestConnection && items.length < 3) {
       const lag = strongestConnection.lagPattern;
-      const sourceSignal = strongestConnection.sourceSignal;
       const connectionText = lag
         ? (lag.direction === 'inverse'
             ? `When ${lag.leadLabel.toLowerCase()} has been higher, ${lag.followLabel.toLowerCase()} has often dipped ${lag.lagDays === 1 ? 'the next day' : `about ${lag.lagDays} days later`}.`
@@ -1765,9 +1756,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         items.push({
           id: `hero-connection:${strongestConnection.aKey}:${strongestConnection.bKey}`,
           text: connectionText,
-          contextLine: sourceSignal ? getPatternContextForSignal(sourceSignal) : getPatternContextForSignal({ metrics: [strongestConnection.aKey, strongestConnection.bKey], confidence: strongestConnection.confidence === 'high' ? 'high' : strongestConnection.confidence === 'medium' ? 'medium' : 'low' }),
+          contextLine: getPatternContextForSignal({ metrics: [strongestConnection.aKey, strongestConnection.bKey], confidence: strongestConnection.confidence === 'high' ? 'high' : strongestConnection.confidence === 'medium' ? 'medium' : 'low' }),
           repeatLine: getRepeatPatternLine(getPatternRecordForLag(lag ?? null, patternMemory)),
-          isNewPattern: sourceSignal ? isHeroPatternNew(sourceSignal.id, false) : false,
+          isNewPattern: false,
         });
       }
     }
@@ -3599,17 +3590,17 @@ const tryNextPrompts = useMemo(() => {
             <div className="text-sm font-semibold text-black">Over the next few days you might notice</div>
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.68)]">
               {bodyWeatherLines.slice(0, 3).map((line) => (
-                <div key={line} className="leading-6">{line}</div>
+                <div key={line} className="leading-6">• {line}</div>
               ))}
             </div>
           </div>
 
           <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
             <div className="text-sm font-semibold text-black">Explore deeper insights</div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
+                className="min-h-[3.25rem] px-3 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium text-sm text-center leading-5"
                 onClick={() => {
                   setDataEvidenceOpen(true);
                   scrollToInsightsSection('eb-insights-settings');
@@ -3619,14 +3610,14 @@ const tryNextPrompts = useMemo(() => {
               </button>
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
+                className="min-h-[3.25rem] px-3 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium text-sm text-center leading-5"
                 onClick={() => scrollToInsightsSection('eb-experiments')}
               >
                 Run experiment
               </button>
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
+                className="col-span-2 min-h-[3.25rem] px-3 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium text-sm text-center leading-5"
                 onClick={() => scrollToInsightsSection('eb-insights-settings')}
               >
                 Change metrics
@@ -3687,10 +3678,6 @@ const tryNextPrompts = useMemo(() => {
                   {shouldPromptPatternFeedback(getPatternFeedbackIdFromMetrics(p.aKey, p.bKey), p.feedback?.status === 'confirmed') ? (() => {
                     const feedbackId = getPatternFeedbackIdFromMetrics(p.aKey, p.bKey);
                     const contradictionOpen = pendingContradiction?.id === feedbackId;
-                    const contradictionOptions = contradictionOpen ? pendingContradiction.driverOptions : [];
-                    const cardMetrics = p.lagPattern && chainTarget?.lagPattern
-                      ? [p.aKey, p.bKey, chainTarget.lagPattern.followKey as InsightMetricKey]
-                      : [p.aKey, p.bKey];
                     return (
                       <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
                         {!contradictionOpen ? (
@@ -3707,7 +3694,7 @@ const tryNextPrompts = useMemo(() => {
                               <button
                                 type="button"
                                 className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-light)/0.55)] bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-primary-dark))] text-sm font-medium hover:opacity-95 transition-all"
-                                onClick={() => openContradictionPrompt(p, cardMetrics)}
+                                onClick={() => openContradictionPrompt(p)}
                               >
                                 No
                               </button>
@@ -3725,7 +3712,7 @@ const tryNextPrompts = useMemo(() => {
                             <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">This pattern didn’t feel right for you, so we’ll stop surfacing it.</div>
                             <div className="mt-3 text-sm eb-muted">Do you know what tends to drive this instead?</div>
                             <div className="mt-3 flex flex-wrap gap-2">
-                              {contradictionOptions.map((option) => (
+                              {CONTRADICTION_DRIVER_OPTIONS.map((option) => (
                                 <button
                                   key={option.key}
                                   type="button"
