@@ -3535,6 +3535,16 @@ const tryNextPrompts = useMemo(() => {
     refreshSavedActions();
   };
 
+  const viewActiveExperiment = () => {
+    try {
+      const el = document.getElementById('eb-experiments');
+      safeScrollIntoView(el, { behavior: 'smooth', block: 'start' });
+    } catch {
+      // ignore
+    }
+  };
+
+
   const renderExperimentCTA = (ms: any) => {
     if (!ms) return null;
     const strength = ms.strength;
@@ -3791,10 +3801,12 @@ const tryNextPrompts = useMemo(() => {
       </div>
 
       <TryNextCard
-        items={(experimentStatus && !experimentStatus.done ? [] : tryNextActions).map((item) => ({ id: item.id, title: item.title, description: item.description, label: item.label, saved: item.saved }))}
+        items={tryNextActions.map((item) => ({ id: item.id, title: item.title, description: item.description, label: item.label, saved: item.saved }))}
         onStart={startSignalExperiment}
         onSave={saveSignalExperiment}
         onDismiss={dismissSignalExperiment}
+        hasActiveExperiment={Boolean(experimentStatus && !experimentStatus.done)}
+        onViewActiveExperiment={viewActiveExperiment}
       />
 
 {/* Experiment dialog */}

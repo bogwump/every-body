@@ -14,6 +14,8 @@ export function TryNextCard(props: {
   onStart: (id: string) => void;
   onSave: (id: string) => void;
   onDismiss: (id: string) => void;
+  hasActiveExperiment?: boolean;
+  onViewActiveExperiment?: () => void;
 }) {
   if (!props.items.length) return null;
 
@@ -36,16 +38,24 @@ export function TryNextCard(props: {
             </div>
             <div className="mt-2 text-sm eb-muted">{item.description}</div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" className="eb-btn-primary" onClick={() => props.onStart(item.id)}>
-                Start experiment
-              </button>
-              <button type="button" className="eb-btn-secondary inline-flex items-center gap-2" onClick={() => props.onSave(item.id)}>
-                <Bookmark className="w-4 h-4" />
-                {item.saved ? 'Saved' : 'Save for later'}
-              </button>
+              {props.hasActiveExperiment ? (
+                <button type="button" className="eb-btn-primary" onClick={() => props.onViewActiveExperiment?.()}>
+                  View active experiment
+                </button>
+              ) : (
+                <>
+                  <button type="button" className="eb-btn-primary" onClick={() => props.onStart(item.id)}>
+                    Start experiment
+                  </button>
+                  <button type="button" className="eb-btn-secondary inline-flex items-center gap-2" onClick={() => props.onSave(item.id)}>
+                    <Bookmark className="w-4 h-4" />
+                    {item.saved ? 'Saved' : 'Save for later'}
+                  </button>
+                </>
+              )}
               <button type="button" className="eb-btn-secondary inline-flex items-center gap-2" onClick={() => props.onDismiss(item.id)}>
                 <X className="w-4 h-4" />
-                Dismiss
+                {props.hasActiveExperiment ? 'Dismiss for now' : 'Dismiss'}
               </button>
             </div>
           </div>
