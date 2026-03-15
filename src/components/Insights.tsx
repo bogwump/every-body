@@ -29,7 +29,7 @@ import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
 import { isMetricInScope } from '../lib/insightsScope';
-import { type InsightSignal, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
+import { type InsightSignal, getDiscoveredPatterns, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
 import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { getSupportSuggestion } from '../lib/patternSupport';
 import { getExperimentForSignal } from '../lib/experimentSuggestions';
@@ -1737,17 +1737,25 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const patternMemory = useMemo(() => buildPatternMemory(entriesAllSorted, userData), [entriesAllSorted, userData]);
 
   const heroInsightState = useMemo(() => {
+    const discoveredToday = new Set(
+      getDiscoveredPatterns()
+        .filter((item) => item.firstDetected === isoTodayLocal())
+        .map((item) => item.id),
+    );
+    const isHeroPatternNew = (id: string, explicitNew: boolean) => explicitNew || discoveredToday.has(id);
+
     const items: HeroInsightItem[] = heroSignals.map((signal) => ({
       id: signal.id,
       text: copyForInsightSignal(signal),
       contextLine: getPatternContextForSignal(signal),
       repeatLine: getRepeatPatternLine(getPatternRecordForSignal(signal, patternMemory)),
-      isNewPattern: signal.isNewPattern,
+      isNewPattern: isHeroPatternNew(signal.id, signal.isNewPattern),
     }));
 
     const strongestConnection = connectionCards.find((pair) => Boolean(pair.lagPattern));
     if (strongestConnection && items.length < 3) {
       const lag = strongestConnection.lagPattern;
+      const sourceSignal = strongestConnection.sourceSignal;
       const connectionText = lag
         ? (lag.direction === 'inverse'
             ? `When ${lag.leadLabel.toLowerCase()} has been higher, ${lag.followLabel.toLowerCase()} has often dipped ${lag.lagDays === 1 ? 'the next day' : `about ${lag.lagDays} days later`}.`
@@ -1757,9 +1765,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         items.push({
           id: `hero-connection:${strongestConnection.aKey}:${strongestConnection.bKey}`,
           text: connectionText,
-          contextLine: getPatternContextForSignal({ metrics: [strongestConnection.aKey, strongestConnection.bKey], confidence: strongestConnection.confidence === 'high' ? 'high' : strongestConnection.confidence === 'medium' ? 'medium' : 'low' }),
+          contextLine: sourceSignal ? getPatternContextForSignal(sourceSignal) : getPatternContextForSignal({ metrics: [strongestConnection.aKey, strongestConnection.bKey], confidence: strongestConnection.confidence === 'high' ? 'high' : strongestConnection.confidence === 'medium' ? 'medium' : 'low' }),
           repeatLine: getRepeatPatternLine(getPatternRecordForLag(lag ?? null, patternMemory)),
-          isNewPattern: false,
+          isNewPattern: sourceSignal ? isHeroPatternNew(sourceSignal.id, false) : false,
         });
       }
     }
@@ -3591,7 +3599,7 @@ const tryNextPrompts = useMemo(() => {
             <div className="text-sm font-semibold text-black">Over the next few days you might notice</div>
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.68)]">
               {bodyWeatherLines.slice(0, 3).map((line) => (
-                <div key={line} className="leading-6">• {line}</div>
+                <div key={line} className="leading-6">{line}</div>
               ))}
             </div>
           </div>
