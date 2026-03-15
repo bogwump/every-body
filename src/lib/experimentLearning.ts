@@ -27,12 +27,11 @@ function readExperimentHistory(): ExperimentHistoryItem[] {
 }
 
 function isUsefulOutcome(status?: string): boolean {
-  return status === 'helped' || status === 'notReally';
+  return status === 'helped';
 }
 
 function scoreOutcome(status?: string): number {
   if (status === 'helped') return 1;
-  if (status === 'notReally') return 0.6;
   return 0;
 }
 

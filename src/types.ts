@@ -229,7 +229,7 @@ export interface ExperimentPlan {
 
 
 
-export type ExperimentOutcomeStatus = 'helped' | 'notReally' | 'abandoned' | 'stopped';
+export type ExperimentOutcomeStatus = 'helped' | 'notReally' | 'abandoned' | 'stopped' | 'pending';
 
 export type ExperimentKind = 'change' | 'track';
 

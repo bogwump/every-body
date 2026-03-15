@@ -27,9 +27,11 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } fr
 import { EBDialogContent } from "./EBDialog";
 import { isoToday } from '../lib/analytics';
 import { isoFromDateLocal } from '../lib/date';
-import { useEntries, useExperiment } from '../lib/appStore';
+import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
 import { applyPhaseChangeForEntries, phaseLabelFromKey } from '../lib/phaseChange';
 import { hasResizeObserver } from '../lib/browserSafe';
+import { recordExperimentOutcome } from '../lib/experimentOutcomes';
+import { getExperimentLifecycle, getExperimentStatusMeta, getExperimentTemplateMeta } from '../lib/experimentMeta';
 
 const INFLUENCE_DEFS: Array<{ key: string; label: string; hint: string }> = [
   {
@@ -460,7 +462,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
   const prevDateISO = useMemo(() => addDaysISO(activeDateISO, -1), [activeDateISO]);
 
   const { entries, upsertEntry } = useEntries();
-  const { experiment } = useExperiment();
+  const { experiment, setExperiment } = useExperiment();
+  const { upsertHistoryItem } = useExperimentHistory();
   const existingEntry = useMemo(
     () => entries.find((e) => e.dateISO === activeDateISO) ?? null,
     [entries, activeDateISO]
@@ -475,15 +478,48 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
     if (!experiment) return null;
     const ex = experiment as ExperimentPlan;
     if (!ex.startDateISO) return null;
-    const todayISO2 = isoToday();
-    const start = new Date(ex.startDateISO + 'T00:00:00');
-    const today = new Date(todayISO2 + 'T00:00:00');
-    const dayIndex = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-    const day = dayIndex + 1;
-    const done = dayIndex >= (ex.durationDays ?? 3);
-    // Only show while active or just-finished
-    return { ex, day: Math.max(1, day), done };
+    return getExperimentLifecycle(ex, isoToday(), 3);
   }, [experiment]);
+
+  const experimentTemplateMeta = useMemo(
+    () => getExperimentTemplateMeta(experimentStatus?.ex?.changeKey, experimentStatus?.ex?.title),
+    [experimentStatus],
+  );
+
+  const saveExperimentReflection = (status: 'helped' | 'notReally' | 'abandoned') => {
+    if (!experimentStatus) return;
+    const ex = experimentStatus.ex as ExperimentPlan;
+    const completedAtISO = new Date().toISOString();
+    const next: ExperimentPlan = {
+      ...ex,
+      outcome: {
+        ...(ex.outcome ?? {}),
+        status,
+        completedAtISO,
+      } as any,
+    };
+    setExperiment(next);
+    upsertHistoryItem({
+      experimentId: ex.id,
+      title: ex.title,
+      kind: (ex as any).kind || ((typeof ex.title === 'string' && ex.title.toLowerCase().includes('tracking')) ? 'track' : 'change'),
+      startDateISO: ex.startDateISO,
+      durationDays: Number(ex.durationDays ?? 3),
+      metrics: Array.isArray(ex.metrics) ? ex.metrics : [],
+      changeKey: ex.changeKey,
+      outcome: {
+        status,
+        completedAtISO,
+        rating: status === 'helped' ? 5 : status === 'notReally' ? 2 : undefined,
+        note: typeof (ex as any)?.outcome?.note === 'string' ? (ex as any).outcome.note : undefined,
+        digest: (ex as any)?.outcome?.digest,
+      },
+    });
+    recordExperimentOutcome({
+      experimentId: ex.id,
+      result: status === 'helped' ? 'helpful' : status === 'notReally' ? 'not_helpful' : 'stopped_early',
+    });
+  };
 
   const labelForMetric = (k: InsightMetricKey): string => {
     if (k === 'mood') return 'Overall mood';
@@ -1051,11 +1087,15 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
         </div>
 
-        {experimentStatus && !experimentStatus.done && (
+        {experimentStatus && (!experimentStatus.done || experimentStatus.withinAcknowledgementWindow) && (
           <div className="eb-inset rounded-2xl p-5 mb-6">
             <div className="text-sm font-semibold flex items-center gap-2">
               <FlaskConical className="w-4 h-4" />
-              Experiment in progress (Day {experimentStatus.day}/{experimentStatus.ex.durationDays})
+              {!experimentStatus.done
+                ? `Experiment in progress (Day ${experimentStatus.day}/${experimentStatus.durationDays})`
+                : experimentStatus.awaitingOutcome
+                  ? 'Your experiment has finished'
+                  : 'Experiment completed'}
             </div>
             <div className="mt-1 text-sm eb-muted">{experimentStatus.ex.title}</div>
             {experimentStatus.ex.metrics?.length ? (
@@ -1067,9 +1107,37 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                 ))}
               </div>
             ) : null}
-            <div className="mt-2 text-sm eb-muted">
-              Tip: use yesterday as your anchor so today’s score is easier to judge.
-            </div>
+
+            {!experimentStatus.done ? (
+              <>
+                <div className="mt-3 rounded-2xl border border-black/8 bg-white p-4 text-sm">
+                  <div className="font-medium">What you are trying</div>
+                  <div className="mt-1 text-[rgb(var(--color-text-secondary))]">{experimentTemplateMeta.actionLabel}</div>
+                  <div className="mt-2 text-[rgb(var(--color-text-secondary))]">{experimentTemplateMeta.explanation}</div>
+                </div>
+                <div className="mt-2 text-sm eb-muted">
+                  Tip: use yesterday as your anchor so today’s score is easier to judge.
+                </div>
+              </>
+            ) : experimentStatus.awaitingOutcome ? (
+              <>
+                <div className="mt-3 text-sm eb-muted">Was this helpful? Save a quick reflection while it is still fresh.</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" className="eb-btn eb-btn-primary" onClick={() => saveExperimentReflection('helped')}>
+                    Yes, it helped
+                  </button>
+                  <button type="button" className="eb-btn eb-btn-secondary" onClick={() => saveExperimentReflection('notReally')}>
+                    Not really
+                  </button>
+                  <button type="button" className="eb-btn eb-btn-secondary" onClick={() => saveExperimentReflection('abandoned')}>
+                    I didn’t really do it
+                  </button>
+                </div>
+                <div className="mt-2 text-sm eb-muted">This prompt will stay here for 3 days after the experiment ends.</div>
+              </>
+            ) : (
+              <div className="mt-3 text-sm eb-muted">Saved as {getExperimentStatusMeta((experimentStatus.ex as any)?.outcome?.status).neutralLabel}.</div>
+            )}
           </div>
         )}
 

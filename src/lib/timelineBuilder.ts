@@ -1,7 +1,6 @@
 import { getCompanionMoments, type CompanionMoment } from './companionMoments';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
 import { safeFormatMonthYearFromKey } from './browserSafe';
-import { getExperimentOutcomes } from './experimentOutcomes';
 import { getDiscoveredPatterns } from './insightEngine';
 import { getPhaseHistory } from './phaseHistory';
 import { phaseLabelFromKey } from './phaseChange';
@@ -365,7 +364,7 @@ function buildHelpfulPatternEvents(): TimelineEvent[] {
 
 function outcomeLabel(status?: string): string {
   if (status === 'helped') return 'helpful';
-  if (status === 'notReally') return 'slightly helpful';
+  if (status === 'notReally') return 'not clearly helpful';
   if (status === 'stopped') return 'stopped early';
   if (status === 'abandoned') return 'unclear';
   return 'unclear';
@@ -373,7 +372,6 @@ function outcomeLabel(status?: string): string {
 
 function buildExperimentEvents(): TimelineEvent[] {
   const history = readExperimentHistory();
-  const outcomes = getExperimentOutcomes();
   const events: TimelineEvent[] = [];
 
   history.forEach((item) => {
@@ -410,7 +408,7 @@ function buildExperimentEvents(): TimelineEvent[] {
         description: digestSummary
           ? tidySentence(digestSummary, `${title} finished.`)
           : `${title} finished with a ${outcomeLabel(status)} result.`,
-        evidence: `Result logged as ${outcomeLabel(status)}${metrics.length ? ` for ${metrics.join(', ')}` : ''}.`,
+        evidence: `You logged this result as ${outcomeLabel(status)}${metrics.length ? ` for ${metrics.join(', ')}` : ''}.`,
         signals: metrics,
         source: 'experiments',
         actionLabel: 'View experiment result',
@@ -418,49 +416,6 @@ function buildExperimentEvents(): TimelineEvent[] {
         metadata: { experimentId, title, status, metrics: item?.metrics },
       });
     }
-
-    if (experimentId && isISODate(completedAtISO) && (status === 'helped' || status === 'notReally')) {
-      events.push({
-        id: `experiment-helped:${experimentId}:${completedAtISO}:history`,
-        type: 'experiment_helped',
-        date: completedAtISO,
-        title: `${title} looked ${status === 'helped' ? 'helpful' : 'slightly helpful'}`,
-        description: digestSummary
-          ? tidySentence(digestSummary, `${title} looked worth remembering.`)
-          : `${title} appeared to support ${metrics.length ? metrics.join(', ') : 'this area'}.`,
-        evidence: 'Taken from the experiment result you saved.',
-        signals: metrics,
-        source: 'experiments',
-        actionLabel: 'View experiment result',
-        actionTarget: 'insights:experiments',
-        metadata: { experimentId, title, status, metrics: item?.metrics },
-      });
-    }
-  });
-
-  outcomes.forEach((item) => {
-    const experimentId = String(item?.experimentId || '').trim();
-    const date = String(item?.date || '').slice(0, 10);
-    if (!experimentId || !isISODate(date)) return;
-    if (item.result !== 'helpful' && item.result !== 'slightly_helpful') return;
-    const matching = history.find((entry) => String(entry?.experimentId || '').trim() === experimentId);
-    const title = String(matching?.title || 'Your experiment').trim() || 'Your experiment';
-    const metrics = metricsSummary(matching?.metrics);
-    events.push({
-      id: `experiment-helped:${experimentId}:${date}:outcome`,
-      type: 'experiment_helped',
-      date,
-      title: `${title} looked ${item.result === 'helpful' ? 'helpful' : 'slightly helpful'}`,
-      description: item.result === 'helpful'
-        ? `${title} appeared to support ${metrics.length ? metrics.join(', ') : 'this area'}.`
-        : `${title} showed an early signal that may support ${metrics.length ? metrics.join(', ') : 'this area'}.`,
-      evidence: 'Taken from your saved experiment outcome.',
-      signals: metrics,
-      source: 'experiments',
-      actionLabel: 'View experiment result',
-      actionTarget: 'insights:experiments',
-      metadata: { experimentId, title, result: item.result, metrics: matching?.metrics },
-    });
   });
 
   return events;
@@ -506,7 +461,7 @@ export function dedupeTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
 export function filterTimelineEvents(events: TimelineEvent[], filter: TimelineFilter): TimelineEvent[] {
   if (filter === 'all') return events;
   if (filter === 'patterns') return events.filter((event) => event.type === 'pattern_discovered' || event.type === 'pattern_strengthened' || event.type === 'helpful_pattern');
-  if (filter === 'experiments') return events.filter((event) => event.type === 'experiment_started' || event.type === 'experiment_completed' || event.type === 'experiment_helped');
+  if (filter === 'experiments') return events.filter((event) => event.type === 'experiment_started' || event.type === 'experiment_completed');
   if (filter === 'rhythm') return events.filter((event) => event.type === 'phase_change' || event.type === 'rhythm_shift');
   return events;
 }
@@ -516,7 +471,7 @@ export function countPatternEvents(events: TimelineEvent[]): number {
 }
 
 export function countHelpfulExperiments(events: TimelineEvent[]): number {
-  return events.filter((event) => event.type === 'experiment_helped').length;
+  return events.filter((event) => event.type === 'experiment_completed' && String(event.metadata?.status || '') === 'helped').length;
 }
 
 export function countPhaseChanges(events: TimelineEvent[]): number {

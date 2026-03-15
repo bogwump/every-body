@@ -2,7 +2,7 @@ import { isoTodayLocal } from './date';
 
 export const EXPERIMENT_OUTCOMES_KEY = 'everybody:v2:experiment_outcomes';
 
-export type ExperimentOutcomeResult = 'helpful' | 'slightly_helpful' | 'not_helpful' | 'stopped_early';
+export type ExperimentOutcomeResult = 'helpful' | 'not_helpful' | 'stopped_early';
 
 export type ExperimentOutcomeRecord = {
   experimentId: string;
@@ -38,5 +38,5 @@ export function recordExperimentOutcome(input: Omit<ExperimentOutcomeRecord, 'da
 }
 
 export function getHelpfulExperiments(): ExperimentOutcomeRecord[] {
-  return getExperimentOutcomes().filter((item) => item.result === 'helpful' || item.result === 'slightly_helpful');
+  return getExperimentOutcomes().filter((item) => item.result === 'helpful');
 }

@@ -58,7 +58,7 @@ export function getPresetMeta(preset: AIExportPreset): { title: string; descript
   if (preset === 'helpful') {
     return {
       title: "Review what's been helping",
-      description: 'This export focuses on helpful patterns, experiment learnings, what looked slightly helpful, and what may be worth repeating.',
+      description: 'This export focuses on helpful patterns, experiment learnings, what did and did not clearly help, and what may be worth repeating.',
       filename: 'everybody_helpful_export',
       copiedMessage: 'Your helpful patterns summary has been copied. Paste it into ChatGPT to continue.',
     };
@@ -136,7 +136,7 @@ function describeSignal(signal: InsightSignal): string {
 
 function outcomeLabel(status?: string): string {
   if (status === 'helped') return 'helped';
-  if (status === 'notReally') return 'slightly helpful';
+  if (status === 'notReally') return 'not clearly helpful';
   if (status === 'stopped') return 'stopped early';
   if (status === 'abandoned') return 'unclear';
   return 'unclear';
@@ -259,7 +259,7 @@ export function buildPresetPrompt(preset: AIExportPreset): { intro: string; asks
       intro: `Please review my tracking data and experiments to help me understand what seems to help most.`,
       asks: [
         'summarise what has looked helpful so far',
-        'point out what was only slightly helpful or still unclear',
+        'point out what did not clearly help or still feels unclear',
         'help me spot anything worth keeping in mind or repeating',
       ],
     };

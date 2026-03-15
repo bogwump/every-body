@@ -36,6 +36,7 @@ import { getExperimentForSignal } from '../lib/experimentSuggestions';
 import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, saveAction } from '../lib/savedActions';
 import { recordExperimentOutcome } from '../lib/experimentOutcomes';
 import { consumePendingExperimentLaunch, inferPendingExperimentLaunchFromText } from '../lib/experimentLaunch';
+import { compareExperimentOutcomes, findPreviousExperimentRun, getExperimentLifecycle, getExperimentStatusMeta, getExperimentTemplateMeta } from '../lib/experimentMeta';
 import { getExperimentHistoryContext, getHelpfulPatternsFromExperiments } from '../lib/experimentLearning';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
@@ -1846,14 +1847,15 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     changeKey?: string;
   }) => {
     const nextMetrics = (Array.isArray(payload.metrics) ? payload.metrics : []).slice(0, 5) as MetricKey[];
+    const templateMeta = getExperimentTemplateMeta(payload.changeKey, payload.experimentName);
     const nextPlan = {
       title: payload.experimentName,
       steps: [
-        'Try one small version of this for the next few days.',
-        'Keep the rest of your routine as steady as you can.',
+        `What you are trying: ${templateMeta.actionLabel}.`,
+        ...templateMeta.examples.slice(0, 3).map((item) => `For example: ${item}.`),
         'Log the same measures each day, then look back at the shift.',
       ],
-      note: payload.experimentDescription,
+      note: `${payload.experimentDescription} ${templateMeta.explanation}`.trim(),
     };
 
     if (experimentStatus && !experimentStatus.done) {
@@ -2032,14 +2034,15 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const openTryNextPrompt = (p: { title: string; changeKey: string; metrics: MetricKey[]; durationDays?: number; why?: string[] }) => {
     if (experimentStatus && !experimentStatus.done) {
       // Stop/start confirmation happens before setup.
+      const templateMeta = getExperimentTemplateMeta(p.changeKey, p.title);
       const plan = {
         title: p.title,
         steps: [
-          'Try ONE small change for the duration.',
-          'Keep everything else roughly the same, if you can.',
+          `What you are trying: ${templateMeta.actionLabel}.`,
+          ...templateMeta.examples.slice(0, 3).map((item) => `For example: ${item}.`),
           'Log your chosen measures each day, then review the before/after summary.',
         ],
-        note: 'If something makes you feel worse, stop and switch to something gentler.',
+        note: `${templateMeta.explanation} If something makes you feel worse, stop and switch to something gentler.`,
       };
       setPreOpenExperimentConfirm({
         type: 'suggested',
@@ -2050,14 +2053,15 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       });
       return;
     }
+    const templateMeta = getExperimentTemplateMeta(p.changeKey, p.title);
     setExperimentPlan({
       title: p.title,
       steps: [
-        'Try ONE small change for the duration.',
-        'Keep everything else roughly the same, if you can.',
+        `What you are trying: ${templateMeta.actionLabel}.`,
+        ...templateMeta.examples.slice(0, 3).map((item) => `For example: ${item}.`),
         'Log your chosen measures each day, then review the before/after summary.',
       ],
-      note: 'If something makes you feel worse, stop and switch to something gentler.',
+      note: `${templateMeta.explanation} If something makes you feel worse, stop and switch to something gentler.`,
     });
     setExperimentMetrics((p.metrics || []).slice(0, 5));
     setExperimentDurationDays(p.durationDays ?? 3);
@@ -2209,7 +2213,7 @@ const confirmFinishExperiment = () => {
     recordExperimentToHistory(next, outcome);
     recordExperimentOutcome({
       experimentId: ex.id,
-      result: outcome === 'helped' ? 'helpful' : outcome === 'notReally' ? 'slightly_helpful' : 'stopped_early',
+      result: outcome === 'helped' ? 'helpful' : outcome === 'notReally' ? 'not_helpful' : 'stopped_early',
     });
     setExperiment(next);
 
@@ -2238,17 +2242,19 @@ const confirmFinishExperiment = () => {
 
   const experimentStatus = useMemo(() => {
     if (!experiment) return null;
-    const ex = experiment as ExperimentPlan;
-    const todayISO = isoTodayLocal();
-    const start = new Date(ex.startDateISO + 'T00:00:00');
-    const today = new Date(todayISO + 'T00:00:00');
-    const dayIndex = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-    const day = dayIndex + 1;
-    const completedAtISO = (ex as any)?.outcome?.completedAtISO;
-    const done = Boolean(completedAtISO) || dayIndex >= (ex.durationDays ?? 3);
-    return { ex, day: Math.max(1, day), done };
+    return getExperimentLifecycle(experiment as ExperimentPlan, isoTodayLocal(), 3);
   }, [experiment]);
 
+  const experimentTemplateMeta = useMemo(
+    () => getExperimentTemplateMeta(experimentStatus?.ex?.changeKey, experimentStatus?.ex?.title),
+    [experimentStatus],
+  );
+
+  useEffect(() => {
+    if (!experimentStatus || !experimentStatus.done) return;
+    if (experimentStatus.withinAcknowledgementWindow) return;
+    clearExperiment();
+  }, [clearExperiment, experimentStatus]);
 
   const todayISO = isoTodayLocal();
   const hasLoggedToday = Array.isArray(entriesAllSorted) && entriesAllSorted.some((e: any) => e?.dateISO === todayISO);
@@ -2542,7 +2548,7 @@ const uniq = new Map<string, (typeof items)[number]>();
         'Keep everything else roughly the same, if you can.',
         'Log your chosen measures each day, then review the before/after summary.',
       ],
-      note: 'Reuse this experiment as a second pass if you want to sense-check what happened last time.',
+      note: `${getExperimentTemplateMeta(typeof item?.changeKey === 'string' ? item.changeKey : '', title).explanation} Reuse this experiment as a second pass if you want to sense-check what happened last time.`,
     });
     setExperimentOpen(true);
   };
@@ -3119,12 +3125,19 @@ const tryNextPrompts = useMemo(() => {
             <div className="text-sm font-semibold">{ex.title || 'Your experiment'}</div>
             <div className="mt-1 text-sm eb-muted">
               {done
-                ? 'Finished'
+                ? experimentStatus.awaitingOutcome
+                  ? `Finished on ${fmtDateUi(experimentStatus.endDateISO, false)} · reflection pending`
+                  : 'Finished'
                 : started
                   ? `Day ${experimentStatus.day} of ${ex.durationDays ?? 3}`
                   : `Starts ${fmtDateUi(ex.startDateISO, false)}`}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">{metricPills}</div>
+            <div className="mt-3 rounded-2xl border border-black/8 bg-white p-4 text-sm">
+              <div className="font-medium">What you are trying</div>
+              <div className="mt-1 eb-muted">{experimentTemplateMeta.actionLabel}</div>
+              <div className="mt-2 eb-muted">{experimentTemplateMeta.explanation}</div>
+            </div>
           </div>
 
           {!done ? (
@@ -3174,6 +3187,7 @@ const tryNextPrompts = useMemo(() => {
           ) : (
             <div className="mt-4">
               <div className="text-sm font-semibold">How did it go?</div>
+              <div className="mt-1 text-sm eb-muted">This stays here for 3 days after the experiment ends so you can reflect while it is still fresh.</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button type="button" className="eb-btn eb-btn-primary" onClick={() => markExperimentOutcome('helped')}>
                   Yes, it helped
@@ -4228,7 +4242,7 @@ const tryNextPrompts = useMemo(() => {
                     {(experimentHistory as any[]).slice(0, 20).map((item: any) => {
                       const id = String(item?.experimentId || item?.title || Math.random());
                       const outcomeStatus = String(item?.outcome?.status || '');
-                      const outcomeLabel = outcomeStatus === 'helped' ? 'Helped' : outcomeStatus === 'notReally' ? 'Not really' : outcomeStatus === 'abandoned' ? 'Didn’t finish' : 'Stopped early';
+                      const outcomeLabel = getExperimentStatusMeta(outcomeStatus).label;
                       const completedDate = fmtDateUi(isoDatePartFromDateTime(item?.outcome?.completedAtISO) || item?.startDateISO, true);
                       const metrics = Array.isArray(item?.metrics) ? item.metrics.slice(0, 4) : [];
                       const digest = item?.outcome?.digest;
@@ -4266,6 +4280,17 @@ const tryNextPrompts = useMemo(() => {
                                     ))}
                                   </div>
                                 ) : null}
+                                {(() => {
+                                  const previousRun = findPreviousExperimentRun(experimentHistory as any, item as any);
+                                  if (!previousRun) return null;
+                                  const comparisonLine = compareExperimentOutcomes(previousRun?.outcome?.status, outcomeStatus);
+                                  if (!comparisonLine) return null;
+                                  return (
+                                    <div className="mt-3 rounded-xl border border-black/8 bg-black/3 p-3 text-sm eb-muted">
+                                      <span className="font-medium text-neutral-900">Compared with last time:</span> {comparisonLine}
+                                    </div>
+                                  );
+                                })()}
                                 {item?.outcome?.note ? (
                                   <div className="mt-3 rounded-xl border border-black/8 bg-black/3 p-3 whitespace-pre-wrap eb-muted">{item.outcome.note}</div>
                                 ) : null}
