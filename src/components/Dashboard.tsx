@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload } from 'lucide-react';
+import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload, History as HistoryIcon, Settings2, Droplets, FlaskConical } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -17,7 +17,7 @@ import { buildHomepageHeroModel, computeCycleStats, estimatePhaseByFlow, filterB
 import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
 import { importBackupFile, parseBackupJson, looksLikeInsightsExport } from '../lib/backup';
-import { getHighestPriorityMoment } from '../lib/companionMoments';
+import { getArchivedMomentSnapshots, getHighestPriorityMoment } from '../lib/companionMoments';
 import { getRhythmPhaseState } from '../lib/phaseChange';
 import { generateMoments } from '../lib/generateMoments';
 import { CompanionMomentCard } from './CompanionMomentCard';
@@ -103,6 +103,208 @@ function buildWeekSeries(dateISOs: string[], entriesByDate: Map<string, any>, me
   });
 }
 
+
+
+
+type GuideCardId =
+  | 'missed-day'
+  | 'low-coverage'
+  | 'cycle-optional'
+  | 'history-saved'
+  | 'it-grows'
+  | 'spotting-patterns'
+  | 'quick-checkin'
+  | 'patterns-take-time'
+  | 'small-experiments';
+
+type GuideCTA =
+  | { label: string; action: 'navigate'; screen: string }
+  | { label: string; action: 'check-in' };
+
+type GuideCardModel = {
+  id: GuideCardId;
+  title: string;
+  body: string;
+  supporting?: string;
+  cta: GuideCTA;
+  priority: number;
+  contextual?: boolean;
+  icon: React.ReactNode;
+};
+
+type GuideMemory = {
+  lastShownAtISO?: string;
+  timesShown?: number;
+  lastClickedAtISO?: string;
+};
+
+const GUIDE_MEMORY_KEY = 'everybody:v2:homepage_guide_memory';
+
+function readGuideMemory(): Partial<Record<GuideCardId, GuideMemory>> {
+  try {
+    const raw = localStorage.getItem(GUIDE_MEMORY_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeGuideMemory(memory: Partial<Record<GuideCardId, GuideMemory>>) {
+  try {
+    localStorage.setItem(GUIDE_MEMORY_KEY, JSON.stringify(memory));
+  } catch {
+    // ignore
+  }
+}
+
+function daysBetweenISO(a: string, b: string): number {
+  const start = new Date(`${a}T00:00:00`).getTime();
+  const end = new Date(`${b}T00:00:00`).getTime();
+  return Math.round((end - start) / 86400000);
+}
+
+function getGuideCoverageTier(userData: UserData): 'logging-only' | 'basic-patterns' | 'full-insights' {
+  const enabled = new Set<SymptomKey>(userData.enabledModules ?? []);
+  const signalCount = enabled.size + 1; // mood is always available
+
+  const hasRecovery = enabled.has('sleep') || enabled.has('energy') || enabled.has('fatigue');
+  const hasCycle = userData.cycleTrackingMode === 'cycle' || enabled.has('flow');
+  const hasMind = true;
+  const bodySignals: SymptomKey[] = ['pain', 'cramps', 'bloating', 'headache', 'jointPain', 'hotFlushes', 'nightSweats', 'hairShedding', 'facialSpots', 'cysts', 'breastTenderness', 'digestion', 'nausea'];
+  const hasBody = bodySignals.some((key) => enabled.has(key));
+  const categoryCount = [hasRecovery, hasCycle, hasMind, hasBody].filter(Boolean).length;
+
+  if (signalCount >= 5 && categoryCount >= 4) return 'full-insights';
+  if (signalCount >= 3 && categoryCount >= 3) return 'basic-patterns';
+  return 'logging-only';
+}
+
+function buildGuideCard(options: {
+  daysTracked: number;
+  daysSinceStart: number;
+  hasRecentGap: boolean;
+  lowCoverage: boolean;
+  hasHistory: boolean;
+  cycleOptionalRelevant: boolean;
+  experimentRelevant: boolean;
+}): GuideCardModel | null {
+  const earlyUser = options.daysSinceStart <= 30 || options.daysTracked < 25;
+  const memory = readGuideMemory();
+  const cooldownDays = 2;
+
+  const cards: GuideCardModel[] = [];
+
+  if (options.hasRecentGap) {
+    cards.push({
+      id: 'missed-day',
+      title: 'Missed a day?',
+      body: 'That’s completely fine. You can tap any day in Calendar and fill it in later.',
+      cta: { label: 'Open Calendar', action: 'navigate', screen: 'calendar' },
+      priority: 1,
+      contextual: true,
+      icon: <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    });
+  }
+
+  if (options.lowCoverage) {
+    cards.push({
+      id: 'low-coverage',
+      title: 'Track what matters to you',
+      body: 'You can keep things simple or add more symptoms over time. A few active signals across mood, body, recovery and cycle usually helps patterns come through more clearly.',
+      cta: { label: 'Customise symptoms', action: 'navigate', screen: 'profile' },
+      priority: 2,
+      contextual: true,
+      icon: <Settings2 className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    });
+  }
+
+  if (options.cycleOptionalRelevant) {
+    cards.push({
+      id: 'cycle-optional',
+      title: 'Cycle insights are there when you want them',
+      body: 'If you log bleeding or spotting, the app can estimate phases and show how symptoms shift across the month. You can still track without it.',
+      cta: { label: 'Edit cycle', action: 'navigate', screen: 'calendar' },
+      priority: 3,
+      contextual: true,
+      icon: <Droplets className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    });
+  }
+
+  if (options.hasHistory) {
+    cards.push({
+      id: 'history-saved',
+      title: 'Want to see what’s saved?',
+      body: 'Your past companion moments and milestones are kept in History, so you can look back without losing the story.',
+      cta: { label: 'Open History', action: 'navigate', screen: 'history' },
+      priority: 4,
+      contextual: true,
+      icon: <HistoryIcon className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    });
+  }
+
+  if (earlyUser) {
+    cards.push(
+      {
+        id: 'it-grows',
+        title: 'It grows with you',
+        body: 'This space gets smarter as you use it. You’ll see helpful reflections from day one, but clearer patterns usually take a little time. Keep logging, and we’ll build your rhythm together.',
+        supporting: 'Early patterns are starting to show. This will get clearer with a little more time.',
+        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+        priority: 5,
+        icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+      {
+        id: 'spotting-patterns',
+        title: 'Start spotting patterns',
+        body: 'Log a few more days and the app will begin showing more meaningful links between symptoms. Small patterns often start softly, then get clearer over time.',
+        cta: { label: 'Open check-in', action: 'check-in' },
+        priority: 6,
+        icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+      {
+        id: 'quick-checkin',
+        title: 'A quick check-in goes a long way',
+        body: 'Short, regular check-ins help the app learn your rhythm. It does not have to be perfect to be useful.',
+        cta: { label: 'Open check-in', action: 'check-in' },
+        priority: 7,
+        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+      {
+        id: 'patterns-take-time',
+        title: 'Patterns take a little time',
+        body: 'You may notice early reflections quickly, but stronger patterns usually build over a few weeks of check-ins. There’s no need to get everything perfect.',
+        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+        priority: 8,
+        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+    );
+  }
+
+  if (options.experimentRelevant) {
+    cards.push({
+      id: 'small-experiments',
+      title: 'Keep experiments small',
+      body: 'If you want to test what helps, small changes are easier to notice and easier to compare over time.',
+      cta: { label: 'View experiments', action: 'navigate', screen: 'insights' },
+      priority: 9,
+      contextual: true,
+      icon: <FlaskConical className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    });
+  }
+
+  const eligible = cards.filter((card) => {
+    const entry = memory[card.id];
+    if (!entry?.lastShownAtISO) return true;
+    return daysBetweenISO(entry.lastShownAtISO, isoToday()) >= cooldownDays;
+  });
+
+  const pool = eligible.length ? eligible : cards;
+  if (!pool.length) return null;
+
+  return [...pool].sort((a, b) => a.priority - b.priority)[0] ?? null;
+}
 
 type DashboardTileProps = {
   title: string;
@@ -232,6 +434,39 @@ export function Dashboard({
   const [momentRefresh, setMomentRefresh] = useState(0);
   const rhythmPhaseState = useMemo(() => getRhythmPhaseState(), [entriesSorted.length, todayISO]);
   const highestMoment = useMemo(() => getHighestPriorityMoment(todayISO), [todayISO, entriesSorted.length, momentRefresh]);
+
+  const guideCard = useMemo(() => {
+    const daysSinceStart = userData.createdAt ? Math.max(0, daysBetweenISO(userData.createdAt.slice(0, 10), todayISO)) : daysTracked;
+    const lastEntryISO = entriesSorted[entriesSorted.length - 1]?.dateISO ?? null;
+    const hasRecentGap = Boolean(lastEntryISO && daysBetweenISO(lastEntryISO, todayISO) >= 2);
+    const coverageTier = getGuideCoverageTier(userData);
+    const hasHistory = getArchivedMomentSnapshots(1).length > 0;
+    const cycleOptionalRelevant = userData.cycleTrackingMode !== 'cycle';
+    const experimentRelevant = Boolean(experiment && !(experiment as any)?.outcome?.completedAtISO);
+
+    return buildGuideCard({
+      daysTracked,
+      daysSinceStart,
+      hasRecentGap,
+      lowCoverage: coverageTier === 'logging-only',
+      hasHistory,
+      cycleOptionalRelevant,
+      experimentRelevant,
+    });
+  }, [todayISO, userData, entriesSorted, daysTracked, experiment, momentRefresh]);
+
+  React.useEffect(() => {
+    if (!guideCard) return;
+    const memory = readGuideMemory();
+    const existing = memory[guideCard.id] ?? {};
+    if (existing.lastShownAtISO === todayISO) return;
+    memory[guideCard.id] = {
+      ...existing,
+      lastShownAtISO: todayISO,
+      timesShown: (existing.timesShown ?? 0) + 1,
+    };
+    writeGuideMemory(memory);
+  }, [guideCard, todayISO]);
 
   React.useEffect(() => {
     generateMoments(entriesSorted as any, userData, todayISO);
@@ -555,6 +790,39 @@ export function Dashboard({
           </div>
         ) : null}
 
+        {guideCard ? (
+          <div className="eb-card">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+                {guideCard.icon}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Guide</div>
+                <h3 className="mt-1 mb-1">{guideCard.title}</h3>
+                <p className="text-sm text-[rgba(0,0,0,0.72)]">{guideCard.body}</p>
+                {guideCard.supporting ? (
+                  <p className="text-sm text-[rgba(0,0,0,0.60)] mt-2">{guideCard.supporting}</p>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const memory = readGuideMemory();
+                    const existing = memory[guideCard.id] ?? {};
+                    memory[guideCard.id] = { ...existing, lastClickedAtISO: todayISO };
+                    writeGuideMemory(memory);
+                    if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
+                    else onNavigate(guideCard.cta.screen);
+                  }}
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+                >
+                  {guideCard.cta.label} <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="eb-card">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
@@ -641,6 +909,39 @@ export function Dashboard({
                 {restoreMsg ? (
                   <p className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">{restoreMsg}</p>
                 ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {guideCard ? (
+          <div className="eb-card">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+                {guideCard.icon}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Guide</div>
+                <h3 className="mt-1 mb-1">{guideCard.title}</h3>
+                <p className="text-sm text-[rgba(0,0,0,0.72)]">{guideCard.body}</p>
+                {guideCard.supporting ? (
+                  <p className="text-sm text-[rgba(0,0,0,0.60)] mt-2">{guideCard.supporting}</p>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const memory = readGuideMemory();
+                    const existing = memory[guideCard.id] ?? {};
+                    memory[guideCard.id] = { ...existing, lastClickedAtISO: todayISO };
+                    writeGuideMemory(memory);
+                    if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
+                    else onNavigate(guideCard.cta.screen);
+                  }}
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+                >
+                  {guideCard.cta.label} <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>

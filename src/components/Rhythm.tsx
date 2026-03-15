@@ -625,19 +625,6 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
           </div>
         ) : null}
 
-        {/* It grows with you (reassurance) */}
-        <div className="eb-card p-6 sm:p-8">
-          <div className="flex items-start gap-3">
-            <IconBadge icon={<Sprout className="w-5 h-5" />} />
-            <div>
-              <h3 className="mb-1 font-semibold tracking-tight">It grows with you</h3>
-              <div className="mt-2 text-neutral-800">
-                This space gets smarter as you use it. You’ll see helpful reflections from day one, but the real magic appears after a few consistent weeks. Patterns take a little time to emerge. Keep logging, and we’ll build your rhythm together.
-              </div>
-              <div className="mt-4 text-neutral-800">{confidenceCopy(level)}</div>
-            </div>
-          </div>
-        </div>
 
         {/* Phase timeline */}
         <div className="eb-card p-5">
