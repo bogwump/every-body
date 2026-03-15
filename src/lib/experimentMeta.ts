@@ -147,6 +147,30 @@ export function compareExperimentOutcomes(previousStatus?: string, currentStatus
   return 'This gave you a different result from the last run.';
 }
 
+
+
+export function getExperimentOutcomeTone(status?: string): string {
+  if (status === 'helped') return 'helpful';
+  if (status === 'notReally') return 'not clearly helpful';
+  if (status === 'stopped') return 'stopped early';
+  if (status === 'abandoned') return 'unfinished';
+  if (status === 'pending') return 'awaiting reflection';
+  return 'unclear';
+}
+
+export function getExperimentOutcomeThreadText(
+  previousStatus?: string,
+  currentStatus?: string,
+  runIndex?: number,
+): string | null {
+  const comparison = compareExperimentOutcomes(previousStatus, currentStatus);
+  const run = Number.isFinite(Number(runIndex)) ? Number(runIndex) : 0;
+  if (comparison && run > 1) return `Run ${run}. ${comparison}`;
+  if (comparison) return comparison;
+  if (run > 1 && currentStatus) return `Run ${run} of this same experiment idea is now saved.`;
+  return null;
+}
+
 export function getExperimentStatusMeta(status?: string): { label: string; neutralLabel: string } {
   if (status === 'helped') return { label: 'Helped', neutralLabel: 'helpful' };
   if (status === 'notReally') return { label: 'Not really', neutralLabel: 'not clearly helpful' };

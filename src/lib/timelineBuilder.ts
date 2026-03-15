@@ -1,5 +1,6 @@
 import { getCompanionMoments, type CompanionMoment } from './companionMoments';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
+import { compareExperimentOutcomes, findPreviousExperimentRun, getExperimentMatchKey, getExperimentOutcomeThreadText, getExperimentOutcomeTone } from './experimentMeta';
 import { safeFormatMonthYearFromKey } from './browserSafe';
 import { getDiscoveredPatterns } from './insightEngine';
 import { getPhaseHistory } from './phaseHistory';
@@ -363,18 +364,16 @@ function buildHelpfulPatternEvents(): TimelineEvent[] {
 }
 
 function outcomeLabel(status?: string): string {
-  if (status === 'helped') return 'helpful';
-  if (status === 'notReally') return 'not clearly helpful';
-  if (status === 'stopped') return 'stopped early';
-  if (status === 'abandoned') return 'unclear';
-  return 'unclear';
+  return getExperimentOutcomeTone(status);
 }
 
 function buildExperimentEvents(): TimelineEvent[] {
-  const history = readExperimentHistory();
+  const history = readExperimentHistory()
+    .slice()
+    .sort((a, b) => String(a?.startDateISO || '').localeCompare(String(b?.startDateISO || '')));
   const events: TimelineEvent[] = [];
 
-  history.forEach((item) => {
+  history.forEach((item, index) => {
     const experimentId = String(item?.experimentId || item?.id || '').trim();
     const title = String(item?.title || 'Your experiment').trim() || 'Your experiment';
     const startDateISO = String(item?.startDateISO || '').slice(0, 10);
@@ -382,38 +381,44 @@ function buildExperimentEvents(): TimelineEvent[] {
     const status = String(item?.outcome?.status || '');
     const digestSummary = typeof item?.outcome?.digest?.summarySentence === 'string' ? String(item.outcome.digest.summarySentence) : '';
     const metrics = metricsSummary(item?.metrics);
+    const previousRun = findPreviousExperimentRun(history.slice(0, index), item as any);
+    const matchKey = getExperimentMatchKey(item as any);
+    const runIndex = history.slice(0, index + 1).filter((candidate) => getExperimentMatchKey(candidate as any) === matchKey).length;
+    const threadText = getExperimentOutcomeThreadText(previousRun?.outcome?.status, status, runIndex);
+
+    if (experimentId && isISODate(completedAtISO)) {
+      const baseDescription = digestSummary
+        ? tidySentence(digestSummary, `${title} finished.`)
+        : `${title} finished with a ${outcomeLabel(status)} result.`;
+      events.push({
+        id: `experiment-completed:${experimentId}:${completedAtISO}`,
+        type: 'experiment_completed',
+        date: completedAtISO,
+        title: runIndex > 1 ? `${title} completed again` : `${title} completed`,
+        description: threadText ? `${baseDescription} ${threadText}` : baseDescription,
+        evidence: `You logged this result as ${outcomeLabel(status)}${metrics.length ? ` for ${metrics.join(', ')}` : ''}.`,
+        signals: metrics,
+        source: 'experiments',
+        actionLabel: 'View experiment result',
+        actionTarget: 'insights:experiments',
+        metadata: { experimentId, title, status, metrics: item?.metrics, matchKey, runIndex, previousStatus: previousRun?.outcome?.status || null },
+      });
+      return;
+    }
 
     if (experimentId && isISODate(startDateISO)) {
       events.push({
         id: `experiment-started:${experimentId}:${startDateISO}`,
         type: 'experiment_started',
         date: startDateISO,
-        title: `${title} started`,
-        description: `This experiment was set up to explore ${metrics.length ? metrics.join(', ') : 'your chosen focus area'}.`,
+        title: runIndex > 1 ? `${title} started again` : `${title} started`,
+        description: `This experiment was set up to explore ${metrics.length ? metrics.join(', ') : 'your chosen focus area'}.${previousRun ? ` Last time it looked ${outcomeLabel(previousRun?.outcome?.status)}.` : ''}`,
         evidence: `Saved from the experiment setup${typeof item?.durationDays === 'number' ? ` for a ${item.durationDays}-day test` : ''}.`,
         signals: metrics,
         source: 'experiments',
         actionLabel: 'View experiment setup',
         actionTarget: 'insights:experiments',
-        metadata: { experimentId, title, metrics: item?.metrics },
-      });
-    }
-
-    if (experimentId && isISODate(completedAtISO)) {
-      events.push({
-        id: `experiment-completed:${experimentId}:${completedAtISO}`,
-        type: 'experiment_completed',
-        date: completedAtISO,
-        title: `${title} completed`,
-        description: digestSummary
-          ? tidySentence(digestSummary, `${title} finished.`)
-          : `${title} finished with a ${outcomeLabel(status)} result.`,
-        evidence: `You logged this result as ${outcomeLabel(status)}${metrics.length ? ` for ${metrics.join(', ')}` : ''}.`,
-        signals: metrics,
-        source: 'experiments',
-        actionLabel: 'View experiment result',
-        actionTarget: 'insights:experiments',
-        metadata: { experimentId, title, status, metrics: item?.metrics },
+        metadata: { experimentId, title, metrics: item?.metrics, matchKey, runIndex },
       });
     }
   });

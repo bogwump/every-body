@@ -32,7 +32,7 @@ import { isMetricInScope } from '../lib/insightsScope';
 import { type InsightSignal, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
 import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { getSupportSuggestion } from '../lib/patternSupport';
-import { getExperimentForSignal } from '../lib/experimentSuggestions';
+import { getExperimentForSignal, scoreExperimentSuggestion } from '../lib/experimentSuggestions';
 import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, saveAction } from '../lib/savedActions';
 import { recordExperimentOutcome } from '../lib/experimentOutcomes';
 import { consumePendingExperimentLaunch, inferPendingExperimentLaunchFromText } from '../lib/experimentLaunch';
@@ -1793,14 +1793,30 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const [savedActionsVersion, setSavedActionsVersion] = useState(0);
   const refreshSavedActions = () => setSavedActionsVersion((value) => value + 1);
 
+  const qualifiedTryNextSignals = useMemo(() => {
+    return filterSignalsByPatternFeedback(getTopInsights(entriesAllSorted, userData, 14, selected))
+      .filter((signal) => {
+        if (signal.type === 'low_data') return false;
+        if (signal.confidence === 'low') return false;
+        if (signal.strength === 'weak' && signal.type !== 'metric_pair') return false;
+        if (Number(signal.sampleSize || 0) < 4 && signal.type !== 'phase_shift') return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const scoreA = Number(a.score || 0) + (a.type === 'metric_pair' ? 8 : 0) + Math.max(0, (a.metrics?.length || 0) - 1) * 3;
+        const scoreB = Number(b.score || 0) + (b.type === 'metric_pair' ? 8 : 0) + Math.max(0, (b.metrics?.length || 0) - 1) * 3;
+        return scoreB - scoreA;
+      });
+  }, [entriesAllSorted, userData, selected, patternFeedbackTick]);
+
   const tryNextActions = useMemo(() => {
     const saved = getSavedActions();
-    const items: Array<TryNextItem & { signal?: InsightSignal; experiment: any }> = [];
-    for (const signal of strongPatternSignals) {
+    const items: Array<(TryNextItem & { signal?: InsightSignal; experiment: any; rank: number })> = [];
+    for (const signal of qualifiedTryNextSignals) {
       const experiment = getExperimentForSignal(signal);
       if (!experiment) continue;
       if (isDismissedAction(experiment.experimentId)) continue;
-      const historyContext = getExperimentHistoryContext(experiment.experimentId);
+      const historyContext = getExperimentHistoryContext(experiment.experimentId, { experimentId: experiment.experimentId, title: experiment.experimentName, changeKey: experiment.changeKey, metrics: experiment.metrics as any } as any);
       items.push({
         id: experiment.experimentId,
         title: experiment.experimentName,
@@ -1811,6 +1827,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         saved: isSavedAction(experiment.experimentId),
         signal,
         experiment,
+        rank: scoreExperimentSuggestion(signal, experiment),
       });
     }
 
@@ -1831,6 +1848,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           durationDays: prompt.durationDays,
           changeKey: prompt.changeKey,
         },
+        rank: Number(prompt.rank || 0) + 8,
       }));
 
     const savedItems = saved
@@ -1841,8 +1859,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         description: item.description || 'A saved experiment from an earlier insight.',
         label: 'Saved',
         saved: true,
-        signal: strongPatternSignals.find((signal) => getExperimentForSignal(signal)?.experimentId === item.experimentId) || strongPatternSignals[0],
-        experiment: strongPatternSignals.map((signal) => getExperimentForSignal(signal)).find((exp) => exp?.experimentId === item.experimentId) || {
+        signal: qualifiedTryNextSignals.find((signal) => getExperimentForSignal(signal)?.experimentId === item.experimentId) || qualifiedTryNextSignals[0],
+        experiment: qualifiedTryNextSignals.map((signal) => getExperimentForSignal(signal)).find((exp) => exp?.experimentId === item.experimentId) || {
           experimentId: item.experimentId,
           experimentName: item.title || 'Saved experiment',
           experimentDescription: item.description || 'A saved experiment from an earlier insight.',
@@ -1850,11 +1868,14 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           durationDays: 3,
           changeKey: undefined,
         },
+        rank: 999,
       }));
 
-    const merged = [...savedItems, ...items, ...promptItems].filter((item, idx, arr) => arr.findIndex((other) => other.id === item.id) === idx);
+    const merged = [...savedItems, ...items, ...promptItems]
+      .filter((item, idx, arr) => arr.findIndex((other) => other.id === item.id) === idx)
+      .sort((a, b) => Number(b.rank || 0) - Number(a.rank || 0));
     return merged.slice(0, 2);
-  }, [entriesAllSorted, strongPatternSignals, savedActionsVersion, userData]);
+  }, [entriesAllSorted, qualifiedTryNextSignals, savedActionsVersion, userData]);
 
   const companionMomentHistory = useMemo(() => getMomentHistory(6), [entriesAllSorted.length]);
 

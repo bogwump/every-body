@@ -139,10 +139,28 @@ export function getExperimentForSignal(signal: InsightSignal): ExperimentForSign
   return null;
 }
 
+
+
+export function scoreExperimentSuggestion(signal: InsightSignal, experiment: ExperimentForSignal): number {
+  const history = getExperimentHistoryContext(experiment.experimentId, {
+    experimentId: experiment.experimentId,
+    title: experiment.experimentName,
+    changeKey: experiment.changeKey,
+    metrics: experiment.metrics as any,
+  } as any);
+  const confidenceBoost = signal.confidence === 'high' ? 18 : signal.confidence === 'medium' ? 10 : 3;
+  const strengthBoost = signal.strength === 'strong' ? 12 : signal.strength === 'moderate' ? 7 : 2;
+  const typeBoost = signal.type === 'metric_pair' ? 12 : signal.type === 'phase_shift' ? 9 : signal.type === 'trend_shift' ? 7 : 4;
+  const multiMetricBoost = Array.isArray(signal.metrics) ? Math.min(8, Math.max(0, signal.metrics.length - 1) * 4) : 0;
+  const sampleBoost = Math.min(8, Math.max(0, Number(signal.sampleSize || 0) - 3));
+  const historyBoost = history.tone === 'helped' ? 10 : history.tone === 'mixed' ? 4 : 0;
+  return Number(signal.score || 0) + confidenceBoost + strengthBoost + typeBoost + multiMetricBoost + sampleBoost + historyBoost;
+}
+
 function suggestionForSignal(signal: InsightSignal): ExperimentSuggestion | null {
   const experiment = getExperimentForSignal(signal);
   if (!experiment) return null;
-  const historyContext = getExperimentHistoryContext(experiment.experimentId);
+  const historyContext = getExperimentHistoryContext(experiment.experimentId, { experimentId: experiment.experimentId, title: experiment.experimentName, changeKey: experiment.changeKey, metrics: experiment.metrics as any } as any);
   const note = historyContext.text
     ? `${experiment.experimentDescription} ${historyContext.text}`
     : experiment.experimentDescription;
@@ -151,7 +169,7 @@ function suggestionForSignal(signal: InsightSignal): ExperimentSuggestion | null
     title: `Try a ${experiment.experimentName.toLowerCase()}`,
     note,
     metrics: experiment.metrics,
-    rank: signal.score + (signal.confidence === 'high' ? 10 : signal.confidence === 'medium' ? 6 : 2),
+    rank: scoreExperimentSuggestion(signal, experiment),
     experimentId: experiment.experimentId,
     experimentName: experiment.experimentName,
     experimentDescription: experiment.experimentDescription,

@@ -1,5 +1,6 @@
 import type { ExperimentHistoryItem, InsightMetricKey } from '../types';
 import { getHelpfulPhrase } from './confidenceCopy';
+import { getExperimentMatchKey, getExperimentOutcomeTone } from './experimentMeta';
 
 export type HelpfulMemoryConfidence = 'very_low' | 'low' | 'moderate' | 'high';
 
@@ -177,21 +178,45 @@ export function getHelpfulPatternsForMetrics(metrics: Array<string | InsightMetr
   return getHelpfulPatternsFromExperiments().filter((item) => item.metrics.some((metric) => wanted.includes(String(metric).toLowerCase())));
 }
 
-export function getExperimentHistoryContext(experimentId: string): { tone: 'helped' | 'mixed' | null; text: string | null } {
-  const target = String(experimentId || '').toLowerCase();
-  const history = readExperimentHistory().filter((item) => String(item?.experimentId || '').toLowerCase() === target);
-  if (!history.length) return { tone: null, text: null };
+export function getExperimentHistoryContext(experimentId: string, sample?: Partial<ExperimentHistoryItem> | null): { tone: 'helped' | 'mixed' | null; text: string | null; runCount?: number } {
+  const history = readExperimentHistory();
+  const sampleLike = sample ?? ({ experimentId } as Partial<ExperimentHistoryItem>);
+  const targetKey = getExperimentMatchKey(sampleLike as any);
+  const directTarget = String(experimentId || '').toLowerCase();
+  const matches = history
+    .filter((item) => {
+      const sameKey = targetKey ? getExperimentMatchKey(item as any) === targetKey : false;
+      const sameId = directTarget ? String(item?.experimentId || '').toLowerCase() === directTarget : false;
+      return sameKey || sameId;
+    })
+    .sort((a, b) => String(b?.outcome?.completedAtISO || b?.startDateISO || '').localeCompare(String(a?.outcome?.completedAtISO || a?.startDateISO || '')));
 
-  const helpful = history.filter((item) => item?.outcome?.status === 'helped').length;
-  const slight = history.filter((item) => item?.outcome?.status === 'notReally').length;
-  const unclear = history.filter((item) => item?.outcome?.status === 'abandoned' || item?.outcome?.status === 'stopped').length;
+  if (!matches.length) return { tone: null, text: null, runCount: 0 };
+
+  const helpful = matches.filter((item) => item?.outcome?.status === 'helped').length;
+  const mixed = matches.filter((item) => item?.outcome?.status === 'notReally').length;
+  const unclear = matches.filter((item) => item?.outcome?.status === 'abandoned' || item?.outcome?.status === 'stopped').length;
+  const latest = matches[0];
+  const latestTone = getExperimentOutcomeTone(latest?.outcome?.status);
 
   if (helpful > 0) {
-    return { tone: 'helped', text: 'A similar experiment looked helpful before. Worth trying again?' };
+    return {
+      tone: 'helped',
+      text: matches.length > 1
+        ? `You have tried something similar ${matches.length} times. The latest run looked ${latestTone}.`
+        : 'A similar experiment looked helpful before. Worth trying again?',
+      runCount: matches.length,
+    };
   }
-  if (slight > 0 || unclear > 0) {
-    return { tone: 'mixed', text: 'You have tested something similar before. Results looked mixed.' };
+  if (mixed > 0 || unclear > 0) {
+    return {
+      tone: 'mixed',
+      text: matches.length > 1
+        ? `You have tried something similar ${matches.length} times. So far the results have looked mixed.`
+        : 'You have tested something similar before. Results looked mixed.',
+      runCount: matches.length,
+    };
   }
 
-  return { tone: null, text: null };
+  return { tone: null, text: null, runCount: matches.length };
 }
