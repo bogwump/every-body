@@ -24,7 +24,7 @@ import { WhatsHelpingCard } from './WhatsHelpingCard';
 import { getMomentHistory } from '../lib/companionMoments';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
 import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
-import { calculateStreak, computeCycleStats, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
+import { calculateStreak, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
 import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
@@ -1580,22 +1580,19 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     if (!cycleEnabled || !hasCycleSignal) return null;
 
     const sorted = entriesAllSorted;
-    const buckets: Record<CyclePhase, CheckInEntry[]> = {
-      Menstrual: [],
-      Follicular: [],
-      Ovulatory: [],
-      Luteal: [],
-      Unknown: [],
+    const buckets = {
+      Menstrual: [] as CheckInEntry[],
+      Follicular: [] as CheckInEntry[],
+      Ovulation: [] as CheckInEntry[],
+      Luteal: [] as CheckInEntry[],
+      Unknown: [] as CheckInEntry[],
     };
 
-    // Estimate phase day-by-day based on bleeding and cycle overrides
-    const cycleStats = computeCycleStats(sorted);
-    sorted.forEach((e, idx) => {
-      const flow = normalise10((e.values as any)?.flow) ?? 0;
-      const phase = estimatePhaseByFlow(sorted, idx, flow, cycleStats);
-      // Safety: older/newer phase estimators may return strings outside our bucket keys.
-      const safePhase: CyclePhase = (phase && (phase as any) in buckets ? (phase as CyclePhase) : 'Unknown');
-      buckets[safePhase].push(e);
+    sorted.forEach((e) => {
+      const rawPhase = estimatePhaseByFlow(String(e.dateISO), sorted);
+      const phase = rawPhase === 'Ovulatory' ? 'Ovulation' : rawPhase;
+      const safePhase = phase && phase in buckets ? phase : 'Unknown';
+      buckets[safePhase as keyof typeof buckets].push(e);
     });
 
     return buckets;
@@ -1611,7 +1608,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const cycleData = useMemo(() => {
     if (!phaseBuckets) return [];
-    const order: CyclePhase[] = ['Menstrual', 'Follicular', 'Ovulatory', 'Luteal'];
+    const order = ['Menstrual', 'Follicular', 'Ovulation', 'Luteal'] as const;
     return order.map((phase) => {
       const list = phaseBuckets[phase] ?? [];
       return {
