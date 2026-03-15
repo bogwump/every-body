@@ -1,4 +1,5 @@
 import type { InsightSignal } from './insightEngine';
+import type { InsightMetricKey } from '../types';
 import { getExperimentHistoryContext } from './experimentLearning';
 import { getExperimentSuggestionSuppression } from './companionLogic';
 import { isoTodayLocal } from './date';
@@ -29,15 +30,26 @@ function hasMetric(signal: InsightSignal, key: string): boolean {
   return Array.isArray(signal.metrics) && signal.metrics.some((metric) => String(metric) === key);
 }
 
+function hasAnyMetric(signal: InsightSignal, keys: string[]): boolean {
+  return keys.some((key) => hasMetric(signal, key));
+}
+
+function uniqueMetrics(metrics: Array<InsightMetricKey | string>): string[] {
+  return metrics.map((metric) => String(metric)).filter((value, idx, arr) => value && arr.indexOf(value) === idx);
+}
+
 export function getExperimentForSignal(signal: InsightSignal): ExperimentForSignal | null {
   const metric = String(signal.metrics?.[0] ?? '');
+  const metrics = uniqueMetrics(signal.metrics ?? []);
+  const metricBlob = metrics.join('|');
+  const signalId = String(signal.id ?? '');
 
-  if (String(signal.id).includes('sleep_before_bleed') || (String(signal.id).includes('phase-sleep') && signal.phase === 'Luteal') || metric === 'sleep') {
+  if (signalId.includes('sleep_before_bleed') || (signalId.includes('phase-sleep') && signal.phase === 'Luteal') || metric === 'sleep') {
     return {
       experimentId: 'wind_down',
       experimentName: 'Wind-down experiment',
       experimentDescription: 'A short evening routine can help test whether sleep feels easier to support in this window.',
-      metrics: ['sleep', 'energy'],
+      metrics: uniqueMetrics(['sleep', 'energy', ...metrics]).slice(0, 5),
       durationDays: 3,
       changeKey: 'lateNight',
     };
@@ -48,20 +60,79 @@ export function getExperimentForSignal(signal: InsightSignal): ExperimentForSign
       experimentId: 'evening_reset',
       experimentName: 'Evening reset experiment',
       experimentDescription: 'A lower-friction evening can help you test whether stressful days lead to lighter sleep.',
-      metrics: ['stress', 'sleep', 'mood'],
+      metrics: uniqueMetrics(['stress', 'sleep', 'mood', ...metrics]).slice(0, 5),
       durationDays: 3,
       changeKey: 'stressfulDay',
     };
   }
 
-  if (hasMetric(signal, 'energy') || hasMetric(signal, 'fatigue') || metric === 'energy' || metric === 'fatigue') {
+  if (hasAnyMetric(signal, ['energy', 'fatigue']) || metric === 'energy' || metric === 'fatigue') {
     return {
       experimentId: 'morning_light',
       experimentName: 'Morning light experiment',
       experimentDescription: 'A steadier morning rhythm can help you test whether energy feels easier to lift and hold.',
-      metrics: ['energy', 'fatigue', 'sleep'],
+      metrics: uniqueMetrics(['energy', 'fatigue', 'sleep', ...metrics]).slice(0, 5),
       durationDays: 3,
       changeKey: 'exercise',
+    };
+  }
+
+  if (hasAnyMetric(signal, ['brainFog', 'focus']) || metricBlob.includes('brainFog')) {
+    return {
+      experimentId: 'focus_buffer',
+      experimentName: 'Focus buffer experiment',
+      experimentDescription: 'A simpler, lower-friction day can help you test whether brain fog feels easier to carry.',
+      metrics: uniqueMetrics(['brainFog', 'stress', 'sleep', ...metrics]).slice(0, 5),
+      durationDays: 3,
+      changeKey: 'stressfulDay',
+    };
+  }
+
+  if (hasAnyMetric(signal, ['hairShedding', 'facialSpots', 'cysts'])) {
+    const includesBrainFog = hasMetric(signal, 'brainFog');
+    const includesStress = hasMetric(signal, 'stress');
+    return {
+      experimentId: includesBrainFog || includesStress ? 'recovery_buffer' : 'symptom_load_reset',
+      experimentName: includesBrainFog || includesStress ? 'Recovery buffer experiment' : 'Symptom load reset experiment',
+      experimentDescription: includesBrainFog || includesStress
+        ? 'A gentler evening and steadier recovery window can help you test whether this cluster settles at all.'
+        : 'A lower-friction few days can help you test whether this cluster settles or stays much the same.',
+      metrics: uniqueMetrics(['hairShedding', 'brainFog', 'stress', 'sleep', ...metrics]).slice(0, 5),
+      durationDays: 3,
+      changeKey: 'lateNight',
+    };
+  }
+
+  if (hasAnyMetric(signal, ['nightSweats', 'hotFlushes'])) {
+    return {
+      experimentId: 'cool_evening',
+      experimentName: 'Cooler evening experiment',
+      experimentDescription: 'A cooler, steadier bedtime setup can help you test whether nights feel a little less disruptive.',
+      metrics: uniqueMetrics(['nightSweats', 'sleep', 'energy', ...metrics]).slice(0, 5),
+      durationDays: 3,
+      changeKey: 'lateNight',
+    };
+  }
+
+  if (hasAnyMetric(signal, ['headache', 'migraine', 'dizziness'])) {
+    return {
+      experimentId: 'hydration_support',
+      experimentName: 'Hydration support experiment',
+      experimentDescription: 'A steadier hydration rhythm can help you test whether headaches or dizziness feel easier to support.',
+      metrics: uniqueMetrics(['headache', 'dizziness', 'energy', ...metrics]).slice(0, 5),
+      durationDays: 3,
+      changeKey: 'lowHydration',
+    };
+  }
+
+  if (hasAnyMetric(signal, ['anxiety', 'irritability']) || metricBlob.includes('mood')) {
+    return {
+      experimentId: 'caffeine_timing',
+      experimentName: 'Caffeine timing experiment',
+      experimentDescription: 'A small caffeine timing tweak can help you test whether stress, mood, or sleep feel steadier.',
+      metrics: uniqueMetrics(['anxiety', 'stress', 'sleep', 'mood', ...metrics]).slice(0, 5),
+      durationDays: 3,
+      changeKey: 'caffeine',
     };
   }
 

@@ -37,6 +37,7 @@ import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, s
 import { recordExperimentOutcome } from '../lib/experimentOutcomes';
 import { consumePendingExperimentLaunch, inferPendingExperimentLaunchFromText } from '../lib/experimentLaunch';
 import { compareExperimentOutcomes, findPreviousExperimentRun, getExperimentLifecycle, getExperimentStatusMeta, getExperimentTemplateMeta } from '../lib/experimentMeta';
+import { computePatternExperimentPrompts } from '../lib/patternExperimentPrompts';
 import { getExperimentHistoryContext, getHelpfulPatternsFromExperiments } from '../lib/experimentLearning';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { EBDialogContent } from './EBDialog';
@@ -1813,6 +1814,25 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       });
     }
 
+    const promptItems = computePatternExperimentPrompts(entriesAllSorted, userData)
+      .filter((prompt) => !isDismissedAction(prompt.id))
+      .map((prompt) => ({
+        id: prompt.id,
+        title: prompt.title,
+        description: prompt.reason,
+        label: isSavedAction(prompt.id) ? 'Saved' : 'Suggested',
+        saved: isSavedAction(prompt.id),
+        signal: undefined,
+        experiment: {
+          experimentId: prompt.id,
+          experimentName: prompt.title,
+          experimentDescription: prompt.reason,
+          metrics: Array.isArray(prompt.metrics) ? prompt.metrics : ['sleep', 'energy'],
+          durationDays: prompt.durationDays,
+          changeKey: prompt.changeKey,
+        },
+      }));
+
     const savedItems = saved
       .filter((item) => item.type === 'experiment')
       .map((item) => ({
@@ -1832,9 +1852,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         },
       }));
 
-    const merged = [...savedItems, ...items].filter((item, idx, arr) => arr.findIndex((other) => other.id === item.id) === idx);
+    const merged = [...savedItems, ...items, ...promptItems].filter((item, idx, arr) => arr.findIndex((other) => other.id === item.id) === idx);
     return merged.slice(0, 2);
-  }, [strongPatternSignals, savedActionsVersion]);
+  }, [entriesAllSorted, strongPatternSignals, savedActionsVersion, userData]);
 
   const companionMomentHistory = useMemo(() => getMomentHistory(6), [entriesAllSorted.length]);
 

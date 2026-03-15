@@ -74,6 +74,24 @@ const TEMPLATE_META: Record<string, ExperimentTemplateMeta> = {
       'aim for a steadier intake',
     ],
   },
+  focusBuffer: {
+    actionLabel: 'A simpler, lower-friction day',
+    explanation: 'This is about reducing decision load and overstimulation for a few days so you can see whether focus feels easier to hold.',
+    examples: [
+      'trim one non-essential task',
+      'keep breaks a bit more regular',
+      'make the day slightly simpler than usual',
+    ],
+  },
+  recoveryBuffer: {
+    actionLabel: 'A gentler recovery window',
+    explanation: 'This is about giving your body a slightly easier few days so you can see whether the symptom cluster settles at all.',
+    examples: [
+      'protect your evening a bit more',
+      'avoid a very late night if you can',
+      'keep the next few days slightly lighter',
+    ],
+  },
 };
 
 export function getExperimentTemplateMeta(changeKey?: string, title?: string): ExperimentTemplateMeta {
@@ -83,6 +101,11 @@ export function getExperimentTemplateMeta(changeKey?: string, title?: string): E
   if (blob.includes('evening reset')) return TEMPLATE_META.stressfulDay;
   if (blob.includes('wind-down') || blob.includes('wind down')) return TEMPLATE_META.lateNight;
   if (blob.includes('morning light')) return TEMPLATE_META.exercise;
+  if (blob.includes('focus buffer')) return TEMPLATE_META.focusBuffer;
+  if (blob.includes('recovery buffer') || blob.includes('symptom load reset')) return TEMPLATE_META.recoveryBuffer;
+  if (blob.includes('cooler evening')) return TEMPLATE_META.lateNight;
+  if (blob.includes('hydration support')) return TEMPLATE_META.lowHydration;
+  if (blob.includes('caffeine timing')) return TEMPLATE_META.caffeine;
   return DEFAULT_META;
 }
 
