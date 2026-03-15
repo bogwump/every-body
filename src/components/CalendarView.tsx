@@ -887,21 +887,15 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     <div className="eb-page">
       {/* Keep a more phone-like density on wide screens */}
       <div className="eb-page-inner">
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-5">
           <h1 className="mb-2">Calendar</h1>
           <p className="text-[rgb(var(--color-text-secondary))]">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
-          <div className="mt-4 inline-flex max-w-full items-start gap-3 rounded-2xl border border-[rgba(0,0,0,0.08)] bg-white/75 px-4 py-3">
-            <div className="min-w-0">
-              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Current rhythm</div>
-              <div className="mt-1 font-semibold">{rhythmContextLabel}</div>
-              <div className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {rhythmTiming.currentDay ? `Day ${rhythmTiming.currentDay} in phase` : 'Still learning the timing'}
-              </div>
-              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{shortPhaseCue(rhythmModel.phaseKey)}</div>
-            </div>
+          <div className="mt-3 min-w-0">
+            <div className="font-semibold text-[15px] sm:text-base">{rhythmContextLabel}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
+            <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing'}</div>
           </div>
         </div>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center justify-between gap-3 sm:justify-start">
             <button
               type="button"

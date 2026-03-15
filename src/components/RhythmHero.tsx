@@ -45,7 +45,7 @@ export function RhythmHero(props: {
       heroSignals: strongSignals.slice(0, 3),
       strongPatternSignals: strongSignals,
     }).slice(0, 3);
-    return lines.map((line) => `• ${line}`).join('\n');
+    return lines.join('\n');
   }, [lowData, props.entries, props.userData]);
 
   return (
