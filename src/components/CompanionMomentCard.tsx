@@ -1,7 +1,6 @@
 import React from 'react';
 import { Activity, FlaskConical, RefreshCw, Sparkles, Star, X } from 'lucide-react';
-import type { CompanionMoment } from '../lib/companionMoments';
-import { dismissMoment } from '../lib/companionMoments';
+import { dismissMoment, getMomentDisplayCopy, type CompanionMoment } from '../lib/companionMoments';
 import { inferPendingExperimentLaunchFromText, queuePendingExperimentLaunch } from '../lib/experimentLaunch';
 import { phaseLabelFromKey } from '../lib/phaseChange';
 
@@ -23,81 +22,8 @@ function iconForType(type: CompanionMoment['type']) {
   }
 }
 
-function copyForMoment(moment: CompanionMoment): { eyebrow?: string; title: string; body: string; button: string; screen: string } {
-  const data = moment.data ?? {};
-  switch (moment.type) {
-    case 'phase_change': {
-      const phase = phaseLabelFromKey(typeof data.phase === 'string' ? data.phase : null);
-      return {
-        eyebrow: 'New phase detected',
-        title: `You’ve moved into ${phase}`,
-        body: 'Your rhythm page has been updated for this new window.',
-        button: 'View rhythm',
-        screen: 'rhythm',
-      };
-    }
-    case 'new_pattern':
-      return {
-        eyebrow: 'New pattern spotted',
-        title: typeof data.title === 'string' ? data.title : 'A new pattern has started standing out',
-        body: typeof data.body === 'string' ? data.body : 'Head to Insights for the fuller read on what has been showing up.',
-        button: 'See insights',
-        screen: 'insights',
-      };
-    case 'experiment_suggestion':
-      return {
-        eyebrow: 'Experiment idea',
-        title: typeof data.title === 'string' ? data.title : 'Something may be worth testing this week',
-        body: typeof data.body === 'string' ? data.body : 'A gentle experiment can help you see whether this pattern is worth supporting differently.',
-        button: 'Try experiment',
-        screen: 'insights',
-      };
-    case 'experiment_result_ready':
-      return {
-        eyebrow: 'Experiment update',
-        title: typeof data.title === 'string' ? data.title : 'Your experiment is ready to look back on',
-        body: typeof data.body === 'string' ? data.body : 'You now have enough to review what felt useful from that test.',
-        button: 'Review experiment',
-        screen: 'insights',
-      };
-    case 'helpful_pattern_detected':
-      return {
-        eyebrow: 'Something that helps',
-        title: typeof data.title === 'string' ? data.title : 'A supportive pattern has started standing out',
-        body: typeof data.body === 'string' ? data.body : 'Your past experiments have started pointing to something that may help in this window.',
-        button: 'See insights',
-        screen: 'insights',
-      };
-    case 'rhythm_shift':
-      return {
-        eyebrow: 'Rhythm shift noticed',
-        title: typeof data.title === 'string' ? data.title : 'Your rhythm looks a little different lately',
-        body: typeof data.body === 'string' ? data.body : 'Rhythm has picked up a small change in timing worth keeping an eye on.',
-        button: 'View rhythm',
-        screen: 'rhythm',
-      };
-    case 'unlock_milestone':
-      return {
-        eyebrow: 'For you',
-        title: typeof data.title === 'string' ? data.title : 'New insights unlocked',
-        body: typeof data.body === 'string' ? data.body : 'You have logged enough to start seeing more useful patterns.',
-        button: 'See insights',
-        screen: 'insights',
-      };
-    case 'encouragement':
-    default:
-      return {
-        eyebrow: 'For you',
-        title: typeof data.title === 'string' ? data.title : 'Nice work checking in',
-        body: typeof data.body === 'string' ? data.body : 'You are building a clearer picture of your rhythm over time.',
-        button: 'Keep going',
-        screen: 'check-in',
-      };
-  }
-}
-
 export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate: (screen: string) => void; onDismiss?: () => void }) {
-  const copy = copyForMoment(props.moment);
+  const copy = getMomentDisplayCopy(props.moment);
 
   const handlePrimaryAction = () => {
     const data = props.moment.data ?? {};

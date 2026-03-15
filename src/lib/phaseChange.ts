@@ -178,6 +178,28 @@ function restoreMissingPhaseHistory(currentPhase: string, refISO: string) {
   savePhaseHistory(seeded);
 }
 
+
+function latestLoggedDate(entries: CheckInEntry[]): string | null {
+  const values = sortByDateAsc(entries).map((entry) => {
+    const iso = (entry as any)?.dateISO ?? (entry as any)?.date;
+    return isISODate(iso) ? iso : null;
+  }).filter((value): value is string => Boolean(value));
+  return values.length ? values[values.length - 1] : null;
+}
+
+function daysBetween(fromISO: string, toISO: string): number {
+  const from = new Date(`${fromISO}T00:00:00`).getTime();
+  const to = new Date(`${toISO}T00:00:00`).getTime();
+  return Math.max(0, Math.floor((to - from) / 86400000));
+}
+
+function isStaleRecoveryWindow(entries: CheckInEntry[], refISO: string, cycleLen?: number): boolean {
+  const latest = latestLoggedDate(entries);
+  if (!latest) return false;
+  const threshold = Math.max(42, Math.round((cycleLen || 28) * 1.5));
+  return daysBetween(latest, refISO) >= threshold;
+}
+
 function countDistinctLoggedDays(entries: CheckInEntry[]): number {
   return new Set(
     (entries ?? [])
@@ -321,8 +343,9 @@ function validatePhaseTransition(args: {
   previousPhase: string | null;
   proposedPhase: string | null;
   refISO: string;
+  allowRecoveryReset?: boolean;
 }) {
-  const { previousPhase, proposedPhase } = args;
+  const { previousPhase, proposedPhase, allowRecoveryReset } = args;
   if (!proposedPhase) {
     return { acceptedPhase: previousPhase, changed: false, reason: 'no_proposed_phase' };
   }
@@ -331,6 +354,10 @@ function validatePhaseTransition(args: {
   }
   if (previousPhase === proposedPhase) {
     return { acceptedPhase: previousPhase, changed: false, reason: 'same_phase' };
+  }
+
+  if (allowRecoveryReset) {
+    return { acceptedPhase: proposedPhase, changed: previousPhase !== proposedPhase, reason: 'stale_recovery_recalculation' };
   }
 
   if (proposedPhase === 'reset') {
@@ -361,12 +388,13 @@ export function applyPhaseChangeForEntries(args: {
   const previousState = getRhythmPhaseState();
   const previousConfirmed = getConfirmedPreviousPhase(args.previousEntries, args.userData, refISO);
   const daysLogged = countDistinctLoggedDays(args.nextEntries);
+  const staleRecoveryMode = isStaleRecoveryWindow(args.nextEntries, refISO, rhythmModel.cycleLen);
 
   const nextState = buildPhaseState({
     previousState,
     previousConfirmed,
     proposedPhase,
-    detectedSource: rhythmModel.source,
+    detectedSource: staleRecoveryMode ? 'inferred' : rhythmModel.source,
     daysLogged,
     refISO,
   });
@@ -399,6 +427,7 @@ export function applyPhaseChangeForEntries(args: {
         previousPhase: previousConfirmed,
         proposedPhase,
         refISO,
+        allowRecoveryReset: staleRecoveryMode,
       });
       nextState.candidateConfirmedPhase = null;
       nextState.candidateConfirmedSince = null;
@@ -408,6 +437,7 @@ export function applyPhaseChangeForEntries(args: {
           previousPhase: previousConfirmed,
           proposedPhase,
           refISO,
+          allowRecoveryReset: staleRecoveryMode,
         });
         if (validation.changed) {
           nextState.candidateConfirmedPhase = null;
@@ -426,6 +456,7 @@ export function applyPhaseChangeForEntries(args: {
         previousPhase: previousConfirmed,
         proposedPhase,
         refISO,
+        allowRecoveryReset: staleRecoveryMode,
       });
       if (validation.changed) {
         nextState.candidateConfirmedPhase = null;
@@ -490,6 +521,7 @@ export function applyPhaseChangeForEntries(args: {
     currentPhase,
     proposedPhase,
     transitionReason: validation.reason,
+    staleRecoveryMode,
     estimatedPhase: nextState.estimatedPhase,
     confirmedPhase: nextState.confirmedPhase,
     candidateConfirmedPhase: nextState.candidateConfirmedPhase,

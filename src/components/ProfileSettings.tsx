@@ -34,6 +34,7 @@ import {
 } from '../lib/cloudSync';
 import { useEntries, useChat, useExperiment } from '../lib/appStore';
 import { calculateStreak, isoToday } from '../lib/analytics';
+import { getSymptomCoverage } from '../lib/symptomCoverage';
 import { buildAIExportContext, buildChatGPTPrompt, getPresetMeta, type AIExportPreset } from '../lib/aiExportBuilder';
 
 import appLogo from '../assets/everybody-logo-256.png';
@@ -329,6 +330,8 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onN
   const [resetConfirm, setResetConfirm] = useState<null | 'logs' | 'all'>(null);
 
   // When turning off a symptom, ask whether to retire its past data from Insights.
+  const symptomCoverage = useMemo(() => getSymptomCoverage(userData), [userData]);
+
   const [retirePrompt, setRetirePrompt] = useState<null | { metricId: string; label: string; kind: 'module' | 'custom' | 'influence'; customId?: string }>(null);
 
   // Simple feedback form (Help centre)
@@ -978,6 +981,18 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
                 Turning a symptom off hides it from your check-in. When you switch something off, we’ll ask if you want to retire its past data from Insights (so it stops shaping your patterns).
               </p>
+
+              <div className="mb-4 rounded-2xl border border-neutral-200 bg-[rgb(var(--color-accent)/0.10)] px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.14em] text-[rgb(var(--color-text-secondary))]">Insight coverage</div>
+                    <div className="mt-1 font-semibold">{symptomCoverage.label}</div>
+                  </div>
+                  <div className="text-sm text-[rgb(var(--color-text-secondary))]">{symptomCoverage.activeCount} active symptoms</div>
+                </div>
+                <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">{symptomCoverage.summary}</p>
+                <p className="mt-2 text-xs text-[rgb(var(--color-text-secondary))]">Aim for 3 to 5 active signals, ideally covering cycle, recovery, mind, and body. Bleeding can be off, but manual cycle start is still available whenever you need it.</p>
+              </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
                 <div className="relative flex-1">

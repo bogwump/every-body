@@ -1,6 +1,8 @@
 import { isoTodayLocal } from './date';
 
 export const COMPANION_MOMENTS_KEY = 'everybody:v2:companion_moments';
+export const COMPANION_MOMENT_ARCHIVE_KEY = 'everybody:v2:companion_moment_archive';
+const MOMENT_HISTORY_LIMIT = 120;
 
 export type CompanionMomentType =
   | 'phase_change'
@@ -20,6 +22,31 @@ export type CompanionMoment = {
   expiresAt?: string;
   createdAtISO?: string;
   data?: Record<string, unknown>;
+};
+
+export type ArchivedCompanionMoment = {
+  archiveId: string;
+  momentId: string;
+  type: CompanionMomentType;
+  date: string;
+  archivedAtISO: string;
+  archivedReason: 'expired' | 'dismissed' | 'replaced';
+  eyebrow?: string;
+  title: string;
+  body: string;
+  button?: string;
+  screen?: string;
+  confidence?: string;
+  signals?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type CompanionMomentDisplayCopy = {
+  eyebrow?: string;
+  title: string;
+  body: string;
+  button: string;
+  screen: string;
 };
 
 const MOMENT_PRIORITY: Record<CompanionMomentType, number> = {
@@ -55,12 +82,6 @@ function isISODate(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function dayDiff(fromISO: string, toISO: string): number {
-  const from = new Date(`${fromISO}T00:00:00`).getTime();
-  const to = new Date(`${toISO}T00:00:00`).getTime();
-  return Math.floor((to - from) / 86400000);
-}
-
 function sortByPriorityThenDate(a: CompanionMoment, b: CompanionMoment): number {
   const prio = MOMENT_PRIORITY[a.type] - MOMENT_PRIORITY[b.type];
   if (prio !== 0) return prio;
@@ -82,57 +103,106 @@ function normaliseMoment(value: unknown): CompanionMoment | null {
   };
 }
 
-export function getMomentPriority(type: CompanionMomentType): number {
-  return MOMENT_PRIORITY[type];
+function normaliseArchive(value: unknown): ArchivedCompanionMoment | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Record<string, unknown>;
+  if (typeof item.archiveId !== 'string' || typeof item.momentId !== 'string' || typeof item.type !== 'string' || !isISODate(item.date)) return null;
+  return {
+    archiveId: item.archiveId,
+    momentId: item.momentId,
+    type: item.type as CompanionMomentType,
+    date: item.date,
+    archivedAtISO: typeof item.archivedAtISO === 'string' ? item.archivedAtISO : new Date().toISOString(),
+    archivedReason: item.archivedReason === 'expired' || item.archivedReason === 'dismissed' || item.archivedReason === 'replaced' ? item.archivedReason : 'expired',
+    eyebrow: typeof item.eyebrow === 'string' ? item.eyebrow : undefined,
+    title: typeof item.title === 'string' ? item.title : 'Saved update',
+    body: typeof item.body === 'string' ? item.body : '',
+    button: typeof item.button === 'string' ? item.button : undefined,
+    screen: typeof item.screen === 'string' ? item.screen : undefined,
+    confidence: typeof item.confidence === 'string' ? item.confidence : undefined,
+    signals: Array.isArray(item.signals) ? item.signals.map((entry) => String(entry)) : undefined,
+    metadata: item.metadata && typeof item.metadata === 'object' ? (item.metadata as Record<string, unknown>) : undefined,
+  };
 }
 
-export function getCompanionMoments(): CompanionMoment[] {
-  return readJson<unknown[]>(COMPANION_MOMENTS_KEY, [])
-    .map(normaliseMoment)
-    .filter((item): item is CompanionMoment => Boolean(item))
-    .sort(sortByPriorityThenDate);
+function toSignalLabels(data: Record<string, unknown> | undefined): string[] | undefined {
+  const raw = Array.isArray(data?.signals) ? data?.signals : [];
+  const values = raw.map((item) => String(item)).filter(Boolean);
+  return values.length ? values : undefined;
 }
 
-export function getMomentHistory(limit = 10): CompanionMoment[] {
-  return getCompanionMoments()
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, limit);
-}
-
-export function expireMoments(refISO: string = isoTodayLocal()): CompanionMoment[] {
-  const moments = getCompanionMoments();
-  const active = moments.filter((moment) => !moment.expiresAt || moment.expiresAt >= refISO);
-  if (active.length !== moments.length) {
-    writeJson(COMPANION_MOMENTS_KEY, active);
+export function getMomentDisplayCopy(moment: CompanionMoment): CompanionMomentDisplayCopy {
+  const data = moment.data ?? {};
+  switch (moment.type) {
+    case 'phase_change': {
+      const phase = typeof data.phase === 'string' ? String(data.phase) : 'a new phase';
+      const phaseLabel = phase === 'reset' ? 'Reset Phase' : phase === 'rebuilding' ? 'Rebuilding Phase' : phase === 'expressive' ? 'Expressive Phase' : phase === 'protective' ? 'Protective Phase' : phase;
+      return {
+        eyebrow: 'New phase detected',
+        title: `You’ve moved into ${phaseLabel}`,
+        body: 'Your rhythm page has been updated for this new window.',
+        button: 'View rhythm',
+        screen: 'rhythm',
+      };
+    }
+    case 'new_pattern':
+      return {
+        eyebrow: 'New pattern spotted',
+        title: typeof data.title === 'string' ? data.title : 'A new pattern has started standing out',
+        body: typeof data.body === 'string' ? data.body : 'A new pattern has started standing out in your logs.',
+        button: 'See insights',
+        screen: 'insights',
+      };
+    case 'experiment_suggestion':
+      return {
+        eyebrow: 'Experiment idea',
+        title: typeof data.title === 'string' ? data.title : 'Something may be worth testing this week',
+        body: typeof data.body === 'string' ? data.body : 'A gentle experiment can help you see whether this pattern is worth supporting differently.',
+        button: 'Try experiment',
+        screen: 'insights',
+      };
+    case 'experiment_result_ready':
+      return {
+        eyebrow: 'Experiment update',
+        title: typeof data.title === 'string' ? data.title : 'Your experiment is ready to look back on',
+        body: typeof data.body === 'string' ? data.body : 'You now have enough to review what felt useful from that test.',
+        button: 'Review experiment',
+        screen: 'insights',
+      };
+    case 'helpful_pattern_detected':
+      return {
+        eyebrow: 'Something that helps',
+        title: typeof data.title === 'string' ? data.title : 'A supportive pattern has started standing out',
+        body: typeof data.body === 'string' ? data.body : 'Your past experiments have started pointing to something that may help in this window.',
+        button: 'See insights',
+        screen: 'insights',
+      };
+    case 'rhythm_shift':
+      return {
+        eyebrow: 'Rhythm shift noticed',
+        title: typeof data.title === 'string' ? data.title : 'Your rhythm looks a little different lately',
+        body: typeof data.body === 'string' ? data.body : 'Rhythm has picked up a small change in timing worth keeping an eye on.',
+        button: 'View rhythm',
+        screen: 'rhythm',
+      };
+    case 'unlock_milestone':
+      return {
+        eyebrow: 'For you',
+        title: typeof data.title === 'string' ? data.title : 'New insights unlocked',
+        body: typeof data.body === 'string' ? data.body : 'You have logged enough to start seeing more useful patterns.',
+        button: 'See insights',
+        screen: 'insights',
+      };
+    case 'encouragement':
+    default:
+      return {
+        eyebrow: 'For you',
+        title: typeof data.title === 'string' ? data.title : 'Nice work checking in',
+        body: typeof data.body === 'string' ? data.body : 'You are building a clearer picture of your rhythm over time.',
+        button: 'Keep going',
+        screen: 'check-in',
+      };
   }
-  return active;
-}
-
-export function getActiveMoments(refISO: string = isoTodayLocal()): CompanionMoment[] {
-  return expireMoments(refISO).filter((moment) => !moment.dismissed);
-}
-
-export function getHighestPriorityMoment(refISO: string = isoTodayLocal()): CompanionMoment | null {
-  const active = getActiveMoments(refISO).sort(sortByPriorityThenDate);
-  return active[0] ?? null;
-}
-
-function defaultExpiry(type: CompanionMomentType, dateISO: string): string | undefined {
-  const days =
-    type === 'phase_change' ? 2 :
-    type === 'new_pattern' ? 5 :
-    type === 'experiment_suggestion' ? 5 :
-    type === 'experiment_result_ready' ? 5 :
-    type === 'helpful_pattern_detected' ? 5 :
-    type === 'rhythm_shift' ? 4 :
-    type === 'unlock_milestone' ? undefined :
-    type === 'encouragement' ? 3 :
-    undefined;
-  if (days == null) return undefined;
-  const d = new Date(`${dateISO}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 function serialiseData(data?: Record<string, unknown>): string {
@@ -145,6 +215,99 @@ function serialiseData(data?: Record<string, unknown>): string {
   } catch {
     return '';
   }
+}
+
+function defaultExpiry(type: CompanionMomentType, dateISO: string): string | undefined {
+  const days =
+    type === 'unlock_milestone' ? undefined : 3;
+  if (days == null) return undefined;
+  const d = new Date(`${dateISO}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export function getMomentPriority(type: CompanionMomentType): number {
+  return MOMENT_PRIORITY[type];
+}
+
+export function getCompanionMoments(): CompanionMoment[] {
+  return readJson<unknown[]>(COMPANION_MOMENTS_KEY, [])
+    .map(normaliseMoment)
+    .filter((item): item is CompanionMoment => Boolean(item))
+    .sort(sortByPriorityThenDate);
+}
+
+export function getArchivedMomentSnapshots(limit = MOMENT_HISTORY_LIMIT): ArchivedCompanionMoment[] {
+  return readJson<unknown[]>(COMPANION_MOMENT_ARCHIVE_KEY, [])
+    .map(normaliseArchive)
+    .filter((item): item is ArchivedCompanionMoment => Boolean(item))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.archivedAtISO).localeCompare(String(a.archivedAtISO)))
+    .slice(0, limit);
+}
+
+function writeArchivedMomentSnapshots(items: ArchivedCompanionMoment[]) {
+  writeJson(COMPANION_MOMENT_ARCHIVE_KEY, items.slice(0, MOMENT_HISTORY_LIMIT));
+}
+
+function archiveMoment(moment: CompanionMoment, reason: ArchivedCompanionMoment['archivedReason']) {
+  const snapshots = getArchivedMomentSnapshots(MOMENT_HISTORY_LIMIT);
+  const existing = snapshots.find((item) => item.momentId === moment.id && item.archivedReason === reason);
+  if (existing) return snapshots;
+  const copy = getMomentDisplayCopy(moment);
+  const nextItem: ArchivedCompanionMoment = {
+    archiveId: `${moment.id}:${reason}`,
+    momentId: moment.id,
+    type: moment.type,
+    date: moment.date,
+    archivedAtISO: new Date().toISOString(),
+    archivedReason: reason,
+    eyebrow: copy.eyebrow,
+    title: copy.title,
+    body: copy.body,
+    button: copy.button,
+    screen: copy.screen,
+    confidence: typeof moment.data?.confidence === 'string' ? String(moment.data.confidence) : undefined,
+    signals: toSignalLabels(moment.data),
+    metadata: {
+      ...(moment.data ?? {}),
+      expiresAt: moment.expiresAt,
+      createdAtISO: moment.createdAtISO,
+    },
+  };
+  const next = [nextItem, ...snapshots].slice(0, MOMENT_HISTORY_LIMIT);
+  writeArchivedMomentSnapshots(next);
+  return next;
+}
+
+export function getMomentHistory(limit = 10): CompanionMoment[] {
+  return getCompanionMoments()
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, limit);
+}
+
+export function expireMoments(refISO: string = isoTodayLocal()): CompanionMoment[] {
+  const moments = getCompanionMoments();
+  const active: CompanionMoment[] = [];
+  moments.forEach((moment) => {
+    const expired = Boolean(moment.expiresAt && moment.expiresAt < refISO);
+    if (expired) {
+      archiveMoment(moment, 'expired');
+      return;
+    }
+    active.push(moment);
+  });
+  if (active.length !== moments.length) writeJson(COMPANION_MOMENTS_KEY, active);
+  return active;
+}
+
+export function getActiveMoments(refISO: string = isoTodayLocal()): CompanionMoment[] {
+  return expireMoments(refISO).filter((moment) => !moment.dismissed);
+}
+
+export function getHighestPriorityMoment(refISO: string = isoTodayLocal()): CompanionMoment | null {
+  const active = getActiveMoments(refISO).sort(sortByPriorityThenDate);
+  return active[0] ?? null;
 }
 
 export function createMoment(input: {
@@ -176,14 +339,27 @@ export function createMoment(input: {
     data: input.data,
   };
 
-  const prunedMoments = sameDayHighest ? moments.filter((moment) => !(moment.date === date && !moment.dismissed)) : moments;
+  const prunedMoments = sameDayHighest ? moments.filter((moment) => {
+    if (moment.date === date && !moment.dismissed) {
+      archiveMoment(moment, 'replaced');
+      return false;
+    }
+    return true;
+  }) : moments;
   const next = [nextMoment, ...prunedMoments].slice(0, 40);
   writeJson(COMPANION_MOMENTS_KEY, next);
   return next;
 }
 
 export function dismissMoment(id: string) {
-  const next = getCompanionMoments().map((moment) => (moment.id === id ? { ...moment, dismissed: true } : moment));
-  writeJson(COMPANION_MOMENTS_KEY, next);
-  return next;
+  const moments = getCompanionMoments();
+  const remaining = moments.filter((moment) => {
+    if (moment.id === id) {
+      archiveMoment(moment, 'dismissed');
+      return false;
+    }
+    return true;
+  });
+  writeJson(COMPANION_MOMENTS_KEY, remaining);
+  return remaining;
 }

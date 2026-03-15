@@ -1,4 +1,4 @@
-import { getCompanionMoments, type CompanionMoment } from './companionMoments';
+import { getArchivedMomentSnapshots, getCompanionMoments, type ArchivedCompanionMoment, type CompanionMoment } from './companionMoments';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
 import { compareExperimentOutcomes, findPreviousExperimentRun, getExperimentMatchKey, getExperimentOutcomeThreadText, getExperimentOutcomeTone } from './experimentMeta';
 import { safeFormatMonthYearFromKey } from './browserSafe';
@@ -24,7 +24,7 @@ export type TimelineEvent = {
   evidence?: string;
   signals?: string[];
   confidence?: string;
-  source: 'phase' | 'insights' | 'experiments' | 'rhythm' | 'moments';
+  source: 'phase' | 'insights' | 'experiments' | 'rhythm' | 'moments' | 'archive';
   actionLabel?: string;
   actionTarget?: string;
   metadata?: Record<string, unknown>;
@@ -231,6 +231,79 @@ function mapMomentToEvent(moment: CompanionMoment): TimelineEvent | null {
 }
 
 
+
+function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent | null {
+  const metadata = { ...(item.metadata ?? {}), archivedReason: item.archivedReason, archivedAtISO: item.archivedAtISO, momentId: item.momentId };
+  switch (item.type) {
+    case 'new_pattern':
+      return {
+        id: `archive:${item.archiveId}`,
+        type: 'pattern_discovered',
+        date: item.date,
+        title: item.title,
+        description: tidySentence(item.body, 'A new pattern was saved to your history.'),
+        evidence: item.archivedReason === 'dismissed' ? 'Saved from the homepage when you dismissed it.' : item.archivedReason === 'replaced' ? 'Saved from the homepage when a more relevant update took its place.' : 'Saved from the homepage after it had been visible for a few days.',
+        signals: item.signals,
+        confidence: item.confidence,
+        source: 'archive',
+        actionLabel: item.button,
+        actionTarget: item.screen,
+        metadata,
+      };
+    case 'helpful_pattern_detected':
+      return {
+        id: `archive:${item.archiveId}`,
+        type: 'helpful_pattern',
+        date: item.date,
+        title: item.title,
+        description: tidySentence(item.body, 'A helpful pattern was saved to your history.'),
+        evidence: item.archivedReason === 'dismissed' ? 'Saved from the homepage when you dismissed it.' : item.archivedReason === 'replaced' ? 'Saved from the homepage when a more relevant update took its place.' : 'Saved from the homepage after it had been visible for a few days.',
+        signals: item.signals,
+        confidence: item.confidence,
+        source: 'archive',
+        actionLabel: item.button,
+        actionTarget: item.screen,
+        metadata,
+      };
+    case 'rhythm_shift':
+    case 'phase_change':
+      return {
+        id: `archive:${item.archiveId}`,
+        type: 'rhythm_shift',
+        date: item.date,
+        title: item.title,
+        description: tidySentence(item.body, 'A rhythm update was saved to your history.'),
+        evidence: item.archivedReason === 'dismissed' ? 'Saved from the homepage when you dismissed it.' : item.archivedReason === 'replaced' ? 'Saved from the homepage when a more relevant update took its place.' : 'Saved from the homepage after it had been visible for a few days.',
+        signals: item.signals,
+        confidence: item.confidence,
+        source: 'archive',
+        actionLabel: item.button,
+        actionTarget: item.screen,
+        metadata,
+      };
+    case 'experiment_suggestion':
+    case 'experiment_result_ready':
+    case 'unlock_milestone':
+    case 'encouragement':
+      return {
+        id: `archive:${item.archiveId}`,
+        type: 'pattern_discovered',
+        date: item.date,
+        title: item.title,
+        description: tidySentence(item.body, 'A companion update was saved to your history.'),
+        evidence: item.archivedReason === 'dismissed' ? 'Saved from the homepage when you dismissed it.' : item.archivedReason === 'replaced' ? 'Saved from the homepage when a more relevant update took its place.' : 'Saved from the homepage after it had been visible for a few days.',
+        signals: item.signals,
+        confidence: item.confidence,
+        source: 'archive',
+        actionLabel: item.button,
+        actionTarget: item.screen,
+        metadata,
+      };
+    default:
+      return null;
+  }
+}
+
 function getFeedbackIdFromSignalId(signalId: string): string | null {
   const match = String(signalId || '').match(/^pair-([^:]+)-([^:]+)$/);
   if (!match) return null;
@@ -329,7 +402,11 @@ function buildPatternEvents(): TimelineEvent[] {
     .map(mapMomentToEvent)
     .filter((event): event is TimelineEvent => Boolean(event) && event.type === 'pattern_discovered');
 
-  return [...base, ...strengthened, ...fromMoments].map(applyPatternFeedbackToEvent);
+  const fromArchive = getArchivedMomentSnapshots()
+    .map(mapArchivedMomentToEvent)
+    .filter((event): event is TimelineEvent => Boolean(event) && event.type === 'pattern_discovered');
+
+  return [...base, ...strengthened, ...fromMoments, ...fromArchive].map(applyPatternFeedbackToEvent);
 }
 
 function buildHelpfulPatternEvents(): TimelineEvent[] {
@@ -360,7 +437,11 @@ function buildHelpfulPatternEvents(): TimelineEvent[] {
     .map(mapMomentToEvent)
     .filter((event): event is TimelineEvent => Boolean(event) && event.type === 'helpful_pattern');
 
-  return [...helpful, ...fromMoments];
+  const fromArchive = getArchivedMomentSnapshots()
+    .map(mapArchivedMomentToEvent)
+    .filter((event): event is TimelineEvent => Boolean(event) && event.type === 'helpful_pattern');
+
+  return [...helpful, ...fromMoments, ...fromArchive];
 }
 
 function outcomeLabel(status?: string): string {
@@ -427,9 +508,13 @@ function buildExperimentEvents(): TimelineEvent[] {
 }
 
 function buildRhythmEvents(): TimelineEvent[] {
-  return getCompanionMoments()
+  const live = getCompanionMoments()
     .map(mapMomentToEvent)
     .filter((event): event is TimelineEvent => Boolean(event) && event.type === 'rhythm_shift');
+  const archived = getArchivedMomentSnapshots()
+    .map(mapArchivedMomentToEvent)
+    .filter((event): event is TimelineEvent => Boolean(event) && event.type === 'rhythm_shift');
+  return [...live, ...archived];
 }
 
 export function sortTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {

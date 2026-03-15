@@ -3,6 +3,26 @@ import type { RhythmPhaseKey } from './rhythmCopy';
 import { getRhythmModel, isoToday } from './analytics';
 import { getAverageCycleLength, getAveragePhaseLength, getCurrentPhaseEntry, getPhaseElapsedDays } from './phaseHistory';
 
+function daysBetween(fromISO: string, toISO: string): number {
+  const from = new Date(`${fromISO}T00:00:00`).getTime();
+  const to = new Date(`${toISO}T00:00:00`).getTime();
+  return Math.max(0, Math.floor((to - from) / 86400000));
+}
+
+function getLatestLoggedISO(entries: CheckInEntry[]): string | null {
+  const valid = (entries ?? []).map((entry) => entry?.dateISO).filter((value): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value));
+  return valid.length ? valid.sort().slice(-1)[0] : null;
+}
+
+function isStaleTimeline(entries: CheckInEntry[], userData: UserData): boolean {
+  const latest = getLatestLoggedISO(entries);
+  if (!latest) return false;
+  const rhythm = getRhythmModel(entries, userData);
+  const safeCycle = Math.max(28, Math.round((rhythm.cycleLen || 28) * 1.5));
+  const staleAfterDays = Math.max(42, safeCycle);
+  return daysBetween(latest, isoToday()) >= staleAfterDays;
+}
+
 export type RhythmTimingModel = {
   currentDay: number | null;
   totalDays: number | null;
@@ -69,12 +89,13 @@ export function getRhythmTimingModel(entries: CheckInEntry[], userData: UserData
   const rhythm = getRhythmModel(entries, userData);
   const phaseKey = (rhythm.phaseKey ?? 'protective') as RhythmPhaseKey;
   const lowData = distinctDays < 5;
+  const staleTimeline = isStaleTimeline(entries, userData);
 
   const currentEntry = getCurrentPhaseEntry();
   const historicalPhaseLength = getAveragePhaseLength(phaseKey, null);
   const historicalCycleLength = getAverageCycleLength(rhythm.cycleLen || 28);
 
-  if (currentEntry && currentEntry.phase === phaseKey) {
+  if (!staleTimeline && currentEntry && currentEntry.phase === phaseKey) {
     const currentDay = getPhaseElapsedDays(isoToday()) ?? null;
     const totalDays = historicalPhaseLength ?? getDefaultPhaseLength(phaseKey);
     const daysRemaining = currentDay ? Math.max(0, totalDays - currentDay) : null;
@@ -87,7 +108,9 @@ export function getRhythmTimingModel(entries: CheckInEntry[], userData: UserData
       timingCopy: '',
       approximate,
     };
-    model.timingCopy = getTimingStripCopy(model);
+    model.timingCopy = staleTimeline
+      ? 'Estimated current phase · refreshed after a logging gap'
+      : getTimingStripCopy(model);
     return model;
   }
 
@@ -97,7 +120,7 @@ export function getRhythmTimingModel(entries: CheckInEntry[], userData: UserData
     const totalDays = historicalPhaseLength ?? boundedLength;
     const currentDay = clamp(rhythm.dayInCycle - bounds.start + 1, 1, totalDays);
     const daysRemaining = Math.max(0, totalDays - currentDay);
-    const approximate = rhythm.source === 'inferred' || lowData || !historicalPhaseLength;
+    const approximate = staleTimeline || rhythm.source === 'inferred' || lowData || !historicalPhaseLength;
     const model: RhythmTimingModel = {
       currentDay,
       totalDays,
@@ -121,6 +144,8 @@ export function getRhythmTimingModel(entries: CheckInEntry[], userData: UserData
     timingCopy: '',
     approximate: true,
   };
-  model.timingCopy = getTimingStripCopy(model);
+  model.timingCopy = staleTimeline
+    ? 'Low confidence until a few more check-ins'
+    : getTimingStripCopy(model);
   return model;
 }
