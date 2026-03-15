@@ -241,6 +241,7 @@ function normaliseExperiment(value: unknown): any | null {
     note: typeof ex.note === "string" ? ex.note : "",
     changeKey: typeof ex.changeKey === "string" && ex.changeKey ? ex.changeKey : undefined,
     kind: ex.kind === "track" ? "track" : "change",
+    threadKey: typeof ex.threadKey === "string" && ex.threadKey ? ex.threadKey : undefined,
     outcome: ex.outcome && typeof ex.outcome === "object" ? {
       ...(ex.outcome as any),
       status: typeof (ex.outcome as any).status === "string" ? (ex.outcome as any).status : undefined,
@@ -271,6 +272,7 @@ function normaliseHistoryItem(value: unknown): any | null {
     durationDays: Number.isFinite(Number(item.durationDays)) ? Math.max(1, Number(item.durationDays)) : 3,
     metrics: Array.isArray(item.metrics) ? item.metrics.filter((k: any) => typeof k === "string") : [],
     changeKey: typeof item.changeKey === "string" && item.changeKey ? item.changeKey : undefined,
+    threadKey: typeof item.threadKey === "string" && item.threadKey ? item.threadKey : undefined,
     outcome: {
       status: typeof outcomeRaw.status === "string" ? outcomeRaw.status : "stopped",
       completedAtISO,

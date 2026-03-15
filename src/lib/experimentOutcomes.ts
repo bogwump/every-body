@@ -40,3 +40,8 @@ export function recordExperimentOutcome(input: Omit<ExperimentOutcomeRecord, 'da
 export function getHelpfulExperiments(): ExperimentOutcomeRecord[] {
   return getExperimentOutcomes().filter((item) => item.result === 'helpful');
 }
+
+export function clearExperimentOutcomeRecord(experimentId: string) {
+  const current = getExperimentOutcomes().filter((item) => item.experimentId !== experimentId);
+  writeJson(current.slice(0, 50));
+}

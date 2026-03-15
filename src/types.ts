@@ -211,6 +211,8 @@ export interface ExperimentPlan {
 
   /** Experiment type */
   kind?: ExperimentKind;
+  /** Stable key for grouping repeated runs of the same experiment idea */
+  threadKey?: string;
 
   /** Optional outcome captured at the end of the experiment */
   outcome?: {
@@ -241,6 +243,8 @@ export interface ExperimentHistoryItem {
   durationDays: number;
   metrics: InsightMetricKey[];
   changeKey?: string;
+  /** Stable key for grouping repeated runs of the same experiment idea */
+  threadKey?: string;
   outcome: {
     status: ExperimentOutcomeStatus;
     completedAtISO: string; // ISO datetime

@@ -34,9 +34,9 @@ import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { getSupportSuggestion } from '../lib/patternSupport';
 import { getExperimentForSignal, scoreExperimentSuggestion } from '../lib/experimentSuggestions';
 import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, saveAction } from '../lib/savedActions';
-import { recordExperimentOutcome } from '../lib/experimentOutcomes';
+import { clearExperimentOutcomeRecord, recordExperimentOutcome } from '../lib/experimentOutcomes';
 import { consumePendingExperimentLaunch, inferPendingExperimentLaunchFromText } from '../lib/experimentLaunch';
-import { compareExperimentOutcomes, findPreviousExperimentRun, getExperimentLifecycle, getExperimentStatusMeta, getExperimentTemplateMeta } from '../lib/experimentMeta';
+import { buildExperimentThreadKey, compareExperimentOutcomes, findPreviousExperimentRun, getExperimentLifecycle, getExperimentStatusMeta, getExperimentTemplateMeta } from '../lib/experimentMeta';
 import { computePatternExperimentPrompts } from '../lib/patternExperimentPrompts';
 import { getExperimentHistoryContext, getHelpfulPatternsFromExperiments } from '../lib/experimentLearning';
 import { Dialog, DialogClose, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
@@ -1966,7 +1966,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   // Experiment dialog state
   const [experimentOpen, setExperimentOpen] = useState(false);
-  const [finishExperimentConfirm, setFinishExperimentConfirm] = useState<null | { outcome: 'helped' | 'notReally' | 'abandoned' }>(null);
+  const [finishExperimentConfirm, setFinishExperimentConfirm] = useState<null | { outcome: 'helped' | 'notReally' | 'abandoned'; editing?: boolean }>(null);
   const [experimentPlan, setExperimentPlan] = useState<{ title: string; steps: string[]; note: string } | null>(null);
   const [experimentMetrics, setExperimentMetrics] = useState<Array<MetricKey>>([]);
   const [experimentDurationDays, setExperimentDurationDays] = useState<number>(3);
@@ -1984,7 +1984,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const [replaceExperimentConfirm, setReplaceExperimentConfirm] = useState<null | ExperimentPlan>(null);
 
   const { experiment, setExperiment, clearExperiment } = useExperiment();
-  const { history: experimentHistory, upsertHistoryItem } = useExperimentHistory();
+  const { history: experimentHistory, upsertHistoryItem, setHistory } = useExperimentHistory();
 
   const helpfulPatterns = useMemo(
     () => getHelpfulPatternsFromExperiments().filter((item) => item.confidence !== 'low').slice(0, 3),
@@ -2137,20 +2137,25 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const trimmedMetrics = isCustomExperiment ? baseMetrics.slice(0, CUSTOM_EXPERIMENT_MAX_METRICS) : baseMetrics;
     const safeMetrics = isCustomExperiment && (!trimmedMetrics || trimmedMetrics.length === 0) ? (['mood'] as any) : trimmedMetrics;
 
+    const title = isCustomExperiment ? (customExperimentTitle.trim() || 'Your experiment') : experimentPlan.title;
+    const kind = (typeof experimentPlan.title === 'string' && experimentPlan.title.toLowerCase().includes('tracking')) ? ('track' as any) : ('change' as any);
+    const changeKey = experimentChangeKey
+      ? experimentChangeKey
+      : isCustomExperiment && customExperimentChangeKey
+        ? customExperimentChangeKey
+        : undefined;
+
     const plan: ExperimentPlan = {
       id: `${startISO}-${Math.random().toString(16).slice(2)}`,
-      title: isCustomExperiment ? (customExperimentTitle.trim() || 'Your experiment') : experimentPlan.title,
+      title,
       startDateISO: startISO,
       durationDays: experimentDurationDays,
       metrics: safeMetrics,
-      changeKey: experimentChangeKey
-        ? experimentChangeKey
-        : isCustomExperiment && customExperimentChangeKey
-          ? customExperimentChangeKey
-          : undefined,
+      changeKey,
+      threadKey: buildExperimentThreadKey({ title, changeKey, kind }),
       steps: experimentPlan.steps,
       note: experimentPlan.note,
-      kind: (typeof experimentPlan.title === 'string' && experimentPlan.title.toLowerCase().includes('tracking')) ? ('track' as any) : ('change' as any),
+      kind,
     };
 
     // Single-active-experiment guardrail
@@ -2203,6 +2208,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         durationDays: Number(plan.durationDays ?? 3),
         metrics: Array.isArray(plan.metrics) ? plan.metrics : [],
         changeKey: plan.changeKey,
+        threadKey: (plan as any).threadKey || buildExperimentThreadKey(plan as any),
         outcome: {
           status: outcomeStatus,
           completedAtISO,
@@ -2241,6 +2247,7 @@ const confirmFinishExperiment = () => {
       kind:
         (ex as any).kind ||
         ((typeof ex.title === 'string' && ex.title.toLowerCase().includes('tracking')) ? ('track' as any) : ('change' as any)),
+      threadKey: (ex as any).threadKey || buildExperimentThreadKey(ex as any),
       outcome: {
         ...(ex.outcome ?? {}),
         status: outcome as any,
@@ -2260,6 +2267,33 @@ const confirmFinishExperiment = () => {
 
     setFinishExperimentConfirm(null);
     setOutcomeNote('');
+  };
+
+
+  const editSavedExperimentOutcome = () => {
+    if (!experiment) return;
+    const ex = experiment as ExperimentPlan;
+    const saved = ((ex as any)?.outcome?.status ?? null) as null | 'helped' | 'notReally' | 'abandoned';
+    if (!saved || saved === 'stopped') return;
+    setOutcomeNote(typeof (ex as any)?.outcome?.note === 'string' ? String((ex as any).outcome.note) : '');
+    setFinishExperimentConfirm({ outcome: saved, editing: true });
+  };
+
+  const clearSavedExperimentOutcome = () => {
+    if (!experiment) return;
+    const ex = experiment as ExperimentPlan;
+    const next: ExperimentPlan = {
+      ...ex,
+      outcome: undefined,
+    };
+    setExperiment(next);
+    clearExperimentOutcomeRecord(ex.id);
+    try {
+      const remaining = (Array.isArray(experimentHistory) ? experimentHistory : []).filter((item: any) => String(item?.experimentId || '') !== String(ex.id));
+      setHistory(remaining as any);
+    } catch {
+      // ignore
+    }
   };
 
   const confirmReplaceExperiment = () => {
@@ -3224,6 +3258,14 @@ const tryNextPrompts = useMemo(() => {
                   </div>
                 </>
               ) : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" className="eb-btn eb-btn-secondary" onClick={() => editSavedExperimentOutcome()}>
+                  Change outcome
+                </button>
+                <button type="button" className="eb-btn eb-btn-secondary" onClick={() => clearSavedExperimentOutcome()}>
+                  Reopen reflection
+                </button>
+              </div>
             </div>
           ) : (
             <div className="mt-4">
@@ -3652,7 +3694,7 @@ const tryNextPrompts = useMemo(() => {
             <div className="text-sm font-semibold text-black">Over the next few days you might notice</div>
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.68)]">
               {bodyWeatherLines.slice(0, 3).map((line) => (
-                <div key={line} className="leading-6">• {line}</div>
+                <div key={line} className="leading-6">{line}</div>
               ))}
             </div>
           </div>
@@ -4168,10 +4210,10 @@ const tryNextPrompts = useMemo(() => {
           <div className="space-y-3">
             <div className="text-sm eb-muted">
               {finishExperimentConfirm?.outcome === 'helped'
-                ? 'Finish now and mark it as helpful?'
+                ? (finishExperimentConfirm?.editing ? 'Update this result to helpful?' : 'Finish now and mark it as helpful?')
                 : finishExperimentConfirm?.outcome === 'notReally'
-                  ? 'Finish now and mark it as not really helpful?'
-                  : 'Finish now and mark it as not completed?'}
+                  ? (finishExperimentConfirm?.editing ? 'Update this result to not really helpful?' : 'Finish now and mark it as not really helpful?')
+                  : (finishExperimentConfirm?.editing ? 'Update this result to not completed?' : 'Finish now and mark it as not completed?')}
             </div>
             <div className="text-sm eb-muted">Optional: add a quick note so Future You knows what happened.</div>
 

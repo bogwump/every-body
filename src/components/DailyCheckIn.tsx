@@ -31,7 +31,7 @@ import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore
 import { applyPhaseChangeForEntries, phaseLabelFromKey } from '../lib/phaseChange';
 import { hasResizeObserver } from '../lib/browserSafe';
 import { recordExperimentOutcome } from '../lib/experimentOutcomes';
-import { getExperimentLifecycle, getExperimentStatusMeta, getExperimentTemplateMeta } from '../lib/experimentMeta';
+import { buildExperimentThreadKey, getExperimentLifecycle, getExperimentStatusMeta, getExperimentTemplateMeta } from '../lib/experimentMeta';
 
 const INFLUENCE_DEFS: Array<{ key: string; label: string; hint: string }> = [
   {
@@ -507,6 +507,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       durationDays: Number(ex.durationDays ?? 3),
       metrics: Array.isArray(ex.metrics) ? ex.metrics : [],
       changeKey: ex.changeKey,
+      threadKey: (ex as any).threadKey || buildExperimentThreadKey(ex as any),
       outcome: {
         status,
         completedAtISO,

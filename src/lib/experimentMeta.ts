@@ -111,11 +111,17 @@ export function getExperimentTemplateMeta(changeKey?: string, title?: string): E
 
 export function getExperimentMatchKey(input: Partial<ExperimentPlan & ExperimentHistoryItem> | null | undefined): string {
   if (!input) return '';
+  const threadKey = String((input as any).threadKey || '').trim().toLowerCase();
+  if (threadKey) return threadKey;
   const changeKey = String((input as any).changeKey || '').trim().toLowerCase();
   const title = String((input as any).title || '').trim().toLowerCase();
   const kind = String((input as any).kind || 'change').trim().toLowerCase();
   if (changeKey) return `${kind}::${changeKey}`;
   return `${kind}::title:${title}`;
+}
+
+export function buildExperimentThreadKey(input: Partial<ExperimentPlan & ExperimentHistoryItem> | null | undefined): string {
+  return getExperimentMatchKey(input);
 }
 
 export function findPreviousExperimentRun(history: ExperimentHistoryItem[], current: Partial<ExperimentPlan & ExperimentHistoryItem> | null | undefined): ExperimentHistoryItem | null {
