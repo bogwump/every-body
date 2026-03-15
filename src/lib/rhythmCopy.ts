@@ -160,7 +160,7 @@ export function getRhythmRelevantSignals(
     if (!copy) continue;
     if (seenCopy.has(copy)) continue;
     seenCopy.add(copy);
-    out.push(signal);
+    out.push(adjustedSignal as InsightSignal);
     if (out.length >= limit) break;
   }
   return out;

@@ -2,6 +2,7 @@ import type { CheckInEntry, UserData } from '../types';
 import { getRhythmModel, isoToday, sortByDateAsc } from './analytics';
 import { createMoment } from './companionMoments';
 import {
+  getAveragePhaseLength,
   getCurrentPhaseEntry,
   getPhaseElapsedDays,
   savePhaseHistory,
@@ -212,6 +213,12 @@ function phaseDistanceForward(fromPhase: string | null | undefined, toPhase: str
   return (toIndex - fromIndex + PHASE_ORDER.length) % PHASE_ORDER.length;
 }
 
+function typicalDaysForPhase(phase: string | null | undefined): number {
+  const fallback = minimumDaysForPhase(phase);
+  const learned = getAveragePhaseLength(String(phase || ''), fallback);
+  return Math.max(fallback, Math.round(learned ?? fallback));
+}
+
 function minimumForwardDaysBetweenPhases(fromPhase: string | null | undefined, toPhase: string | null | undefined): number {
   const distance = phaseDistanceForward(fromPhase, toPhase);
   if (distance <= 0 || !fromPhase) return 0;
@@ -219,6 +226,19 @@ function minimumForwardDaysBetweenPhases(fromPhase: string | null | undefined, t
   let total = 0;
   for (let step = 0; step < distance; step += 1) {
     total += minimumDaysForPhase(current);
+    current = nextPhaseInOrder(current);
+    if (!current) break;
+  }
+  return total;
+}
+
+function typicalForwardDaysBetweenPhases(fromPhase: string | null | undefined, toPhase: string | null | undefined): number {
+  const distance = phaseDistanceForward(fromPhase, toPhase);
+  if (distance <= 0 || !fromPhase) return 0;
+  let current = fromPhase;
+  let total = 0;
+  for (let step = 0; step < distance; step += 1) {
+    total += typicalDaysForPhase(current);
     current = nextPhaseInOrder(current);
     if (!current) break;
   }
@@ -275,13 +295,25 @@ function hasCandidateSupport(entries: CheckInEntry[], candidateSince: string | n
   return countDistinctLoggedDaysOnOrAfter(entries, candidateSince) >= CANDIDATE_CONFIRMATION_DAYS;
 }
 
-function derivePhaseConfidence(args: { daysLogged: number; hasAnchor: boolean; hasConfirmedHistory: boolean }): PhaseConfidenceState {
-  const { daysLogged, hasAnchor, hasConfirmedHistory } = args;
-  if (hasAnchor) return 'high';
-  if (daysLogged >= CONFIRMED_HISTORY_MIN_DAYS && hasConfirmedHistory) return 'high';
-  if (daysLogged >= 7) return 'moderate';
-  if (daysLogged >= 3) return 'low';
-  return 'very_low';
+function derivePhaseConfidence(args: { daysLogged: number; hasAnchor: boolean; hasConfirmedHistory: boolean; gapMode?: RhythmGapMode }): PhaseConfidenceState {
+  const { daysLogged, hasAnchor, hasConfirmedHistory, gapMode = 'continuity' } = args;
+  let base: PhaseConfidenceState;
+  if (hasAnchor) base = 'high';
+  else if (daysLogged >= CONFIRMED_HISTORY_MIN_DAYS && hasConfirmedHistory) base = 'high';
+  else if (daysLogged >= 7) base = 'moderate';
+  else if (daysLogged >= 3) base = 'low';
+  else base = 'very_low';
+
+  if (gapMode === 'stale') {
+    if (base === 'high') return 'low';
+    if (base === 'moderate') return 'low';
+    return 'very_low';
+  }
+  if (gapMode === 'catchup') {
+    if (base === 'high') return 'moderate';
+    if (base === 'moderate') return 'low';
+  }
+  return base;
 }
 
 function deriveHistoryLockLevel(args: { daysLogged: number; hasAnchor: boolean; hasConfirmedHistory: boolean }): HistoryLockLevel {
@@ -304,7 +336,7 @@ function buildPhaseState(args: {
   const { previousState, previousConfirmed, proposedPhase, detectedSource, daysLogged, refISO, gapMode = 'continuity', gapDays = 0 } = args;
   const hasConfirmedHistory = Boolean(previousConfirmed || getCurrentPhaseEntry());
   const hasAnchor = detectedSource === 'override' || detectedSource === 'bleed';
-  const phaseConfidence = derivePhaseConfidence({ daysLogged, hasAnchor, hasConfirmedHistory });
+  const phaseConfidence = derivePhaseConfidence({ daysLogged, hasAnchor, hasConfirmedHistory, gapMode });
   const historyLockLevel = deriveHistoryLockLevel({ daysLogged, hasAnchor, hasConfirmedHistory });
 
   const previousEstimated = previousState?.estimatedPhase ?? previousConfirmed ?? null;
@@ -439,6 +471,25 @@ function validatePhaseTransition(args: {
   const minimumForwardDays = minimumForwardDaysBetweenPhases(previousPhase, proposedPhase);
   if (minimumForwardDays > availableDays) {
     return { acceptedPhase: previousPhase, changed: false, reason: 'blocked_catchup_plausibility' };
+  }
+
+  const typicalForwardDays = typicalForwardDaysBetweenPhases(previousPhase, proposedPhase);
+  const personalBuffer = Math.max(1, Math.min(4, Math.round(forwardDistance * 1.5)));
+  if (typicalForwardDays > 0 && typicalForwardDays > availableDays + personalBuffer) {
+    let cappedPhase = previousPhase;
+    let current = previousPhase;
+    for (let step = 0; step < forwardDistance; step += 1) {
+      const next = nextPhaseInOrder(current);
+      if (!next) break;
+      const stepTypical = typicalForwardDaysBetweenPhases(previousPhase, next);
+      if (stepTypical > availableDays + personalBuffer) break;
+      cappedPhase = next;
+      current = next;
+    }
+    if (cappedPhase !== previousPhase) {
+      return { acceptedPhase: cappedPhase, changed: true, reason: 'catchup_capped_to_typical_timing' };
+    }
+    return { acceptedPhase: previousPhase, changed: false, reason: 'blocked_catchup_typical_timing' };
   }
 
   return {

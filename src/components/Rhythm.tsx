@@ -566,8 +566,8 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
   const rhythmStatusNote = useMemo(() => {
     const gapMode = (computed.phaseState as any)?.gapMode as string | undefined;
-    if (gapMode === 'stale') return 'Rhythm was refreshed after a longer logging gap. A few more check-ins will help firm this up again.';
-    if (gapMode === 'catchup') return 'Rhythm has caught up after a gap in logging, so this phase is inferred from elapsed time and recent anchors.';
+    if (gapMode === 'stale') return 'Estimated current phase after a longer logging gap. A few more check-ins will help firm this up again.';
+    if (gapMode === 'catchup') return 'Estimated current phase after a gap in logging. Rhythm has caught up using elapsed time and recent anchors.';
     if (computed.phaseState?.historyLockLevel !== 'confirmed') return 'This is an estimated phase for now. A few more check-ins will help it settle.';
     return null;
   }, [computed.phaseState]);

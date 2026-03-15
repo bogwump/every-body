@@ -510,9 +510,9 @@ export function Dashboard({
             ) : null}
             <div className="mt-2 text-sm text-[rgba(0,0,0,0.65)]">{heroModel.rhythmBody}</div>
             {rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'stale' ? (
-              <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Estimated current phase after a longer gap in logging.</div>
+              <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Estimated current phase after a longer gap in logging. A few more check-ins will help firm this up again.</div>
             ) : rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'catchup' ? (
-              <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Rhythm has caught up after a gap in logging.</div>
+              <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Estimated current phase after a gap in logging. Rhythm has caught up using elapsed time and recent anchors.</div>
             ) : null}
           </div>
 

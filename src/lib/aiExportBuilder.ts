@@ -126,12 +126,12 @@ function describeSignal(signal: InsightSignal): string {
     if (signal.confidence === 'low') return 'Stressful days might sometimes be followed by worse sleep.';
     return 'This sleep pattern is still emerging.';
   }
-  if (id.includes('brainfog') || id.includes('brain_fog')) return 'Brain fog is showing a pattern that is still emerging.';
+  if (id.includes('brainfog') || id.includes('brain_fog')) return `Brain fog ${phrase} follows a pattern in your recent logs.`;
   if (signal.type === 'metric_pair' && metricB) return `${toTitleCase(metricA)} and ${metricB} ${phrase} move together.`;
   if (signal.type === 'phase_shift' && signal.phase) return `${toTitleCase(metricA)} ${phrase} shift during your ${String(signal.phase).toLowerCase()} phase.`;
-  if (signal.type === 'trend_shift') return `${toTitleCase(metricA)} has been shifting over time.`;
-  if (signal.type === 'weekday_pattern') return `${toTitleCase(metricA)} has shown a day-of-week pattern that is still emerging.`;
-  return `${toTitleCase(metricA)} is showing a pattern that is still emerging.`;
+  if (signal.type === 'trend_shift') return `${toTitleCase(metricA)} ${phrase} shifted over time in your logs.`;
+  if (signal.type === 'weekday_pattern') return `${toTitleCase(metricA)} ${phrase} varies by day of week in your logs.`;
+  return `${toTitleCase(metricA)} ${phrase} follows a pattern in your logs.`;
 }
 
 function outcomeLabel(status?: string): string {
