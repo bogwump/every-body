@@ -2,7 +2,8 @@ import type { CheckInEntry, InsightMetricKey, UserData } from '../types';
 import type { InsightSignal } from './insightEngine';
 import { generateCandidateInsights, rankInsights, scoreInsights } from './insightEngine';
 import { getExperimentsForSignal, getHelpfulPatternsForMetrics } from './experimentLearning';
-import { getRhythmPhrase } from './confidenceCopy';
+import { downgradeConfidence, getRhythmPhrase } from './confidenceCopy';
+import { getSymptomCoverage } from './symptomCoverage';
 
 export type RhythmPhaseKey = 'reset' | 'rebuilding' | 'expressive' | 'protective';
 
@@ -128,13 +129,15 @@ function copyForSignal(signal: InsightSignal, userData: UserData, phaseKey: Rhyt
   return phaseFallback[phaseKey] ?? null;
 }
 
-function signalPriority(signal: InsightSignal, phaseKey: RhythmPhaseKey): number {
+function signalPriority(signal: InsightSignal, phaseKey: RhythmPhaseKey, userData: UserData): number {
   const phaseMetrics = PHASE_METRIC_PRIORITY[phaseKey] ?? [];
   const phaseMetricHits = signal.metrics.reduce((total, metric) => total + (phaseMetrics.includes(metric) ? 1 : 0), 0);
   const phaseBonus = signal.phase && ['Menstrual', 'Follicular', 'Ovulation', 'Luteal'].includes(signal.phase) ? 8 : 0;
   const typeBonus = signal.type === 'phase_shift' ? 12 : signal.type === 'metric_pair' ? 7 : signal.type === 'trend_shift' ? 5 : 0;
+  const coverage = getSymptomCoverage(userData);
+  const coveragePenalty = coverage.confidencePenaltySteps * 10;
   const penalty = signal.type === 'weekday_pattern' ? 16 : signal.type === 'low_data' ? 100 : 0;
-  return signal.score + phaseMetricHits * 9 + phaseBonus + typeBonus - penalty;
+  return signal.score + phaseMetricHits * 9 + phaseBonus + typeBonus - penalty - coveragePenalty;
 }
 
 export function getRhythmRelevantSignals(
@@ -147,12 +150,13 @@ export function getRhythmRelevantSignals(
   const filtered = ranked.filter((signal) => signal.type !== 'low_data');
   const sorted = filtered
     .slice()
-    .sort((a, b) => signalPriority(b, phaseKey) - signalPriority(a, phaseKey));
+    .sort((a, b) => signalPriority(b, phaseKey, userData) - signalPriority(a, phaseKey, userData));
 
   const out: InsightSignal[] = [];
   const seenCopy = new Set<string>();
   for (const signal of sorted) {
-    const copy = copyForSignal(signal, userData, phaseKey);
+    const adjustedSignal = { ...signal, confidence: downgradeConfidence(signal.confidence as any, getSymptomCoverage(userData).confidencePenaltySteps) as any };
+    const copy = copyForSignal(adjustedSignal, userData, phaseKey);
     if (!copy) continue;
     if (seenCopy.has(copy)) continue;
     seenCopy.add(copy);
@@ -222,7 +226,7 @@ export function getRhythmSupportNudge(args: {
 export function getRhythmLowDataPatternLines(): string[] {
   return [
     'We are still learning how your energy, sleep and symptoms move across your rhythm.',
-    'A few more check-ins will help this feel more personal and clear.',
+    'A few more check-ins, with a bit of signal variety, will help this feel more personal and clear.',
   ];
 }
 

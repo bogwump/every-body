@@ -45,3 +45,10 @@ export function getHelpfulPhrase(level?: string | null): string {
 export function describeInsightConfidence(signal: Pick<InsightSignal, 'confidence'>): UnifiedConfidence {
   return normaliseConfidence(signal.confidence);
 }
+
+export function downgradeConfidence(level: UnifiedConfidence | string | null | undefined, steps = 1): UnifiedConfidence {
+  const order: UnifiedConfidence[] = ['very_low', 'low', 'moderate', 'high'];
+  const current = normaliseConfidence(level);
+  const idx = order.indexOf(current);
+  return order[Math.max(0, idx - Math.max(0, Math.floor(steps)))];
+}

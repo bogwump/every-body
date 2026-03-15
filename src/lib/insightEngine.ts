@@ -2,9 +2,11 @@ import type { CheckInEntry, CyclePhase, InsightMetricKey, SymptomKey, SymptomKin
 import { estimatePhaseByFlow, pearsonCorrelation, sortByDateAsc } from './analytics';
 import { isoTodayLocal } from './date';
 import { isMetricInScope } from './insightsScope';
+import { getSymptomCoverage } from './symptomCoverage';
+import { downgradeConfidence } from './confidenceCopy';
 import { SYMPTOM_META } from './symptomMeta';
 
-export type InsightConfidence = 'low' | 'medium' | 'high';
+export type InsightConfidence = 'very_low' | 'low' | 'medium' | 'high';
 export type InsightStrength = 'weak' | 'moderate' | 'strong';
 export type InsightSignalType = 'phase_shift' | 'trend_shift' | 'metric_pair' | 'weekday_pattern' | 'low_data';
 
@@ -466,7 +468,8 @@ export function getTopInsights(
   limit = 3,
   selectedMetrics: InsightMetricKey[] = [],
 ): InsightSignal[] {
-  return rankInsights(scoreInsights(generateCandidateInsights(entries, userData, selectedMetrics))).slice(0, limit);
+  const scored = rankInsights(scoreInsights(generateCandidateInsights(entries, userData, selectedMetrics)));
+  return applyCoverageToSignals(scored, userData).slice(0, limit);
 }
 
 function safeReadJson<T>(key: string, fallback: T): T {
@@ -495,6 +498,23 @@ function daysBetween(startISO: string, endISO: string): number {
 
 export function getDiscoveredPatterns(): StoredDiscoveredPattern[] {
   return safeReadJson<StoredDiscoveredPattern[]>(DISCOVERED_PATTERNS_KEY, []);
+}
+
+function applyCoverageToSignals(signals: InsightSignal[], userData: UserData): InsightSignal[] {
+  const coverage = getSymptomCoverage(userData);
+  const penalty = coverage.confidencePenaltySteps;
+  if (penalty <= 0) return signals;
+  return signals.map((signal) => {
+    const adjustedConfidence = downgradeConfidence(signal.confidence as any, penalty);
+    const adjustedScore = Math.max(0, signal.score - penalty * 12);
+    const adjustedStrength = adjustedScore >= 80 ? 'strong' : adjustedScore >= 55 ? 'moderate' : 'weak';
+    return {
+      ...signal,
+      confidence: adjustedConfidence === 'very_low' ? 'low' : adjustedConfidence === 'moderate' ? 'medium' : adjustedConfidence,
+      score: adjustedScore,
+      strength: adjustedStrength,
+    };
+  });
 }
 
 function qualifiesForDiscovery(signal: InsightSignal): boolean {

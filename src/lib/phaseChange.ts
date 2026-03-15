@@ -33,8 +33,12 @@ export type StoredPhase = {
 export type PhaseConfidenceState = 'very_low' | 'low' | 'moderate' | 'high';
 export type HistoryLockLevel = 'provisional' | 'stabilising' | 'confirmed';
 
+export type RhythmGapMode = 'continuity' | 'catchup' | 'stale';
+
 export type RhythmPhaseState = {
   estimatedPhase: string | null;
+  gapMode?: RhythmGapMode;
+  gapDays?: number;
   estimatedPhaseStartedAt: string | null;
   confirmedPhase: string | null;
   confirmedPhaseStartedAt: string | null;
@@ -115,6 +119,12 @@ export function getRhythmPhaseState(): RhythmPhaseState | null {
     return 'provisional';
   })();
   const updatedAt = isISODate(parsed.updatedAt) ? parsed.updatedAt : isoToday();
+  const gapMode = ((): RhythmGapMode => {
+    const value = String((parsed as any).gapMode || 'continuity');
+    if (value === 'continuity' || value === 'catchup' || value === 'stale') return value;
+    return 'continuity';
+  })();
+  const gapDays = typeof (parsed as any).gapDays === 'number' && Number.isFinite((parsed as any).gapDays) ? Math.max(0, Math.floor((parsed as any).gapDays)) : 0;
 
   return {
     estimatedPhase,
@@ -125,6 +135,8 @@ export function getRhythmPhaseState(): RhythmPhaseState | null {
     candidateConfirmedSince,
     phaseConfidence,
     historyLockLevel,
+    gapMode,
+    gapDays,
     updatedAt,
   };
 }
@@ -193,6 +205,42 @@ function daysBetween(fromISO: string, toISO: string): number {
   return Math.max(0, Math.floor((to - from) / 86400000));
 }
 
+function phaseDistanceForward(fromPhase: string | null | undefined, toPhase: string | null | undefined): number {
+  const fromIndex = getPhaseIndex(fromPhase);
+  const toIndex = getPhaseIndex(toPhase);
+  if (fromIndex < 0 || toIndex < 0) return -1;
+  return (toIndex - fromIndex + PHASE_ORDER.length) % PHASE_ORDER.length;
+}
+
+function minimumForwardDaysBetweenPhases(fromPhase: string | null | undefined, toPhase: string | null | undefined): number {
+  const distance = phaseDistanceForward(fromPhase, toPhase);
+  if (distance <= 0 || !fromPhase) return 0;
+  let current = fromPhase;
+  let total = 0;
+  for (let step = 0; step < distance; step += 1) {
+    total += minimumDaysForPhase(current);
+    current = nextPhaseInOrder(current);
+    if (!current) break;
+  }
+  return total;
+}
+
+function getRhythmGapMode(args: {
+  previousEntries: CheckInEntry[];
+  refISO: string;
+  cycleLen?: number;
+  allowContradictoryEvidence?: boolean;
+}): RhythmGapMode {
+  const latest = latestLoggedDate(args.previousEntries);
+  if (!latest) return 'continuity';
+  const gapDays = daysBetween(latest, args.refISO);
+  const staleThreshold = Math.max(42, Math.round((args.cycleLen || 28) * 1.5));
+  if (args.allowContradictoryEvidence && gapDays >= 21) return 'stale';
+  if (gapDays >= staleThreshold) return 'stale';
+  if (gapDays >= 8) return 'catchup';
+  return 'continuity';
+}
+
 function isStaleRecoveryWindow(entries: CheckInEntry[], refISO: string, cycleLen?: number): boolean {
   const latest = latestLoggedDate(entries);
   if (!latest) return false;
@@ -250,8 +298,10 @@ function buildPhaseState(args: {
   detectedSource: string;
   daysLogged: number;
   refISO: string;
+  gapMode?: RhythmGapMode;
+  gapDays?: number;
 }): RhythmPhaseState {
-  const { previousState, previousConfirmed, proposedPhase, detectedSource, daysLogged, refISO } = args;
+  const { previousState, previousConfirmed, proposedPhase, detectedSource, daysLogged, refISO, gapMode = 'continuity', gapDays = 0 } = args;
   const hasConfirmedHistory = Boolean(previousConfirmed || getCurrentPhaseEntry());
   const hasAnchor = detectedSource === 'override' || detectedSource === 'bleed';
   const phaseConfidence = derivePhaseConfidence({ daysLogged, hasAnchor, hasConfirmedHistory });
@@ -279,6 +329,8 @@ function buildPhaseState(args: {
     candidateConfirmedSince: preserveCandidate ? previousState?.candidateConfirmedSince ?? null : null,
     phaseConfidence,
     historyLockLevel,
+    gapMode,
+    gapDays,
     updatedAt: refISO,
   };
 }
@@ -343,9 +395,11 @@ function validatePhaseTransition(args: {
   previousPhase: string | null;
   proposedPhase: string | null;
   refISO: string;
+  gapMode?: RhythmGapMode;
+  gapDays?: number;
   allowRecoveryReset?: boolean;
 }) {
-  const { previousPhase, proposedPhase, allowRecoveryReset } = args;
+  const { previousPhase, proposedPhase, allowRecoveryReset, gapMode = 'continuity', gapDays = 0 } = args;
   if (!proposedPhase) {
     return { acceptedPhase: previousPhase, changed: false, reason: 'no_proposed_phase' };
   }
@@ -356,7 +410,7 @@ function validatePhaseTransition(args: {
     return { acceptedPhase: previousPhase, changed: false, reason: 'same_phase' };
   }
 
-  if (allowRecoveryReset) {
+  if (allowRecoveryReset || gapMode === 'stale') {
     return { acceptedPhase: proposedPhase, changed: previousPhase !== proposedPhase, reason: 'stale_recovery_recalculation' };
   }
 
@@ -364,16 +418,34 @@ function validatePhaseTransition(args: {
     return { acceptedPhase: proposedPhase, changed: true, reason: 'explicit_reset' };
   }
 
-  const elapsed = getPhaseElapsedDays(args.refISO) ?? 0;
-  if (!isNextForwardPhase(previousPhase, proposedPhase)) {
+  const forwardDistance = phaseDistanceForward(previousPhase, proposedPhase);
+  if (forwardDistance <= 0) {
     return { acceptedPhase: previousPhase, changed: false, reason: 'blocked_non_forward_transition' };
   }
 
-  if (elapsed > 0 && elapsed < minimumDaysForPhase(previousPhase)) {
-    return { acceptedPhase: previousPhase, changed: false, reason: 'blocked_minimum_phase_days' };
+  const elapsed = getPhaseElapsedDays(args.refISO) ?? 0;
+  const availableDays = Math.max(elapsed, gapDays);
+
+  if (gapMode === 'continuity') {
+    if (!isNextForwardPhase(previousPhase, proposedPhase)) {
+      return { acceptedPhase: previousPhase, changed: false, reason: 'blocked_non_forward_transition' };
+    }
+    if (availableDays > 0 && availableDays < minimumDaysForPhase(previousPhase)) {
+      return { acceptedPhase: previousPhase, changed: false, reason: 'blocked_minimum_phase_days' };
+    }
+    return { acceptedPhase: proposedPhase, changed: true, reason: 'forward_transition' };
   }
 
-  return { acceptedPhase: proposedPhase, changed: true, reason: 'forward_transition' };
+  const minimumForwardDays = minimumForwardDaysBetweenPhases(previousPhase, proposedPhase);
+  if (minimumForwardDays > availableDays) {
+    return { acceptedPhase: previousPhase, changed: false, reason: 'blocked_catchup_plausibility' };
+  }
+
+  return {
+    acceptedPhase: proposedPhase,
+    changed: true,
+    reason: forwardDistance > 1 ? 'catchup_forward_transition' : 'forward_transition',
+  };
 }
 
 export function applyPhaseChangeForEntries(args: {
@@ -388,15 +460,21 @@ export function applyPhaseChangeForEntries(args: {
   const previousState = getRhythmPhaseState();
   const previousConfirmed = getConfirmedPreviousPhase(args.previousEntries, args.userData, refISO);
   const daysLogged = countDistinctLoggedDays(args.nextEntries);
-  const staleRecoveryMode = isStaleRecoveryWindow(args.nextEntries, refISO, rhythmModel.cycleLen);
+  const previousLatest = latestLoggedDate(args.previousEntries);
+  const gapDays = previousLatest ? daysBetween(previousLatest, refISO) : 0;
+  const contradictoryEvidence = Boolean(previousConfirmed && proposedPhase && proposedPhase !== previousConfirmed && !isAdjacentPhase(previousConfirmed, proposedPhase));
+  const gapMode = getRhythmGapMode({ previousEntries: args.previousEntries, refISO, cycleLen: rhythmModel.cycleLen, allowContradictoryEvidence: contradictoryEvidence });
+  const staleRecoveryMode = gapMode === 'stale';
 
   const nextState = buildPhaseState({
     previousState,
     previousConfirmed,
     proposedPhase,
-    detectedSource: staleRecoveryMode ? 'inferred' : rhythmModel.source,
+    detectedSource: gapMode === 'continuity' ? rhythmModel.source : 'inferred',
     daysLogged,
     refISO,
+    gapMode,
+    gapDays,
   });
 
   let validation: {
@@ -521,6 +599,8 @@ export function applyPhaseChangeForEntries(args: {
     currentPhase,
     proposedPhase,
     transitionReason: validation.reason,
+    gapMode,
+    gapDays,
     staleRecoveryMode,
     estimatedPhase: nextState.estimatedPhase,
     confirmedPhase: nextState.confirmedPhase,

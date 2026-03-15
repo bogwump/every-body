@@ -18,6 +18,7 @@ import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
 import { importBackupFile, parseBackupJson, looksLikeInsightsExport } from '../lib/backup';
 import { getHighestPriorityMoment } from '../lib/companionMoments';
+import { getRhythmPhaseState } from '../lib/phaseChange';
 import { generateMoments } from '../lib/generateMoments';
 import { CompanionMomentCard } from './CompanionMomentCard';
 
@@ -229,6 +230,7 @@ export function Dashboard({
   }, [userData.cycleTrackingMode, todayISO, entriesSorted]);
 
   const [momentRefresh, setMomentRefresh] = useState(0);
+  const rhythmPhaseState = useMemo(() => getRhythmPhaseState(), [entriesSorted.length, todayISO]);
   const highestMoment = useMemo(() => getHighestPriorityMoment(todayISO), [todayISO, entriesSorted.length, momentRefresh]);
 
   React.useEffect(() => {
@@ -507,6 +509,11 @@ export function Dashboard({
               <div className="mt-1 text-lg font-semibold text-black">{heroModel.rhythmHeadline}</div>
             ) : null}
             <div className="mt-2 text-sm text-[rgba(0,0,0,0.65)]">{heroModel.rhythmBody}</div>
+            {rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'stale' ? (
+              <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Estimated current phase after a longer gap in logging.</div>
+            ) : rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'catchup' ? (
+              <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Rhythm has caught up after a gap in logging.</div>
+            ) : null}
           </div>
 
           {/* How you've been */}

@@ -7,7 +7,8 @@ import { generateExperimentSuggestions, getExperimentForSignal, rankExperimentSu
 import { detectLongCycle, detectShortCycle, detectUnusualPhaseLength } from './rhythmDiagnostics';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
 import { getExperimentSuggestionSuppression, getWeeklyReflectionMoment, shouldSuppressCompanionMoment } from './companionLogic';
-import { getConfidencePhrase } from './confidenceCopy';
+import { downgradeConfidence, getConfidencePhrase } from './confidenceCopy';
+import { getSymptomCoverage } from './symptomCoverage';
 import { phaseLabelFromKey } from './phaseChange';
 import { getResurfacingPatternMoment } from './patternIntelligence';
 
@@ -25,17 +26,19 @@ function readExperimentHistory(): any[] {
   }
 }
 
-function patternCopy(signal: InsightSignal): { title: string; body: string } {
+function patternCopy(signal: InsightSignal, userData?: UserData): { title: string; body: string } {
+  const penalty = userData ? getSymptomCoverage(userData).confidencePenaltySteps : 0;
+  const adjusted = downgradeConfidence(signal.confidence as any, penalty);
   const metric = String(signal.metrics?.[0] ?? 'This pattern');
   const niceMetric = metric.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
   if (signal.id.includes('sleep_before_bleed')) {
-    return { title: `Sleep ${getConfidencePhrase('high')} dip before your bleed`, body: 'Insights has picked up a repeat pattern around sleep that looks worth keeping an eye on.' };
+    return { title: `Sleep ${getConfidencePhrase(adjusted)} dip before your bleed`, body: 'Insights has picked up a repeat pattern around sleep that looks worth keeping an eye on.' };
   }
   if (signal.type === 'metric_pair') {
     return { title: `${niceMetric} is showing a clearer pattern`, body: 'Insights has noticed a stronger link between a couple of your recent signals.' };
   }
   if (signal.type === 'phase_shift') {
-    return { title: `${niceMetric} ${getConfidencePhrase('high')} shift with this part of your cycle`, body: 'This has started looking repeatable enough to feel worth noticing.' };
+    return { title: `${niceMetric} ${getConfidencePhrase(adjusted)} shift with this part of your cycle`, body: 'This has started looking repeatable enough to feel worth noticing.' };
   }
   return { title: `${niceMetric} has started standing out`, body: 'Insights has picked up a pattern that looks more repeatable now.' };
 }
@@ -101,7 +104,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
   if (latestDiscovery && latestDiscovery.firstDetected >= refISO && !hasMomentWithId(`pattern:${latestDiscovery.id}:${latestDiscovery.firstDetected}`) && !shouldSuppressCompanionMoment({ type: 'new_pattern', refISO, cooldownDays: 6, dismissalCooldownDays: 12, signalId: latestDiscovery.id })) {
     const signal = getTopInsights(entries, userData, 8).find((item) => item.id === latestDiscovery.id);
     if (signal) {
-      const copy = patternCopy(signal);
+      const copy = patternCopy(signal, userData);
       createMoment({
         id: `pattern:${latestDiscovery.id}:${latestDiscovery.firstDetected}`,
         type: 'new_pattern',
@@ -111,6 +114,7 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
           metric: signal.metrics?.[0] ?? null,
           title: copy.title,
           body: copy.body,
+          confidence: downgradeConfidence(signal.confidence as any, getSymptomCoverage(userData).confidencePenaltySteps),
         },
       });
       return;

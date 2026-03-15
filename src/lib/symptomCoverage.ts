@@ -6,6 +6,7 @@ export type SymptomCoverage = {
   tier: SymptomCoverageTier;
   label: string;
   activeCount: number;
+  confidencePenaltySteps: number;
   hasCycleAnchor: boolean;
   hasRecoveryAnchor: boolean;
   hasMindAnchor: boolean;
@@ -17,6 +18,17 @@ export type SymptomCoverage = {
 const RECOVERY_ANCHORS = new Set(['sleep', 'energy']);
 const MIND_ANCHORS = new Set(['mood', 'brainFog', 'stress', 'focus']);
 const BODY_ANCHORS = new Set(['pain', 'nightSweats', 'hairShedding', 'headache', 'cramps', 'hotFlushes', 'bloating']);
+
+export function getCoveragePenaltySteps(coverage: Pick<SymptomCoverage, 'tier' | 'hasCycleAnchor' | 'hasRecoveryAnchor' | 'hasMindAnchor' | 'hasBodyAnchor'>): number {
+  if (coverage.tier === 'logging_only') return 2;
+  let penalty = 0;
+  if (coverage.tier === 'basic_patterns') penalty += 1;
+  if (!coverage.hasRecoveryAnchor) penalty += 1;
+  if (!coverage.hasMindAnchor) penalty += 1;
+  if (!coverage.hasBodyAnchor) penalty += 1;
+  if (!coverage.hasCycleAnchor) penalty += 1;
+  return Math.min(2, penalty);
+}
 
 export function getSymptomCoverage(userData: UserData): SymptomCoverage {
   const enabled = Array.isArray(userData?.enabledModules) ? userData.enabledModules : [];
@@ -45,10 +57,13 @@ export function getSymptomCoverage(userData: UserData): SymptomCoverage {
     ? 'You can still spot simple trends, but broader patterns may be less reliable.'
     : 'You can still log, but pattern detection will be less reliable with fewer active signals.';
 
+  const confidencePenaltySteps = getCoveragePenaltySteps({ tier, hasCycleAnchor, hasRecoveryAnchor, hasMindAnchor, hasBodyAnchor });
+
   return {
     tier,
     label,
     activeCount,
+    confidencePenaltySteps,
     hasCycleAnchor,
     hasRecoveryAnchor,
     hasMindAnchor,

@@ -564,6 +564,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
   const nextPhasePlanning = getNextPhasePlanningCopy(computed.nextPhaseKey);
   const softMeta = softPhaseMeta(phaseKey);
 
+  const rhythmStatusNote = useMemo(() => {
+    const gapMode = (computed.phaseState as any)?.gapMode as string | undefined;
+    if (gapMode === 'stale') return 'Rhythm was refreshed after a longer logging gap. A few more check-ins will help firm this up again.';
+    if (gapMode === 'catchup') return 'Rhythm has caught up after a gap in logging, so this phase is inferred from elapsed time and recent anchors.';
+    if (computed.phaseState?.historyLockLevel !== 'confirmed') return 'This is an estimated phase for now. A few more check-ins will help it settle.';
+    return null;
+  }, [computed.phaseState]);
+
   function IconBadge({ icon }: { icon: React.ReactNode }) {
     return (
       <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
@@ -610,6 +618,12 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
           phaseStatusLabel={computed.phaseState?.historyLockLevel === 'confirmed' ? 'Confirmed phase' : 'Estimated phase'}
           phaseIcon={phaseIcon}
         />
+
+        {rhythmStatusNote ? (
+          <div className="eb-card p-5">
+            <p className="text-sm text-[rgb(var(--color-text-secondary))]">{rhythmStatusNote}</p>
+          </div>
+        ) : null}
 
         {/* It grows with you (reassurance) */}
         <div className="eb-card p-6 sm:p-8">
