@@ -1005,7 +1005,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
             <button
               type="button"
               onClick={() => onNavigate('calendar')}
-              className="eb-btn-secondary inline-flex items-center gap-2"
+              className="eb-btn eb-btn-secondary"
               title="Open calendar"
             >
               <Calendar className="w-4 h-4" />
@@ -1102,7 +1102,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
             {experimentStatus.ex.metrics?.length ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {experimentStatus.ex.metrics.slice(0, 6).map((k) => (
-                  <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                  <span key={String(k)} className="eb-chip-meta">
                     {labelForMetric(k)}
                   </span>
                 ))}
@@ -1111,7 +1111,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
             {!experimentStatus.done ? (
               <>
-                <div className="mt-3 rounded-2xl border border-black/8 bg-white p-4 text-sm">
+                <div className="mt-3 eb-inset-soft rounded-2xl p-4 text-sm">
                   <div className="font-medium">What you are trying</div>
                   <div className="mt-1 text-[rgb(var(--color-text-secondary))]">{experimentTemplateMeta.actionLabel}</div>
                   <div className="mt-2 text-[rgb(var(--color-text-secondary))]">{experimentTemplateMeta.explanation}</div>
@@ -1151,7 +1151,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
             </div>
             <button
               type="button"
-              className="shrink-0 inline-flex items-center gap-2 rounded-full border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-accent)/0.16)] px-3 py-2 text-sm font-medium text-[rgb(var(--color-primary-dark))]"
+              className="eb-btn-tertiary shrink-0"
               onClick={() => setCustomiseOpen((prev) => !prev)}
               aria-expanded={customiseOpen}
             >
@@ -1280,8 +1280,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                   />
 
                   {key === 'sleep' && userData.sleepDetailsEnabled ? (
-                    <details className="mt-3 rounded-2xl border border-[rgb(var(--color-primary)/0.14)] bg-[rgb(var(--color-primary-light)/0.14)] overflow-hidden group">
-                      <summary className="list-none cursor-pointer select-none px-4 py-3 flex items-center justify-between">
+                    <details className="eb-disclosure mt-3 group eb-inset-callout">
+                      <summary>
                         <span className="text-sm font-medium">Sleep details</span>
                         <ChevronRight className="w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />
                       </summary>
@@ -1463,7 +1463,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                   />
 
                   {item.key === 'exercise' && Boolean(eventsState.exercise) ? (
-                    <div className="mt-2 ml-1 rounded-2xl border border-neutral-200 bg-white p-3">
+                    <div className="mt-2 ml-1 eb-inset-soft rounded-2xl p-3">
                       <div className="text-sm font-medium mb-2">How did it feel?</div>
                       <div className="flex flex-wrap gap-2">
                         {(
@@ -1479,11 +1479,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                               key={opt.k}
                               type="button"
                               onClick={() => setExerciseIntensity(opt.k)}
-                              className={
-                                active
-                                  ? 'eb-btn eb-btn-primary !py-2 !px-3 text-sm'
-                                  : 'eb-btn eb-btn-secondary !py-2 !px-3 text-sm'
-                              }
+                              className={active ? 'eb-choice-pill' : 'eb-choice-pill'}
+                              data-selected={active ? 'true' : undefined}
                             >
                               {opt.label}
                             </button>

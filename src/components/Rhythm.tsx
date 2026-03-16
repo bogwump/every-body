@@ -787,9 +787,9 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         </div>
 
         {/* Why this happens */}
-        <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
-          <details>
-            <summary className="cursor-pointer font-medium text-neutral-900">
+        <div className="eb-inset-callout rounded-2xl p-6">
+          <details className="eb-disclosure mt-0 bg-transparent border-0 shadow-none">
+            <summary className="font-medium text-neutral-900 px-0 py-0">
               <span className="inline-flex items-center gap-3">
                 <span className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
                   <span className="text-[rgb(var(--color-primary))]"><Info className="w-5 h-5" /></span>

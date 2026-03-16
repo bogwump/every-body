@@ -3210,7 +3210,7 @@ const tryNextPrompts = useMemo(() => {
     const started = Boolean(ex.startDateISO && ex.startDateISO <= todayISO);
 
     const metricPills = (ex.metrics ?? []).slice(0, 6).map((k) => (
-      <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+      <span key={String(k)} className="eb-chip-meta">
         {labelFor(k as any, userData)}
       </span>
     ));
@@ -3230,7 +3230,7 @@ const tryNextPrompts = useMemo(() => {
                   : `Starts ${fmtDateUi(ex.startDateISO, false)}`}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">{metricPills}</div>
-            <div className="mt-3 rounded-2xl border border-black/8 bg-white p-4 text-sm">
+            <div className="mt-3 eb-inset-soft rounded-2xl p-4 text-sm">
               <div className="font-medium">What you are trying</div>
               <div className="mt-1 eb-muted">{experimentTemplateMeta.actionLabel}</div>
               <div className="mt-2 eb-muted">{experimentTemplateMeta.explanation}</div>
@@ -3270,12 +3270,12 @@ const tryNextPrompts = useMemo(() => {
             <div className="mt-4">
               <div className="text-sm font-semibold">How it went</div>
               <div className="mt-2 flex flex-wrap gap-2">
-                <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>{savedOutcomeLabel}</span>
+                <span className="eb-chip-meta">{savedOutcomeLabel}</span>
               </div>
               {savedOutcomeNote ? (
                 <>
                   <div className="mt-3 text-sm eb-muted">Saved note:</div>
-                  <div className="mt-2 rounded-2xl border border-black/8 bg-white p-4 text-sm whitespace-pre-wrap">
+                  <div className="mt-2 eb-inset-soft rounded-2xl p-4 text-sm whitespace-pre-wrap">
                     {savedOutcomeNote}
                   </div>
                 </>
@@ -3399,8 +3399,8 @@ const tryNextPrompts = useMemo(() => {
             type="button"
             className={
               experimentCompareMode === 'quick'
-                ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
-                : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/60 hover:bg-white'
+                ? 'eb-chip-filter eb-chip-filter-active'
+                : 'eb-chip-filter'
             }
             onClick={() => setExperimentCompareMode('quick')}
           >
@@ -3411,10 +3411,10 @@ const tryNextPrompts = useMemo(() => {
             className={
               hasUsual
                 ? (experimentCompareMode === 'usual'
-                    ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
-                    : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white'
+                    ? 'eb-chip-filter eb-chip-filter-active'
+                    : 'eb-chip-filter'
                   )
-                : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/40 opacity-60 cursor-not-allowed'
+                : 'eb-chip-filter opacity-60 cursor-not-allowed'
             }
             onClick={() => {
               if (hasUsual) setExperimentCompareMode('usual');
@@ -3458,8 +3458,8 @@ const tryNextPrompts = useMemo(() => {
             type="button"
             className={
               experimentCompareMode === 'quick'
-                ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
-                : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/60 hover:bg-white'
+                ? 'eb-chip-filter eb-chip-filter-active'
+                : 'eb-chip-filter'
             }
             onClick={() => setExperimentCompareMode('quick')}
           >
@@ -3470,10 +3470,10 @@ const tryNextPrompts = useMemo(() => {
             className={
               hasUsual
                 ? (experimentCompareMode === 'usual'
-                    ? 'px-3 py-1 rounded-full text-xs font-medium border border-black/10 bg-white'
-                    : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white'
+                    ? 'eb-chip-filter eb-chip-filter-active'
+                    : 'eb-chip-filter'
                   )
-                : 'px-3 py-1 rounded-full text-xs border border-black/10 bg-white/40 opacity-60 cursor-not-allowed'
+                : 'eb-chip-filter opacity-60 cursor-not-allowed'
             }
             onClick={() => {
               if (hasUsual) setExperimentCompareMode('usual');
@@ -3497,7 +3497,7 @@ const tryNextPrompts = useMemo(() => {
             const beforeValue = typeof m.before.avg === 'number' ? Math.max(0, Math.min(10, m.before.avg)) : null;
             const duringValue = typeof m.during.avg === 'number' ? Math.max(0, Math.min(10, m.during.avg)) : null;
             return (
-            <div key={String(m.key)} className="rounded-2xl border border-black/5 bg-white p-4">
+            <div key={String(m.key)} className="eb-inset-soft rounded-2xl p-4">
               <div className="text-sm font-semibold">{labelFor(m.key as any, userData)}</div>
               {hasComparableData ? (
                 <>
@@ -3648,7 +3648,7 @@ const tryNextPrompts = useMemo(() => {
     return (
       <button
         type="button"
-        className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2"
+        className="eb-btn eb-btn-primary"
         onClick={() => openExperiment(ms)}
         title="Turn this finding into a tiny 3-day test"
       >
@@ -3792,8 +3792,8 @@ const tryNextPrompts = useMemo(() => {
                   <div className="mt-2 text-sm eb-muted">{supportingLine}</div>
                   {p.contextLine ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
                   <div className="flex-1" />
-                  <details className="mt-3 rounded-2xl border border-neutral-200 bg-white/60 px-3 py-2">
-                    <summary className="cursor-pointer text-sm font-medium">Why am I seeing this?</summary>
+                  <details className="eb-disclosure mt-3">
+                    <summary>Why am I seeing this?</summary>
                     <div className="mt-2 text-sm eb-muted space-y-1">
                       {(p.why ?? []).map((w, i) => (
                         <div key={i}>{w}</div>
@@ -3809,28 +3809,30 @@ const tryNextPrompts = useMemo(() => {
 
                     if (shouldAsk) {
                       return (
-                        <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
+                        <div className="mt-4 eb-inset-soft rounded-2xl px-4 py-4">
                           {!contradictionOpen ? (
                             <>
                               <div className="text-sm font-medium">Does this match your experience?</div>
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="mt-3 eb-choice-group">
                                 <button
                                   type="button"
-                                  className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-dark)/0.18)] bg-[rgb(var(--color-primary-dark))] text-white text-sm font-medium hover:opacity-95 transition-all"
+                                  className="eb-choice-pill"
+                                  data-selected="true"
                                   onClick={() => handlePatternFeedback('yes', p)}
                                 >
                                   Yes
                                 </button>
                                 <button
                                   type="button"
-                                  className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-light)/0.55)] bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-primary-dark))] text-sm font-medium hover:opacity-95 transition-all"
+                                  className="eb-choice-pill"
+                                  data-tone="soft"
                                   onClick={() => openContradictionPrompt(p)}
                                 >
                                   No
                                 </button>
                                 <button
                                   type="button"
-                                  className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                  className="eb-choice-pill"
                                   onClick={() => handlePatternFeedback('unsure', p)}
                                 >
                                   Not sure
@@ -3846,7 +3848,7 @@ const tryNextPrompts = useMemo(() => {
                                   <button
                                     key={option.key}
                                     type="button"
-                                    className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                    className="eb-choice-pill"
                                     onClick={() => submitContradictionFeedback(option.key)}
                                   >
                                     {option.label}
@@ -3873,7 +3875,7 @@ const tryNextPrompts = useMemo(() => {
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                              className="eb-choice-pill"
                               onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                             >
                               Undo
@@ -3881,7 +3883,7 @@ const tryNextPrompts = useMemo(() => {
                             {showReassess ? (
                               <button
                                 type="button"
-                                className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                className="eb-choice-pill"
                                 onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                               >
                                 Reassess
@@ -3899,7 +3901,7 @@ const tryNextPrompts = useMemo(() => {
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                              className="eb-choice-pill"
                               onClick={() => { restorePattern(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                             >
                               Undo
@@ -3907,7 +3909,7 @@ const tryNextPrompts = useMemo(() => {
                             {showReassess ? (
                               <button
                                 type="button"
-                                className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                className="eb-choice-pill"
                                 onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                               >
                                 Reassess
@@ -3925,7 +3927,7 @@ const tryNextPrompts = useMemo(() => {
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                              className="eb-choice-pill"
                               onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                             >
                               Change response
@@ -4077,7 +4079,7 @@ const tryNextPrompts = useMemo(() => {
                   (experimentMetrics.length ? experimentMetrics : selected)
                     .slice(0, 6)
                     .map((k) => (
-                      <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                      <span key={String(k)} className="eb-chip-meta">
                         {labelFor(k as any, userData)}
                       </span>
                     ))
@@ -4444,12 +4446,12 @@ const tryNextPrompts = useMemo(() => {
                                 <div className="text-sm font-semibold">{item?.title || 'Past experiment'}</div>
                                 <div className="mt-1 text-sm eb-muted">Completed {completedDate}</div>
                               </div>
-                              <span className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>{outcomeLabel}</span>
+                              <span className="eb-chip-meta">{outcomeLabel}</span>
                             </div>
 
                             <div className="mt-3 flex flex-wrap gap-2">
                               {metrics.map((k: any) => (
-                                <span key={String(k)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                                <span key={String(k)} className="eb-chip-meta">
                                   {labelFor(k as any, userData)}
                                 </span>
                               ))}
@@ -4567,7 +4569,7 @@ const tryNextPrompts = useMemo(() => {
                               </div>
                               <div className="flex-1" />
                               <div className="mt-4 flex items-center justify-end gap-3">
-                                <button type="button" className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2" onClick={() => openTryNextPrompt(p as any)}>
+                                <button type="button" className="eb-btn eb-btn-primary" onClick={() => openTryNextPrompt(p as any)}>
                                   <FlaskConical className="w-4 h-4" />
                                   Set up {p.durationDays || 3}-day experiment
                                 </button>
@@ -4611,7 +4613,7 @@ const tryNextPrompts = useMemo(() => {
                                 </div>
                                 <div className="flex-1" />
                                 <div className="mt-4 flex justify-end">
-                                  <button type="button" className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2" onClick={() => openExperiment(s.metrics)}>
+                                  <button type="button" className="eb-btn eb-btn-primary" onClick={() => openExperiment(s.metrics)}>
                                     <FlaskConical className="w-4 h-4" />
                                     Try a 3-day experiment
                                   </button>

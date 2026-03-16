@@ -113,8 +113,8 @@ export function History({ onNavigate }: HistoryProps) {
                 className={[
                   'px-4 py-2 rounded-full text-sm font-medium transition-colors border',
                   active
-                    ? 'bg-white/20 text-white border-white/25 shadow-[0_8px_20px_rgba(31,41,55,0.08)]'
-                    : 'bg-white/8 text-white/85 border-white/18 hover:bg-white/12 hover:text-white'
+                    ? 'eb-chip-filter eb-chip-filter-active !border-white/20 !bg-white/20 !text-white !shadow-[0_8px_20px_rgba(31,41,55,0.08)]'
+                    : 'eb-chip-filter !border-white/20 !bg-white/10 !text-white/85 hover:!bg-white/14 hover:!text-white'
                 ].join(' ')}
               >
                 {item.label}
@@ -162,7 +162,7 @@ export function History({ onNavigate }: HistoryProps) {
                             <p className="mt-2 text-sm text-[rgb(var(--color-text))]">{event.description}</p>
                             {(event.evidence || (event.signals && event.signals.length) || confidence) ? (
                               <details className="eb-collapsible">
-                                <summary className="flex items-center justify-between gap-3">
+                                <summary>
                                   <span>Why this is here</span>
                                   <ChevronDown className="w-4 h-4 text-[rgb(var(--color-text-secondary))]" />
                                 </summary>
