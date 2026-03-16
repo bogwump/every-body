@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload, History as HistoryIcon, Settings2, Droplets, FlaskConical } from 'lucide-react';
+import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload, History as HistoryIcon, Settings2, Droplets, FlaskConical, Star } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -252,7 +252,7 @@ function buildGuideCard(options: {
     cta: { label: 'Open History', action: 'navigate', screen: 'history' },
     priority: 4,
     contextual: true,
-    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    icon: <Star className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
   }, options.hasHistory);
 
   addCard({
@@ -261,7 +261,7 @@ function buildGuideCard(options: {
     body: 'A few more check-ins will help this start turning into personalised guidance.',
     cta: { label: 'Keep going', action: 'check-in' },
     priority: 5,
-    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    icon: <Star className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
   }, inFirstDays);
 
   addCard({
@@ -270,7 +270,7 @@ function buildGuideCard(options: {
     body: 'You have enough check-ins now for early patterns to feel a little more trustworthy.',
     cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
     priority: 6,
-    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    icon: <Star className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
   }, inFirstWeekShape);
 
   addCard({
@@ -279,7 +279,7 @@ function buildGuideCard(options: {
     body: 'Patterns are repeating a bit more now, so the app can be calmer and more specific.',
     cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
     priority: 7,
-    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    icon: <Star className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
   }, settlingStage);
 
   addCard({
@@ -288,7 +288,7 @@ function buildGuideCard(options: {
     body: 'With more check-ins in place, the app can start making steadier sense of what tends to shift together.',
     cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
     priority: 8,
-    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    icon: <Star className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
   }, easierReadStage);
 
   addCard({
@@ -297,7 +297,7 @@ function buildGuideCard(options: {
     body: 'With a stronger baseline in place, small changes and experiments should be easier to interpret.',
     cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
     priority: 9,
-    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    icon: <Star className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
   }, baselineStage);
 
   addCard({
@@ -335,7 +335,7 @@ function buildGuideCard(options: {
     body: 'Short, regular check-ins help the app learn your rhythm. It does not have to be perfect to be useful.',
     cta: { label: 'Open check-in', action: 'check-in' },
     priority: 12,
-    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    icon: <Star className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
   }, quickCheckinStage);
 
   addCard({
@@ -344,7 +344,7 @@ function buildGuideCard(options: {
     body: 'You may notice early reflections quickly, but stronger patterns usually build over a few weeks of check-ins. There’s no need to get everything perfect.',
     cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
     priority: 13,
-    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+    icon: <Star className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
   }, patternsTakeTimeStage);
 
   const eligible = cards.filter((card) => {
