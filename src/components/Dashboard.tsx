@@ -195,149 +195,157 @@ function buildGuideCard(options: {
   cycleOptionalRelevant: boolean;
   experimentRelevant: boolean;
 }): GuideCardModel | null {
-  const earlyUser = options.daysSinceStart <= 30 || options.daysTracked < 25;
   const memory = readGuideMemory();
   const cooldownDays = 2;
+  const { daysTracked, daysSinceStart } = options;
 
   const cards: GuideCardModel[] = [];
 
-  if (options.hasRecentGap) {
-    cards.push({
-      id: 'missed-day',
-      title: 'Missed a day?',
-      body: 'That’s completely fine. You can tap any day in Calendar and fill it in later.',
-      cta: { label: 'Open Calendar', action: 'navigate', screen: 'calendar' },
-      priority: 1,
-      contextual: true,
-      icon: <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-    });
-  }
+  const addCard = (card: GuideCardModel, condition = true) => {
+    if (condition) cards.push(card);
+  };
 
-  if (options.lowCoverage) {
-    cards.push({
-      id: 'low-coverage',
-      title: 'Track what matters to you',
-      body: 'You can keep things simple or add more symptoms over time. A few active signals across mood, body, recovery and cycle usually helps patterns come through more clearly.',
-      cta: { label: 'Customise symptoms', action: 'navigate', screen: 'profile' },
-      priority: 2,
-      contextual: true,
-      icon: <Settings2 className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-    });
-  }
+  const inFirstDays = daysSinceStart <= 7 || daysTracked < 5;
+  const inFirstWeekShape = daysTracked >= 5 && daysTracked <= 8 && daysSinceStart <= 10;
+  const settlingStage = daysTracked >= 8 && daysTracked <= 14 && daysSinceStart <= 18;
+  const easierReadStage = daysTracked >= 12 && daysTracked <= 20 && daysSinceStart <= 28;
+  const baselineStage = daysTracked >= 16 && daysTracked <= 28 && daysSinceStart <= 35;
+  const growthStage = daysTracked >= 3 && daysTracked < 14 && daysSinceStart <= 21;
+  const spottingStage = daysTracked >= 2 && daysTracked <= 8 && daysSinceStart <= 12;
+  const quickCheckinStage = daysTracked < 7 && daysSinceStart <= 10;
+  const patternsTakeTimeStage = daysTracked >= 4 && daysTracked < 12 && daysSinceStart <= 21;
 
-  if (options.cycleOptionalRelevant) {
-    cards.push({
-      id: 'cycle-optional',
-      title: 'Cycle insights are there when you want them',
-      body: 'If you log bleeding or spotting, the app can estimate phases and show how symptoms shift across the month. You can still track without it.',
-      cta: { label: 'Edit cycle', action: 'navigate', screen: 'calendar' },
-      priority: 3,
-      contextual: true,
-      icon: <Droplets className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-    });
-  }
+  addCard({
+    id: 'missed-day',
+    title: 'Missed a day?',
+    body: 'That’s completely fine. You can tap any day in Calendar and fill it in later.',
+    cta: { label: 'Open Calendar', action: 'navigate', screen: 'calendar' },
+    priority: 1,
+    contextual: true,
+    icon: <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, options.hasRecentGap);
 
-  if (options.hasHistory) {
-    cards.push({
-      id: 'history-saved',
-      title: 'Want to see what’s saved?',
-      body: 'Your past companion moments and milestones are kept in History, so you can look back without losing the story.',
-      cta: { label: 'Open History', action: 'navigate', screen: 'history' },
-      priority: 4,
-      contextual: true,
-      icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-    });
-  }
+  addCard({
+    id: 'low-coverage',
+    title: 'Track what matters to you',
+    body: 'You can keep things simple or add more symptoms over time. A few active signals across mood, body, recovery and cycle usually helps patterns come through more clearly.',
+    cta: { label: 'Customise symptoms', action: 'navigate', screen: 'profile' },
+    priority: 2,
+    contextual: true,
+    icon: <Settings2 className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, options.lowCoverage);
 
-  if (earlyUser) {
-    cards.push(
-      {
-        id: 'building-rhythm',
-        title: 'You’re building your rhythm',
-        body: 'A few more check-ins will help this start turning into personalised guidance.',
-        cta: { label: 'Keep going', action: 'check-in' },
-        priority: 5,
-        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-      {
-        id: 'first-week-taking-shape',
-        title: 'Your first week is taking shape',
-        body: 'You have enough check-ins now for early patterns to feel a little more trustworthy.',
-        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 6,
-        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-      {
-        id: 'patterns-starting-to-settle',
-        title: 'Your patterns are starting to settle',
-        body: 'Patterns are repeating a bit more now, so the app can be calmer and more specific.',
-        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 7,
-        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-      {
-        id: 'rhythm-getting-easier',
-        title: 'Your rhythm is getting easier to read',
-        body: 'With more check-ins in place, the app can start making steadier sense of what tends to shift together.',
-        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 8,
-        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-      {
-        id: 'stronger-baseline',
-        title: 'You have built a stronger baseline',
-        body: 'With a stronger baseline in place, small changes and experiments should be easier to interpret.',
-        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 9,
-        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-      {
-        id: 'it-grows',
-        title: 'It grows with you',
-        body: 'This space gets smarter as you use it. You’ll see helpful reflections from day one, but clearer patterns usually take a little time. Keep logging, and we’ll build your rhythm together.',
-        supporting: 'Early patterns are starting to show. This will get clearer with a little more time.',
-        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 10,
-        icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-      {
-        id: 'spotting-patterns',
-        title: 'Start spotting patterns',
-        body: 'Log a few more days and the app will begin showing more meaningful links between symptoms. Small patterns often start softly, then get clearer over time.',
-        cta: { label: 'Open check-in', action: 'check-in' },
-        priority: 11,
-        icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-      {
-        id: 'quick-checkin',
-        title: 'A quick check-in goes a long way',
-        body: 'Short, regular check-ins help the app learn your rhythm. It does not have to be perfect to be useful.',
-        cta: { label: 'Open check-in', action: 'check-in' },
-        priority: 12,
-        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-      {
-        id: 'patterns-take-time',
-        title: 'Patterns take a little time',
-        body: 'You may notice early reflections quickly, but stronger patterns usually build over a few weeks of check-ins. There’s no need to get everything perfect.',
-        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 13,
-        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-      },
-    );
-  }
+  addCard({
+    id: 'cycle-optional',
+    title: 'Cycle insights are there when you want them',
+    body: 'If you log bleeding or spotting, the app can estimate phases and show how symptoms shift across the month. You can still track without it.',
+    cta: { label: 'Edit cycle', action: 'navigate', screen: 'calendar' },
+    priority: 3,
+    contextual: true,
+    icon: <Droplets className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, options.cycleOptionalRelevant);
 
-  if (options.experimentRelevant) {
-    cards.push({
-      id: 'small-experiments',
-      title: 'Keep experiments small',
-      body: 'If you want to test what helps, small changes are easier to notice and easier to compare over time.',
-      cta: { label: 'View experiments', action: 'navigate', screen: 'insights' },
-      priority: 10,
-      contextual: true,
-      icon: <FlaskConical className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
-    });
-  }
+  addCard({
+    id: 'history-saved',
+    title: 'Want to see what’s saved?',
+    body: 'Your past companion moments and milestones are kept in History, so you can look back without losing the story.',
+    cta: { label: 'Open History', action: 'navigate', screen: 'history' },
+    priority: 4,
+    contextual: true,
+    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, options.hasHistory);
+
+  addCard({
+    id: 'building-rhythm',
+    title: 'You’re building your rhythm',
+    body: 'A few more check-ins will help this start turning into personalised guidance.',
+    cta: { label: 'Keep going', action: 'check-in' },
+    priority: 5,
+    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, inFirstDays);
+
+  addCard({
+    id: 'first-week-taking-shape',
+    title: 'Your first week is taking shape',
+    body: 'You have enough check-ins now for early patterns to feel a little more trustworthy.',
+    cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+    priority: 6,
+    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, inFirstWeekShape);
+
+  addCard({
+    id: 'patterns-starting-to-settle',
+    title: 'Your patterns are starting to settle',
+    body: 'Patterns are repeating a bit more now, so the app can be calmer and more specific.',
+    cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+    priority: 7,
+    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, settlingStage);
+
+  addCard({
+    id: 'rhythm-getting-easier',
+    title: 'Your rhythm is getting easier to read',
+    body: 'With more check-ins in place, the app can start making steadier sense of what tends to shift together.',
+    cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+    priority: 8,
+    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, easierReadStage);
+
+  addCard({
+    id: 'stronger-baseline',
+    title: 'You have built a stronger baseline',
+    body: 'With a stronger baseline in place, small changes and experiments should be easier to interpret.',
+    cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+    priority: 9,
+    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, baselineStage);
+
+  addCard({
+    id: 'it-grows',
+    title: 'It grows with you',
+    body: 'This space gets smarter as you use it. You’ll see helpful reflections from day one, but clearer patterns usually take a little time. Keep logging, and we’ll build your rhythm together.',
+    supporting: 'Early patterns are starting to show. This will get clearer with a little more time.',
+    cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+    priority: 10,
+    icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, growthStage);
+
+  addCard({
+    id: 'small-experiments',
+    title: 'Keep experiments small',
+    body: 'If you want to test what helps, small changes are easier to notice and easier to compare over time.',
+    cta: { label: 'View experiments', action: 'navigate', screen: 'insights' },
+    priority: 10,
+    contextual: true,
+    icon: <FlaskConical className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, options.experimentRelevant);
+
+  addCard({
+    id: 'spotting-patterns',
+    title: 'Start spotting patterns',
+    body: 'Log a few more days and the app will begin showing more meaningful links between symptoms. Small patterns often start softly, then get clearer over time.',
+    cta: { label: 'Open check-in', action: 'check-in' },
+    priority: 11,
+    icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, spottingStage);
+
+  addCard({
+    id: 'quick-checkin',
+    title: 'A quick check-in goes a long way',
+    body: 'Short, regular check-ins help the app learn your rhythm. It does not have to be perfect to be useful.',
+    cta: { label: 'Open check-in', action: 'check-in' },
+    priority: 12,
+    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, quickCheckinStage);
+
+  addCard({
+    id: 'patterns-take-time',
+    title: 'Patterns take a little time',
+    body: 'You may notice early reflections quickly, but stronger patterns usually build over a few weeks of check-ins. There’s no need to get everything perfect.',
+    cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+    priority: 13,
+    icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+  }, patternsTakeTimeStage);
 
   const eligible = cards.filter((card) => {
     const entry = memory[card.id];
