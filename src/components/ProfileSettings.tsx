@@ -1461,9 +1461,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               setAiExportPreset(preset);
                               setAiExportMessage(null);
                             }}
-                            className={selected
-                              ? 'rounded-full border border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)/0.12)] px-3 py-2 text-sm font-medium text-[rgb(var(--color-text))]'
-                              : 'rounded-full border border-[rgb(var(--color-border))] bg-white px-3 py-2 text-sm text-[rgb(var(--color-text-secondary))]'}
+                            className="eb-choice-pill"
+                            data-selected={selected ? 'true' : undefined}
                           >
                             {meta.title}
                           </button>
