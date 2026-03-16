@@ -270,14 +270,14 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-hero-surface .eb-chip-filter {
     background: linear-gradient(180deg, rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.72));
     border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 18%, white);
-    color: rgb(var(--color-primary-dark) / 0.6);
+    color: rgb(var(--color-primary-dark) / 0.58);
   }
 
   .eb-hero-surface .eb-choice-pill:hover,
   .eb-hero-surface .eb-chip-filter:hover {
     background: linear-gradient(180deg, rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.72));
     border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 18%, white);
-    color: rgb(var(--color-primary-dark) / 0.6);
+    color: rgb(var(--color-primary-dark) / 0.58);
   }
 
   .eb-hero-surface .eb-choice-pill[data-selected="true"],
@@ -286,8 +286,8 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-hero-surface .eb-chip-filter[data-active="true"]:hover,
   .eb-hero-surface .eb-chip-filter-active,
   .eb-hero-surface .eb-chip-filter-active:hover {
-    background: color-mix(in srgb, rgb(var(--color-primary-light)) 24%, white);
-    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 28%, white);
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 18%, white);
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 26%, white);
     color: rgb(var(--color-primary-dark));
   }
 

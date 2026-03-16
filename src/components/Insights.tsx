@@ -3240,7 +3240,7 @@ const tryNextPrompts = useMemo(() => {
                   Log today
                 </button>
               ) : null}
-              <button type="button" className="eb-btn eb-btn-secondary min-w-[10rem]" onClick={() => extendExperiment(2)}>
+              <button type="button" className="eb-btn eb-btn-secondary eb-btn-soft-choice min-w-[10rem]" onClick={() => extendExperiment(2)}>
                 Extend 2 days
               </button>
               <button type="button" className="eb-btn eb-btn-tertiary" onClick={() => setStopExperimentConfirmOpen(true)}>
