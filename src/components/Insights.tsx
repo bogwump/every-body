@@ -47,6 +47,7 @@ import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
 import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
+import { getSuggestedDriverOptionsForMetrics } from '../lib/patternDrivers';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
@@ -62,13 +63,6 @@ type PendingContradiction = {
   id: string;
   pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high' };
 };
-
-const CONTRADICTION_DRIVER_OPTIONS: Array<{ key: PatternDriverHint; label: string }> = [
-  { key: 'hormones', label: 'Hormones' },
-  { key: 'stress', label: 'Stress' },
-  { key: 'nutrition', label: 'Nutrition' },
-  { key: 'not_sure', label: 'Not sure' },
-];
 
 const TIMEFRAMES: Array<{ key: Timeframe; label: string; days: number }> = [
   { key: 'week', label: '7 days', days: 7 },
@@ -3845,7 +3839,7 @@ const tryNextPrompts = useMemo(() => {
                               <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">This pattern didn’t feel right for you, so we’ll stop surfacing it.</div>
                               <div className="mt-3 text-sm eb-muted">Do you know what tends to drive this instead?</div>
                               <div className="mt-3 flex flex-wrap gap-2">
-                                {CONTRADICTION_DRIVER_OPTIONS.map((option) => (
+                                {getSuggestedDriverOptionsForMetrics([p.aKey, p.bKey]).map((option) => (
                                   <button
                                     key={option.key}
                                     type="button"
@@ -3877,7 +3871,7 @@ const tryNextPrompts = useMemo(() => {
                             <button
                               type="button"
                               className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
-                              onClick={() => { restorePattern(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
+                              onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                             >
                               Undo
                             </button>

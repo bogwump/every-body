@@ -1,9 +1,10 @@
 import type { InsightSignal } from './insightEngine';
+import type { PatternDriverHint } from './patternDrivers';
 import type { InsightMetricKey } from '../types';
 
 export type PatternFeedbackStatus = 'active' | 'suppressed' | 'confirmed';
 export type PatternUserFeedback = 'yes' | 'no' | 'unsure';
-export type PatternDriverHint = 'hormones' | 'stress' | 'nutrition' | 'not_sure';
+export type { PatternDriverHint } from './patternDrivers';
 
 export interface PatternFeedbackRecord {
   id: string;
@@ -195,7 +196,7 @@ export function confirmPattern(args: { id: string; patternId?: string; metrics: 
 export function markPatternUnsure(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; driverHint?: PatternDriverHint; }): PatternFeedbackRecord {
   const today = toISODate();
   const existing = getPatternFeedback(args.id);
-  return upsert({
+  const record = upsert({
     id: args.id,
     patternId: args.patternId ?? args.id,
     canonicalMetrics: args.metrics.map(String).slice(0, 2).sort(),
@@ -208,6 +209,17 @@ export function markPatternUnsure(args: { id: string; patternId?: string; metric
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
     userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
+  appendHistoryEvent({
+    patternFeedbackId: record.id,
+    patternId: record.patternId,
+    canonicalMetrics: record.canonicalMetrics,
+    action: 'unsure',
+    date: today,
+    confidence: record.confidence,
+    previousScore: record.previousScore,
+    userDriverHint: record.userDriverHint,
+  });
+  return record;
 }
 
 export function restorePattern(id: string, reducedConfidence = 0.45): PatternFeedbackRecord | null {
@@ -219,10 +231,11 @@ export function restorePattern(id: string, reducedConfidence = 0.45): PatternFee
     status: 'active',
     confidence: Math.min(reducedConfidence, existing.confidence ?? reducedConfidence),
     userContradicted: false,
+    userFeedback: undefined,
     lastFeedback: today,
     restoredAt: today,
     historyNote: 'Restored by you for further observation.',
-    suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
+    suppressPromptUntil: undefined,
     userDriverHint: existing.userDriverHint,
   });
   appendHistoryEvent({
