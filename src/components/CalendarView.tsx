@@ -498,10 +498,25 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
   const cycleStarts = cycleEnabled ? (cycleStats?.cycleStarts ?? []) : [];
   const hasCycleAnchor = cycleEnabled && cycleStarts.length > 0;
 
+  const learnedCycleLength = useMemo(
+    () => Math.max(21, Math.round(avgLen ?? cycleStats?.lastLength ?? 28)),
+    [avgLen, cycleStats?.lastLength],
+  );
+
+  const learnedBleedLength = useMemo(
+    () => clamp(bleedStats.avgLength ?? bleedStats.lastLength ?? 7, 2, 8),
+    [bleedStats.avgLength, bleedStats.lastLength],
+  );
+
+  const ovulationOffsetDays = useMemo(() => {
+    const minOvulationDay = Math.max(10, learnedBleedLength + 5);
+    const latestAllowed = Math.max(minOvulationDay + 1, learnedCycleLength - 10);
+    return clamp(learnedCycleLength - 14, minOvulationDay, latestAllowed);
+  }, [learnedBleedLength, learnedCycleLength]);
+
   const predictedNextCycleStartISO = useMemo(() => {
     if (!cycleEnabled || !hasCycleAnchor || cycleStarts.length === 0) return null;
 
-    const learnedCycleLength = Math.max(21, Math.round(avgLen ?? cycleStats?.lastLength ?? 28));
     const latestStartISO = cycleStarts[cycleStarts.length - 1];
     if (!latestStartISO) return null;
 
@@ -512,30 +527,35 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
 
     if (cycleStarts.includes(candidateISO)) return null;
     return candidateISO;
-  }, [cycleEnabled, hasCycleAnchor, cycleStarts, avgLen, cycleStats?.lastLength, todayISO]);
+  }, [cycleEnabled, hasCycleAnchor, cycleStarts, learnedCycleLength, todayISO]);
+
+  const currentCyclePredictedOvulationISO = useMemo(() => {
+    if (!fertilityEnabled || !hasCycleAnchor || cycleStarts.length === 0) return null;
+    const latestStartISO = cycleStarts[cycleStarts.length - 1];
+    if (!latestStartISO) return null;
+
+    const explicitInCurrentCycle = Array.from(ovulationSet)
+      .filter((iso) => iso >= latestStartISO && (!predictedNextCycleStartISO || iso < predictedNextCycleStartISO))
+      .sort()[0] ?? null;
+    if (explicitInCurrentCycle) return explicitInCurrentCycle;
+
+    return addDaysISO(latestStartISO, ovulationOffsetDays);
+  }, [fertilityEnabled, hasCycleAnchor, cycleStarts, ovulationSet, predictedNextCycleStartISO, ovulationOffsetDays]);
+
+  const nextCyclePredictedOvulationISO = useMemo(() => {
+    if (!fertilityEnabled || !hasCycleAnchor || !predictedNextCycleStartISO) return null;
+    return addDaysISO(predictedNextCycleStartISO, ovulationOffsetDays);
+  }, [fertilityEnabled, hasCycleAnchor, predictedNextCycleStartISO, ovulationOffsetDays]);
 
   const predictedOvulationSet = useMemo(() => {
     const s = new Set<string>();
     if (!fertilityEnabled || !hasCycleAnchor) return s;
 
-    if (ovulationSet.size > 0) {
-      for (const iso of Array.from(ovulationSet)) s.add(iso);
-      return s;
-    }
-
-    if (cycleStarts.length === 0) return s;
-
-    const fallbackLen = avgLen ?? cycleStats?.lastLength ?? 28;
-    for (let i = 0; i < cycleStarts.length; i++) {
-      const startISO = cycleStarts[i];
-      const nextStartISO = cycleStarts[i + 1] ?? addDaysISO(startISO, fallbackLen);
-      const cycleLen = daysBetweenISO(startISO, nextStartISO);
-      const latestAllowed = Math.max(10, cycleLen - 10);
-      const ovulationDay = clamp(cycleLen - 14, 10, latestAllowed);
-      s.add(addDaysISO(startISO, ovulationDay));
-    }
+    for (const iso of Array.from(ovulationSet)) s.add(iso);
+    if (currentCyclePredictedOvulationISO) s.add(currentCyclePredictedOvulationISO);
+    if (nextCyclePredictedOvulationISO) s.add(nextCyclePredictedOvulationISO);
     return s;
-  }, [fertilityEnabled, hasCycleAnchor, ovulationSet, cycleStarts, avgLen, cycleStats?.lastLength]);
+  }, [fertilityEnabled, hasCycleAnchor, ovulationSet, currentCyclePredictedOvulationISO, nextCyclePredictedOvulationISO]);
 
   const rhythmModel = useMemo(() => getRhythmModel(entriesSorted, userData, todayISO), [entriesSorted, userData, todayISO]);
   const rhythmTiming = useMemo(() => getRhythmTimingModel(entriesSorted as any, userData), [entriesSorted, userData]);
@@ -557,7 +577,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     const byISO = new Map<string, any>();
     for (const e of entriesSorted) byISO.set(e.dateISO, e);
 
-    const learnedBleedLength = clamp(bleedStats.avgLength ?? bleedStats.lastLength ?? 7, 2, 8);
+    const learnedBleedLength = learnedBleedLength;
 
     for (const startISO of cycleStarts) {
       let seenPositive = false;
@@ -607,23 +627,19 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     }
 
     return s;
-  }, [cycleEnabled, hasCycleAnchor, entriesSorted, cycleStarts, bleedStats.avgLength, bleedStats.lastLength]);
+  }, [cycleEnabled, hasCycleAnchor, entriesSorted, cycleStarts, learnedBleedLength]);
 
   const fertileSet = useMemo(() => {
     const s = new Set<string>();
-    if (!fertilityEnabled || !hasCycleAnchor) return s;
+    if (!fertilityEnabled || !hasCycleAnchor || !currentCyclePredictedOvulationISO) return s;
 
-    if (predictedOvulationSet.size === 0) return s;
-
-    for (const ovISO of Array.from(predictedOvulationSet)) {
-      for (let d = -5; d <= 1; d++) {
-        const dayISO = addDaysISO(ovISO, d);
-        if (periodSet.has(dayISO)) continue;
-        s.add(dayISO);
-      }
+    for (let d = -5; d <= 1; d++) {
+      const dayISO = addDaysISO(currentCyclePredictedOvulationISO, d);
+      if (periodSet.has(dayISO)) continue;
+      s.add(dayISO);
     }
     return s;
-  }, [fertilityEnabled, hasCycleAnchor, periodSet, predictedOvulationSet]);
+  }, [fertilityEnabled, hasCycleAnchor, periodSet, currentCyclePredictedOvulationISO]);
 
   const summaryModal = useMemo(() => {
     if (!summaryISO) return null;
