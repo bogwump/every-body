@@ -52,13 +52,6 @@ function logsMilestone(entries: CheckInEntry[]): { title: string; body: string; 
       body: 'You have logged enough days to start seeing early sleep and energy patterns.',
     };
   }
-  if (count >= 3 && !hasMomentWithId('encouragement:3-logs')) {
-    return {
-      id: 'encouragement:3-logs',
-      title: 'You’re building your rhythm',
-      body: 'A few more check-ins will help this start turning into personalised guidance.',
-    };
-  }
   return null;
 }
 

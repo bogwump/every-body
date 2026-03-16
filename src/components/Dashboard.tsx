@@ -247,12 +247,20 @@ function buildGuideCard(options: {
   if (earlyUser) {
     cards.push(
       {
+        id: 'building-rhythm',
+        title: 'You’re building your rhythm',
+        body: 'A few more check-ins will help this start turning into personalised guidance.',
+        cta: { label: 'Keep going', action: 'check-in' },
+        priority: 5,
+        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+      {
         id: 'it-grows',
         title: 'It grows with you',
         body: 'This space gets smarter as you use it. You’ll see helpful reflections from day one, but clearer patterns usually take a little time. Keep logging, and we’ll build your rhythm together.',
         supporting: 'Early patterns are starting to show. This will get clearer with a little more time.',
         cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 5,
+        priority: 7,
         icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
       },
       {
@@ -268,7 +276,7 @@ function buildGuideCard(options: {
         title: 'A quick check-in goes a long way',
         body: 'Short, regular check-ins help the app learn your rhythm. It does not have to be perfect to be useful.',
         cta: { label: 'Open check-in', action: 'check-in' },
-        priority: 7,
+        priority: 9,
         icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
       },
       {
@@ -288,7 +296,7 @@ function buildGuideCard(options: {
       title: 'Keep experiments small',
       body: 'If you want to test what helps, small changes are easier to notice and easier to compare over time.',
       cta: { label: 'View experiments', action: 'navigate', screen: 'insights' },
-      priority: 9,
+      priority: 10,
       contextual: true,
       icon: <FlaskConical className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
     });
