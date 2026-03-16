@@ -4,7 +4,7 @@ import { PencilLine, Droplet, Droplets, Egg, X, ChevronRight, Smile, Meh, Frown,
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
-import { computeBleedStats, computeCycleStats, estimatePhaseByFlow, getRhythmModel, sortByDateAsc } from '../lib/analytics';
+import { computeBleedStats, computeCycleStats, estimatePhaseByFlow, getCycleStarts, getRhythmModel, sortByDateAsc } from '../lib/analytics';
 import { getRhythmTimingModel } from '../lib/rhythmTiming';
 import { getCycleTrustModel } from '../lib/cycleTrust';
 
@@ -278,70 +278,6 @@ function MoodIcon({ mood, className, size = 20 }: { mood?: number; className?: s
   return null;
 }
 
-
-function getCycleStarts(entriesSorted: CheckInEntry[]): string[] {
-  const starts: string[] = [];
-
-  // We want to avoid treating a single day of very light / breakthrough spotting as a new cycle.
-  // Heuristic:
-  // - A clear bleed (flow >= 3 on a 0–10 scale) after no flow counts as a new cycle start
-  // - Spotting (flow 1–2) only counts if there are 2 consecutive spotting days
-  // - Manual override (cycleStartOverride) always counts as a new cycle start
-  let prevFlow = 0;
-  let spottingStreak = 0;
-  let spottingStreakStartISO: string | null = null;
-
-  for (const e of entriesSorted) {
-    const flowVal = e?.values?.flow;
-    const flow = typeof flowVal === 'number' ? flowVal : 0;
-    const override = Boolean(e?.cycleStartOverride);
-    const breakthrough = Boolean(e?.breakthroughBleed);
-    const effectiveFlow = breakthrough ? 0 : flow;
-
-    // Breakthrough/spotting flagged by the user should never start a cycle. Treat it as 'no flow' for cycle logic.
-    if (breakthrough && !override) {
-      prevFlow = 0;
-      spottingStreak = 0;
-      spottingStreakStartISO = null;
-      continue;
-    }
-
-    if (override) {
-      starts.push(e.dateISO);
-      // Keep state moving in case the user also logged flow the same day.
-      prevFlow = flow;
-      spottingStreak = 0;
-      spottingStreakStartISO = null;
-      continue;
-    }
-
-    const isBleed = effectiveFlow >= 3;
-    const isSpotting = effectiveFlow > 0 && effectiveFlow < 3;
-
-    if (isBleed && prevFlow === 0) {
-      starts.push(e.dateISO);
-      spottingStreak = 0;
-      spottingStreakStartISO = null;
-    } else if (isSpotting) {
-      if (spottingStreak === 0) spottingStreakStartISO = e.dateISO;
-      spottingStreak += 1;
-
-      // Only promote spotting to a cycle start if we see two consecutive spotting days and we were previously at zero.
-      if (prevFlow === 0 && spottingStreak >= 2 && spottingStreakStartISO) {
-        starts.push(spottingStreakStartISO);
-        // prevent repeated pushes on longer streaks
-        spottingStreak = 2;
-      }
-    } else {
-      spottingStreak = 0;
-      spottingStreakStartISO = null;
-    }
-
-    prevFlow = flow;
-  }
-
-  return Array.from(new Set(starts)).sort((a, b) => a.localeCompare(b));
-}
 
 
 function getOverlayValue(entry: CheckInEntry | null | undefined, key: SymptomKey | 'mood'): number | null {
