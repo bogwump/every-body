@@ -210,23 +210,24 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-chip-filter {
     @apply inline-flex items-center justify-center text-sm font-medium;
     min-height: 1.58rem;
+    min-width: 3.35rem;
     padding: 0.14rem 0.78rem;
     border-radius: 9999px;
     line-height: 1.2;
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
-    border: 1px solid color-mix(in srgb, rgb(var(--color-primary-dark)) 22%, white);
-    background: color-mix(in srgb, rgb(var(--color-primary-light)) 18%, white);
-    color: color-mix(in srgb, rgb(var(--color-primary-dark)) 62%, white);
+    border: 1px solid rgb(var(--color-primary-dark) / 0.18);
+    background: rgb(var(--color-primary-light) / 0.14);
+    color: rgb(var(--color-primary-dark) / 0.56);
     box-shadow: none;
   }
 
   .eb-choice-pill:hover,
   .eb-chip-filter:hover {
-    background: color-mix(in srgb, rgb(var(--color-primary-light)) 18%, white);
-    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 22%, white);
-    color: color-mix(in srgb, rgb(var(--color-primary-dark)) 62%, white);
+    background: rgb(var(--color-primary-light) / 0.14);
+    border-color: rgb(var(--color-primary-dark) / 0.18);
+    color: rgb(var(--color-primary-dark) / 0.56);
     box-shadow: none;
   }
 
@@ -234,8 +235,8 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-chip-filter[data-active="true"]:hover,
   .eb-chip-filter-active:hover {
     color: rgb(var(--color-primary-dark));
-    background: color-mix(in srgb, rgb(var(--color-primary-light)) 42%, white);
-    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 52%, white);
+    background: rgb(var(--color-primary-light) / 0.28);
+    border-color: rgb(var(--color-primary-dark) / 0.34);
     box-shadow: none;
   }
 
@@ -252,15 +253,15 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-chip-filter[data-active="true"],
   .eb-chip-filter-active {
     color: rgb(var(--color-primary-dark));
-    background: color-mix(in srgb, rgb(var(--color-primary-light)) 42%, white);
-    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 52%, white);
+    background: rgb(var(--color-primary-light) / 0.28);
+    border-color: rgb(var(--color-primary-dark) / 0.34);
     box-shadow: none;
   }
 
   .eb-choice-pill[data-tone="soft"] {
-    background: color-mix(in srgb, rgb(var(--color-primary-light)) 14%, white);
-    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 18%, white);
-    color: color-mix(in srgb, rgb(var(--color-primary-dark)) 58%, white);
+    background: rgb(var(--color-primary-light) / 0.12);
+    border-color: rgb(var(--color-primary-dark) / 0.16);
+    color: rgb(var(--color-primary-dark) / 0.52);
   }
 
   /* Passive metadata tags only. Match the compact tags used at the top of Insights. */

@@ -363,7 +363,7 @@ function slope(values: Array<{ x: number; y: number }>): number {
 }
 
 function chipClass(active: boolean) {
-  return 'eb-choice-pill';
+  return active ? 'eb-choice-pill' : 'eb-choice-pill';
 }
 
 function strengthLabel(r: number): 'Small' | 'Moderate' | 'Strong' | 'Unknown' {
@@ -4024,6 +4024,7 @@ const tryNextPrompts = useMemo(() => {
                         key={k}
                         type="button"
                         className={chipClass(customExperimentChangeKey === k)}
+                        data-selected={customExperimentChangeKey === k ? 'true' : undefined}
                         onClick={() => toggle(k)}
                         aria-pressed={customExperimentChangeKey === k}
                       >
@@ -4068,6 +4069,7 @@ const tryNextPrompts = useMemo(() => {
                           key={String(k)}
                           type="button"
                           className={chipClass(on)}
+                          data-selected={on ? 'true' : undefined}
                           onClick={() => toggle(k)}
                           aria-pressed={on}
                         >
@@ -4110,6 +4112,7 @@ const tryNextPrompts = useMemo(() => {
                     key={d}
                     type="button"
                     className={chipClass(d === experimentDurationDays)}
+                    data-selected={d === experimentDurationDays ? 'true' : undefined}
                     onClick={() => setExperimentDurationDays(d)}
                     aria-label={`Set experiment length to ${d} days`}
                   >
@@ -4671,12 +4674,7 @@ const tryNextPrompts = useMemo(() => {
               selected.map((m) => (
                 <span
                   key={String(m)}
-                  className="inline-flex items-center rounded-full px-3 py-1 text-sm"
-                  style={{
-                    background: 'rgba(255,255,255,0.50)',
-                    border: '1px solid rgba(255,255,255,0.55)',
-                    color: 'rgba(0,0,0,0.82)',
-                  }}
+                  className="eb-pill"
                 >
                   {labelFor(m, userData)}
                 </span>
@@ -4749,7 +4747,7 @@ const tryNextPrompts = useMemo(() => {
 
                   <div className="mt-3 flex flex-wrap gap-2 justify-end">
 
-                    <button type="button" className={chipClass(selected.includes('mood'))} onClick={() => toggleMetric('mood')}>
+                    <button type="button" className={chipClass(selected.includes('mood'))} data-selected={selected.includes('mood') ? 'true' : undefined} onClick={() => toggleMetric('mood')}>
 
                       Mood
 
@@ -4765,7 +4763,7 @@ const tryNextPrompts = useMemo(() => {
                         key={k}
 
                         className={chipClass(selected.includes(k))}
-
+                        data-selected={selected.includes(k) ? 'true' : undefined}
                         onClick={() => toggleMetric(k)}
 
                         title={labelFor(k, userData)}
