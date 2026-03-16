@@ -178,42 +178,59 @@ export function History({ onNavigate }: HistoryProps) {
                           <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">{fmtDate(event.date)}</div>
                         </div>
 
-                        {event.actionLabel && event.actionTarget ? (
-                          <div className="mt-4 flex flex-wrap gap-3">
-                            <button
-                              type="button"
-                              className="eb-btn eb-btn-secondary"
-                              onClick={() => navigateToTarget(event.actionTarget, onNavigate)}
-                            >
-                              {event.actionLabel}
-                            </button>
-                            {event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
-                              <button
-                                type="button"
-                                className="eb-btn eb-btn-secondary"
-                                onClick={() => {
-                                  restorePattern(String(event.metadata?.patternFeedbackId), 0.45);
-                                  setHistoryTick((v) => v + 1);
-                                }}
-                              >
-                                Undo correction
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
-                          <div className="mt-4">
-                            <button
-                              type="button"
-                              className="eb-btn eb-btn-secondary"
-                              onClick={() => {
-                                restorePattern(String(event.metadata?.patternFeedbackId), 0.45);
-                                setHistoryTick((v) => v + 1);
-                              }}
-                            >
-                              Undo correction
-                            </button>
-                          </div>
-                        ) : null}
+                        {(() => {
+                          const feedbackId = typeof event.metadata?.patternFeedbackId === 'string' ? String(event.metadata.patternFeedbackId) : null;
+                          const feedbackAction = String(event.metadata?.patternFeedbackAction || '');
+                          const canUndoPattern = Boolean(feedbackId) && (feedbackAction === 'suppressed' || feedbackAction === 'confirmed');
+                          const undoLabel = feedbackAction === 'suppressed' ? 'Undo correction' : feedbackAction === 'confirmed' ? 'Undo confirmation' : 'Undo';
+
+                          if (event.actionLabel && event.actionTarget) {
+                            return (
+                              <div className="mt-4 flex flex-wrap gap-3">
+                                <button
+                                  type="button"
+                                  className="eb-btn eb-btn-secondary"
+                                  onClick={() => navigateToTarget(event.actionTarget, onNavigate)}
+                                >
+                                  {event.actionLabel}
+                                </button>
+                                {canUndoPattern ? (
+                                  <button
+                                    type="button"
+                                    className="eb-btn eb-btn-secondary"
+                                    onClick={() => {
+                                      restorePattern(feedbackId!, 0.45);
+                                      setHistoryTick((v) => v + 1);
+                                      navigateToTarget('insights:connections', onNavigate);
+                                    }}
+                                  >
+                                    {undoLabel}
+                                  </button>
+                                ) : null}
+                              </div>
+                            );
+                          }
+
+                          if (canUndoPattern) {
+                            return (
+                              <div className="mt-4">
+                                <button
+                                  type="button"
+                                  className="eb-btn eb-btn-secondary"
+                                  onClick={() => {
+                                    restorePattern(feedbackId!, 0.45);
+                                    setHistoryTick((v) => v + 1);
+                                    navigateToTarget('insights:connections', onNavigate);
+                                  }}
+                                >
+                                  {undoLabel}
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          return null;
+                        })()}
                       </div>
                     </div>
                   </article>

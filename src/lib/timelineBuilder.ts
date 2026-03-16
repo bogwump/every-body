@@ -428,6 +428,7 @@ function patternFeedbackActionText(item: PatternFeedbackHistoryEntry): { title: 
 
 function buildPatternFeedbackEvents(): TimelineEvent[] {
   return listPatternFeedbackHistory()
+    .filter((item) => item.action !== 'unsure')
     .map((item) => {
       const metrics = Array.isArray(item.canonicalMetrics) ? item.canonicalMetrics.slice(0, 2) : [];
       if (metrics.length < 2) return null;

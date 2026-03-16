@@ -195,7 +195,7 @@ export function confirmPattern(args: { id: string; patternId?: string; metrics: 
 export function markPatternUnsure(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; driverHint?: PatternDriverHint; }): PatternFeedbackRecord {
   const today = toISODate();
   const existing = getPatternFeedback(args.id);
-  const record = upsert({
+  return upsert({
     id: args.id,
     patternId: args.patternId ?? args.id,
     canonicalMetrics: args.metrics.map(String).slice(0, 2).sort(),
@@ -208,17 +208,6 @@ export function markPatternUnsure(args: { id: string; patternId?: string; metric
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
     userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
-  appendHistoryEvent({
-    patternFeedbackId: record.id,
-    patternId: record.patternId,
-    canonicalMetrics: record.canonicalMetrics,
-    action: 'unsure',
-    date: today,
-    confidence: record.confidence,
-    previousScore: record.previousScore,
-    userDriverHint: record.userDriverHint,
-  });
-  return record;
 }
 
 export function restorePattern(id: string, reducedConfidence = 0.45): PatternFeedbackRecord | null {
