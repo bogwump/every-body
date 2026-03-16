@@ -110,13 +110,8 @@ export function History({ onNavigate }: HistoryProps) {
                 key={item.key}
                 type="button"
                 onClick={() => setFilter(item.key)}
-                className={[
-                  'eb-chip-filter',
-                  active
-                    ? '!border-white/28 !bg-white/16 !text-white !font-medium'
-                    : '!border-white/20 !bg-transparent !text-white/85 hover:!bg-white/10 hover:!text-white'
-                ].join(' ')}
-                data-active={active}
+                className="eb-chip-filter"
+                data-active={active ? 'true' : undefined}
               >
                 {item.label}
               </button>

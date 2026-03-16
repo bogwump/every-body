@@ -3826,14 +3826,14 @@ const tryNextPrompts = useMemo(() => {
                                 </button>
                                 <button
                                   type="button"
-                                  className="eb-btn-tertiary"
+                                  className="eb-btn-secondary eb-btn-soft-choice"
                                   onClick={() => openContradictionPrompt(p)}
                                 >
                                   No
                                 </button>
                                 <button
                                   type="button"
-                                  className="eb-btn-secondary"
+                                  className="eb-btn-secondary eb-btn-soft-choice min-w-[5.75rem]"
                                   onClick={() => handlePatternFeedback('unsure', p)}
                                 >
                                   Not sure

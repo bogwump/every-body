@@ -208,7 +208,7 @@ body.eb-chat-typing .eb-mobile-nav {
      never for primary or secondary actions. Match the compact Profile selector pills. */
   .eb-choice-pill,
   .eb-chip-filter {
-    @apply inline-flex items-center justify-center text-sm font-medium transition-colors;
+    @apply inline-flex items-center justify-center text-sm font-medium;
     min-height: 1.58rem;
     padding: 0.14rem 0.78rem;
     border-radius: 9999px;
@@ -219,6 +219,23 @@ body.eb-chat-typing .eb-mobile-nav {
     border: 1px solid color-mix(in srgb, rgb(var(--color-primary-dark)) 22%, white);
     background: color-mix(in srgb, rgb(var(--color-primary-light)) 18%, white);
     color: color-mix(in srgb, rgb(var(--color-primary-dark)) 62%, white);
+    box-shadow: none;
+  }
+
+  .eb-choice-pill:hover,
+  .eb-chip-filter:hover {
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 18%, white);
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 22%, white);
+    color: color-mix(in srgb, rgb(var(--color-primary-dark)) 62%, white);
+    box-shadow: none;
+  }
+
+  .eb-choice-pill[data-selected="true"]:hover,
+  .eb-chip-filter[data-active="true"]:hover,
+  .eb-chip-filter-active:hover {
+    color: rgb(var(--color-primary-dark));
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 42%, white);
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 52%, white);
     box-shadow: none;
   }
 
@@ -450,6 +467,29 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-btn-tertiary:hover {
     border-color: rgb(var(--color-primary) / 0.22);
     background: rgb(255 255 255 / 0.95);
+  }
+
+
+  .eb-btn-soft-choice {
+    min-width: 4.5rem;
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 26%, white);
+    color: rgb(var(--color-primary-dark));
+    border: 1px solid color-mix(in srgb, rgb(var(--color-primary-dark)) 26%, white);
+    box-shadow: none;
+  }
+
+  .eb-btn-soft-choice,
+  .eb-btn-soft-choice:hover,
+  .eb-btn-soft-choice:active,
+  .eb-btn-soft-choice:focus-visible {
+    color: rgb(var(--color-primary-dark));
+  }
+
+  .eb-btn-soft-choice:hover {
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 26%, white);
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 26%, white);
+    box-shadow: none;
+    transform: none;
   }
 
   .eb-input {
