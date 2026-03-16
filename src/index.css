@@ -264,6 +264,33 @@ body.eb-chat-typing .eb-mobile-nav {
     color: rgb(var(--color-primary-dark) / 0.52);
   }
 
+  /* Hero pills sit on a much stronger coloured surface, so use the same soft inset
+     surface as the hero insert rather than transparent theme tinting. */
+  .eb-hero-surface .eb-choice-pill,
+  .eb-hero-surface .eb-chip-filter {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.72));
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 18%, white);
+    color: rgb(var(--color-primary-dark) / 0.6);
+  }
+
+  .eb-hero-surface .eb-choice-pill:hover,
+  .eb-hero-surface .eb-chip-filter:hover {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.72));
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 18%, white);
+    color: rgb(var(--color-primary-dark) / 0.6);
+  }
+
+  .eb-hero-surface .eb-choice-pill[data-selected="true"],
+  .eb-hero-surface .eb-choice-pill[data-selected="true"]:hover,
+  .eb-hero-surface .eb-chip-filter[data-active="true"],
+  .eb-hero-surface .eb-chip-filter[data-active="true"]:hover,
+  .eb-hero-surface .eb-chip-filter-active,
+  .eb-hero-surface .eb-chip-filter-active:hover {
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 24%, white);
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 28%, white);
+    color: rgb(var(--color-primary-dark));
+  }
+
   /* Passive metadata tags only. Match the compact tags used at the top of Insights. */
   .eb-chip,
   .eb-pill,
