@@ -110,8 +110,8 @@ export function History({ onNavigate }: HistoryProps) {
                 key={item.key}
                 type="button"
                 onClick={() => setFilter(item.key)}
-                className="eb-chip-filter"
-                data-active={active ? 'true' : undefined}
+                className="eb-choice-pill"
+                data-selected={active ? 'true' : undefined}
               >
                 {item.label}
               </button>

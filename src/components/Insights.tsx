@@ -363,7 +363,7 @@ function slope(values: Array<{ x: number; y: number }>): number {
 }
 
 function chipClass(active: boolean) {
-  return active ? 'eb-chip-filter eb-chip-filter-active' : 'eb-chip-filter';
+  return 'eb-choice-pill';
 }
 
 function strengthLabel(r: number): 'Small' | 'Moderate' | 'Strong' | 'Unknown' {
@@ -3394,10 +3394,10 @@ const tryNextPrompts = useMemo(() => {
             type="button"
             className={
               experimentCompareMode === 'quick'
-                ? 'eb-chip-filter eb-chip-filter-active'
-                : 'eb-chip-filter'
+                ? 'eb-choice-pill'
+                : 'eb-choice-pill'
             }
-            data-active={experimentCompareMode === 'quick'}
+            data-selected={experimentCompareMode === 'quick' ? 'true' : undefined}
             onClick={() => setExperimentCompareMode('quick')}
           >
             Just before
@@ -3407,12 +3407,12 @@ const tryNextPrompts = useMemo(() => {
             className={
               hasUsual
                 ? (experimentCompareMode === 'usual'
-                    ? 'eb-chip-filter eb-chip-filter-active'
-                    : 'eb-chip-filter'
+                    ? 'eb-choice-pill'
+                    : 'eb-choice-pill'
                   )
-                : 'eb-chip-filter'
+                : 'eb-choice-pill'
             }
-            data-active={experimentCompareMode === 'usual' && hasUsual}
+            data-selected={experimentCompareMode === 'usual' && hasUsual ? 'true' : undefined}
             disabled={!hasUsual}
             aria-disabled={!hasUsual}
             onClick={() => {
@@ -3457,10 +3457,10 @@ const tryNextPrompts = useMemo(() => {
             type="button"
             className={
               experimentCompareMode === 'quick'
-                ? 'eb-chip-filter eb-chip-filter-active'
-                : 'eb-chip-filter'
+                ? 'eb-choice-pill'
+                : 'eb-choice-pill'
             }
-            data-active={experimentCompareMode === 'quick'}
+            data-selected={experimentCompareMode === 'quick' ? 'true' : undefined}
             onClick={() => setExperimentCompareMode('quick')}
           >
             Just before
@@ -3470,12 +3470,12 @@ const tryNextPrompts = useMemo(() => {
             className={
               hasUsual
                 ? (experimentCompareMode === 'usual'
-                    ? 'eb-chip-filter eb-chip-filter-active'
-                    : 'eb-chip-filter'
+                    ? 'eb-choice-pill'
+                    : 'eb-choice-pill'
                   )
-                : 'eb-chip-filter'
+                : 'eb-choice-pill'
             }
-            data-active={experimentCompareMode === 'usual' && hasUsual}
+            data-selected={experimentCompareMode === 'usual' && hasUsual ? 'true' : undefined}
             disabled={!hasUsual}
             aria-disabled={!hasUsual}
             onClick={() => {
@@ -4653,7 +4653,12 @@ const tryNextPrompts = useMemo(() => {
 
         <div className="mt-3 flex flex-wrap gap-2 items-center">
           {TIMEFRAMES.map((t) => (
-            <button key={t.key} className={chipClass(timeframe === t.key)} onClick={() => setTimeframe(t.key)}>
+            <button
+              key={t.key}
+              className="eb-choice-pill"
+              data-selected={timeframe === t.key ? 'true' : undefined}
+              onClick={() => setTimeframe(t.key)}
+            >
               {t.label}
             </button>
           ))}</div>

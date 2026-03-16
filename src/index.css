@@ -280,6 +280,8 @@ body.eb-chat-typing .eb-mobile-nav {
     box-shadow: none;
   }
 
+  .eb-choice-pill:disabled,
+  .eb-choice-pill[aria-disabled="true"],
   .eb-chip-filter:disabled,
   .eb-chip-filter[aria-disabled="true"] {
     opacity: 0.6;
