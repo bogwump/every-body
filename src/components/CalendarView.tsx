@@ -190,7 +190,7 @@ function shortPhaseCue(phaseKey: string | null | undefined): string {
 
 
 type CalendarMarker = {
-  key: 'cycleStart' | 'period' | 'spotting' | 'ovulation' | 'experiment' | 'sex';
+  key: 'cycleStart' | 'predictedCycleStart' | 'period' | 'spotting' | 'ovulation' | 'experiment' | 'sex';
   priority: number;
   label: string;
   icon: React.ReactNode;
@@ -199,6 +199,7 @@ type CalendarMarker = {
 function getCalendarMarkers(args: {
   isPeriod: boolean;
   isCycleStart: boolean;
+  isPredictedCycleStart: boolean;
   hasSpotting: boolean;
   isPredictedOvulation: boolean;
   hasExperiment: boolean;
@@ -213,6 +214,13 @@ function getCalendarMarkers(args: {
       priority: 0,
       label: 'Cycle start',
       icon: <CycleFlagIcon size={11} className="opacity-80" filled />,
+    });
+  } else if (args.isPredictedCycleStart) {
+    markers.push({
+      key: 'predictedCycleStart',
+      priority: 1,
+      label: 'Predicted cycle start',
+      icon: <CycleFlagIcon size={11} className="opacity-80" />,
     });
   }
   if (args.isPeriod) {
@@ -488,6 +496,22 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
 
   const cycleStarts = cycleEnabled ? (cycleStats?.cycleStarts ?? []) : [];
   const hasCycleAnchor = cycleEnabled && cycleStarts.length > 0;
+
+  const predictedNextCycleStartISO = useMemo(() => {
+    if (!cycleEnabled || !hasCycleAnchor || cycleStarts.length === 0) return null;
+
+    const learnedCycleLength = Math.max(21, Math.round(avgLen ?? cycleStats?.lastLength ?? 28));
+    const latestStartISO = cycleStarts[cycleStarts.length - 1];
+    if (!latestStartISO) return null;
+
+    let candidateISO = addDaysISO(latestStartISO, learnedCycleLength);
+    while (candidateISO <= todayISO) {
+      candidateISO = addDaysISO(candidateISO, learnedCycleLength);
+    }
+
+    if (cycleStarts.includes(candidateISO)) return null;
+    return candidateISO;
+  }, [cycleEnabled, hasCycleAnchor, cycleStarts, avgLen, cycleStats?.lastLength, todayISO]);
 
   const predictedOvulationSet = useMemo(() => {
     const s = new Set<string>();
@@ -1023,12 +1047,14 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             const hasExperiment = isExperimentActiveOnISO(experiment, iso);
             const isPredictedOvulation = fertilityEnabled && predictedOvulationSet.has(iso);
             const isCycleStart = cycleStarts.includes(iso);
+            const isPredictedCycleStart = cycleEnabled && predictedNextCycleStartISO === iso && !isCycleStart;
             const flowVal = (entry as any)?.values?.flow;
             const flow = typeof flowVal === 'number' ? flowVal : 0;
             const hasSpotting = Boolean((entry as any)?.breakthroughBleed) || (flow > 0 && !isPeriod);
             const dayMarkers = getCalendarMarkers({
               isPeriod,
               isCycleStart,
+              isPredictedCycleStart,
               hasSpotting,
               isPredictedOvulation,
               hasExperiment,
@@ -1124,6 +1150,12 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                 <CycleFlagIcon size={11} filled className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                 <span>Cycle start</span>
               </div>
+              {cycleEnabled && hasCycleAnchor && predictedNextCycleStartISO && (
+                <div className="flex items-center gap-2">
+                  <CycleFlagIcon size={11} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                  <span>Predicted cycle start</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Droplet size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                 <span>Period day</span>
