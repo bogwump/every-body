@@ -632,13 +632,15 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         {/* Phase timeline */}
         <div className="eb-card p-5">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-3">
-              <IconBadge icon={<Compass className="w-5 h-5" />} />
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0 flex-1">
               <h3 className="font-semibold tracking-tight">Your cycle, at a glance</h3>
             </div>
+            <Compass className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
+          </div>
 
-            {userData?.cycleTrackingMode === 'cycle' ? (
+          {userData?.cycleTrackingMode === 'cycle' ? (
+            <div className="mb-3 flex justify-end">
               <button
                 type="button"
                 onClick={() => setCycleModalOpen(true)}
@@ -649,8 +651,8 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 <span className="mx-2 opacity-60">•</span>
                 <span className="font-semibold">{avgCycleText}</span>
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           {(() => {
             const steps: Array<{ key: PhaseKey; label: string; sci: string }> = [
@@ -721,9 +723,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
               <p className="text-neutral-700">{content.lookLikeDuration}</p>
             </div>
-            <div className="shrink-0 mt-0.5">
-              <IconBadge icon={<Eye className="w-5 h-5" />} />
-            </div>
+            <Eye className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
           </div>
         </div>
 
@@ -755,9 +755,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             </div>
               </div>
             </div>
-            <div className="shrink-0 mt-0.5">
-              <IconBadge icon={<GraduationCap className="w-5 h-5" />} />
-            </div>
+            <GraduationCap className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
           </div>
         </div>
 
@@ -780,9 +778,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 <div className="mt-1 text-base text-neutral-800 font-normal">{nextPhasePlanning.body}</div>
               </div>
             </div>
-            <div className="shrink-0 mt-0.5">
-              <IconBadge icon={<Compass className="w-5 h-5" />} />
-            </div>
+            <Compass className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
           </div>
         </div>
 

@@ -97,9 +97,7 @@ export function History({ onNavigate }: HistoryProps) {
               {summary.patterns} pattern{summary.patterns === 1 ? '' : 's'} discovered · {summary.helpfulExperiments} experiment{summary.helpfulExperiments === 1 ? '' : 's'} looked helpful · {summary.phaseChanges} phase shift{summary.phaseChanges === 1 ? '' : 's'} recorded
             </p>
           </div>
-          <div className="eb-icon-frame eb-icon-frame--hero">
-            <Clock3 className="w-5 h-5" />
-          </div>
+          <Clock3 className="w-5 h-5 shrink-0 text-white/90 mt-1" />
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -147,43 +145,44 @@ export function History({ onNavigate }: HistoryProps) {
                 const confidence = confidenceLabel(event.confidence);
                 return (
                   <article key={event.id} className="eb-card eb-card-soft">
-                    <div className="eb-card-header items-start">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 max-w-3xl">
-                            <h3>{event.title}</h3>
-                            <p className="mt-2 text-sm text-[rgb(var(--color-text))]">{event.description}</p>
-                            {(event.evidence || (event.signals && event.signals.length) || confidence) ? (
-                              <details className="eb-collapsible">
-                                <summary>
-                                  <span>Why this is here</span>
-                                  <ChevronDown className="w-4 h-4 text-[rgb(var(--color-text-secondary))]" />
-                                </summary>
-                                <div>
-                                  {event.evidence ? (
-                                    <p className="text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
-                                      <span className="font-medium text-[rgb(var(--color-text))]">Why this is here:</span> {event.evidence}
-                                    </p>
-                                  ) : null}
-                                  {event.signals && event.signals.length ? (
-                                    <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
-                                      <span className="font-medium text-[rgb(var(--color-text))]">Signals involved:</span> {event.signals.join(' • ')}
-                                    </p>
-                                  ) : null}
-                                  {confidence ? (
-                                    <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
-                                      <span className="font-medium text-[rgb(var(--color-text))]">Confidence:</span> {confidence}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              </details>
-                            ) : null}
-                          </div>
-                          <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">{fmtDate(event.date)}</div>
-                        </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 max-w-3xl">
+                        <h3>{event.title}</h3>
+                        <p className="mt-2 text-sm text-[rgb(var(--color-text))]">{event.description}</p>
+                      </div>
+                      <Icon className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
+                    </div>
 
-                        {event.actionLabel && event.actionTarget ? (
-                          <div className="mt-4 flex flex-wrap gap-3">
+                    {(event.evidence || (event.signals && event.signals.length) || confidence) ? (
+                      <details className="eb-collapsible mt-4">
+                        <summary>
+                          <span>Why this is here</span>
+                          <ChevronDown className="w-4 h-4 text-[rgb(var(--color-text-secondary))]" />
+                        </summary>
+                        <div>
+                          {event.evidence ? (
+                            <p className="text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                              <span className="font-medium text-[rgb(var(--color-text))]">Why this is here:</span> {event.evidence}
+                            </p>
+                          ) : null}
+                          {event.signals && event.signals.length ? (
+                            <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                              <span className="font-medium text-[rgb(var(--color-text))]">Signals involved:</span> {event.signals.join(' • ')}
+                            </p>
+                          ) : null}
+                          {confidence ? (
+                            <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                              <span className="font-medium text-[rgb(var(--color-text))]">Confidence:</span> {confidence}
+                            </p>
+                          ) : null}
+                        </div>
+                      </details>
+                    ) : null}
+
+                    {(event.actionLabel && event.actionTarget) || (event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string') ? (
+                      <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+                        <div className="flex flex-wrap gap-3">
+                          {event.actionLabel && event.actionTarget ? (
                             <button
                               type="button"
                               className="eb-btn eb-btn-primary"
@@ -191,21 +190,8 @@ export function History({ onNavigate }: HistoryProps) {
                             >
                               {event.actionLabel}
                             </button>
-                            {event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
-                              <button
-                                type="button"
-                                className="eb-btn eb-btn-secondary"
-                                onClick={() => {
-                                  reopenPatternForReview(String(event.metadata?.patternFeedbackId), 0.45);
-                                  setHistoryTick((v) => v + 1);
-                                }}
-                              >
-                                Undo correction
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
-                          <div className="mt-4">
+                          ) : null}
+                          {event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
                             <button
                               type="button"
                               className="eb-btn eb-btn-secondary"
@@ -216,10 +202,15 @@ export function History({ onNavigate }: HistoryProps) {
                             >
                               Undo correction
                             </button>
-                          </div>
-                        ) : null}
+                          ) : null}
+                        </div>
+                        <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap sm:text-right">{fmtDate(event.date)}</div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="mt-4 flex justify-end">
+                        <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">{fmtDate(event.date)}</div>
+                      </div>
+                    )}
                   </article>
                 );
               })}
