@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X, ChevronRight, Smile, Meh, Frown, Heart, FlaskConical, Sparkles } from 'lucide-react';
+import { PencilLine, Droplet, Droplets, Egg, X, ChevronRight, Smile, Meh, Frown, Heart, FlaskConical, Sparkles, Flag } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
@@ -206,6 +206,7 @@ function getCalendarMarkers(args: {
   hasSex: boolean;
 }): CalendarMarker[] {
   const iconProps = { size: 11, strokeWidth: 1.75, className: 'opacity-80' } as const;
+  const predictedFlagProps = { size: 11, strokeWidth: 1.75, className: 'opacity-80' } as const;
   const markers: CalendarMarker[] = [];
 
   if (args.isCycleStart) {
@@ -213,14 +214,14 @@ function getCalendarMarkers(args: {
       key: 'cycleStart',
       priority: 0,
       label: 'Cycle start',
-      icon: <CycleFlagIcon size={11} className="opacity-80" filled />,
+      icon: <CycleFlagIcon size={12} className="opacity-80" filled />,
     });
   } else if (args.isPredictedCycleStart) {
     markers.push({
       key: 'predictedCycleStart',
       priority: 1,
       label: 'Predicted cycle start',
-      icon: <CycleFlagIcon size={11} className="opacity-80" />,
+      icon: <Flag {...predictedFlagProps} aria-hidden="true" />,
     });
   }
   if (args.isPeriod) {
@@ -943,7 +944,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
               className={cn('eb-btn-secondary flex items-center gap-2 justify-center', isStart ? 'bg-[rgb(var(--color-primary)/0.10)] border-[rgb(var(--color-primary)/0.30)]' : '')}
               onClick={() => { toggleStart(!isStart); setEditISO(null); }}
             >
-              <CycleFlagIcon size={16} filled className="text-current" />
+              <CycleFlagIcon size={17} filled className="text-current" />
               <span>{isStart ? 'Remove cycle start' : 'Set as cycle start'}</span>
             </button>
 
@@ -1147,12 +1148,12 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <CycleFlagIcon size={11} filled className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                <CycleFlagIcon size={12} filled className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                 <span>Cycle start</span>
               </div>
               {cycleEnabled && hasCycleAnchor && predictedNextCycleStartISO && (
                 <div className="flex items-center gap-2">
-                  <CycleFlagIcon size={11} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                  <Flag size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                   <span>Predicted cycle start</span>
                 </div>
               )}
