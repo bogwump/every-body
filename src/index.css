@@ -205,28 +205,27 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   /* Interactive selector wrappers only. These are for local state/view changes,
-     never for primary or secondary actions. */
+     never for primary or secondary actions. Match the compact Profile selector pills. */
   .eb-choice-pill,
   .eb-chip-filter {
     @apply inline-flex items-center justify-center text-sm font-medium transition;
-    min-height: 2.15rem;
-    padding: 0.42rem 0.9rem;
+    min-height: 1.92rem;
+    padding: 0.22rem 0.82rem;
     border-radius: 9999px;
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
+    border: 1px solid rgb(var(--color-border) / 0.95);
+    background: rgb(var(--color-surface) / 0.96);
+    color: rgb(var(--color-text-secondary));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.75);
   }
 
-  .eb-choice-pill {
-    border: 1px solid rgb(var(--color-primary) / 0.18);
-    background: rgb(var(--color-primary) / 0.08);
-    color: rgb(var(--color-primary-dark));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
-  }
-
-  .eb-choice-pill:hover {
-    background: rgb(var(--color-primary) / 0.12);
+  .eb-choice-pill:hover,
+  .eb-chip-filter:hover {
+    color: rgb(var(--color-text));
     border-color: rgb(var(--color-primary) / 0.24);
+    background: rgb(255 255 255 / 0.985);
   }
 
   .eb-choice-pill:focus-visible,
@@ -238,55 +237,36 @@ body.eb-chat-typing .eb-mobile-nav {
     box-shadow: 0 0 0 4px rgb(var(--color-primary) / 0.12);
   }
 
-  .eb-choice-pill[data-selected="true"] {
-    color: white;
-    background: linear-gradient(180deg, rgb(var(--color-primary)), rgb(var(--color-primary-dark)));
-    border-color: rgb(var(--color-primary-dark) / 0.28);
-    box-shadow: 0 4px 12px rgb(var(--color-primary-dark) / 0.14);
+  .eb-choice-pill[data-selected="true"],
+  .eb-chip-filter[data-active="true"],
+  .eb-chip-filter-active {
+    color: rgb(var(--color-text));
+    background: rgb(var(--color-surface) / 0.98);
+    border-color: rgb(var(--color-primary) / 0.42);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
   }
 
   .eb-choice-pill[data-tone="soft"] {
-    background: rgb(var(--color-primary-light) / 0.32);
-    border-color: rgb(var(--color-primary-light) / 0.42);
-    color: rgb(var(--color-primary-dark));
+    background: rgb(var(--color-surface-alt) / 0.9);
+    border-color: rgb(var(--color-border) / 0.9);
+    color: rgb(var(--color-text-secondary));
   }
 
-  /* Passive metadata tags only. These should never inherit interactive button styles. */
+  /* Passive metadata tags only. Match the compact tags used at the top of Insights. */
   .eb-chip,
   .eb-pill,
   .eb-chip-meta {
     @apply inline-flex items-center gap-1.5 text-xs font-medium;
-    min-height: 1.9rem;
-    padding: 0.28rem 0.8rem;
+    min-height: 1.72rem;
+    padding: 0.2rem 0.7rem;
     border-radius: 9999px;
     white-space: nowrap;
-    background: rgb(var(--color-primary) / 0.06);
-    color: rgb(var(--color-primary-dark));
-    border: 1px solid rgb(var(--color-primary) / 0.12);
-    cursor: default;
-    user-select: none;
-  }
-
-  .eb-chip-filter {
-    gap: 0.5rem;
     background: rgb(var(--color-surface) / 0.94);
     color: rgb(var(--color-text-secondary));
-    border: 1px solid rgb(var(--color-border) / 0.95);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6);
-  }
-
-  .eb-chip-filter:hover {
-    color: rgb(var(--color-text));
-    background: rgb(255 255 255 / 0.98);
-    border-color: rgb(var(--color-primary) / 0.22);
-  }
-
-  .eb-chip-filter[data-active="true"],
-  .eb-chip-filter-active {
-    color: white;
-    background: linear-gradient(180deg, rgb(var(--color-primary)), rgb(var(--color-primary-dark)));
-    border-color: rgb(var(--color-primary-dark) / 0.28);
-    box-shadow: 0 4px 12px rgb(var(--color-primary-dark) / 0.14);
+    border: 1px solid rgb(var(--color-border) / 0.9);
+    cursor: default;
+    user-select: none;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7);
   }
 
   .eb-chip-filter:disabled,
