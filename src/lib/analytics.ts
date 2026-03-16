@@ -191,31 +191,28 @@ export function estimatePhaseByFlow(
     return Math.max(0, Math.min(10, scaled));
   };
 
-  // If you are bleeding/spotting *today*, that's Menstrual regardless of day count.
-  const todayFlow = flowTo10((sorted[idx] as any)?.values?.flow);
-  if (todayFlow != null && todayFlow > 0) return "Menstrual";
+  const entry: any = sorted[idx];
+  const isOverrideDay = Boolean(entry?.cycleStartOverride);
+  const isBreakthrough = Boolean(entry?.breakthroughBleed);
+  const rawFlow = flowTo10(entry?.values?.flow);
+  const effectiveFlow = isBreakthrough ? 0 : rawFlow;
 
-  // (Duplicate block removed) bleeding/spotting today already handled above.
+  // Treat manual cycle starts and genuine bleeding days as menstrual/reset anchors.
+  if (isOverrideDay) return "Menstrual";
+  if (effectiveFlow != null && effectiveFlow > 0) return "Menstrual";
 
-  // Find most recent day with flow > 0 up to idx.
-  // NOTE: flow is now treated as a 0–10 scale (older builds stored 0–100).
-  let lastBleedIndex = -1;
-  for (let i = idx; i >= 0; i--) {
-    const flow = flowTo10((sorted[i] as any)?.values?.flow);
-    if (flow != null && flow > 0) {
-      lastBleedIndex = i;
-      break;
-    }
-  }
+  // Use the same cycle-start detection as the wider rhythm engine so phase bucketing
+  // stays aligned across Dashboard, Insights, Calendar and Rhythm.
+  const starts = getCycleStarts(sorted).filter((iso) => iso <= dateISO);
+  const lastStart = starts.length ? starts[starts.length - 1] : null;
+  if (!lastStart) return null;
 
-  if (lastBleedIndex === -1) return null;
+  const stats = computeCycleStats(sorted);
+  const cycleLen = stats.avgLength ?? stats.lastLength ?? 28;
+  const dayInCycle = daysBetweenISO(lastStart, dateISO) + 1;
+  if (!Number.isFinite(dayInCycle) || dayInCycle < 1 || dayInCycle > 60) return null;
 
-  const daySince = idx - lastBleedIndex; // 0 = bleeding day
-
-  if (daySince <= 4) return "Menstrual";
-  if (daySince <= 12) return "Follicular";
-  if (daySince <= 15) return "Ovulation";
-  return "Luteal";
+  return phaseFromDayInCycle(dayInCycle, cycleLen, effectiveFlow).sci;
 }
 
 
