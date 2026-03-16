@@ -216,17 +216,10 @@ body.eb-chat-typing .eb-mobile-nav {
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
-    border: 1px solid rgb(var(--color-primary-dark) / 0.22);
-    background: rgb(var(--color-primary-light) / 0.15);
-    color: rgb(var(--color-primary-dark) / 0.62);
+    border: 1px solid color-mix(in srgb, rgb(var(--color-primary-dark)) 22%, white);
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 18%, white);
+    color: color-mix(in srgb, rgb(var(--color-primary-dark)) 62%, white);
     box-shadow: none;
-  }
-
-  .eb-choice-pill:hover,
-  .eb-chip-filter:hover {
-    color: rgb(var(--color-primary-dark) / 0.82);
-    border-color: rgb(var(--color-primary-dark) / 0.34);
-    background: rgb(var(--color-primary-light) / 0.20);
   }
 
   .eb-choice-pill:focus-visible,
@@ -242,15 +235,15 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-chip-filter[data-active="true"],
   .eb-chip-filter-active {
     color: rgb(var(--color-primary-dark));
-    background: rgb(var(--color-primary-light) / 0.42);
-    border-color: rgb(var(--color-primary-dark) / 0.52);
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 42%, white);
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 52%, white);
     box-shadow: none;
   }
 
   .eb-choice-pill[data-tone="soft"] {
-    background: rgb(var(--color-primary-light) / 0.12);
-    border-color: rgb(var(--color-primary-dark) / 0.18);
-    color: rgb(var(--color-primary-dark) / 0.58);
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 14%, white);
+    border-color: color-mix(in srgb, rgb(var(--color-primary-dark)) 18%, white);
+    color: color-mix(in srgb, rgb(var(--color-primary-dark)) 58%, white);
   }
 
   /* Passive metadata tags only. Match the compact tags used at the top of Insights. */
@@ -262,9 +255,9 @@ body.eb-chat-typing .eb-mobile-nav {
     padding: 0.2rem 0.7rem;
     border-radius: 9999px;
     white-space: nowrap;
-    background: rgb(var(--color-primary-light) / 0.15);
+    background: color-mix(in srgb, rgb(var(--color-primary-light)) 16%, white);
     color: rgb(var(--color-primary-dark));
-    border: 1px solid rgb(var(--color-primary-dark) / 0.16);
+    border: 1px solid color-mix(in srgb, rgb(var(--color-primary-dark)) 16%, white);
     cursor: default;
     user-select: none;
     box-shadow: none;

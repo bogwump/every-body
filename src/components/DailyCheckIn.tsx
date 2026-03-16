@@ -1297,12 +1297,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                                   key={n}
                                   type="button"
                                   onClick={() => setSleepDetails((p) => ({ ...p, timesWoke: n as any }))}
-                                  className="eb-pill"
-                                  style={
-                                    active
-                                      ? { background: 'rgba(var(--color-primary), 0.15)', color: 'rgb(var(--color-primary))' }
-                                      : { background: 'rgba(0,0,0,0.05)', color: 'rgb(var(--color-text-secondary))' }
-                                  }
+                                  className="eb-choice-pill"
+                                  data-selected={active ? 'true' : undefined}
                                 >
                                   {label}
                                 </button>
@@ -1325,12 +1321,8 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                                   key={opt.v}
                                   type="button"
                                   onClick={() => setSleepDetails((p) => ({ ...p, troubleFallingAsleep: opt.v as any }))}
-                                  className="eb-pill"
-                                  style={
-                                    active
-                                      ? { background: 'rgba(var(--color-primary), 0.15)', color: 'rgb(var(--color-primary))' }
-                                      : { background: 'rgba(0,0,0,0.05)', color: 'rgb(var(--color-text-secondary))' }
-                                  }
+                                  className="eb-choice-pill"
+                                  data-selected={active ? 'true' : undefined}
                                 >
                                   {opt.label}
                                 </button>
