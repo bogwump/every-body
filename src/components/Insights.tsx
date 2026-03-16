@@ -363,7 +363,7 @@ function slope(values: Array<{ x: number; y: number }>): number {
 }
 
 function chipClass(active: boolean) {
-  return active ? 'eb-choice-pill eb-chip-filter-active' : 'eb-choice-pill';
+  return active ? 'eb-chip-filter eb-chip-filter-active' : 'eb-chip-filter';
 }
 
 function strengthLabel(r: number): 'Small' | 'Moderate' | 'Strong' | 'Unknown' {
@@ -4685,14 +4685,14 @@ const tryNextPrompts = useMemo(() => {
           </div>
 
           <div className="shrink-0 flex flex-wrap gap-2 justify-end">
-            <button type="button" className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-sm text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium" onClick={() => setDataEvidenceOpen((prev) => !prev)}>
+            <button type="button" className="eb-btn eb-btn-primary" onClick={() => setDataEvidenceOpen((prev) => !prev)}>
               {dataEvidenceOpen ? 'Hide your data' : 'See your data'}
             </button>
             <Dialog>
             <DialogTrigger asChild>
               <button
                 type="button"
-                className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-sm text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium"
+                className="eb-btn eb-btn-secondary"
               >
                 Change metrics
               </button>
@@ -4726,7 +4726,7 @@ const tryNextPrompts = useMemo(() => {
 
                       type="button"
 
-                      className="shrink-0 rounded-full border border-black/10 px-3 py-1 text-sm eb-muted hover:bg-black/5"
+                      className="eb-btn eb-btn-tertiary shrink-0"
 
                     >
 

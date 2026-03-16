@@ -204,11 +204,20 @@ body.eb-chat-typing .eb-mobile-nav {
     @apply flex flex-wrap gap-2;
   }
 
-  .eb-choice-pill {
+  /* Interactive selector wrappers only. These are for local state/view changes,
+     never for primary or secondary actions. */
+  .eb-choice-pill,
+  .eb-chip-filter {
     @apply inline-flex items-center justify-center text-sm font-medium transition;
     min-height: 2.15rem;
     padding: 0.42rem 0.9rem;
     border-radius: 9999px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .eb-choice-pill {
     border: 1px solid rgb(var(--color-primary) / 0.18);
     background: rgb(var(--color-primary) / 0.08);
     color: rgb(var(--color-primary-dark));
@@ -242,6 +251,7 @@ body.eb-chat-typing .eb-mobile-nav {
     color: rgb(var(--color-primary-dark));
   }
 
+  /* Passive metadata tags only. These should never inherit interactive button styles. */
   .eb-chip,
   .eb-pill,
   .eb-chip-meta {
@@ -249,16 +259,16 @@ body.eb-chat-typing .eb-mobile-nav {
     min-height: 1.9rem;
     padding: 0.28rem 0.8rem;
     border-radius: 9999px;
+    white-space: nowrap;
     background: rgb(var(--color-primary) / 0.06);
     color: rgb(var(--color-primary-dark));
     border: 1px solid rgb(var(--color-primary) / 0.12);
+    cursor: default;
+    user-select: none;
   }
 
   .eb-chip-filter {
-    @apply inline-flex items-center justify-center gap-2 text-sm font-medium transition;
-    min-height: 2.15rem;
-    padding: 0.42rem 0.9rem;
-    border-radius: 9999px;
+    gap: 0.5rem;
     background: rgb(var(--color-surface) / 0.94);
     color: rgb(var(--color-text-secondary));
     border: 1px solid rgb(var(--color-border) / 0.95);
