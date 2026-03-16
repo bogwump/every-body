@@ -189,7 +189,7 @@ export function History({ onNavigate }: HistoryProps) {
                           <div className="mt-4 flex flex-wrap gap-3">
                             <button
                               type="button"
-                              className="eb-btn eb-btn-secondary"
+                              className="eb-btn eb-btn-primary"
                               onClick={() => navigateToTarget(event.actionTarget, onNavigate)}
                             >
                               {event.actionLabel}
