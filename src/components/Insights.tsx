@@ -26,6 +26,7 @@ import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, Exper
 import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
 import { calculateStreak, estimatePhaseByFlow, filterByDays, pearsonCorrelation, sortByDateAsc } from '../lib/analytics';
 import { isoFromDateLocal, isoTodayLocal } from '../lib/date';
+import { getCycleTrustModel } from '../lib/cycleTrust';
 import { SYMPTOM_META, kindLabel } from '../lib/symptomMeta';
 import { getMixedChartColors } from '../lib/chartPalette';
 import { isMetricInScope } from '../lib/insightsScope';

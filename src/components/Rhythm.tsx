@@ -4,6 +4,7 @@ import { RhythmHero } from './RhythmHero';
 import { PhaseHistoryCard } from './PhaseHistoryCard';
 import { useEntries, useExperimentHistory } from '../lib/appStore';
 import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
+import { getCycleTrustModel } from '../lib/cycleTrust';
 import { getExperimentLearnings, getWhatsComingPredictions } from '../lib/rhythmPredictions';
 import { getPhaseHistory } from '../lib/phaseHistory';
 import { getRhythmPhaseState } from '../lib/phaseChange';
