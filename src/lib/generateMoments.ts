@@ -2,7 +2,7 @@ import type { CheckInEntry, UserData } from '../types';
 import { isoTodayLocal } from './date';
 import type { InsightSignal } from './insightEngine';
 import { getDiscoveredPatterns, getTopInsights } from './insightEngine';
-import { createMoment, getActiveMoments, getCompanionMoments, getHighestPriorityMoment } from './companionMoments';
+import { createMoment, getActiveMoments, getCompanionMoments, getHighestPriorityMoment, hasArchivedMomentId } from './companionMoments';
 import { generateExperimentSuggestions, getExperimentForSignal, rankExperimentSuggestions } from './experimentSuggestions';
 import { detectLongCycle, detectShortCycle, detectUnusualPhaseLength } from './rhythmDiagnostics';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
@@ -13,7 +13,7 @@ import { phaseLabelFromKey } from './phaseChange';
 import { getResurfacingPatternMoment } from './patternIntelligence';
 
 function hasMomentWithId(id: string): boolean {
-  return getCompanionMoments().some((moment) => moment.id === id);
+  return getCompanionMoments().some((moment) => moment.id === id) || hasArchivedMomentId(id);
 }
 
 function readExperimentHistory(): any[] {

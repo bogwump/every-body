@@ -287,7 +287,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         confidence: item.confidence,
         source: 'archive',
         actionLabel: item.button,
-        actionTarget: item.screen,
+        actionTarget: item.focusTarget || item.screen,
         metadata,
       };
     case 'helpful_pattern_detected':
@@ -302,7 +302,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         confidence: item.confidence,
         source: 'archive',
         actionLabel: item.button,
-        actionTarget: item.screen,
+        actionTarget: item.focusTarget || item.screen,
         metadata,
       };
     case 'rhythm_shift':
@@ -318,7 +318,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         confidence: item.confidence,
         source: 'archive',
         actionLabel: item.button,
-        actionTarget: item.screen,
+        actionTarget: item.focusTarget || item.screen,
         metadata,
       };
     case 'experiment_suggestion':
@@ -336,7 +336,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         confidence: item.confidence,
         source: 'archive',
         actionLabel: item.button,
-        actionTarget: item.screen,
+        actionTarget: item.focusTarget || item.screen,
         metadata,
       };
     default:

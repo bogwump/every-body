@@ -1,6 +1,6 @@
 import type { CheckInEntry, CyclePhase, ExperimentHistoryItem, InsightMetricKey, UserData } from '../types';
 import type { InsightSignal } from './insightEngine';
-import { getCompanionMoments, type CompanionMoment, type CompanionMomentType } from './companionMoments';
+import { getArchivedMomentSnapshots, getCompanionMoments, type ArchivedCompanionMoment, type CompanionMoment, type CompanionMomentType } from './companionMoments';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
 import { getExperimentLearnings, getWhatsComingPredictions } from './rhythmPredictions';
 import { getCycleAwarePredictionLines, getPatternContextForSignal, getWeeklyPatternReflection } from './patternIntelligence';
@@ -114,6 +114,27 @@ function recentMomentMatch(args: {
   });
 }
 
+function recentArchivedMomentMatch(args: {
+  moments: ArchivedCompanionMoment[];
+  type: CompanionMomentType;
+  refISO: string;
+  cooldownDays: number;
+  signalId?: string;
+  experimentId?: string;
+  reasons?: ArchivedCompanionMoment['archivedReason'][];
+}): boolean {
+  return args.moments.some((moment) => {
+    if (moment.type !== args.type) return false;
+    if (args.reasons && args.reasons.length > 0 && !args.reasons.includes(moment.archivedReason)) return false;
+    const age = daysBetweenISO(moment.date, args.refISO);
+    if (age < 0 || age > args.cooldownDays) return false;
+    const data = (moment.metadata ?? {}) as Record<string, unknown>;
+    if (args.signalId && data.signalId && String(data.signalId) !== String(args.signalId)) return false;
+    if (args.experimentId && data.experimentId && String(data.experimentId) !== String(args.experimentId)) return false;
+    return true;
+  });
+}
+
 export function shouldSuppressCompanionMoment(args: {
   type: CompanionMomentType;
   refISO: string;
@@ -123,9 +144,18 @@ export function shouldSuppressCompanionMoment(args: {
   dismissalCooldownDays?: number;
 }): boolean {
   const moments = getCompanionMoments();
+  const archived = getArchivedMomentSnapshots();
   if (recentMomentMatch({ moments, ...args, includeDismissed: false })) return true;
+  if (recentArchivedMomentMatch({
+    moments: archived,
+    type: args.type,
+    refISO: args.refISO,
+    cooldownDays: args.cooldownDays,
+    signalId: args.signalId,
+    experimentId: args.experimentId,
+  })) return true;
   if ((args.dismissalCooldownDays ?? 0) > 0) {
-    return recentMomentMatch({
+    if (recentMomentMatch({
       moments,
       type: args.type,
       refISO: args.refISO,
@@ -133,6 +163,15 @@ export function shouldSuppressCompanionMoment(args: {
       signalId: args.signalId,
       experimentId: args.experimentId,
       includeDismissed: true,
+    })) return true;
+    return recentArchivedMomentMatch({
+      moments: archived,
+      type: args.type,
+      refISO: args.refISO,
+      cooldownDays: args.dismissalCooldownDays ?? 0,
+      signalId: args.signalId,
+      experimentId: args.experimentId,
+      reasons: ['dismissed', 'interacted'],
     });
   }
   return false;

@@ -36,6 +36,7 @@ export type ArchivedCompanionMoment = {
   body: string;
   button?: string;
   screen?: string;
+  focusTarget?: string;
   confidence?: string;
   signals?: string[];
   metadata?: Record<string, unknown>;
@@ -48,6 +49,20 @@ export type CompanionMomentDisplayCopy = {
   button: string;
   screen: string;
 };
+
+export function getMomentFocusTarget(moment: CompanionMoment): string | undefined {
+  switch (moment.type) {
+    case 'experiment_suggestion':
+    case 'experiment_result_ready':
+      return 'insights:experiments';
+    case 'new_pattern':
+    case 'helpful_pattern_detected':
+    case 'unlock_milestone':
+      return 'insights:full-insights';
+    default:
+      return undefined;
+  }
+}
 
 const MOMENT_PRIORITY: Record<CompanionMomentType, number> = {
   phase_change: 1,
@@ -119,6 +134,7 @@ function normaliseArchive(value: unknown): ArchivedCompanionMoment | null {
     body: typeof item.body === 'string' ? item.body : '',
     button: typeof item.button === 'string' ? item.button : undefined,
     screen: typeof item.screen === 'string' ? item.screen : undefined,
+    focusTarget: typeof item.focusTarget === 'string' ? item.focusTarget : undefined,
     confidence: typeof item.confidence === 'string' ? item.confidence : undefined,
     signals: Array.isArray(item.signals) ? item.signals.map((entry) => String(entry)) : undefined,
     metadata: item.metadata && typeof item.metadata === 'object' ? (item.metadata as Record<string, unknown>) : undefined,
@@ -245,6 +261,10 @@ export function getArchivedMomentSnapshots(limit = MOMENT_HISTORY_LIMIT): Archiv
     .slice(0, limit);
 }
 
+export function hasArchivedMomentId(id: string): boolean {
+  return getArchivedMomentSnapshots(MOMENT_HISTORY_LIMIT).some((item) => item.momentId === id || item.archiveId === id);
+}
+
 function writeArchivedMomentSnapshots(items: ArchivedCompanionMoment[]) {
   writeJson(COMPANION_MOMENT_ARCHIVE_KEY, items.slice(0, MOMENT_HISTORY_LIMIT));
 }
@@ -266,6 +286,7 @@ function archiveMoment(moment: CompanionMoment, reason: ArchivedCompanionMoment[
     body: copy.body,
     button: copy.button,
     screen: copy.screen,
+    focusTarget: getMomentFocusTarget(moment),
     confidence: typeof moment.data?.confidence === 'string' ? String(moment.data.confidence) : undefined,
     signals: toSignalLabels(moment.data),
     metadata: {
@@ -323,7 +344,7 @@ export function createMoment(input: {
   const id = input.id ?? `${input.type}:${date}:${dataSig}`;
 
   const duplicate = moments.some((moment) => moment.id === id || (moment.type === input.type && serialiseData(moment.data) === dataSig && moment.date === date));
-  if (duplicate) return moments;
+  if (duplicate || hasArchivedMomentId(id)) return moments;
 
   const sameDayMoments = moments.filter((moment) => moment.date === date && !moment.dismissed);
   const sameDayHighest = sameDayMoments.slice().sort(sortByPriorityThenDate)[0] ?? null;

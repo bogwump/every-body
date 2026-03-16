@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, FlaskConical, RefreshCw, Sparkles, Star, X } from 'lucide-react';
-import { dismissMoment, getMomentDisplayCopy, type CompanionMoment } from '../lib/companionMoments';
+import { dismissMoment, getMomentDisplayCopy, getMomentFocusTarget, type CompanionMoment } from '../lib/companionMoments';
 import { inferPendingExperimentLaunchFromText, queuePendingExperimentLaunch } from '../lib/experimentLaunch';
 import { phaseLabelFromKey } from '../lib/phaseChange';
 
@@ -31,19 +31,6 @@ function setPageFocus(target?: string) {
   }
 }
 
-function targetForMoment(moment: CompanionMoment): string | null {
-  switch (moment.type) {
-    case 'experiment_suggestion':
-    case 'experiment_result_ready':
-      return 'insights:experiments';
-    case 'new_pattern':
-    case 'helpful_pattern_detected':
-    case 'unlock_milestone':
-      return 'insights:full-insights';
-    default:
-      return null;
-  }
-}
 
 export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate: (screen: string) => void; onDismiss?: () => void }) {
   const copy = getMomentDisplayCopy(props.moment);
@@ -57,7 +44,7 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
 
   const handlePrimaryAction = () => {
     const data = props.moment.data ?? {};
-    const focusTarget = targetForMoment(props.moment);
+    const focusTarget = getMomentFocusTarget(props.moment) ?? null;
     if (props.moment.type === 'experiment_suggestion') {
       const inferred = inferPendingExperimentLaunchFromText(
         typeof data.title === 'string' ? data.title : copy.title,
