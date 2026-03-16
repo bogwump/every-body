@@ -577,7 +577,6 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     const byISO = new Map<string, any>();
     for (const e of entriesSorted) byISO.set(e.dateISO, e);
 
-    const learnedBleedLength = learnedBleedLength;
 
     for (const startISO of cycleStarts) {
       let seenPositive = false;
