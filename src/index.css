@@ -205,18 +205,19 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   .eb-choice-pill {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-semibold transition;
-    min-height: 2.75rem;
-    border-radius: 1rem;
-    border: 1px solid rgb(var(--color-primary) / 0.16);
-    background: rgb(var(--color-primary) / 0.10);
+    @apply inline-flex items-center justify-center text-sm font-medium transition;
+    min-height: 2.15rem;
+    padding: 0.42rem 0.9rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(var(--color-primary) / 0.18);
+    background: rgb(var(--color-primary) / 0.08);
     color: rgb(var(--color-primary-dark));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.54);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
   }
 
   .eb-choice-pill:hover {
-    background: rgb(var(--color-primary) / 0.14);
-    border-color: rgb(var(--color-primary) / 0.22);
+    background: rgb(var(--color-primary) / 0.12);
+    border-color: rgb(var(--color-primary) / 0.24);
   }
 
   .eb-choice-pill:focus-visible,
@@ -231,8 +232,8 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-choice-pill[data-selected="true"] {
     color: white;
     background: linear-gradient(180deg, rgb(var(--color-primary)), rgb(var(--color-primary-dark)));
-    border-color: rgb(var(--color-primary-dark) / 0.3);
-    box-shadow: 0 10px 22px rgb(var(--color-primary-dark) / 0.18);
+    border-color: rgb(var(--color-primary-dark) / 0.28);
+    box-shadow: 0 4px 12px rgb(var(--color-primary-dark) / 0.14);
   }
 
   .eb-choice-pill[data-tone="soft"] {
@@ -244,16 +245,19 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-chip,
   .eb-pill,
   .eb-chip-meta {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 text-xs font-medium;
+    min-height: 1.9rem;
+    padding: 0.28rem 0.8rem;
     border-radius: 9999px;
-    background: rgb(var(--color-primary) / 0.09);
+    background: rgb(var(--color-primary) / 0.06);
     color: rgb(var(--color-primary-dark));
-    border: 1px solid rgb(var(--color-primary) / 0.16);
+    border: 1px solid rgb(var(--color-primary) / 0.12);
   }
 
   .eb-chip-filter {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold transition;
-    min-height: 2.35rem;
+    @apply inline-flex items-center justify-center gap-2 text-sm font-medium transition;
+    min-height: 2.15rem;
+    padding: 0.42rem 0.9rem;
     border-radius: 9999px;
     background: rgb(var(--color-surface) / 0.94);
     color: rgb(var(--color-text-secondary));
@@ -271,8 +275,8 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-chip-filter-active {
     color: white;
     background: linear-gradient(180deg, rgb(var(--color-primary)), rgb(var(--color-primary-dark)));
-    border-color: rgb(var(--color-primary-dark) / 0.3);
-    box-shadow: 0 8px 18px rgb(var(--color-primary-dark) / 0.16);
+    border-color: rgb(var(--color-primary-dark) / 0.28);
+    box-shadow: 0 4px 12px rgb(var(--color-primary-dark) / 0.14);
   }
 
   .eb-chip-filter:disabled,

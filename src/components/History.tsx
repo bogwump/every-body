@@ -113,7 +113,7 @@ export function History({ onNavigate }: HistoryProps) {
                 className={[
                   'eb-chip-filter',
                   active
-                    ? 'eb-chip-filter-active !border-white/20 !bg-white/20 !text-white !shadow-[0_8px_20px_rgba(31,41,55,0.08)]'
+                    ? 'eb-chip-filter-active'
                     : '!border-white/20 !bg-white/10 !text-white/85 hover:!bg-white/14 hover:!text-white'
                 ].join(' ')}
                 data-active={active}

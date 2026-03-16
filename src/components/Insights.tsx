@@ -363,12 +363,7 @@ function slope(values: Array<{ x: number; y: number }>): number {
 }
 
 function chipClass(active: boolean) {
-  return (
-    'px-3 py-1.5 rounded-2xl text-sm transition ' +
-    (active
-      ? 'bg-black text-white shadow-sm'
-      : 'bg-white text-black border border-[rgba(0,0,0,0.08)] hover:border-[rgba(0,0,0,0.18)]')
-  );
+  return active ? 'eb-choice-pill eb-chip-filter-active' : 'eb-choice-pill';
 }
 
 function strengthLabel(r: number): 'Small' | 'Moderate' | 'Strong' | 'Unknown' {
@@ -3734,7 +3729,7 @@ const tryNextPrompts = useMemo(() => {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                className="eb-btn eb-btn-primary min-h-[3.25rem] px-3 text-center leading-5"
+                className="eb-btn eb-btn-primary w-full min-h-[3rem] px-4 text-center leading-5"
                 onClick={() => {
                   setDataEvidenceOpen(true);
                   scrollToInsightsSection('eb-insights-settings');
@@ -3744,14 +3739,14 @@ const tryNextPrompts = useMemo(() => {
               </button>
               <button
                 type="button"
-                className="eb-btn eb-btn-primary min-h-[3.25rem] px-3 text-center leading-5"
+                className="eb-btn eb-btn-primary w-full min-h-[3rem] px-4 text-center leading-5"
                 onClick={() => scrollToInsightsSection('eb-experiments')}
               >
                 Run experiment
               </button>
               <button
                 type="button"
-                className="eb-btn eb-btn-primary col-span-2 min-h-[3.25rem] px-3 text-center leading-5"
+                className="eb-btn eb-btn-primary col-span-2 w-full min-h-[3rem] px-4 text-center leading-5"
                 onClick={() => scrollToInsightsSection('eb-insights-settings')}
               >
                 Change metrics
@@ -4131,7 +4126,7 @@ const tryNextPrompts = useMemo(() => {
 	          <div className="pt-3 shrink-0 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
 	            <button
 	              type="button"
-	              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium"
+	              className="eb-btn eb-btn-primary min-h-[3rem] px-6"
 	              onClick={startExperiment}
 	            >
 	              {`Start ${experimentDurationDays}-day experiment`}
