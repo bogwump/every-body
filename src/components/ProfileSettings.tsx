@@ -880,10 +880,16 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             <button
               type="button"
               onClick={() =>
-                onUpdateUserData((prev) => ({
-                  ...prev,
-                  cycleTrackingMode: prev.cycleTrackingMode === 'cycle' ? 'no-cycle' : 'cycle',
-                }))
+                onUpdateUserData((prev) => {
+                  const nextCycleTrackingMode = prev.cycleTrackingMode === 'cycle' ? 'no-cycle' : 'cycle';
+                  return {
+                    ...prev,
+                    cycleTrackingMode: nextCycleTrackingMode,
+                    fertilityMode: nextCycleTrackingMode === 'cycle' ? prev.fertilityMode : false,
+                    autoStartPeriodFromBleeding:
+                      nextCycleTrackingMode === 'cycle' ? prev.autoStartPeriodFromBleeding : false,
+                  };
+                })
               }
               className={`shrink-0 w-12 h-6 rounded-full transition-all ${
                 userData.cycleTrackingMode === 'cycle' ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
@@ -901,12 +907,15 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             <div>
               <p className="font-medium mb-1">Fertility mode</p>
               <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {userData.fertilityMode ? 'On (shows fertile window shading and a discreet sex log)' : 'Off'}
+                {userData.cycleTrackingMode === 'cycle'
+                  ? (userData.fertilityMode ? 'On (shows fertile window shading and a discreet sex log)' : 'Off')
+                  : 'Turn on cycle tracking to use fertility predictions'}
               </p>
             </div>
 
             <button
               type="button"
+              disabled={userData.cycleTrackingMode !== 'cycle'}
               onClick={() =>
                 onUpdateUserData((prev) => ({
                   ...prev,
@@ -915,7 +924,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               }
               className={`shrink-0 w-12 h-6 rounded-full transition-all ${
                 userData.fertilityMode ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-              }`}
+              } ${userData.cycleTrackingMode !== 'cycle' ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -929,12 +938,15 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             <div>
               <p className="font-medium mb-1">Auto-start periods from bleeding</p>
               <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {autoStartPeriodFromBleedingLabel}
+                {userData.cycleTrackingMode === 'cycle'
+                  ? autoStartPeriodFromBleedingLabel
+                  : 'Turn on cycle tracking to let bleeding start a new cycle automatically'}
               </p>
             </div>
 
             <button
               type="button"
+              disabled={userData.cycleTrackingMode !== 'cycle'}
               onClick={() =>
                 onUpdateUserData((prev) => ({
                   ...prev,
@@ -943,7 +955,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               }
               className={`shrink-0 w-12 h-6 rounded-full transition-all ${
                 autoStartPeriodFromBleeding ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-              }`}
+              } ${userData.cycleTrackingMode !== 'cycle' ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -952,6 +964,10 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               />
             </button>
           </div>
+
+          <p className="mt-4 text-xs text-[rgb(var(--color-text-secondary))]">
+            Don’t bleed or have a coil? You can still mark a manual cycle start from Calendar → Edit cycle whenever you know your period has begun.
+          </p>
         </div>
 
         

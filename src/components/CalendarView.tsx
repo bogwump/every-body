@@ -452,10 +452,11 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
   }, [userData.ovulationOverrideISOs, entriesSorted]);
 
   const cycleStarts = cycleEnabled ? (cycleStats?.cycleStarts ?? []) : [];
+  const hasCycleAnchor = cycleEnabled && cycleStarts.length > 0;
 
   const predictedOvulationSet = useMemo(() => {
     const s = new Set<string>();
-    if (!fertilityEnabled) return s;
+    if (!fertilityEnabled || !hasCycleAnchor) return s;
 
     if (ovulationSet.size > 0) {
       for (const iso of Array.from(ovulationSet)) s.add(iso);
@@ -474,7 +475,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
       s.add(addDaysISO(startISO, ovulationDay));
     }
     return s;
-  }, [fertilityEnabled, ovulationSet, cycleStarts, avgLen, cycleStats?.lastLength]);
+  }, [fertilityEnabled, hasCycleAnchor, ovulationSet, cycleStarts, avgLen, cycleStats?.lastLength]);
 
   const rhythmModel = useMemo(() => getRhythmModel(entriesSorted, userData, todayISO), [entriesSorted, userData, todayISO]);
   const rhythmTiming = useMemo(() => getRhythmTimingModel(entriesSorted as any, userData), [entriesSorted, userData]);
@@ -491,7 +492,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
   // Build period + fertile windows
   const periodSet = useMemo(() => {
     const s = new Set<string>();
-    if (!cycleEnabled) return s;
+    if (!cycleEnabled || !hasCycleAnchor) return s;
 
     const byISO = new Map<string, any>();
     for (const e of entriesSorted) byISO.set(e.dateISO, e);
@@ -546,11 +547,11 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     }
 
     return s;
-  }, [cycleEnabled, entriesSorted, cycleStarts, bleedStats.avgLength, bleedStats.lastLength]);
+  }, [cycleEnabled, hasCycleAnchor, entriesSorted, cycleStarts, bleedStats.avgLength, bleedStats.lastLength]);
 
   const fertileSet = useMemo(() => {
     const s = new Set<string>();
-    if (!fertilityEnabled) return s;
+    if (!fertilityEnabled || !hasCycleAnchor) return s;
 
     if (predictedOvulationSet.size === 0) return s;
 
@@ -562,7 +563,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
       }
     }
     return s;
-  }, [fertilityEnabled, periodSet, predictedOvulationSet]);
+  }, [fertilityEnabled, hasCycleAnchor, periodSet, predictedOvulationSet]);
 
   const summaryModal = useMemo(() => {
     if (!summaryISO) return null;
@@ -917,8 +918,22 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
           <h1 className="mb-2">Calendar</h1>
           <p className="text-[rgb(var(--color-text-secondary))]">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
           <div className="mt-3 min-w-0">
-            <div className="font-semibold text-[15px] sm:text-base">{rhythmContextLabel}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
-            <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing'}</div>
+            {hasCycleAnchor ? (
+              <>
+                <div className="font-semibold text-[15px] sm:text-base">{rhythmContextLabel}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
+                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing'}</div>
+              </>
+            ) : cycleEnabled ? (
+              <>
+                <div className="font-semibold text-[15px] sm:text-base">Still learning your cycle</div>
+                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Log your first period or mark a cycle start in Edit cycle before the calendar starts predicting phase or fertile windows.</div>
+              </>
+            ) : (
+              <>
+                <div className="font-semibold text-[15px] sm:text-base">Symptom calendar</div>
+                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Cycle timing is off right now, but you can still use Calendar to log and review symptoms.</div>
+              </>
+            )}
           </div>
         </div>
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
