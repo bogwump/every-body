@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Calendar, TrendingUp, Sparkles, ArrowRight, ChevronRight, Lightbulb, Upload, History as HistoryIcon, Settings2, Droplets, FlaskConical, Star } from 'lucide-react';
+import { Calendar, TrendingUp, Sparkles, ArrowRight, Lightbulb, Upload, History as HistoryIcon, Settings2, Droplets, FlaskConical, Star, BookOpen } from 'lucide-react';
 import {
   CartesianGrid,
   Legend,
@@ -375,23 +375,20 @@ function DashboardTile({ title, subtitle, cta, icon, onClick }: DashboardTilePro
       onClick={onClick}
       className="eb-card hover:shadow-md transition-all text-left group h-full flex flex-col justify-start"
     >
-      <div className="flex items-start gap-4 w-full h-full">
-        <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
-          <div className="text-[rgb(var(--color-primary))]">{icon}</div>
-        </div>
-
-        <div className="min-w-0 flex-1 flex flex-col items-start h-full">
+      <div className="eb-card-header w-full">
+        <div className="min-w-0 flex-1">
           <h3 className="font-semibold mb-1">{title}</h3>
           <p className="text-sm text-[rgba(0,0,0,0.65)]">{subtitle}</p>
-          {cta ? (
-            <span className="mt-auto pt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))]">
-              {cta} <ArrowRight className="w-4 h-4" />
-            </span>
-          ) : null}
         </div>
-
-        <ChevronRight className="w-5 h-5 text-[rgba(0,0,0,0.45)] group-hover:text-[rgba(0,0,0,0.65)] mt-1" />
+        <div className="eb-icon-frame">
+          <div className="text-[rgb(var(--color-primary))]">{icon}</div>
+        </div>
       </div>
+      {cta ? (
+        <span className="mt-auto pt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))]">
+          {cta} <ArrowRight className="w-4 h-4" />
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -907,10 +904,7 @@ export function Dashboard({
         ) : null}
 
         <div className="eb-card eb-card-soft">
-          <div className="flex items-start gap-4">
-            <div className="eb-icon-frame">
-              <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-            </div>
+          <div className="eb-card-header">
             <div className="min-w-0 flex-1">
               <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Today</div>
               <h3 className="mt-1 mb-1">{checkedInToday ? 'Today is logged' : 'Today is ready for a check-in'}</h3>
@@ -919,6 +913,11 @@ export function Dashboard({
                   ? 'You have already logged today. Reopen it if anything changed.'
                   : 'A quick check-in today helps the app make better sense of what matters right now.'}
               </p>
+            </div>
+            <div className="eb-icon-frame">
+              <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+            </div>
+          </div>
 
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="eb-inset rounded-2xl p-3">
@@ -945,8 +944,6 @@ export function Dashboard({
                   Open calendar
                 </button>
               </div>
-            </div>
-          </div>
         </div>
 
         {/* Restore from backup nudge (only when there is no data yet) */}
@@ -999,10 +996,7 @@ export function Dashboard({
 
 
         <div className="eb-card eb-card-soft">
-          <div className="flex items-start gap-4 w-full h-full">
-            <div className="eb-icon-frame">
-              <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-            </div>
+          <div className="eb-card-header w-full">
             <div className="min-w-0 flex-1">
               <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Snapshot</div>
               <h3 className="mt-1 mb-2">What looks most useful right now</h3>
@@ -1037,14 +1031,20 @@ export function Dashboard({
                 {insightsReady ? 'View insights' : "Do today’s check-in"} <ArrowRight className="w-4 h-4" />
               </button>
             </div>
+            <div className="eb-icon-frame">
+              <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+            </div>
           </div>
         </div>
 
         <div className="eb-card">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
+          <div className="eb-card-header mb-3">
+            <div className="min-w-0 flex-1">
               <h3 className="mb-1">Your week at a glance</h3>
               <p className="text-xs text-[rgb(var(--color-text-secondary))]">A small trend snapshot. Pick 3 metrics to show.</p>
+            </div>
+            <div className="eb-icon-frame">
+              <BookOpen className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
           </div>
           <div style={{ width: '100%', height: 220 }}>
@@ -1094,10 +1094,7 @@ export function Dashboard({
         </div>
         {/* Tip for today */}
         <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
-          <div className="flex items-start gap-4 w-full h-full">
-            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
-              <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-            </div>
+          <div className="eb-card-header w-full">
             <div className="relative min-w-0 flex-1">
               <button
                 type="button"
@@ -1126,6 +1123,9 @@ export function Dashboard({
                   {tip.cta.label} <ArrowRight className="w-4 h-4" />
                 </button>
               ) : null}
+            </div>
+            <div className="eb-icon-frame">
+              <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
           </div>
         </div>

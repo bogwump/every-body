@@ -18,7 +18,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
+import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle, Blend, Layers3 } from 'lucide-react';
 import { TryNextCard, type TryNextItem } from './TryNextCard';
 import { WhatsHelpingCard } from './WhatsHelpingCard';
 import { getMomentHistory } from '../lib/companionMoments';
@@ -3760,9 +3760,12 @@ const tryNextPrompts = useMemo(() => {
 
       <div className="eb-card">
         <div className="eb-card-header">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="eb-card-title">Connections in your body</div>
             <div className="eb-card-sub">A simple read on which things have been moving together lately.</div>
+          </div>
+          <div className="eb-icon-frame">
+            <Blend className="w-5 h-5" />
           </div>
         </div>
 
@@ -4643,15 +4646,16 @@ const tryNextPrompts = useMemo(() => {
         id="eb-insights-settings"
         className="insights-settings-card bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30 shadow-sm"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
+        <div className="eb-card-header">
+          <div className="min-w-0 flex-1">
             <h3 className="mb-1">Data &amp; settings</h3>
             <p className="text-[rgba(0,0,0,0.75)]">
               Keep it simple: 3-5 metrics gives you the cleanest signals, then open your graphs only when you want the evidence view.
             </p>
           </div>
-
-          
+          <div className="eb-icon-frame">
+            <Layers3 className="w-5 h-5" />
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2 items-center">

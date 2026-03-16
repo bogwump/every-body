@@ -18,6 +18,8 @@ import {
   Moon as MoonIcon,
   Sun as SunIcon,
   X,
+  RefreshCcw,
+  TrendingUpDown,
 } from 'lucide-react';
 import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, looksLikeInsightsExport, importBackupFile } from '../lib/backup';
 import type { ColorTheme, SymptomKey, SymptomKind, UserData, InfluenceKey, UserGoal } from '../types';
@@ -861,11 +863,18 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
         {/* Cycle tracking */}
         <div className="eb-card eb-card-soft mb-6">
-          <h3 className="mb-2">Cycle tracking</h3>
-          <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
-            Symptoms and cycle are not mutually exclusive. You can track symptoms with no periods (coil, menopause, hysterectomy, etc).
-            Turn cycle tracking on only if you want phase-based insights.
-          </p>
+          <div className="eb-card-header mb-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="mb-2">Cycle tracking</h3>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
+                Symptoms and cycle are not mutually exclusive. You can track symptoms with no periods (coil, menopause, hysterectomy, etc).
+                Turn cycle tracking on only if you want phase-based insights.
+              </p>
+            </div>
+            <div className="eb-icon-frame">
+              <RefreshCcw className="w-5 h-5" />
+            </div>
+          </div>
 
           <div className="flex items-center justify-between">
             <div>
@@ -1442,10 +1451,17 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                   Take your patterns, insights and experiments into an AI assistant for deeper analysis.
                 </p>
                 <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-                  <p className="font-medium">Analyse your data</p>
-                  <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
-                    This export contains a summary of your tracking data. Only share it with tools you trust.
-                  </p>
+                  <div className="eb-card-header">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">Analyse your data</p>
+                      <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
+                        This export contains a summary of your tracking data. Only share it with tools you trust.
+                      </p>
+                    </div>
+                    <div className="eb-icon-frame">
+                      <TrendingUpDown className="w-5 h-5" />
+                    </div>
+                  </div>
 
                   <div className="mt-4">
                     <p className="text-sm font-medium">Choose a focus</p>

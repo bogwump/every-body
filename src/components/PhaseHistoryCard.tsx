@@ -1,4 +1,5 @@
 import React from 'react';
+import { HeartPulse } from 'lucide-react';
 import type { PhaseHistoryEntry } from '../lib/phaseHistory';
 
 function phaseLabel(phase: string) {
@@ -23,9 +24,14 @@ export function PhaseHistoryCard(props: { history: PhaseHistoryEntry[] }) {
 
   return (
     <div className="eb-card p-6">
-      <div className="mb-4">
-        <h3 className="font-semibold tracking-tight">Recent rhythm</h3>
-        <p className="mt-1 text-sm text-[rgba(0,0,0,0.65)]">A quick look at how your recent phases have been moving.</p>
+      <div className="eb-card-header mb-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold tracking-tight">Recent rhythm</h3>
+          <p className="mt-1 text-sm text-[rgba(0,0,0,0.65)]">A quick look at how your recent phases have been moving.</p>
+        </div>
+        <div className="eb-icon-frame">
+          <HeartPulse className="w-5 h-5" />
+        </div>
       </div>
 
       <div className="space-y-3">

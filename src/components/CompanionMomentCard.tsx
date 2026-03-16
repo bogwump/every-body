@@ -77,15 +77,17 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
 
   return (
     <div className="eb-card mb-6">
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
-          {iconForType(props.moment.type)}
-        </div>
+      <div className="eb-card-header">
         <div className="min-w-0 flex-1">
           <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">{copy.eyebrow ?? 'For you'}</div>
           <h3 className="mt-1 mb-1">{copy.title}</h3>
           <p className="text-sm text-[rgba(0,0,0,0.68)]">{copy.body}</p>
-          <div className="mt-4 flex flex-wrap gap-3">
+        </div>
+        <div className="eb-icon-frame">
+          {iconForType(props.moment.type)}
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-3">
             <button type="button" className="eb-btn-primary" onClick={handlePrimaryAction}>{copy.button}</button>
             <button
               type="button"
@@ -98,8 +100,6 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
               <X className="w-4 h-4" />
               Dismiss
             </button>
-          </div>
-        </div>
       </div>
     </div>
   );

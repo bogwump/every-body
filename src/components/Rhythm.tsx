@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info } from 'lucide-react';
+import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info, GraduationCap } from 'lucide-react';
 import { RhythmHero } from './RhythmHero';
 import { PhaseHistoryCard } from './PhaseHistoryCard';
 import { useEntries, useExperimentHistory } from '../lib/appStore';
@@ -695,10 +695,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         
 
         <div className="eb-card p-6">
-          <div className="flex items-start gap-4">
-            <div className="shrink-0 mt-0.5">
-              <IconBadge icon={<Eye className="w-5 h-5" />} />
-            </div>
+          <div className="eb-card-header">
             <div className="min-w-0 flex-1 space-y-4">
               <div>
                 <h3 className="mb-1">What this can look like</h3>
@@ -724,15 +721,15 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
               <p className="text-neutral-700">{content.lookLikeDuration}</p>
             </div>
+            <div className="shrink-0 mt-0.5">
+              <IconBadge icon={<Eye className="w-5 h-5" />} />
+            </div>
           </div>
         </div>
 
         {/* What you can do */}
         <div className="eb-card p-6">
-          <div className="flex items-start gap-4">
-            <div className="shrink-0 mt-0.5">
-              <IconBadge icon={<Leaf className="w-5 h-5" />} />
-            </div>
+          <div className="eb-card-header">
             <div className="min-w-0 flex-1 space-y-4">
               <div>
                 <h3 className="mb-1 font-semibold tracking-tight">What you can do about it</h3>
@@ -758,6 +755,9 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             </div>
               </div>
             </div>
+            <div className="shrink-0 mt-0.5">
+              <IconBadge icon={<GraduationCap className="w-5 h-5" />} />
+            </div>
           </div>
         </div>
 
@@ -765,10 +765,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         {/* What usually comes next */}
         <div className="eb-card p-6">
-          <div className="flex items-start gap-4">
-            <div className="shrink-0 mt-0.5">
-              <IconBadge icon={<Compass className="w-5 h-5" />} />
-            </div>
+          <div className="eb-card-header">
             <div className="min-w-0 flex-1 space-y-4">
               <div>
                 <h3 className="mb-1 font-semibold tracking-tight">What usually comes next</h3>
@@ -782,6 +779,9 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 <div className="text-base font-medium text-neutral-800">{nextPhasePlanning.title}</div>
                 <div className="mt-1 text-base text-neutral-800 font-normal">{nextPhasePlanning.body}</div>
               </div>
+            </div>
+            <div className="shrink-0 mt-0.5">
+              <IconBadge icon={<Compass className="w-5 h-5" />} />
             </div>
           </div>
         </div>
