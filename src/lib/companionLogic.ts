@@ -114,6 +114,13 @@ function recentMomentMatch(args: {
   });
 }
 
+function getArchivedMomentReferenceISO(moment: ArchivedCompanionMoment): string {
+  if (moment.archivedReason === 'dismissed' || moment.archivedReason === 'interacted') {
+    return String(moment.archivedAtISO || moment.date).slice(0, 10);
+  }
+  return moment.date;
+}
+
 function recentArchivedMomentMatch(args: {
   moments: ArchivedCompanionMoment[];
   type: CompanionMomentType;
@@ -126,7 +133,8 @@ function recentArchivedMomentMatch(args: {
   return args.moments.some((moment) => {
     if (moment.type !== args.type) return false;
     if (args.reasons && args.reasons.length > 0 && !args.reasons.includes(moment.archivedReason)) return false;
-    const age = daysBetweenISO(moment.date, args.refISO);
+    const referenceISO = getArchivedMomentReferenceISO(moment);
+    const age = daysBetweenISO(referenceISO, args.refISO);
     if (age < 0 || age > args.cooldownDays) return false;
     const data = (moment.metadata ?? {}) as Record<string, unknown>;
     if (args.signalId && data.signalId && String(data.signalId) !== String(args.signalId)) return false;

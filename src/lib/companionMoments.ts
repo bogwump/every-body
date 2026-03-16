@@ -246,13 +246,24 @@ export function getMomentPriority(type: CompanionMomentType): number {
   return MOMENT_PRIORITY[type];
 }
 
-function isLegacyGuideMoment(moment: CompanionMoment): boolean {
-  const title = typeof moment.data?.title === 'string' ? String(moment.data.title) : '';
-  const body = typeof moment.data?.body === 'string' ? String(moment.data.body) : '';
+function isGuideLikeCompanionMoment(moment: CompanionMoment): boolean {
+  const title = typeof moment.data?.title === 'string' ? String(moment.data.title).trim() : '';
+  const body = typeof moment.data?.body === 'string' ? String(moment.data.body).trim() : '';
+  const guideTitles = new Set([
+    'You’re building your rhythm',
+    "You're building your rhythm",
+    'Your first week is taking shape',
+    'Your patterns are starting to settle',
+    'Your rhythm is getting easier to read',
+    'You have built a stronger baseline',
+  ]);
+
   return moment.id === 'building-rhythm'
-    || title === 'You’re building your rhythm'
-    || title === "You're building your rhythm"
-    || body === 'A few more check-ins will help this start turning into personalised guidance.';
+    || guideTitles.has(title)
+    || body === 'A few more check-ins will help this start turning into personalised guidance.'
+    || body.includes('You have enough check-ins now for early patterns to feel a little more trustworthy.')
+    || body.includes('Patterns are repeating a bit more now, so the app can be calmer and more specific.')
+    || body.includes('With a stronger baseline in place, small changes and experiments should be easier to interpret.');
 }
 
 export function getCompanionMoments(): CompanionMoment[] {
@@ -261,7 +272,7 @@ export function getCompanionMoments(): CompanionMoment[] {
     .map(normaliseMoment)
     .filter((item): item is CompanionMoment => Boolean(item));
 
-  const cleaned = all.filter((moment) => !isLegacyGuideMoment(moment));
+  const cleaned = all.filter((moment) => !isGuideLikeCompanionMoment(moment));
   if (cleaned.length !== all.length) writeJson(COMPANION_MOMENTS_KEY, cleaned);
 
   return cleaned.sort(sortByPriorityThenDate);

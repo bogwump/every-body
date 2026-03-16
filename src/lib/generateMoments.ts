@@ -6,7 +6,7 @@ import { createMoment, getActiveMoments, getCompanionMoments, getHighestPriority
 import { generateExperimentSuggestions, getExperimentForSignal, rankExperimentSuggestions } from './experimentSuggestions';
 import { detectLongCycle, detectShortCycle, detectUnusualPhaseLength } from './rhythmDiagnostics';
 import { getHelpfulPatternsFromExperiments } from './experimentLearning';
-import { getExperimentSuggestionSuppression, getWeeklyReflectionMoment, shouldSuppressCompanionMoment } from './companionLogic';
+import { getExperimentSuggestionSuppression, shouldSuppressCompanionMoment } from './companionLogic';
 import { downgradeConfidence, getConfidencePhrase } from './confidenceCopy';
 import { getSymptomCoverage } from './symptomCoverage';
 import { phaseLabelFromKey } from './phaseChange';
@@ -205,16 +205,4 @@ export function generateMoments(entries: CheckInEntry[], userData: UserData, ref
     return;
   }
 
-  const reflection = getWeeklyReflectionMoment(entries, refISO, userData);
-  if (reflection && !shouldSuppressCompanionMoment({ type: reflection.type, refISO, cooldownDays: 6, dismissalCooldownDays: 10 })) {
-    createMoment({
-      id: reflection.id,
-      type: reflection.type,
-      date: refISO,
-      data: {
-        title: reflection.title,
-        body: reflection.body,
-      },
-    });
-  }
 }
