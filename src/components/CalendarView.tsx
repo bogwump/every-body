@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, Frown, Heart, FlaskConical, Sparkles } from 'lucide-react';
+import { PencilLine, Droplet, Droplets, Egg, X, ChevronRight, Smile, Meh, Frown, Heart, FlaskConical, Sparkles } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
@@ -138,6 +138,41 @@ function isExperimentActiveOnISO(experiment: any, dateISO: string): boolean {
   return target >= start && target <= end.getTime();
 }
 
+
+function CycleFlagIcon({
+  filled = false,
+  size = 11,
+  className = '',
+}: {
+  filled?: boolean;
+  size?: number;
+  className?: string;
+}) {
+  const strokeWidth = 1.75;
+  const stroke = 'currentColor';
+  const fill = filled ? 'currentColor' : 'none';
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M6 20V4" stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <path
+        d="M7.5 5.5H16.5L14 9.25L16.5 13H7.5V5.5Z"
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+        fill={fill}
+      />
+    </svg>
+  );
+}
+
 function shortPhaseCue(phaseKey: string | null | undefined): string {
   switch (phaseKey) {
     case 'reset':
@@ -177,7 +212,7 @@ function getCalendarMarkers(args: {
       key: 'cycleStart',
       priority: 0,
       label: 'Cycle start',
-      icon: <Flag {...iconProps} aria-hidden="true" />,
+      icon: <CycleFlagIcon size={11} className="opacity-80" filled />,
     });
   }
   if (args.isPeriod) {
@@ -884,7 +919,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
               className={cn('eb-btn-secondary flex items-center gap-2 justify-center', isStart ? 'bg-[rgb(var(--color-primary)/0.10)] border-[rgb(var(--color-primary)/0.30)]' : '')}
               onClick={() => { toggleStart(!isStart); setEditISO(null); }}
             >
-              <Flag className="w-4 h-4" />
+              <CycleFlagIcon size={16} filled className="text-current" />
               <span>{isStart ? 'Remove cycle start' : 'Set as cycle start'}</span>
             </button>
 
@@ -1086,7 +1121,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <Flag size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                <CycleFlagIcon size={11} filled className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                 <span>Cycle start</span>
               </div>
               <div className="flex items-center gap-2">
