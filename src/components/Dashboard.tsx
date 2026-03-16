@@ -240,7 +240,7 @@ function buildGuideCard(options: {
       cta: { label: 'Open History', action: 'navigate', screen: 'history' },
       priority: 4,
       contextual: true,
-      icon: <HistoryIcon className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
     });
   }
 
@@ -775,19 +775,6 @@ export function Dashboard({
             onNavigate={onNavigate}
             onDismiss={() => setMomentRefresh((value) => value + 1)}
           />
-        ) : entriesSorted.length < 3 ? (
-          <div className="eb-card mb-6">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Companion</div>
-                <h3 className="mt-1 mb-1">You’re building your rhythm</h3>
-                <p className="text-sm text-[rgba(0,0,0,0.68)]">A few more check-ins will help this turn into more personal reflections and experiments that actually fit you.</p>
-              </div>
-            </div>
-          </div>
         ) : null}
 
         {guideCard ? (
