@@ -5,7 +5,7 @@ import { safeFormatMonthYearFromKey } from './browserSafe';
 import { getDiscoveredPatterns } from './insightEngine';
 import { getPhaseHistory } from './phaseHistory';
 import { phaseLabelFromKey } from './phaseChange';
-import { getPatternFeedback, getPatternFeedbackIdFromMetrics } from './patternFeedback';
+import { getPatternFeedback, getPatternFeedbackIdFromMetrics, listPatternFeedbackHistory, type PatternFeedbackHistoryEntry } from './patternFeedback';
 
 export type TimelineEvent = {
   id: string;
@@ -392,6 +392,70 @@ function buildPhaseEvents(): TimelineEvent[] {
     .filter((item): item is TimelineEvent => Boolean(item));
 }
 
+
+function patternFeedbackActionText(item: PatternFeedbackHistoryEntry): { title: string; description: string; evidence: string; type: 'pattern_discovered' | 'pattern_strengthened' } {
+  if (item.action === 'confirmed') {
+    return {
+      title: 'Connection confirmed',
+      description: 'You said this connection matched your experience.',
+      evidence: 'Saved when you marked this connection as a good fit in Connections.',
+      type: 'pattern_strengthened',
+    };
+  }
+  if (item.action === 'suppressed') {
+    return {
+      title: 'Connection corrected',
+      description: 'You said this connection did not feel right for you.',
+      evidence: 'Saved when you corrected this connection in Connections.',
+      type: 'pattern_strengthened',
+    };
+  }
+  if (item.action === 'reopened' || item.action === 'restored') {
+    return {
+      title: 'Connection reopened',
+      description: 'This connection was reopened for another look after more logging.',
+      evidence: 'Saved when you chose to reassess this connection.',
+      type: 'pattern_strengthened',
+    };
+  }
+  return {
+    title: 'Connection noted',
+    description: 'You marked this connection as not sure yet.',
+    evidence: 'Saved when you left this connection open for a bit longer.',
+    type: 'pattern_strengthened',
+  };
+}
+
+function buildPatternFeedbackEvents(): TimelineEvent[] {
+  return listPatternFeedbackHistory()
+    .map((item) => {
+      const metrics = Array.isArray(item.canonicalMetrics) ? item.canonicalMetrics.slice(0, 2) : [];
+      if (metrics.length < 2) return null;
+      const labels = metrics.map((metric) => metricLabel(metric));
+      const action = patternFeedbackActionText(item);
+      return {
+        id: `pattern-feedback:${item.eventId}`,
+        type: action.type,
+        date: item.date,
+        title: action.title,
+        description: `${labels[0]} + ${labels[1]} · ${action.description}`,
+        evidence: action.evidence,
+        signals: labels,
+        confidence: typeof item.confidence === 'number' ? (item.confidence >= 0.78 ? 'high' : item.confidence >= 0.58 ? 'medium' : 'low') : undefined,
+        source: 'insights' as const,
+        actionLabel: 'Open Connections',
+        actionTarget: 'insights:connections',
+        metadata: {
+          patternFeedbackId: item.patternFeedbackId,
+          patternDismissed: item.action === 'suppressed',
+          patternRestored: item.action === 'restored' || item.action === 'reopened',
+          patternFeedbackAction: item.action,
+        },
+      } as TimelineEvent;
+    })
+    .filter((event): event is TimelineEvent => Boolean(event));
+}
+
 function buildPatternEvents(): TimelineEvent[] {
   const discoveries = getDiscoveredPatterns();
   const base = discoveries.map((item) => {
@@ -637,6 +701,7 @@ export function buildTimelineEvents(limit = 40): TimelineEvent[] {
   const all = [
     ...buildPhaseEvents(),
     ...buildPatternEvents(),
+    ...buildPatternFeedbackEvents(),
     ...buildHelpfulPatternEvents(),
     ...buildExperimentEvents(),
     ...buildRhythmEvents(),

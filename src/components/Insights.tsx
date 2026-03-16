@@ -46,7 +46,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
-import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
+import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 
 interface InsightsProps {
@@ -1305,6 +1305,28 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
 
 
+
+  const daysSinceISO = (iso?: string | null): number => {
+    if (!iso) return 0;
+    const start = new Date(`${String(iso).slice(0, 10)}T00:00:00`);
+    const end = new Date();
+    if (Number.isNaN(start.getTime())) return 0;
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
+  };
+
+  const countEntriesSince = (iso?: string | null): number => {
+    const cutoff = String(iso || '').slice(0, 10);
+    if (!cutoff) return 0;
+    return entriesSorted.filter((entry) => String((entry as any)?.date || '').slice(0, 10) > cutoff).length;
+  };
+
+  const canReassessFeedback = (feedback?: { lastFeedback?: string | null } | null): boolean => {
+    if (!feedback?.lastFeedback) return false;
+    return daysSinceISO(feedback.lastFeedback) >= 45 || countEntriesSince(feedback.lastFeedback) >= 20;
+  };
+
   const connectionCards = useMemo(() => {
     type ConnectionCard = (typeof corrPairs)[number] & { signalId: string; sourceSignal: InsightSignal; displayRank: number; };
 
@@ -2380,6 +2402,9 @@ const confirmFinishExperiment = () => {
       if (!focus) return;
       if (focus === 'insights:experiments') {
         window.setTimeout(() => scrollToInsightsSection('eb-experiments'), 60);
+      }
+      if (focus === 'insights:connections') {
+        window.setTimeout(() => scrollToInsightsSection('eb-connections'), 60);
       }
       localStorage.removeItem('everybody:v2:page_focus');
     } catch {
@@ -3779,70 +3804,142 @@ const tryNextPrompts = useMemo(() => {
                       <div className="pt-1 text-xs eb-muted">Patterns are a hint, not proof.</div>
                     </div>
                   </details>
-                  {shouldPromptPatternFeedback(getPatternFeedbackIdFromMetrics(p.aKey, p.bKey), p.feedback?.status === 'confirmed') ? (() => {
+                  {(() => {
                     const feedbackId = getPatternFeedbackIdFromMetrics(p.aKey, p.bKey);
                     const contradictionOpen = pendingContradiction?.id === feedbackId;
-                    return (
-                      <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
-                        {!contradictionOpen ? (
-                          <>
-                            <div className="text-sm font-medium">Does this match your experience?</div>
-                            <div className="mt-3 flex flex-wrap gap-2">
+                    const shouldAsk = !p.feedback || (p.feedback.status === 'active' && p.feedback.userFeedback !== 'yes' && shouldPromptPatternFeedback(feedbackId));
+                    const showReassess = canReassessFeedback(p.feedback);
+
+                    if (shouldAsk) {
+                      return (
+                        <div className="mt-4 rounded-2xl border border-neutral-200 bg-white/70 px-3 py-3">
+                          {!contradictionOpen ? (
+                            <>
+                              <div className="text-sm font-medium">Does this match your experience?</div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-dark)/0.18)] bg-[rgb(var(--color-primary-dark))] text-white text-sm font-medium hover:opacity-95 transition-all"
+                                  onClick={() => handlePatternFeedback('yes', p)}
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  type="button"
+                                  className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-light)/0.55)] bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-primary-dark))] text-sm font-medium hover:opacity-95 transition-all"
+                                  onClick={() => openContradictionPrompt(p)}
+                                >
+                                  No
+                                </button>
+                                <button
+                                  type="button"
+                                  className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                  onClick={() => handlePatternFeedback('unsure', p)}
+                                >
+                                  Not sure
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">This pattern didn’t feel right for you, so we’ll stop surfacing it.</div>
+                              <div className="mt-3 text-sm eb-muted">Do you know what tends to drive this instead?</div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {CONTRADICTION_DRIVER_OPTIONS.map((option) => (
+                                  <button
+                                    key={option.key}
+                                    type="button"
+                                    className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                    onClick={() => submitContradictionFeedback(option.key)}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                              </div>
                               <button
                                 type="button"
-                                className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-dark)/0.18)] bg-[rgb(var(--color-primary-dark))] text-white text-sm font-medium hover:opacity-95 transition-all"
-                                onClick={() => handlePatternFeedback('yes', p)}
+                                className="mt-3 text-xs font-medium text-[rgb(var(--color-primary-dark))] hover:underline"
+                                onClick={() => dismissContradictionPrompt(feedbackId)}
                               >
-                                Yes
+                                Keep this pattern visible
                               </button>
-                              <button
-                                type="button"
-                                className="px-3 py-2 rounded-xl border border-[rgb(var(--color-primary-light)/0.55)] bg-[rgb(var(--color-primary-light))] text-[rgb(var(--color-primary-dark))] text-sm font-medium hover:opacity-95 transition-all"
-                                onClick={() => openContradictionPrompt(p)}
-                              >
-                                No
-                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    if (p.feedback?.status === 'confirmed') {
+                      return (
+                        <div className="mt-4 text-sm eb-muted">
+                          <div>Marked by you as a good fit.</div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                              onClick={() => { restorePattern(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
+                            >
+                              Undo
+                            </button>
+                            {showReassess ? (
                               <button
                                 type="button"
                                 className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
-                                onClick={() => handlePatternFeedback('unsure', p)}
+                                onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                               >
-                                Not sure
+                                Reassess
                               </button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">This pattern didn’t feel right for you, so we’ll stop surfacing it.</div>
-                            <div className="mt-3 text-sm eb-muted">Do you know what tends to drive this instead?</div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {CONTRADICTION_DRIVER_OPTIONS.map((option) => (
-                                <button
-                                  key={option.key}
-                                  type="button"
-                                  className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
-                                  onClick={() => submitContradictionFeedback(option.key)}
-                                >
-                                  {option.label}
-                                </button>
-                              ))}
-                            </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (p.feedback?.status === 'suppressed') {
+                      return (
+                        <div className="mt-4 text-sm eb-muted">
+                          <div>Hidden after you said it didn’t fit.</div>
+                          <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              className="mt-3 text-xs font-medium text-[rgb(var(--color-primary-dark))] hover:underline"
-                              onClick={() => dismissContradictionPrompt(feedbackId)}
+                              className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                              onClick={() => { restorePattern(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                             >
-                              Keep this pattern visible
+                              Undo
                             </button>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })() : p.feedback?.status === 'confirmed' ? (
-                    <div className="mt-4 text-sm eb-muted">Marked by you as a good fit.</div>
-                  ) : p.feedback?.userFeedback === 'unsure' ? (
-                    <div className="mt-4 text-sm eb-muted">Marked by you as not sure yet.</div>
-                  ) : null}
+                            {showReassess ? (
+                              <button
+                                type="button"
+                                className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                                onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
+                              >
+                                Reassess
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (p.feedback?.userFeedback === 'unsure') {
+                      return (
+                        <div className="mt-4 text-sm eb-muted">
+                          <div>Marked by you as not sure yet.</div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="px-3 py-2 rounded-xl border border-black/10 bg-white text-sm font-medium text-[rgb(var(--color-text-primary))] hover:bg-black/[0.03] transition-all"
+                              onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
+                            >
+                              Change response
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })()}
 
                   <div className="pt-4 flex items-center justify-between gap-2">
                     {p.allowSuggestedExperiment ? (

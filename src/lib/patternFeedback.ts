@@ -22,7 +22,21 @@ export interface PatternFeedbackRecord {
   userDriverHint?: PatternDriverHint;
 }
 
+
+export interface PatternFeedbackHistoryEntry {
+  eventId: string;
+  patternFeedbackId: string;
+  patternId: string;
+  canonicalMetrics: string[];
+  action: 'confirmed' | 'suppressed' | 'unsure' | 'restored' | 'reopened';
+  date: string;
+  confidence?: number;
+  previousScore?: number;
+  userDriverHint?: PatternDriverHint;
+}
+
 const PATTERN_FEEDBACK_KEY = 'everybody:v2:pattern_feedback';
+const PATTERN_FEEDBACK_HISTORY_KEY = 'everybody:v2:pattern_feedback_history';
 const FEEDBACK_COOLDOWN_DAYS = 14;
 
 function toISODate(value?: Date | string | null): string {
@@ -47,6 +61,40 @@ function writeStore(store: Record<string, PatternFeedbackRecord>) {
   } catch {
     // ignore
   }
+}
+
+
+function readHistoryStore(): PatternFeedbackHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(PATTERN_FEEDBACK_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === 'object') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeHistoryStore(history: PatternFeedbackHistoryEntry[]) {
+  try {
+    localStorage.setItem(PATTERN_FEEDBACK_HISTORY_KEY, JSON.stringify(history.slice(-200)));
+  } catch {
+    // ignore
+  }
+}
+
+function appendHistoryEvent(entry: Omit<PatternFeedbackHistoryEntry, 'eventId'>): PatternFeedbackHistoryEntry {
+  const next: PatternFeedbackHistoryEntry = {
+    ...entry,
+    eventId: `${entry.patternFeedbackId}:${entry.action}:${entry.date}:${Date.now().toString(36)}`,
+  };
+  const history = readHistoryStore();
+  history.push(next);
+  writeHistoryStore(history);
+  return next;
+}
+
+export function listPatternFeedbackHistory(): PatternFeedbackHistoryEntry[] {
+  return readHistoryStore().slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.eventId || '').localeCompare(String(a.eventId || '')));
 }
 
 function addDays(iso: string, days: number): string {
@@ -87,7 +135,7 @@ function upsert(record: PatternFeedbackRecord): PatternFeedbackRecord {
 export function suppressPattern(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; driverHint?: PatternDriverHint; }): PatternFeedbackRecord {
   const today = toISODate();
   const existing = getPatternFeedback(args.id);
-  return upsert({
+  const record = upsert({
     id: args.id,
     patternId: args.patternId ?? args.id,
     canonicalMetrics: args.metrics.map(String).slice(0, 2).sort(),
@@ -101,13 +149,24 @@ export function suppressPattern(args: { id: string; patternId?: string; metrics:
     historyNote: 'Later marked by you as unlikely.',
     userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
+  appendHistoryEvent({
+    patternFeedbackId: record.id,
+    patternId: record.patternId,
+    canonicalMetrics: record.canonicalMetrics,
+    action: 'suppressed',
+    date: today,
+    confidence: record.confidence,
+    previousScore: record.previousScore,
+    userDriverHint: record.userDriverHint,
+  });
+  return record;
 }
 
 export function confirmPattern(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; driverHint?: PatternDriverHint; }): PatternFeedbackRecord {
   const today = toISODate();
   const existing = getPatternFeedback(args.id);
   const nextConfidenceBase = typeof args.confidence === 'number' ? args.confidence : existing?.confidence ?? 0.6;
-  return upsert({
+  const record = upsert({
     id: args.id,
     patternId: args.patternId ?? args.id,
     canonicalMetrics: args.metrics.map(String).slice(0, 2).sort(),
@@ -120,12 +179,23 @@ export function confirmPattern(args: { id: string; patternId?: string; metrics: 
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
     userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
+  appendHistoryEvent({
+    patternFeedbackId: record.id,
+    patternId: record.patternId,
+    canonicalMetrics: record.canonicalMetrics,
+    action: 'confirmed',
+    date: today,
+    confidence: record.confidence,
+    previousScore: record.previousScore,
+    userDriverHint: record.userDriverHint,
+  });
+  return record;
 }
 
 export function markPatternUnsure(args: { id: string; patternId?: string; metrics: Array<InsightMetricKey | string>; previousScore?: number; confidence?: number; driverHint?: PatternDriverHint; }): PatternFeedbackRecord {
   const today = toISODate();
   const existing = getPatternFeedback(args.id);
-  return upsert({
+  const record = upsert({
     id: args.id,
     patternId: args.patternId ?? args.id,
     canonicalMetrics: args.metrics.map(String).slice(0, 2).sort(),
@@ -138,13 +208,24 @@ export function markPatternUnsure(args: { id: string; patternId?: string; metric
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
     userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
+  appendHistoryEvent({
+    patternFeedbackId: record.id,
+    patternId: record.patternId,
+    canonicalMetrics: record.canonicalMetrics,
+    action: 'unsure',
+    date: today,
+    confidence: record.confidence,
+    previousScore: record.previousScore,
+    userDriverHint: record.userDriverHint,
+  });
+  return record;
 }
 
 export function restorePattern(id: string, reducedConfidence = 0.45): PatternFeedbackRecord | null {
   const existing = getPatternFeedback(id);
   if (!existing) return null;
   const today = toISODate();
-  return upsert({
+  const record = upsert({
     ...existing,
     status: 'active',
     confidence: Math.min(reducedConfidence, existing.confidence ?? reducedConfidence),
@@ -155,6 +236,46 @@ export function restorePattern(id: string, reducedConfidence = 0.45): PatternFee
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
     userDriverHint: existing.userDriverHint,
   });
+  appendHistoryEvent({
+    patternFeedbackId: record.id,
+    patternId: record.patternId,
+    canonicalMetrics: record.canonicalMetrics,
+    action: 'restored',
+    date: today,
+    confidence: record.confidence,
+    previousScore: record.previousScore,
+    userDriverHint: record.userDriverHint,
+  });
+  return record;
+}
+
+export function reopenPatternForReview(id: string, reducedConfidence = 0.45): PatternFeedbackRecord | null {
+  const existing = getPatternFeedback(id);
+  if (!existing) return null;
+  const today = toISODate();
+  const record = upsert({
+    ...existing,
+    status: 'active',
+    confidence: Math.min(reducedConfidence, existing.confidence ?? reducedConfidence),
+    userContradicted: false,
+    userFeedback: undefined,
+    lastFeedback: today,
+    restoredAt: today,
+    historyNote: 'Reopened by you for reassessment after more logging.',
+    suppressPromptUntil: undefined,
+    userDriverHint: existing.userDriverHint,
+  });
+  appendHistoryEvent({
+    patternFeedbackId: record.id,
+    patternId: record.patternId,
+    canonicalMetrics: record.canonicalMetrics,
+    action: 'reopened',
+    date: today,
+    confidence: record.confidence,
+    previousScore: record.previousScore,
+    userDriverHint: record.userDriverHint,
+  });
+  return record;
 }
 
 export function shouldPromptPatternFeedback(id: string | null | undefined, cycleScoped = false, currentCycleKey?: string | null): boolean {
