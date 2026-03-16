@@ -150,7 +150,7 @@ export function History({ onNavigate }: HistoryProps) {
                         <h3>{event.title}</h3>
                         <p className="mt-2 text-sm text-[rgb(var(--color-text))]">{event.description}</p>
                       </div>
-                      <Icon className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
+                      <Icon className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
                     </div>
 
                     {(event.evidence || (event.signals && event.signals.length) || confidence) ? (

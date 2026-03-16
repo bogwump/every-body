@@ -636,7 +636,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold tracking-tight">Your cycle, at a glance</h3>
             </div>
-            <Compass className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
+            <Compass className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
           </div>
 
           {userData?.cycleTrackingMode === 'cycle' ? (
@@ -723,7 +723,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
               <p className="text-neutral-700">{content.lookLikeDuration}</p>
             </div>
-            <Eye className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
+            <Eye className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
           </div>
         </div>
 
@@ -755,7 +755,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             </div>
               </div>
             </div>
-            <GraduationCap className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
+            <GraduationCap className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
           </div>
         </div>
 
@@ -778,7 +778,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 <div className="mt-1 text-base text-neutral-800 font-normal">{nextPhasePlanning.body}</div>
               </div>
             </div>
-            <Compass className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary))] mt-1" />
+            <Compass className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
           </div>
         </div>
 
@@ -788,7 +788,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             <summary className="font-medium text-neutral-900 px-0 py-0">
               <span className="inline-flex items-center gap-3">
                 <span className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
-                  <span className="text-[rgb(var(--color-primary))]"><Info className="w-5 h-5" /></span>
+                  <span className="text-[rgb(var(--color-primary-dark))]"><Info className="w-5 h-5" /></span>
                 </span>
                 <span>{content.whyTitle}</span>
               </span>

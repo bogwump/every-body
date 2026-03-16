@@ -412,9 +412,16 @@ body.eb-chat-typing .eb-mobile-nav {
     padding: 0;
   }
 
-  .eb-icon-frame--hero {
+  .eb-icon-frame svg {
+    color: rgb(var(--color-primary-dark)) !important;
+  }
+
+  .eb-hero-on-dark .eb-icon-frame,
+  .eb-hero-on-dark .eb-icon-frame svg,
+  .eb-icon-frame--hero,
+  .eb-icon-frame--hero svg {
     background: transparent;
-    color: inherit;
+    color: rgb(255 255 255 / 0.92) !important;
     border-color: transparent;
   }
 
