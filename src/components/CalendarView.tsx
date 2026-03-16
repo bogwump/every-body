@@ -6,6 +6,7 @@ import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
 import { computeBleedStats, computeCycleStats, estimatePhaseByFlow, getRhythmModel, sortByDateAsc } from '../lib/analytics';
 import { getRhythmTimingModel } from '../lib/rhythmTiming';
+import { getCycleTrustModel } from '../lib/cycleTrust';
 
 type Props = {
   userData: UserData;
@@ -498,6 +499,8 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
   const cycleStarts = cycleEnabled ? (cycleStats?.cycleStarts ?? []) : [];
   const hasCycleAnchor = cycleEnabled && cycleStarts.length > 0;
 
+  const cycleTrust = useMemo(() => getCycleTrustModel(entriesSorted as any, userData, todayISO), [entriesSorted, userData, todayISO]);
+
   const learnedCycleLength = useMemo(
     () => Math.max(21, Math.round(avgLen ?? cycleStats?.lastLength ?? 28)),
     [avgLen, cycleStats?.lastLength],
@@ -515,7 +518,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
   }, [learnedBleedLength, learnedCycleLength]);
 
   const predictedNextCycleStartISO = useMemo(() => {
-    if (!cycleEnabled || !hasCycleAnchor || cycleStarts.length === 0) return null;
+    if (!cycleTrust.showFutureCycleStart || !cycleEnabled || !hasCycleAnchor || cycleStarts.length === 0) return null;
 
     const latestStartISO = cycleStarts[cycleStarts.length - 1];
     if (!latestStartISO) return null;
@@ -527,10 +530,10 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
 
     if (cycleStarts.includes(candidateISO)) return null;
     return candidateISO;
-  }, [cycleEnabled, hasCycleAnchor, cycleStarts, learnedCycleLength, todayISO]);
+  }, [cycleTrust.showFutureCycleStart, cycleEnabled, hasCycleAnchor, cycleStarts, learnedCycleLength, todayISO]);
 
   const currentCyclePredictedOvulationISO = useMemo(() => {
-    if (!fertilityEnabled || !hasCycleAnchor || cycleStarts.length === 0) return null;
+    if (!fertilityEnabled || !cycleTrust.showCurrentCyclePrediction || !hasCycleAnchor || cycleStarts.length === 0) return null;
     const latestStartISO = cycleStarts[cycleStarts.length - 1];
     if (!latestStartISO) return null;
 
@@ -540,12 +543,12 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     if (explicitInCurrentCycle) return explicitInCurrentCycle;
 
     return addDaysISO(latestStartISO, ovulationOffsetDays);
-  }, [fertilityEnabled, hasCycleAnchor, cycleStarts, ovulationSet, predictedNextCycleStartISO, ovulationOffsetDays]);
+  }, [fertilityEnabled, cycleTrust.showCurrentCyclePrediction, hasCycleAnchor, cycleStarts, ovulationSet, predictedNextCycleStartISO, ovulationOffsetDays]);
 
   const nextCyclePredictedOvulationISO = useMemo(() => {
-    if (!fertilityEnabled || !hasCycleAnchor || !predictedNextCycleStartISO) return null;
+    if (!fertilityEnabled || !cycleTrust.showFutureOvulation || !hasCycleAnchor || !predictedNextCycleStartISO) return null;
     return addDaysISO(predictedNextCycleStartISO, ovulationOffsetDays);
-  }, [fertilityEnabled, hasCycleAnchor, predictedNextCycleStartISO, ovulationOffsetDays]);
+  }, [fertilityEnabled, cycleTrust.showFutureOvulation, hasCycleAnchor, predictedNextCycleStartISO, ovulationOffsetDays]);
 
   const predictedOvulationSet = useMemo(() => {
     const s = new Set<string>();
@@ -995,8 +998,8 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
           <div className="mt-3 min-w-0">
             {hasCycleAnchor ? (
               <>
-                <div className="font-semibold text-[15px] sm:text-base">{rhythmContextLabel}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
-                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing'}</div>
+                <div className="font-semibold text-[15px] sm:text-base">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
+                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{cycleTrust.predictionTrust === 'stale' ? 'Rhythm is waiting for a fresh cycle anchor before it resumes forward predictions.' : cycleTrust.predictionTrust === 'early' ? 'Early estimate based on your latest cycle start. This will tighten as more cycles are logged.' : cycleTrust.phaseTrust === 'confirmed' ? (rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing') : 'Estimated from your recent logs and cycle timing.'}</div>
               </>
             ) : cycleEnabled ? (
               <>
@@ -1166,7 +1169,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                 <CycleFlagIcon size={12} filled className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                 <span>Cycle start</span>
               </div>
-              {cycleEnabled && hasCycleAnchor && predictedNextCycleStartISO && (
+              {cycleEnabled && hasCycleAnchor && cycleTrust.showFutureCycleStart && predictedNextCycleStartISO && (
                 <div className="flex items-center gap-2">
                   <Flag size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                   <span>Predicted cycle start</span>

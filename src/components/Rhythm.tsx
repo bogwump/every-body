@@ -556,6 +556,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
   const [cycleModalOpen, setCycleModalOpen] = useState(false);
   const avgCycleText = avgCycleLen ? `${avgCycleLen} days avg` : 'Not enough data yet';
+  const cycleTrust = useMemo(() => getCycleTrustModel(sorted as any, ((userData ?? ({} as any)) as UserData), computed.todayISO), [sorted, userData, computed.todayISO]);
 
   
   // Phase key for reminders (kept simple for v1; can be wired to your phase engine later)
@@ -565,12 +566,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
   const softMeta = softPhaseMeta(phaseKey);
 
   const rhythmStatusNote = useMemo(() => {
+    if (userData?.cycleTrackingMode === 'cycle' && !cycleTrust.hasCycleAnchor) return 'Still learning your cycle. Log your first period or mark a cycle start in Calendar → Edit cycle before phase timing appears here.';
     const gapMode = (computed.phaseState as any)?.gapMode as string | undefined;
-    if (gapMode === 'stale') return 'Estimated current phase after a longer logging gap. A few more check-ins will help firm this up again.';
+    if (gapMode === 'stale') return 'Estimated current phase after a longer logging gap. Forward predictions are paused until you add a fresh cycle anchor.';
     if (gapMode === 'catchup') return 'Estimated current phase after a gap in logging. Rhythm has caught up using elapsed time and recent anchors.';
+    if (cycleTrust.predictionTrust === 'early') return 'Early estimate based on your latest cycle start. A few more cycles will help the timing settle.';
     if (computed.phaseState?.historyLockLevel !== 'confirmed') return 'This is an estimated phase for now. A few more check-ins will help it settle.';
     return null;
-  }, [computed.phaseState]);
+  }, [computed.phaseState, cycleTrust, userData?.cycleTrackingMode]);
 
   function IconBadge({ icon }: { icon: React.ReactNode }) {
     return (
@@ -615,7 +618,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
           phaseSubtitle={/phase$/i.test(String(computed.sci).trim()) ? String(computed.sci).trim() : `${computed.sci} phase`}
           phaseDescription={phaseOneLiner(phaseKey, (((userData ?? {}) as any).goal ?? null) as any)}
           confidenceLabel={computed.confidence}
-          phaseStatusLabel={computed.phaseState?.historyLockLevel === 'confirmed' ? 'Confirmed phase' : 'Estimated phase'}
+          phaseStatusLabel={cycleTrust.phaseTrust === 'confirmed' ? 'Confirmed phase' : cycleTrust.hasCycleAnchor ? 'Estimated phase' : 'Still learning'}
           phaseIcon={phaseIcon}
         />
 

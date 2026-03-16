@@ -1082,6 +1082,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const [patternFeedbackTick, setPatternFeedbackTick] = useState(0);
   const [pendingContradiction, setPendingContradiction] = useState<PendingContradiction | null>(null);
 
+  const cycleTrust = useMemo(() => getCycleTrustModel(entriesAllSorted as any, userData, isoTodayLocal()), [entriesAllSorted, userData]);
+
   const currentInsightsPhase = useMemo(() => {
     if (userData.cycleTrackingMode !== 'cycle' || !entriesAllSorted.length) return null;
     try {
@@ -5104,7 +5106,7 @@ const tryNextPrompts = useMemo(() => {
         <div className="eb-card-header">
           <div>
             <div className="eb-card-title">Symptoms by cycle phase</div>
-            <div className="eb-card-sub">Optional: if cycle tracking is on and you log bleeding/spotting.</div>
+            <div className="eb-card-sub">{userData.cycleTrackingMode !== 'cycle' ? 'Turn on cycle tracking to see phase-based patterns.' : !cycleTrust.hasCycleAnchor ? 'Log your first period or mark a cycle start before phase-based patterns appear.' : cycleTrust.predictionTrust === 'stale' ? 'Phase-based patterns are paused after a longer gap until you add a fresh cycle anchor.' : cycleTrust.predictionTrust === 'early' ? 'Phase-based patterns are still learning from your first cycle anchor, so treat them as early estimates.' : 'Cycle tracking is on and phase-based patterns are using your logged cycle timing.'}</div>
           </div>
         </div>
 

@@ -21,6 +21,7 @@ import { getArchivedMomentSnapshots, getHighestPriorityMoment } from '../lib/com
 import { getRhythmPhaseState } from '../lib/phaseChange';
 import { generateMoments } from '../lib/generateMoments';
 import { CompanionMomentCard } from './CompanionMomentCard';
+import { getCycleTrustModel } from '../lib/cycleTrust';
 
 interface DashboardProps {
   userName: string;
@@ -486,7 +487,48 @@ export function Dashboard({
 
   const [momentRefresh, setMomentRefresh] = useState(0);
   const rhythmPhaseState = useMemo(() => getRhythmPhaseState(), [entriesSorted.length, todayISO]);
+  const cycleTrust = useMemo(() => getCycleTrustModel(entriesSorted as any, userData, todayISO), [entriesSorted, userData, todayISO]);
   const highestMoment = useMemo(() => getHighestPriorityMoment(todayISO), [todayISO, entriesSorted.length, momentRefresh]);
+
+
+  const dashboardRhythm = useMemo(() => {
+    if (userData.cycleTrackingMode !== 'cycle') {
+      return {
+        title: heroModel.rhythmTitle,
+        headline: heroModel.rhythmHeadline,
+        body: heroModel.rhythmBody,
+      };
+    }
+    if (!cycleTrust.hasCycleAnchor) {
+      return {
+        title: 'Your cycle is still learning',
+        headline: 'Still learning your cycle',
+        body: 'Log your first period or mark a cycle start in Calendar → Edit cycle before the app starts estimating phase and future timing.',
+      };
+    }
+    if (cycleTrust.predictionTrust === 'stale') {
+      return {
+        title: 'Your rhythm lately',
+        headline: 'Estimated current phase',
+        body: 'Rhythm is waiting for a fresh cycle anchor after a longer gap in logging before it resumes forward predictions.',
+      };
+    }
+    if (cycleTrust.phaseTrust !== 'confirmed') {
+      const base = typeof heroModel.rhythmHeadline === 'string' ? heroModel.rhythmHeadline.replace(/^You’re in\s+/u, '').trim() : 'current phase';
+      return {
+        title: heroModel.rhythmTitle,
+        headline: `Estimated ${base}`,
+        body: cycleTrust.predictionTrust === 'early'
+          ? 'Early estimate based on your latest cycle start. A few more cycles will help the timing settle.'
+          : 'Estimated from your recent logs and cycle timing.',
+      };
+    }
+    return {
+      title: heroModel.rhythmTitle,
+      headline: heroModel.rhythmHeadline,
+      body: heroModel.rhythmBody,
+    };
+  }, [userData.cycleTrackingMode, cycleTrust, heroModel]);
 
   const guideCard = useMemo(() => {
     const daysSinceStart = userData.createdAt ? Math.max(0, daysBetweenISO(userData.createdAt.slice(0, 10), todayISO)) : daysTracked;
@@ -792,11 +834,11 @@ export function Dashboard({
 
           {/* Today in your rhythm */}
           <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)]">
-            <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{heroModel.rhythmTitle}</div>
-            {heroModel.rhythmHeadline ? (
-              <div className="mt-1 text-lg font-semibold text-black">{heroModel.rhythmHeadline}</div>
+            <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{dashboardRhythm.title}</div>
+            {dashboardRhythm.headline ? (
+              <div className="mt-1 text-lg font-semibold text-black">{dashboardRhythm.headline}</div>
             ) : null}
-            <div className="mt-2 text-sm text-[rgba(0,0,0,0.65)]">{heroModel.rhythmBody}</div>
+            <div className="mt-2 text-sm text-[rgba(0,0,0,0.65)]">{dashboardRhythm.body}</div>
             {rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'stale' ? (
               <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Estimated current phase after a longer gap in logging. A few more check-ins will help firm this up again.</div>
             ) : rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'catchup' ? (
