@@ -3245,10 +3245,10 @@ const tryNextPrompts = useMemo(() => {
                   Log today
                 </button>
               ) : null}
-              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => extendExperiment(2)}>
+              <button type="button" className="eb-btn eb-btn-secondary min-w-[10rem]" onClick={() => extendExperiment(2)}>
                 Extend 2 days
               </button>
-              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setStopExperimentConfirmOpen(true)}>
+              <button type="button" className="eb-btn eb-btn-tertiary" onClick={() => setStopExperimentConfirmOpen(true)}>
                 Stop
               </button>
             </div>
@@ -3402,6 +3402,7 @@ const tryNextPrompts = useMemo(() => {
                 ? 'eb-chip-filter eb-chip-filter-active'
                 : 'eb-chip-filter'
             }
+            data-active={experimentCompareMode === 'quick'}
             onClick={() => setExperimentCompareMode('quick')}
           >
             Just before
@@ -3414,8 +3415,11 @@ const tryNextPrompts = useMemo(() => {
                     ? 'eb-chip-filter eb-chip-filter-active'
                     : 'eb-chip-filter'
                   )
-                : 'eb-chip-filter opacity-60 cursor-not-allowed'
+                : 'eb-chip-filter'
             }
+            data-active={experimentCompareMode === 'usual' && hasUsual}
+            disabled={!hasUsual}
+            aria-disabled={!hasUsual}
             onClick={() => {
               if (hasUsual) setExperimentCompareMode('usual');
             }}
@@ -3461,6 +3465,7 @@ const tryNextPrompts = useMemo(() => {
                 ? 'eb-chip-filter eb-chip-filter-active'
                 : 'eb-chip-filter'
             }
+            data-active={experimentCompareMode === 'quick'}
             onClick={() => setExperimentCompareMode('quick')}
           >
             Just before
@@ -3473,8 +3478,11 @@ const tryNextPrompts = useMemo(() => {
                     ? 'eb-chip-filter eb-chip-filter-active'
                     : 'eb-chip-filter'
                   )
-                : 'eb-chip-filter opacity-60 cursor-not-allowed'
+                : 'eb-chip-filter'
             }
+            data-active={experimentCompareMode === 'usual' && hasUsual}
+            disabled={!hasUsual}
+            aria-disabled={!hasUsual}
             onClick={() => {
               if (hasUsual) setExperimentCompareMode('usual');
             }}
@@ -3726,7 +3734,7 @@ const tryNextPrompts = useMemo(() => {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                className="min-h-[3.25rem] px-3 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium text-sm text-center leading-5"
+                className="eb-btn eb-btn-primary min-h-[3.25rem] px-3 text-center leading-5"
                 onClick={() => {
                   setDataEvidenceOpen(true);
                   scrollToInsightsSection('eb-insights-settings');
@@ -3736,14 +3744,14 @@ const tryNextPrompts = useMemo(() => {
               </button>
               <button
                 type="button"
-                className="min-h-[3.25rem] px-3 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium text-sm text-center leading-5"
+                className="eb-btn eb-btn-primary min-h-[3.25rem] px-3 text-center leading-5"
                 onClick={() => scrollToInsightsSection('eb-experiments')}
               >
                 Run experiment
               </button>
               <button
                 type="button"
-                className="col-span-2 min-h-[3.25rem] px-3 py-2 rounded-xl bg-[rgb(var(--color-primary-dark))] text-white hover:bg-[rgb(var(--color-primary))] transition-all font-medium text-sm text-center leading-5"
+                className="eb-btn eb-btn-primary col-span-2 min-h-[3.25rem] px-3 text-center leading-5"
                 onClick={() => scrollToInsightsSection('eb-insights-settings')}
               >
                 Change metrics
@@ -4401,7 +4409,7 @@ const tryNextPrompts = useMemo(() => {
             </div>
             <button
               type="button"
-              className="px-6 py-3 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center sm:self-auto self-stretch"
+              className="eb-btn eb-btn-primary whitespace-nowrap w-full sm:w-auto justify-center sm:self-auto self-stretch"
               onClick={openCustomExperiment}
             >
               <FlaskConical className="w-4 h-4" />

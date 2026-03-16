@@ -111,11 +111,12 @@ export function History({ onNavigate }: HistoryProps) {
                 type="button"
                 onClick={() => setFilter(item.key)}
                 className={[
-                  'px-4 py-2 rounded-full text-sm font-medium transition-colors border',
+                  'eb-chip-filter',
                   active
-                    ? 'eb-chip-filter eb-chip-filter-active !border-white/20 !bg-white/20 !text-white !shadow-[0_8px_20px_rgba(31,41,55,0.08)]'
-                    : 'eb-chip-filter !border-white/20 !bg-white/10 !text-white/85 hover:!bg-white/14 hover:!text-white'
+                    ? 'eb-chip-filter-active !border-white/20 !bg-white/20 !text-white !shadow-[0_8px_20px_rgba(31,41,55,0.08)]'
+                    : '!border-white/20 !bg-white/10 !text-white/85 hover:!bg-white/14 hover:!text-white'
                 ].join(' ')}
+                data-active={active}
               >
                 {item.label}
               </button>
