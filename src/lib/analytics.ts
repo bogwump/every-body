@@ -216,6 +216,74 @@ export function estimatePhaseByFlow(
 }
 
 
+
+export interface BleedStats {
+  lengths: number[];
+  lastLength: number | null;
+  avgLength: number | null;
+}
+
+/**
+ * Learn period / bleed duration from completed logged bleed windows.
+ * - Uses cycle starts as anchors
+ * - Counts non-breakthrough flow days after each start
+ * - Stops once the user explicitly logs flow back to zero
+ * - Falls back cleanly when there is not enough data yet
+ */
+export function computeBleedStats(entries: CheckInEntry[] | unknown): BleedStats {
+  const sorted = sortByDateAsc(entries);
+  const starts = getCycleStarts(sorted);
+  const byISO = new Map<string, any>();
+  for (const e of sorted as any[]) {
+    const iso = entryISO(e);
+    if (iso) byISO.set(iso, e);
+  }
+
+  const flowTo10 = (v: any): number | null => {
+    if (typeof v !== 'number') return null;
+    const scaled = v > 10 ? Math.round(v / 10) : v;
+    return Math.max(0, Math.min(10, scaled));
+  };
+
+  const lengths: number[] = [];
+
+  for (let i = 0; i < starts.length; i++) {
+    const startISO = starts[i];
+    const nextStartISO = starts[i + 1] ?? null;
+    let sawBleeding = false;
+    let length = 0;
+    let completed = false;
+
+    for (let day = 0; day < 10; day++) {
+      const iso = addDaysISO(startISO, day);
+      if (nextStartISO && iso >= nextStartISO) break;
+      const e = byISO.get(iso);
+      if (!e) continue;
+      const breakthrough = Boolean(e?.breakthroughBleed);
+      const raw = flowTo10(e?.values?.flow);
+      const flow = breakthrough ? 0 : (typeof raw === 'number' ? raw : 0);
+
+      if (flow > 0) {
+        sawBleeding = true;
+        length = day + 1;
+        continue;
+      }
+
+      if (sawBleeding) {
+        completed = true;
+        break;
+      }
+    }
+
+    if (sawBleeding && completed && length >= 1 && length <= 10) lengths.push(length);
+  }
+
+  const lastLength = lengths.length ? lengths[lengths.length - 1] : null;
+  const recent = lengths.slice(-6);
+  const avgLength = recent.length ? Math.round(recent.reduce((a, b) => a + b, 0) / recent.length) : null;
+  return { lengths, lastLength, avgLength };
+}
+
 export interface CycleStats {
   cycleStarts: string[]; // YYYY-MM-DD sorted asc
   lengths: number[]; // days between consecutive starts
@@ -226,10 +294,12 @@ export interface CycleStats {
 }
 
 /**
- * Detect cycle starts using either a manual override, or a flow "start" signal.
+ * Detect cycle starts using either a manual override, or a stronger bleed-start signal.
  * Rules:
  * - Manual override always counts as a start
- * - Otherwise flow > 0 counts as bleeding, and the first bleeding day after a non-bleeding day is a start
+ * - Breakthrough bleed never starts a cycle unless manually overridden
+ * - Clear bleeding (flow >= 3 on the 0-10 scale) after no flow starts a cycle
+ * - Light spotting (flow 1-2) only starts a cycle when it happens on 2 consecutive days
  */
 export function getCycleStarts(entries: CheckInEntry[] | unknown): string[] {
   const sorted = sortByDateAsc(entries);
@@ -237,33 +307,60 @@ export function getCycleStarts(entries: CheckInEntry[] | unknown): string[] {
 
   const flowTo10 = (v: any): number | null => {
     if (typeof v !== 'number') return null;
-    // Support older 0–100 values
     const scaled = v > 10 ? Math.round(v / 10) : v;
     return Math.max(0, Math.min(10, scaled));
   };
 
-  // Track bleeding state, treating breakthrough bleeds as NOT resetting the cycle.
-  let wasBleeding = false;
+  let prevFlow = 0;
+  let spottingStreak = 0;
+  let spottingStreakStartISO: string | null = null;
 
   for (let i = 0; i < sorted.length; i++) {
     const e: any = sorted[i];
     const dateISO = entryISO(e);
     if (!dateISO) continue;
 
-    if (e?.cycleStartOverride === true) {
+    const override = Boolean(e?.cycleStartOverride);
+    const breakthrough = Boolean(e?.breakthroughBleed);
+
+    if (override) {
       starts.push(dateISO);
-      wasBleeding = true;
+      const raw = flowTo10(e?.values?.flow);
+      prevFlow = typeof raw === 'number' ? raw : 0;
+      spottingStreak = 0;
+      spottingStreakStartISO = null;
+      continue;
+    }
+
+    if (breakthrough) {
+      prevFlow = 0;
+      spottingStreak = 0;
+      spottingStreakStartISO = null;
       continue;
     }
 
     const rawFlow = flowTo10(e?.values?.flow);
-    const isBreakthrough = Boolean(e?.breakthroughBleed);
-    const effectiveFlow = isBreakthrough ? 0 : (typeof rawFlow === 'number' ? rawFlow : 0);
+    const flow = typeof rawFlow === 'number' ? rawFlow : 0;
+    const isBleed = flow >= 3;
+    const isSpotting = flow > 0 && flow < 3
 
-    const isBleeding = effectiveFlow > 0;
-    if (isBleeding && !wasBleeding) starts.push(dateISO);
+    if (isBleed && prevFlow === 0) {
+      starts.push(dateISO);
+      spottingStreak = 0;
+      spottingStreakStartISO = null;
+    } else if (isSpotting) {
+      if (spottingStreak === 0) spottingStreakStartISO = dateISO;
+      spottingStreak += 1;
+      if (prevFlow === 0 && spottingStreak >= 2 && spottingStreakStartISO) {
+        starts.push(spottingStreakStartISO);
+        spottingStreak = 2;
+      }
+    } else {
+      spottingStreak = 0;
+      spottingStreakStartISO = null;
+    }
 
-    wasBleeding = isBleeding;
+    prevFlow = flow;
   }
 
   return Array.from(new Set(starts)).sort((a, b) => a.localeCompare(b));

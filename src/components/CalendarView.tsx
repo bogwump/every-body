@@ -4,7 +4,7 @@ import { PencilLine, Droplet, Droplets, Egg, X, Flag, ChevronRight, Smile, Meh, 
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
-import { computeCycleStats, estimatePhaseByFlow, getRhythmModel, sortByDateAsc } from '../lib/analytics';
+import { computeBleedStats, computeCycleStats, estimatePhaseByFlow, getRhythmModel, sortByDateAsc } from '../lib/analytics';
 import { getRhythmTimingModel } from '../lib/rhythmTiming';
 
 type Props = {
@@ -155,7 +155,7 @@ function shortPhaseCue(phaseKey: string | null | undefined): string {
 
 
 type CalendarMarker = {
-  key: 'period' | 'ovulation' | 'experiment' | 'sex';
+  key: 'cycleStart' | 'period' | 'spotting' | 'ovulation' | 'experiment' | 'sex';
   priority: number;
   label: string;
   icon: React.ReactNode;
@@ -163,6 +163,8 @@ type CalendarMarker = {
 
 function getCalendarMarkers(args: {
   isPeriod: boolean;
+  isCycleStart: boolean;
+  hasSpotting: boolean;
   isPredictedOvulation: boolean;
   hasExperiment: boolean;
   hasSex: boolean;
@@ -170,6 +172,14 @@ function getCalendarMarkers(args: {
   const iconProps = { size: 11, strokeWidth: 1.75, className: 'opacity-80' } as const;
   const markers: CalendarMarker[] = [];
 
+  if (args.isCycleStart) {
+    markers.push({
+      key: 'cycleStart',
+      priority: 0,
+      label: 'Cycle start',
+      icon: <Flag {...iconProps} aria-hidden="true" />,
+    });
+  }
   if (args.isPeriod) {
     markers.push({
       key: 'period',
@@ -178,10 +188,18 @@ function getCalendarMarkers(args: {
       icon: <Droplet {...iconProps} aria-hidden="true" />,
     });
   }
+  if (args.hasSpotting) {
+    markers.push({
+      key: 'spotting',
+      priority: 2,
+      label: 'Spotting / breakthrough bleed',
+      icon: <Droplets {...iconProps} aria-hidden="true" />,
+    });
+  }
   if (args.isPredictedOvulation) {
     markers.push({
       key: 'ovulation',
-      priority: 2,
+      priority: 3,
       label: 'Predicted ovulation',
       icon: <Sparkles {...iconProps} aria-hidden="true" />,
     });
@@ -189,7 +207,7 @@ function getCalendarMarkers(args: {
   if (args.hasExperiment) {
     markers.push({
       key: 'experiment',
-      priority: 3,
+      priority: 4,
       label: 'Experiment active',
       icon: <FlaskConical {...iconProps} aria-hidden="true" />,
     });
@@ -197,7 +215,7 @@ function getCalendarMarkers(args: {
   if (args.hasSex) {
     markers.push({
       key: 'sex',
-      priority: 4,
+      priority: 5,
       label: 'Sex logged',
       icon: <Heart {...iconProps} aria-hidden="true" />,
     });
@@ -335,6 +353,7 @@ export function CalendarView({ userData, onNavigate, onOpenCheckIn, onUpdateUser
   const entriesSorted = useMemo(() => sortByDateAsc(entries), [entries]);
 
   const cycleStats = useMemo(() => computeCycleStats(entriesSorted), [entriesSorted]);
+  const bleedStats = useMemo(() => computeBleedStats(entriesSorted), [entriesSorted]);
   const avgLen = cycleStats?.avgLength ?? null;
 
   const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
@@ -474,57 +493,60 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     const s = new Set<string>();
     if (!cycleEnabled) return s;
 
-    // 1) Always shade days where the user actually logged bleeding/spotting.
     const byISO = new Map<string, any>();
     for (const e of entriesSorted) byISO.set(e.dateISO, e);
 
-    const loggedBleed = (iso: string): boolean => {
-      const e = byISO.get(iso);
-      const flowVal = e?.values?.flow;
-      const flow = typeof flowVal === 'number' ? flowVal : 0;
-      return flow > 0;
-    };
+    const learnedBleedLength = clamp(bleedStats.avgLength ?? bleedStats.lastLength ?? 7, 2, 8);
 
-    for (const e of entriesSorted) {
-      if (loggedBleed(e.dateISO)) s.add(e.dateISO);
-    }
-
-    // 2) Provisional 7-day window after a cycle start.
-    //    This is a *starting point* and gets trimmed if the user logs bleeding down to zero early.
     for (const startISO of cycleStarts) {
       let seenPositive = false;
-      let stopAfterISO: string | null = null;
+      let explicitStopDay: string | null = null;
+      let lastPositiveOffset = -1;
 
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < Math.max(learnedBleedLength, 8); i++) {
         const dayISO = addDaysISO(startISO, i);
         const e = byISO.get(dayISO);
+        if (!e) continue;
+
         const breakthrough = Boolean(e?.breakthroughBleed);
         const flowVal = e?.values?.flow;
         const flow = typeof flowVal === 'number' ? flowVal : 0;
         const effectiveFlow = breakthrough ? 0 : flow;
 
-        if (effectiveFlow > 0) seenPositive = true;
+        if (effectiveFlow > 0) {
+          seenPositive = true;
+          lastPositiveOffset = i;
+          continue;
+        }
 
-        // If the user has been bleeding and then explicitly logs 0, treat that as the end.
         if (seenPositive && effectiveFlow === 0) {
-          stopAfterISO = dayISO;
+          explicitStopDay = dayISO;
           break;
+        }
+      }
+
+      const provisionalLength = explicitStopDay
+        ? Math.max(1, daysBetweenISO(startISO, explicitStopDay))
+        : Math.max(1, lastPositiveOffset >= 0 ? lastPositiveOffset + 1 : learnedBleedLength);
+
+      for (let i = 0; i < provisionalLength; i++) {
+        const dayISO = addDaysISO(startISO, i);
+        const e = byISO.get(dayISO);
+        const breakthrough = Boolean(e?.breakthroughBleed);
+        const flowVal = e?.values?.flow;
+        const flow = typeof flowVal === 'number' ? flowVal : null;
+
+        if (e) {
+          if (breakthrough) continue;
+          if (typeof flow === 'number' && flow <= 0) continue;
         }
 
         s.add(dayISO);
       }
-
-      if (stopAfterISO) {
-        // remove stop day and anything after it in the provisional window
-        for (let i = 0; i < 7; i++) {
-          const dayISO = addDaysISO(startISO, i);
-          if (dayISO >= stopAfterISO) s.delete(dayISO);
-        }
-      }
     }
 
     return s;
-  }, [cycleEnabled, entriesSorted, cycleStarts]);
+  }, [cycleEnabled, entriesSorted, cycleStarts, bleedStats.avgLength, bleedStats.lastLength]);
 
   const fertileSet = useMemo(() => {
     const s = new Set<string>();
@@ -581,6 +603,8 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     const isPeriod = periodSet.has(summaryISO);
     const isFertile = fertileSet.has(summaryISO);
     const isOv = fertilityEnabled && predictedOvulationSet.has(summaryISO);
+    const isCycleStart = cycleStarts.includes(summaryISO);
+    const isSpotting = Boolean((e as any)?.breakthroughBleed) || (() => { const fv = (e as any)?.values?.flow; return typeof fv === 'number' && fv > 0 && !isPeriod; })();
 
     const summaryPhase = (() => {
       if (isPeriod) return 'Reset Phase';
@@ -635,7 +659,9 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
 
           {(() => {
             const pills: Array<{ key: string; text: string }> = [];
+            if (isCycleStart) pills.push({ key: 'cycleStart', text: 'Cycle start' });
             if (isPeriod) pills.push({ key: 'period', text: 'Period day' });
+            if (isSpotting) pills.push({ key: 'spotting', text: 'Spotting / breakthrough bleed' });
             if (isFertile) pills.push({ key: 'fertile', text: isOv ? 'Ovulation day' : 'Fertile window' });
             if (sexLogged) pills.push({ key: 'sex', text: 'Sex logged' });
             if (experimentActive) pills.push({ key: 'experiment', text: 'Experiment active' });
@@ -946,8 +972,14 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             const hasSex = Boolean((entry as any)?.events?.sex);
             const hasExperiment = isExperimentActiveOnISO(experiment, iso);
             const isPredictedOvulation = fertilityEnabled && predictedOvulationSet.has(iso);
+            const isCycleStart = cycleStarts.includes(iso);
+            const flowVal = (entry as any)?.values?.flow;
+            const flow = typeof flowVal === 'number' ? flowVal : 0;
+            const hasSpotting = Boolean((entry as any)?.breakthroughBleed) || (flow > 0 && !isPeriod);
             const dayMarkers = getCalendarMarkers({
               isPeriod,
+              isCycleStart,
+              hasSpotting,
               isPredictedOvulation,
               hasExperiment,
               hasSex,
@@ -1039,8 +1071,16 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                 </div>
               )}
               <div className="flex items-center gap-2">
+                <Flag size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                <span>Cycle start</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Droplet size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
                 <span>Period day</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Droplets size={11} strokeWidth={1.75} className="opacity-80 text-[rgb(var(--color-primary-dark))]" />
+                <span>Spotting / breakthrough bleed</span>
               </div>
               {fertilityEnabled && (
                 <div className="flex items-center gap-2">
