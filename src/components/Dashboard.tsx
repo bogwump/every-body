@@ -914,37 +914,7 @@ export function Dashboard({
           </div>
         ) : null}
 
-        {guideCard ? (
-          <div className="eb-card">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
-                {guideCard.icon}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Guide</div>
-                <h3 className="mt-1 mb-1">{guideCard.title}</h3>
-                <p className="text-sm text-[rgba(0,0,0,0.72)]">{guideCard.body}</p>
-                {guideCard.supporting ? (
-                  <p className="text-sm text-[rgba(0,0,0,0.60)] mt-2">{guideCard.supporting}</p>
-                ) : null}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const memory = readGuideMemory();
-                    const existing = memory[guideCard.id] ?? {};
-                    memory[guideCard.id] = { ...existing, lastClickedAtISO: todayISO };
-                    writeGuideMemory(memory);
-                    if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
-                    else onNavigate(guideCard.cta.screen);
-                  }}
-                  className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
-                >
-                  {guideCard.cta.label} <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
         ) : null}
 
         <div className="eb-card">
