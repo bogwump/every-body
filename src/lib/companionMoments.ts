@@ -246,11 +246,25 @@ export function getMomentPriority(type: CompanionMomentType): number {
   return MOMENT_PRIORITY[type];
 }
 
+function isLegacyGuideMoment(moment: CompanionMoment): boolean {
+  const title = typeof moment.data?.title === 'string' ? String(moment.data.title) : '';
+  const body = typeof moment.data?.body === 'string' ? String(moment.data.body) : '';
+  return moment.id === 'building-rhythm'
+    || title === 'You’re building your rhythm'
+    || title === "You're building your rhythm"
+    || body === 'A few more check-ins will help this start turning into personalised guidance.';
+}
+
 export function getCompanionMoments(): CompanionMoment[] {
-  return readJson<unknown[]>(COMPANION_MOMENTS_KEY, [])
+  const raw = readJson<unknown[]>(COMPANION_MOMENTS_KEY, []);
+  const all = raw
     .map(normaliseMoment)
-    .filter((item): item is CompanionMoment => Boolean(item))
-    .sort(sortByPriorityThenDate);
+    .filter((item): item is CompanionMoment => Boolean(item));
+
+  const cleaned = all.filter((moment) => !isLegacyGuideMoment(moment));
+  if (cleaned.length !== all.length) writeJson(COMPANION_MOMENTS_KEY, cleaned);
+
+  return cleaned.sort(sortByPriorityThenDate);
 }
 
 export function getArchivedMomentSnapshots(limit = MOMENT_HISTORY_LIMIT): ArchivedCompanionMoment[] {
