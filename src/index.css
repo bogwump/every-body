@@ -402,19 +402,20 @@ body.eb-chat-typing .eb-mobile-nav {
 
   .eb-icon-frame {
     @apply inline-flex items-center justify-center shrink-0;
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: 1rem;
-    background: rgb(var(--color-accent) / 0.18);
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0;
+    background: transparent;
     color: rgb(var(--color-primary-dark));
-    border: 1px solid rgb(var(--color-primary) / 0.14);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
+    border: 0;
+    box-shadow: none;
+    padding: 0;
   }
 
   .eb-icon-frame--hero {
-    background: rgb(255 255 255 / 0.16);
-    color: white;
-    border-color: rgb(255 255 255 / 0.18);
+    background: transparent;
+    color: inherit;
+    border-color: transparent;
   }
 
   .eb-inset,

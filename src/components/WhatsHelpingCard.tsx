@@ -1,5 +1,5 @@
 import React from 'react';
-import { HandHeart } from 'lucide-react';
+import { HeartHandshake } from 'lucide-react';
 
 export function WhatsHelpingCard(props: { items: string[] }) {
   if (!props.items.length) return null;
@@ -12,7 +12,7 @@ export function WhatsHelpingCard(props: { items: string[] }) {
           <div className="eb-card-sub">A gentle read on what has looked useful for your body before.</div>
         </div>
         <div className="eb-icon-frame">
-          <HandHeart className="w-5 h-5" />
+          <HeartHandshake className="w-5 h-5" />
         </div>
       </div>
       <div className="mt-5 space-y-3">

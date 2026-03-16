@@ -147,10 +147,7 @@ export function History({ onNavigate }: HistoryProps) {
                 const confidence = confidenceLabel(event.confidence);
                 return (
                   <article key={event.id} className="eb-card eb-card-soft">
-                    <div className="flex items-start gap-4">
-                      <div className="eb-icon-frame mt-0.5">
-                        <Icon className="w-5 h-5" />
-                      </div>
+                    <div className="eb-card-header items-start">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 max-w-3xl">

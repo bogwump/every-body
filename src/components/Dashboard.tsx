@@ -872,10 +872,7 @@ export function Dashboard({
 
         {guideCard ? (
           <div className="eb-card eb-card-soft">
-            <div className="flex items-start gap-4">
-              <div className="eb-icon-frame">
-                {guideCard.icon}
-              </div>
+            <div className="eb-card-header">
               <div className="min-w-0 flex-1">
                 <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Guide</div>
                 <h3 className="mt-1 mb-1">{guideCard.title}</h3>
@@ -898,6 +895,9 @@ export function Dashboard({
                 >
                   {guideCard.cta.label} <ArrowRight className="w-4 h-4" />
                 </button>
+              </div>
+              <div className="eb-icon-frame">
+                {guideCard.icon}
               </div>
             </div>
           </div>
@@ -949,10 +949,7 @@ export function Dashboard({
         {/* Restore from backup nudge (only when there is no data yet) */}
         {daysTracked === 0 ? (
           <div className="eb-card eb-card-soft">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
-                <Upload className="w-5 h-5 text-[rgb(var(--color-primary))]" />
-              </div>
+            <div className="eb-card-header">
               <div className="min-w-0 flex-1">
                 <h3 className="mb-1">Got a backup to restore?</h3>
                 <p className="text-sm text-[rgb(var(--color-text-secondary))]">

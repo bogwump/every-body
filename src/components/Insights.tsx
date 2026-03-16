@@ -4844,11 +4844,7 @@ const tryNextPrompts = useMemo(() => {
       {/* Sleep Insights (optional) */}
       {sleepInsightsOn ? (
         <div id="eb-sleep-trend" className="eb-card p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0 self-start">
-              <Moon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />
-            </div>
-
+          <div className="eb-card-header items-start">
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -4865,6 +4861,9 @@ const tryNextPrompts = useMemo(() => {
               <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
                 Extra sleep details logged on <span className="font-medium">{sleepExtrasCount}</span> day{sleepExtrasCount === 1 ? '' : 's'}.
               </div>
+            </div>
+            <div className="eb-icon-frame self-start">
+              <Moon className="w-5 h-5 text-[rgb(var(--color-primary-dark))]" />
             </div>
           </div>
 

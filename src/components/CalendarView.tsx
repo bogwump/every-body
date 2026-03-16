@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { PencilLine, Droplet, Droplets, Egg, X, ChevronRight, Smile, Meh, Frown, Heart, FlaskConical, Sparkles, Flag } from 'lucide-react';
+import { PencilLine, Droplet, Droplets, Egg, X, ChevronRight, Smile, Meh, Frown, Heart, FlaskConical, Sparkles, Flag, CalendarDays } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { UserData, SymptomKey, CheckInEntry } from '../types';
 import { useEntries, useExperiment } from '../lib/appStore';
@@ -949,6 +949,10 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                 <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Cycle timing is off right now, but you can still use Calendar to log and review symptoms.</div>
               </>
             )}
+            </div>
+            <div className="eb-icon-frame self-start">
+              <CalendarDays className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+            </div>
           </div>
         </section>
         <div className="eb-card eb-card-soft mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
