@@ -915,8 +915,6 @@ export function Dashboard({
         ) : null}
 
 
-        ) : null}
-
         <div className="eb-card">
           <div className="flex items-start gap-4 w-full h-full">
             <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
