@@ -208,24 +208,25 @@ body.eb-chat-typing .eb-mobile-nav {
      never for primary or secondary actions. Match the compact Profile selector pills. */
   .eb-choice-pill,
   .eb-chip-filter {
-    @apply inline-flex items-center justify-center text-sm font-medium transition;
-    min-height: 1.92rem;
-    padding: 0.22rem 0.82rem;
+    @apply inline-flex items-center justify-center text-sm font-medium transition-colors;
+    min-height: 1.56rem;
+    padding: 0.14rem 0.78rem;
     border-radius: 9999px;
+    line-height: 1.2;
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
-    border: 1px solid rgb(var(--color-border) / 0.95);
-    background: rgb(var(--color-surface) / 0.96);
+    border: 1px solid rgb(var(--color-border) / 0.92);
+    background: transparent;
     color: rgb(var(--color-text-secondary));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.75);
+    box-shadow: none;
   }
 
   .eb-choice-pill:hover,
   .eb-chip-filter:hover {
     color: rgb(var(--color-text));
-    border-color: rgb(var(--color-primary) / 0.24);
-    background: rgb(255 255 255 / 0.985);
+    border-color: rgb(var(--color-primary) / 0.26);
+    background: rgb(var(--color-surface) / 0.72);
   }
 
   .eb-choice-pill:focus-visible,
@@ -241,9 +242,9 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-chip-filter[data-active="true"],
   .eb-chip-filter-active {
     color: rgb(var(--color-text));
-    background: rgb(var(--color-surface) / 0.98);
-    border-color: rgb(var(--color-primary) / 0.42);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
+    background: rgb(var(--color-surface) / 0.88);
+    border-color: rgb(var(--color-primary) / 0.46);
+    box-shadow: none;
   }
 
   .eb-choice-pill[data-tone="soft"] {

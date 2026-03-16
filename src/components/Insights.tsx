@@ -3819,23 +3819,21 @@ const tryNextPrompts = useMemo(() => {
                               <div className="mt-3 eb-choice-group">
                                 <button
                                   type="button"
-                                  className="eb-choice-pill"
-                                  data-selected="true"
+                                  className="eb-btn-primary"
                                   onClick={() => handlePatternFeedback('yes', p)}
                                 >
                                   Yes
                                 </button>
                                 <button
                                   type="button"
-                                  className="eb-choice-pill"
-                                  data-tone="soft"
+                                  className="eb-btn-tertiary"
                                   onClick={() => openContradictionPrompt(p)}
                                 >
                                   No
                                 </button>
                                 <button
                                   type="button"
-                                  className="eb-choice-pill"
+                                  className="eb-btn-secondary"
                                   onClick={() => handlePatternFeedback('unsure', p)}
                                 >
                                   Not sure
@@ -3878,7 +3876,7 @@ const tryNextPrompts = useMemo(() => {
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              className="eb-choice-pill"
+                              className="eb-btn-tertiary"
                               onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                             >
                               Undo
@@ -3886,7 +3884,7 @@ const tryNextPrompts = useMemo(() => {
                             {showReassess ? (
                               <button
                                 type="button"
-                                className="eb-choice-pill"
+                                className="eb-btn-tertiary"
                                 onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                               >
                                 Reassess
@@ -3904,7 +3902,7 @@ const tryNextPrompts = useMemo(() => {
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              className="eb-choice-pill"
+                              className="eb-btn-tertiary"
                               onClick={() => { restorePattern(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                             >
                               Undo
@@ -3912,7 +3910,7 @@ const tryNextPrompts = useMemo(() => {
                             {showReassess ? (
                               <button
                                 type="button"
-                                className="eb-choice-pill"
+                                className="eb-btn-tertiary"
                                 onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                               >
                                 Reassess
@@ -3930,7 +3928,7 @@ const tryNextPrompts = useMemo(() => {
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              className="eb-choice-pill"
+                              className="eb-btn-tertiary"
                               onClick={() => { reopenPatternForReview(feedbackId, 0.45); setPatternFeedbackTick((value) => value + 1); }}
                             >
                               Change response
@@ -3945,7 +3943,7 @@ const tryNextPrompts = useMemo(() => {
 
                   <div className="pt-4 flex items-center justify-between gap-2">
                     {p.allowSuggestedExperiment ? (
-                      <button type="button" className="px-5 py-2 rounded-xl bg-[rgb(var(--color-primary))] text-white hover:bg-[rgb(var(--color-primary-dark))] transition-all font-medium inline-flex items-center gap-2 text-sm" onClick={() => openExperiment([p.aKey, p.bKey])}>
+                      <button type="button" className="eb-btn-primary" onClick={() => openExperiment([p.aKey, p.bKey])}>
                         <FlaskConical className="w-4 h-4" />
                         Try 3-day experiment
                       </button>
