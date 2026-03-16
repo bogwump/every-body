@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Activity, CheckCircle2, Clock3, FlaskConical, Heart, RefreshCw, Sparkles } from 'lucide-react';
+import { Activity, CheckCircle2, ChevronDown, Clock3, FlaskConical, Heart, RefreshCw, Sparkles } from 'lucide-react';
 import { buildTimelineEvents, filterTimelineEvents, getTimelineSummary, groupEventsByMonth, type TimelineEvent, type TimelineFilter } from '../lib/timelineBuilder';
-import { reopenPatternForReview, restorePattern } from '../lib/patternFeedback';
+import { reopenPatternForReview } from '../lib/patternFeedback';
 import { safeFormatISODate } from '../lib/browserSafe';
 
 interface HistoryProps {
@@ -86,14 +86,15 @@ export function History({ onNavigate }: HistoryProps) {
   const empty = visible.length === 0;
 
   return (
-    <div className="px-4 pt-6 pb-28 md:px-8 md:pb-10 max-w-5xl mx-auto space-y-6">
-      <section className="eb-hero-surface eb-hero-on-dark rounded-3xl p-6 shadow-lg overflow-hidden">
+    <div className="eb-page">
+      <div className="eb-page-inner">
+      <section className="eb-card eb-hero eb-hero-surface eb-hero-lg eb-hero-on-dark overflow-hidden">
         <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-2xl bg-[rgba(255,255,255,0.18)] border border-[rgba(255,255,255,0.18)] text-white flex items-center justify-center shrink-0">
+          <div className="eb-icon-frame eb-icon-frame--hero">
             <Clock3 className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/75">History</div>
+            <div className="eb-page-kicker !text-white/72">History</div>
             <h1 className="mt-1 text-white">Your story so far</h1>
             <p className="mt-3 text-sm text-white/85">
               {summary.patterns} pattern{summary.patterns === 1 ? '' : 's'} discovered · {summary.helpfulExperiments} experiment{summary.helpfulExperiments === 1 ? '' : 's'} looked helpful · {summary.phaseChanges} phase shift{summary.phaseChanges === 1 ? '' : 's'} recorded
@@ -110,9 +111,9 @@ export function History({ onNavigate }: HistoryProps) {
                 type="button"
                 onClick={() => setFilter(item.key)}
                 className={[
-                  'px-4 py-2 rounded-full text-sm transition-colors border',
+                  'px-4 py-2 rounded-full text-sm font-medium transition-colors border',
                   active
-                    ? 'bg-white/20 text-white border-white/25'
+                    ? 'bg-white/20 text-white border-white/25 shadow-[0_8px_20px_rgba(31,41,55,0.08)]'
                     : 'bg-white/8 text-white/85 border-white/18 hover:bg-white/12 hover:text-white'
                 ].join(' ')}
               >
@@ -124,7 +125,7 @@ export function History({ onNavigate }: HistoryProps) {
       </section>
 
       {empty ? (
-        <section className="eb-card">
+        <section className="eb-card eb-card-soft">
           <h3>Your story is just getting started</h3>
           <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))] max-w-2xl">
             As you log symptoms, phases, and experiments, this timeline will begin to show the patterns and progress that matter most.
@@ -149,9 +150,9 @@ export function History({ onNavigate }: HistoryProps) {
                 const Icon = iconForEvent(event.type);
                 const confidence = confidenceLabel(event.confidence);
                 return (
-                  <article key={event.id} className="eb-card">
+                  <article key={event.id} className="eb-card eb-card-soft">
                     <div className="flex items-start gap-4">
-                      <div className="w-11 h-11 rounded-2xl bg-[rgb(var(--color-accent)/0.18)] text-[rgb(var(--color-primary))] flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="eb-icon-frame mt-0.5">
                         <Icon className="w-5 h-5" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -159,20 +160,30 @@ export function History({ onNavigate }: HistoryProps) {
                           <div className="min-w-0 max-w-3xl">
                             <h3>{event.title}</h3>
                             <p className="mt-2 text-sm text-[rgb(var(--color-text))]">{event.description}</p>
-                            {event.evidence ? (
-                              <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
-                                <span className="font-medium text-[rgb(var(--color-text))]">Why this is here:</span> {event.evidence}
-                              </p>
-                            ) : null}
-                            {event.signals && event.signals.length ? (
-                              <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
-                                <span className="font-medium text-[rgb(var(--color-text))]">Signals involved:</span> {event.signals.join(' • ')}
-                              </p>
-                            ) : null}
-                            {confidence ? (
-                              <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
-                                <span className="font-medium text-[rgb(var(--color-text))]">Confidence:</span> {confidence}
-                              </p>
+                            {(event.evidence || (event.signals && event.signals.length) || confidence) ? (
+                              <details className="eb-collapsible">
+                                <summary className="flex items-center justify-between gap-3">
+                                  <span>Why this is here</span>
+                                  <ChevronDown className="w-4 h-4 text-[rgb(var(--color-text-secondary))]" />
+                                </summary>
+                                <div>
+                                  {event.evidence ? (
+                                    <p className="text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                                      <span className="font-medium text-[rgb(var(--color-text))]">Why this is here:</span> {event.evidence}
+                                    </p>
+                                  ) : null}
+                                  {event.signals && event.signals.length ? (
+                                    <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                                      <span className="font-medium text-[rgb(var(--color-text))]">Signals involved:</span> {event.signals.join(' • ')}
+                                    </p>
+                                  ) : null}
+                                  {confidence ? (
+                                    <p className="mt-2 text-xs leading-5 text-[rgb(var(--color-text-secondary))]">
+                                      <span className="font-medium text-[rgb(var(--color-text))]">Confidence:</span> {confidence}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </details>
                             ) : null}
                           </div>
                           <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap">{fmtDate(event.date)}</div>
@@ -223,6 +234,7 @@ export function History({ onNavigate }: HistoryProps) {
           ))}
         </section>
       )}
+      </div>
     </div>
   );
 }

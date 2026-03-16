@@ -667,7 +667,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
   return view === 'personal' ? (
 <div className="eb-page overflow-x-hidden">
-        <div className="mx-auto w-full max-w-4xl px-4 space-y-6 pb-28">
+        <div className="eb-page-inner !max-w-4xl">
           <div className="mb-6 flex items-center gap-3">
             <button
               type="button"
@@ -683,7 +683,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm">
+          <div className="eb-card eb-card-soft">
             <div className="flex items-start gap-4">
               <div className="w-20 h-20 rounded-full bg-[rgb(var(--color-primary)/0.14)] flex items-center justify-center overflow-hidden border border-[rgb(var(--color-border))]">
                 {draftAvatarDataUrl ? (
@@ -803,14 +803,14 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
       </div>
   ) : (
 <div className="eb-page overflow-x-hidden">
-      <div className="mx-auto w-full max-w-4xl px-4 space-y-6 pb-28">
+      <div className="eb-page-inner !max-w-4xl">
         <div className="mb-8">
           <h1 className="mb-2">Profile & Settings</h1>
           <p className="text-[rgb(var(--color-text-secondary))]">Make it personal</p>
         </div>
 
         {/* Profile hero card */}
-        <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-6 mb-6 shadow-lg overflow-hidden">
+        <div className="eb-card eb-hero eb-hero-surface eb-hero-lg eb-hero-on-dark mb-6 overflow-hidden">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-[rgba(255,255,255,0.22)] border border-[rgba(255,255,255,0.28)] flex items-center justify-center overflow-hidden">
@@ -860,7 +860,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
         </div>
 
         {/* Cycle tracking */}
-        <div className="eb-card mb-6">
+        <div className="eb-card eb-card-soft mb-6">
           <h3 className="mb-2">Cycle tracking</h3>
           <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
             Symptoms and cycle are not mutually exclusive. You can track symptoms with no periods (coil, menopause, hysterectomy, etc).
@@ -891,12 +891,12 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                   };
                 })
               }
-              className={`shrink-0 w-12 h-6 rounded-full transition-all ${
+              className={`eb-toggle shrink-0 transition-all ${
                 userData.cycleTrackingMode === 'cycle' ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
               }`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                className={`eb-toggle-thumb transition-transform ${
                   userData.cycleTrackingMode === 'cycle' ? 'translate-x-6' : 'translate-x-0.5'
                 }`}
               />
@@ -922,12 +922,12 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                   fertilityMode: !prev.fertilityMode,
                 }))
               }
-              className={`shrink-0 w-12 h-6 rounded-full transition-all ${
+              className={`eb-toggle shrink-0 transition-all ${
                 userData.fertilityMode ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
               } ${userData.cycleTrackingMode !== 'cycle' ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                className={`eb-toggle-thumb transition-transform ${
                   userData.fertilityMode ? 'translate-x-6' : 'translate-x-0.5'
                 }`}
               />
@@ -953,12 +953,12 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                   autoStartPeriodFromBleeding: !prev.autoStartPeriodFromBleeding,
                 }))
               }
-              className={`shrink-0 w-12 h-6 rounded-full transition-all ${
+              className={`eb-toggle shrink-0 transition-all ${
                 autoStartPeriodFromBleeding ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
               } ${userData.cycleTrackingMode !== 'cycle' ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                className={`eb-toggle-thumb transition-transform ${
                   autoStartPeriodFromBleeding ? 'translate-x-6' : 'translate-x-0.5'
                 }`}
               />
@@ -1437,7 +1437,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
           <div key={section.title} className="mb-6">
             <h3 className="mb-3 px-2">{section.title}</h3>
             {section.title === 'Analyse your data' ? (
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[rgb(var(--color-primary)/0.22)] p-5">
+              <div className="eb-list-card p-5">
                 <p className="text-sm text-[rgb(var(--color-text-secondary))]">
                   Take your patterns, insights and experiments into an AI assistant for deeper analysis.
                 </p>
@@ -1523,7 +1523,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                 </div>
               </div>
             ) : (
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[rgb(var(--color-primary)/0.22)]">
+            <div className="eb-list-card">
               {section.items.map((item, index) => {
                 const Icon = item.icon;
 
@@ -1535,7 +1535,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                       open={showThemeSelector}
                       onToggle={(e) => setShowThemeSelector((e.currentTarget as HTMLDetailsElement).open)}
                     >
-                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                      <summary className="eb-list-row hover:bg-white/80 transition-colors">
                         <div className="flex items-center gap-3">
                           <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
                           <span>Theme</span>
@@ -1614,7 +1614,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                       open={showGoalSelector}
                       onToggle={(e) => setShowGoalSelector((e.currentTarget as HTMLDetailsElement).open)}
                     >
-                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                      <summary className="eb-list-row hover:bg-white/80 transition-colors">
                         <div className="flex items-center gap-3">
                           <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
                           <span>Goal</span>
@@ -1675,7 +1675,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                       open={showPrivacyPanel}
                       onToggle={(e) => setShowPrivacyPanel((e.currentTarget as HTMLDetailsElement).open)}
                     >
-                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                      <summary className="eb-list-row hover:bg-white/80 transition-colors">
                         <div className="flex items-center gap-3">
                           <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
                           <span>Privacy &amp; security</span>
@@ -1923,7 +1923,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                       open={showNotificationsPanel}
                       onToggle={(e) => setShowNotificationsPanel((e.currentTarget as HTMLDetailsElement).open)}
                     >
-                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                      <summary className="eb-list-row hover:bg-white/80 transition-colors">
                         <div className="flex items-center gap-3">
                           <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
                           <span>Notifications</span>
@@ -2007,7 +2007,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                       open={showHelpPanel}
                       onToggle={(e) => setShowHelpPanel((e.currentTarget as HTMLDetailsElement).open)}
                     >
-                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                      <summary className="eb-list-row hover:bg-white/80 transition-colors">
                         <div className="flex items-center gap-3">
                           <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
                           <span>Help centre</span>
@@ -2263,7 +2263,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                       open={showLogoutPanel}
                       onToggle={(e) => setShowLogoutPanel((e.currentTarget as HTMLDetailsElement).open)}
                     >
-                      <summary className="list-none cursor-pointer select-none w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors">
+                      <summary className="eb-list-row hover:bg-white/80 transition-colors">
                         <div className="flex items-center gap-3">
                           <Icon className="w-5 h-5 text-[rgb(var(--color-text-secondary))]" />
                           <span>Log out</span>

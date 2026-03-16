@@ -802,15 +802,16 @@ export function Dashboard({
     <div className="eb-page">
       <div className="eb-page-inner">
         {/* Header */}
-        <div>
+        <div className="eb-page-header">
+          <div className="eb-page-kicker">Home</div>
           <h1 className="mb-2">Welcome back{userName ? `, ${userName}` : ''}</h1>
-          <p>{todayLabel}</p>
+          <p className="eb-subtitle">{todayLabel}</p>
         </div>
 
 
         {/* HERO: Symptom tracking */}
 
-        <div className="eb-card eb-hero eb-hero-surface rounded-2xl p-6 relative">
+        <div className="eb-card eb-hero eb-hero-surface eb-hero-lg relative">
           {/* Calendar icon */}
           <button
             type="button"
@@ -873,9 +874,9 @@ export function Dashboard({
         ) : null}
 
         {guideCard ? (
-          <div className="eb-card">
+          <div className="eb-card eb-card-soft">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+              <div className="eb-icon-frame">
                 {guideCard.icon}
               </div>
               <div className="min-w-0 flex-1">
@@ -905,9 +906,9 @@ export function Dashboard({
           </div>
         ) : null}
 
-        <div className="eb-card">
+        <div className="eb-card eb-card-soft">
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+            <div className="eb-icon-frame">
               <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
             <div className="min-w-0 flex-1">
@@ -950,7 +951,7 @@ export function Dashboard({
 
         {/* Restore from backup nudge (only when there is no data yet) */}
         {daysTracked === 0 ? (
-          <div className="eb-card">
+          <div className="eb-card eb-card-soft">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-primary)/0.12)] flex items-center justify-center shrink-0">
                 <Upload className="w-5 h-5 text-[rgb(var(--color-primary))]" />
@@ -997,9 +998,9 @@ export function Dashboard({
         ) : null}
 
 
-        <div className="eb-card">
+        <div className="eb-card eb-card-soft">
           <div className="flex items-start gap-4 w-full h-full">
-            <div className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.18)] flex items-center justify-center shrink-0">
+            <div className="eb-icon-frame">
               <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
             <div className="min-w-0 flex-1">

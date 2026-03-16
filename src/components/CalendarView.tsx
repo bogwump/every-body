@@ -658,17 +658,17 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
               {prettyDate(new Date(`${summaryISO}T00:00:00`))}
             </div>
             {summaryPhase ? (
-              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{summaryPhase}</div>
+              <div className="mt-1 text-sm text-[rgba(0,0,0,0.68)]">{summaryPhase}</div>
             ) : null}
             {mood ? (
-              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Mood: {mood}</div>
+              <div className="mt-1 text-sm text-[rgba(0,0,0,0.68)]">Mood: {mood}</div>
             ) : null}
           </div>
 
           {!hasEntry ? (
             <div className="mb-4 eb-inset rounded-2xl p-4">
               <div className="font-medium">No check-in recorded.</div>
-              <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Tap below to log how you felt on this day.</div>
+              <div className="mt-1 text-sm text-[rgba(0,0,0,0.68)]">Tap below to log how you felt on this day.</div>
             </div>
           ) : null}
 
@@ -928,29 +928,30 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     <div className="eb-page">
       {/* Keep a more phone-like density on wide screens */}
       <div className="eb-page-inner">
-        <div className="mb-4 sm:mb-5">
-          <h1 className="mb-2">Calendar</h1>
-          <p className="text-[rgb(var(--color-text-secondary))]">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
-          <div className="mt-3 min-w-0">
+        <section className="eb-card eb-hero eb-hero-surface eb-hero-md eb-hero-on-dark mb-4 sm:mb-5">
+          <div className="eb-page-kicker !text-white/72">Calendar</div>
+          <h1 className="mb-2 text-white">Calendar</h1>
+          <p className="text-white/85">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
+          <div className="mt-4 min-w-0 eb-inset p-4 bg-[rgba(255,255,255,0.12)] border-[rgba(255,255,255,0.16)]">
             {hasCycleAnchor ? (
               <>
-                <div className="font-semibold text-[15px] sm:text-base">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
+                <div className="font-semibold text-[15px] sm:text-base text-black">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
                 <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{cycleTrust.predictionTrust === 'stale' ? 'Rhythm is waiting for a fresh cycle anchor before it resumes forward predictions.' : cycleTrust.predictionTrust === 'early' ? 'Early estimate based on your latest cycle start. This will tighten as more cycles are logged.' : cycleTrust.phaseTrust === 'confirmed' ? (rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing') : 'Estimated from your recent logs and cycle timing.'}</div>
               </>
             ) : cycleEnabled ? (
               <>
-                <div className="font-semibold text-[15px] sm:text-base">Still learning your cycle</div>
+                <div className="font-semibold text-[15px] sm:text-base text-black">Still learning your cycle</div>
                 <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Log your first period or mark a cycle start in Edit cycle before the calendar starts predicting phase or fertile windows.</div>
               </>
             ) : (
               <>
-                <div className="font-semibold text-[15px] sm:text-base">Symptom calendar</div>
+                <div className="font-semibold text-[15px] sm:text-base text-black">Symptom calendar</div>
                 <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Cycle timing is off right now, but you can still use Calendar to log and review symptoms.</div>
               </>
             )}
           </div>
-        </div>
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        </section>
+        <div className="eb-card eb-card-soft mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center justify-between gap-3 sm:justify-start">
             <button
               type="button"
@@ -959,7 +960,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             >
               Prev
             </button>
-            <div className="font-semibold">{monthLabel}</div>
+            <div className="font-semibold tracking-[-0.01em]">{monthLabel}</div>
             <button type="button" className="eb-btn-secondary" onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)))}>
               Next
             </button>

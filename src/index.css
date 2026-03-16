@@ -11,9 +11,17 @@
   --color-surface: 255 255 255;
   --color-text: 45 55 50;
   --color-text-secondary: 100 110 105;
+  --color-border: 217 224 218;
+  --eb-radius-card: 1.5rem;
+  --eb-radius-hero: 1.75rem;
+  --eb-radius-inset: 1.25rem;
+  --eb-shadow-soft: 0 8px 24px rgba(31, 41, 55, 0.06);
+  --eb-shadow-card: 0 14px 38px rgba(31, 41, 55, 0.07);
+  --eb-shadow-hero: 0 18px 42px rgba(31, 41, 55, 0.10);
 }
 
 [data-theme="lavender"] {
+  --color-border: 224 216 232;
   --color-primary: 156 136 177;
   --color-primary-light: 190 175 207;
   --color-primary-dark: 122 102 147;
@@ -25,6 +33,7 @@
 }
 
 [data-theme="ocean"] {
+  --color-border: 212 224 229;
   --color-primary: 115 155 175;
   --color-primary-light: 158 191 207;
   --color-primary-dark: 82 125 145;
@@ -36,6 +45,7 @@
 }
 
 [data-theme="terracotta"] {
+  --color-border: 231 217 210;
   --color-primary: 190 130 110;
   --color-primary-light: 215 170 155;
   --color-primary-dark: 160 100 80;
@@ -115,16 +125,29 @@ body.eb-chat-typing .eb-mobile-nav {
 */
 @layer components {
 
-  /* Page layout */
   .eb-page {
-    @apply min-h-screen py-8;
-    background: rgb(var(--color-background));
+    @apply min-h-screen;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    background:
+      radial-gradient(circle at top, rgb(var(--color-primary) / 0.07), transparent 34%),
+      rgb(var(--color-background));
     color: rgb(var(--color-text));
   }
 
   .eb-page-inner {
-    /* Extra bottom padding keeps content comfortably above the bottom nav on iPhone */
-    @apply mx-auto w-full max-w-5xl px-4 space-y-6 pb-28;
+    @apply mx-auto w-full max-w-5xl px-4 pb-28;
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .eb-page-header {
+    @apply space-y-2;
+  }
+
+  .eb-page-kicker {
+    @apply text-[0.7rem] font-semibold uppercase tracking-[0.18em];
+    color: rgb(var(--color-text-secondary));
   }
 
   .eb-card-header {
@@ -132,17 +155,21 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   .eb-card-title {
-    @apply text-base font-semibold;
+    @apply text-[1.05rem] font-semibold tracking-[-0.01em];
+    color: rgb(var(--color-text));
   }
 
   .eb-card-sub {
-    @apply text-sm;
+    @apply text-sm leading-6;
     color: rgb(var(--color-text-secondary));
   }
 
   .eb-chart {
-    @apply rounded-2xl border border-[rgba(0,0,0,0.06)] p-4;
-    background: white;
+    @apply p-4;
+    border-radius: var(--eb-radius-card);
+    background: rgb(var(--color-surface));
+    border: 1px solid rgb(var(--color-border) / 0.95);
+    box-shadow: var(--eb-shadow-soft);
   }
 
   .eb-section {
@@ -150,32 +177,51 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   .eb-section-title {
-    @apply text-base font-semibold;
+    @apply text-base font-semibold tracking-[-0.01em];
   }
 
   .eb-seg {
-    @apply inline-flex rounded-2xl p-1 bg-white shadow-sm border border-[rgba(0,0,0,0.06)];
+    @apply inline-flex p-1;
+    border-radius: 9999px;
+    background: rgb(var(--color-surface) / 0.96);
+    border: 1px solid rgb(var(--color-border) / 0.95);
+    box-shadow: var(--eb-shadow-soft);
   }
+
   .eb-seg-btn {
-    @apply px-4 py-2 rounded-xl text-sm transition;
+    @apply px-4 py-2 text-sm font-medium transition;
+    border-radius: 9999px;
     color: rgb(var(--color-text-secondary));
   }
+
   .eb-seg-btn[data-active="true"] {
     background: rgb(var(--color-primary));
     color: white;
+    box-shadow: 0 6px 18px rgb(var(--color-primary-dark) / 0.18);
   }
 
-  .eb-chip {
-    @apply inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm;
-    background: rgb(var(--color-primary)/0.10);
+  .eb-chip,
+  .eb-pill {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium;
+    border-radius: 9999px;
+    background: rgb(var(--color-primary) / 0.09);
     color: rgb(var(--color-primary-dark));
-    border: 1px solid rgb(0 0 0 / 0.04);
+    border: 1px solid rgb(var(--color-primary) / 0.16);
+  }
+
+  .eb-pill-active {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium;
+    border-radius: 9999px;
+    color: white;
+    background: rgb(var(--color-primary));
+    box-shadow: 0 8px 18px rgb(var(--color-primary-dark) / 0.16);
   }
 
   .eb-scroll-row {
     @apply flex gap-3 overflow-x-auto pb-1;
     scroll-snap-type: x mandatory;
   }
+
   .eb-scroll-item {
     scroll-snap-align: start;
   }
@@ -190,76 +236,160 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   .eb-card {
-    @apply rounded-2xl p-6 shadow-sm;
-    background: rgb(var(--color-surface));
-    border: 1px solid rgb(var(--color-primary) / 0.22);
-}
+    padding: 1.25rem;
+    border-radius: var(--eb-radius-card);
+    background:
+      linear-gradient(180deg, rgb(var(--color-surface)), rgb(255 255 255 / 0.96));
+    border: 1px solid rgb(var(--color-border) / 0.95);
+    box-shadow: var(--eb-shadow-card);
+  }
+
+  .eb-card-soft {
+    box-shadow: var(--eb-shadow-soft);
+  }
+
+  .eb-hero {
+    color: rgba(0, 0, 0, 0.92);
+  }
+
+  .eb-hero-lg,
+  .eb-hero-md {
+    border-radius: var(--eb-radius-hero);
+    box-shadow: var(--eb-shadow-hero);
+  }
+
+  .eb-hero-lg {
+    padding: 1.5rem;
+  }
+
+  .eb-hero-md {
+    padding: 1.25rem;
+  }
+
+  .eb-icon-frame {
+    @apply inline-flex items-center justify-center shrink-0;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 1rem;
+    background: rgb(var(--color-accent) / 0.18);
+    color: rgb(var(--color-primary-dark));
+    border: 1px solid rgb(var(--color-primary) / 0.14);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
+  }
+
+  .eb-icon-frame--hero {
+    background: rgb(255 255 255 / 0.16);
+    color: white;
+    border-color: rgb(255 255 255 / 0.18);
+  }
+
+  .eb-inset {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.72));
+    border: 1px solid rgb(var(--color-border) / 0.95);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.62), 0 1px 2px rgba(0, 0, 0, 0.04);
+    border-radius: var(--eb-radius-inset);
+  }
+
+  .eb-inset-label {
+    color: rgba(0, 0, 0, 0.62);
+    font-size: 0.75rem;
+  }
+
+  .eb-inset-value {
+    color: rgba(0, 0, 0, 0.92);
+    font-weight: 600;
+  }
 
   .eb-muted {
     color: rgb(var(--color-text-secondary));
   }
 
   .eb-title {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply text-[1.8rem] font-semibold tracking-[-0.03em];
+    color: rgb(var(--color-text));
   }
 
   .eb-subtitle {
-    @apply text-sm;
+    @apply text-sm leading-6;
     color: rgb(var(--color-text-secondary));
   }
 
-  /* Buttons (duplicate base styles so components can keep using eb-btn-primary/secondary only) */
-    .eb-btn-primary {
-    /* Tailwind v4: avoid state variants inside @apply (e.g. active:, hover:, focus:) */
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition;
+  .eb-btn,
+  .eb-btn-primary,
+  .eb-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition;
+    min-height: 2.75rem;
+    border-radius: 1rem;
+  }
+
+  .eb-btn-primary {
     color: white;
-    background: rgb(var(--color-primary));
+    background: linear-gradient(180deg, rgb(var(--color-primary)), rgb(var(--color-primary-dark)));
+    box-shadow: 0 10px 22px rgb(var(--color-primary-dark) / 0.18);
   }
+
   .eb-btn-primary:hover {
-    background: rgb(var(--color-primary-dark));
+    filter: brightness(1.02);
   }
-  .eb-btn-primary:active {
-    transform: scale(0.99);
+
+  .eb-btn-primary:active,
+  .eb-btn-secondary:active {
+    transform: translateY(1px);
   }
 
   .eb-btn-secondary {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition;
-    background: white;
+    background: rgb(var(--color-surface) / 0.92);
     color: rgb(var(--color-text));
-    border: 1px solid rgb(var(--color-primary) / 0.22);
-}
+    border: 1px solid rgb(var(--color-border) / 0.95);
+    box-shadow: var(--eb-shadow-soft);
+  }
+
   .eb-btn-secondary:hover {
-    background: rgb(250 250 250);
+    background: rgb(255 255 255 / 0.98);
+    border-color: rgb(var(--color-primary) / 0.24);
   }
-  .eb-btn-secondary:active {
-    transform: scale(0.99);
+
+  .eb-input {
+    @apply w-full px-3 py-2.5 text-base outline-none transition;
+    min-height: 2.75rem;
+    border-radius: 1rem;
+    background: rgb(var(--color-surface));
+    border: 1px solid rgb(var(--color-border) / 0.95);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.65), 0 1px 2px rgba(0,0,0,0.04);
   }
-.eb-input {
-    @apply w-full rounded-xl px-3 py-2 text-base shadow-sm outline-none transition;
-    background: white;
-    border: 1px solid rgb(228 228 231 / 1);
-  }
+
   .eb-input:focus {
-    border-color: rgb(212 212 216 / 1);
-    box-shadow: 0 0 0 4px rgb(15 23 42 / 0.08);
-  }
-
-  .eb-pill {
-    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-neutral-100 text-neutral-800 border border-neutral-200;
-  }
-
-  .eb-pill-active {
-    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium;
-    color: white;
-    background: rgb(var(--color-primary));
+    border-color: rgb(var(--color-primary) / 0.32);
+    box-shadow: 0 0 0 4px rgb(var(--color-primary) / 0.10);
   }
 
   .eb-card-hover {
     @apply transition will-change-transform;
   }
+
   .eb-card-hover:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 28px rgb(0 0 0 / 0.10);
+    box-shadow: 0 16px 34px rgb(0 0 0 / 0.09);
+  }
+
+  .eb-collapsible {
+    @apply mt-4 overflow-hidden;
+    border-radius: var(--eb-radius-inset);
+    border: 1px solid rgb(var(--color-border) / 0.95);
+    background: rgb(var(--color-background) / 0.62);
+  }
+
+  .eb-collapsible > summary {
+    @apply list-none cursor-pointer select-none px-4 py-3 text-sm font-medium;
+    color: rgb(var(--color-text));
+  }
+
+  .eb-collapsible > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .eb-collapsible > div {
+    @apply px-4 pb-4 pt-0;
   }
 }
 
@@ -320,11 +450,9 @@ p {
 
 /* Dark/coloured hero surface (background only) */
 .eb-hero-surface {
-  background: linear-gradient(
-    135deg,
-    rgb(var(--color-primary-dark)),
-    rgb(var(--color-primary))
-  );
+  background:
+    radial-gradient(circle at top right, rgb(var(--color-accent) / 0.26), transparent 34%),
+    linear-gradient(135deg, rgb(var(--color-primary-dark)), rgb(var(--color-primary)));
 }
 /* Default hero text is black (eg "Symptom tracking") */
 .eb-hero {
@@ -341,24 +469,6 @@ p {
 }
 
 /* ===== Light inset cards (Checked in / Goal etc) ===== */
-
-.eb-inset {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgb(var(--color-primary) / 0.18);
-box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-
-.eb-inset-label {
-  color: rgba(0, 0, 0, 0.7);
-  font-size: 0.75rem;
-}
-
-.eb-inset-value {
-  color: rgba(0, 0, 0, 0.9);
-  font-weight: 600;
-}
-
-
 
   /* Calendar fertile window */
   .eb-fertile {
@@ -520,4 +630,75 @@ box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .insights-settings-card {
+}
+
+
+/* Shared details/list rows used by settings and secondary cards */
+.eb-list-card {
+  border-radius: var(--eb-radius-card);
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-border) / 0.95);
+  box-shadow: var(--eb-shadow-soft);
+  overflow: hidden;
+}
+
+.eb-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1rem;
+}
+
+.eb-list-row + .eb-list-row {
+  border-top: 1px solid rgb(var(--color-border) / 0.75);
+}
+
+.eb-toggle {
+  width: 3rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  transition: background-color 160ms ease;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.08);
+}
+
+.eb-toggle-thumb {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.16);
+  transition: transform 160ms ease;
+}
+
+@media (max-width: 640px) {
+  .eb-page-inner {
+    gap: 1rem;
+  }
+
+  .eb-card,
+  .eb-hero-lg,
+  .eb-hero-md {
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .eb-page {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+
+  .eb-card {
+    padding: 1.5rem;
+  }
+
+  .eb-hero-lg {
+    padding: 1.75rem;
+  }
+
+  .eb-hero-md {
+    padding: 1.5rem;
+  }
 }
