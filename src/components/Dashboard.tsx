@@ -111,6 +111,11 @@ type GuideCardId =
   | 'low-coverage'
   | 'cycle-optional'
   | 'history-saved'
+  | 'building-rhythm'
+  | 'first-week-taking-shape'
+  | 'patterns-starting-to-settle'
+  | 'rhythm-getting-easier'
+  | 'stronger-baseline'
   | 'it-grows'
   | 'spotting-patterns'
   | 'quick-checkin'
@@ -255,12 +260,44 @@ function buildGuideCard(options: {
         icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
       },
       {
+        id: 'first-week-taking-shape',
+        title: 'Your first week is taking shape',
+        body: 'You have enough check-ins now for early patterns to feel a little more trustworthy.',
+        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+        priority: 6,
+        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+      {
+        id: 'patterns-starting-to-settle',
+        title: 'Your patterns are starting to settle',
+        body: 'Patterns are repeating a bit more now, so the app can be calmer and more specific.',
+        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+        priority: 7,
+        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+      {
+        id: 'rhythm-getting-easier',
+        title: 'Your rhythm is getting easier to read',
+        body: 'With more check-ins in place, the app can start making steadier sense of what tends to shift together.',
+        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+        priority: 8,
+        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+      {
+        id: 'stronger-baseline',
+        title: 'You have built a stronger baseline',
+        body: 'With a stronger baseline in place, small changes and experiments should be easier to interpret.',
+        cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
+        priority: 9,
+        icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
+      },
+      {
         id: 'it-grows',
         title: 'It grows with you',
         body: 'This space gets smarter as you use it. You’ll see helpful reflections from day one, but clearer patterns usually take a little time. Keep logging, and we’ll build your rhythm together.',
         supporting: 'Early patterns are starting to show. This will get clearer with a little more time.',
         cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 7,
+        priority: 10,
         icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
       },
       {
@@ -268,7 +305,7 @@ function buildGuideCard(options: {
         title: 'Start spotting patterns',
         body: 'Log a few more days and the app will begin showing more meaningful links between symptoms. Small patterns often start softly, then get clearer over time.',
         cta: { label: 'Open check-in', action: 'check-in' },
-        priority: 6,
+        priority: 11,
         icon: <Sparkles className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
       },
       {
@@ -276,7 +313,7 @@ function buildGuideCard(options: {
         title: 'A quick check-in goes a long way',
         body: 'Short, regular check-ins help the app learn your rhythm. It does not have to be perfect to be useful.',
         cta: { label: 'Open check-in', action: 'check-in' },
-        priority: 9,
+        priority: 12,
         icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
       },
       {
@@ -284,7 +321,7 @@ function buildGuideCard(options: {
         title: 'Patterns take a little time',
         body: 'You may notice early reflections quickly, but stronger patterns usually build over a few weeks of check-ins. There’s no need to get everything perfect.',
         cta: { label: 'View Insights', action: 'navigate', screen: 'insights' },
-        priority: 8,
+        priority: 13,
         icon: <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />,
       },
     );
