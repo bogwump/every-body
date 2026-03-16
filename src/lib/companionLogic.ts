@@ -64,9 +64,7 @@ export function getExperimentSuggestionSuppression(refISO: string): {
     const end = new Date(`${startISO}T00:00:00`);
     end.setDate(end.getDate() + duration - 1);
     const endISO = end.toISOString().slice(0, 10);
-    if (refISO <= endISO) {
-      return { active: true, recentCompletion: false, untilISO: endISO, daysSinceCompletion: null };
-    }
+    return { active: true, recentCompletion: false, untilISO: endISO, daysSinceCompletion: null };
   }
 
   const history = readExperimentHistory()

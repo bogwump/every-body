@@ -22,11 +22,42 @@ function iconForType(type: CompanionMoment['type']) {
   }
 }
 
+function setPageFocus(target?: string) {
+  if (!target || !target.includes(':')) return;
+  try {
+    localStorage.setItem('everybody:v2:page_focus', target);
+  } catch {
+    // ignore
+  }
+}
+
+function targetForMoment(moment: CompanionMoment): string | null {
+  switch (moment.type) {
+    case 'experiment_suggestion':
+    case 'experiment_result_ready':
+      return 'insights:experiments';
+    case 'new_pattern':
+    case 'helpful_pattern_detected':
+    case 'unlock_milestone':
+      return 'insights:full-insights';
+    default:
+      return null;
+  }
+}
+
 export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate: (screen: string) => void; onDismiss?: () => void }) {
   const copy = getMomentDisplayCopy(props.moment);
 
+  const completeInteractionAndNavigate = (screen: string, focusTarget?: string | null) => {
+    dismissMoment(props.moment.id);
+    props.onDismiss?.();
+    if (focusTarget) setPageFocus(focusTarget);
+    props.onNavigate(screen);
+  };
+
   const handlePrimaryAction = () => {
     const data = props.moment.data ?? {};
+    const focusTarget = targetForMoment(props.moment);
     if (props.moment.type === 'experiment_suggestion') {
       const inferred = inferPendingExperimentLaunchFromText(
         typeof data.title === 'string' ? data.title : copy.title,
@@ -47,12 +78,12 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
 
       if (payload) {
         queuePendingExperimentLaunch(payload);
-        props.onNavigate('insights');
+        completeInteractionAndNavigate('insights', focusTarget);
         return;
       }
     }
 
-    props.onNavigate(copy.screen);
+    completeInteractionAndNavigate(copy.screen, focusTarget);
   };
 
   return (
