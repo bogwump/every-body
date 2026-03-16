@@ -49,7 +49,7 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
   const copy = getMomentDisplayCopy(props.moment);
 
   const completeInteractionAndNavigate = (screen: string, focusTarget?: string | null) => {
-    dismissMoment(props.moment.id);
+    dismissMoment(props.moment.id, 'interacted');
     props.onDismiss?.();
     if (focusTarget) setPageFocus(focusTarget);
     props.onNavigate(screen);

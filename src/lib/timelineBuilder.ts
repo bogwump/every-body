@@ -232,6 +232,46 @@ function mapMomentToEvent(moment: CompanionMoment): TimelineEvent | null {
 
 
 
+
+function formatArchiveDateLabel(iso: string | undefined): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function getInteractionPhrase(item: ArchivedCompanionMoment): string {
+  const button = String(item.button || '').toLowerCase();
+  const screen = String(item.screen || '').toLowerCase();
+  if (button.includes('review experiment')) return 'when you reviewed the experiment';
+  if (button.includes('try experiment')) return 'when you opened the experiment';
+  if (button.includes('see insights') || button.includes('view insights')) return 'when you viewed the insight';
+  if (button.includes('view rhythm')) return 'when you viewed the rhythm update';
+  if (button.includes('open history')) return 'when you opened History';
+  if (button.includes('open calendar')) return 'when you opened Calendar';
+  if (button.includes('customise symptoms')) return 'when you opened symptom customisation';
+  if (button.includes('edit cycle')) return 'when you opened cycle settings';
+  if (button.includes('open check-in') || screen === 'check-in') return 'when you opened check-in';
+  if (screen === 'insights') return 'when you viewed the insight';
+  if (screen === 'rhythm') return 'when you viewed the rhythm update';
+  return 'when you interacted with the card';
+}
+
+function getArchivedMomentEvidence(item: ArchivedCompanionMoment): string {
+  const archivedDate = formatArchiveDateLabel(item.archivedAtISO);
+  const dateSuffix = archivedDate ? ` on ${archivedDate}.` : '.';
+  if (item.archivedReason === 'interacted') {
+    return `Saved from the homepage ${getInteractionPhrase(item)}${dateSuffix}`;
+  }
+  if (item.archivedReason === 'dismissed') {
+    return `Saved from the homepage when you dismissed it${dateSuffix}`;
+  }
+  if (item.archivedReason === 'replaced') {
+    return 'Saved from the homepage when a more relevant update took its place.';
+  }
+  return 'Saved from the homepage after it had been visible for a few days.';
+}
+
 function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent | null {
   const metadata = { ...(item.metadata ?? {}), archivedReason: item.archivedReason, archivedAtISO: item.archivedAtISO, momentId: item.momentId };
   switch (item.type) {
@@ -242,7 +282,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         date: item.date,
         title: item.title,
         description: tidySentence(item.body, 'A new pattern was saved to your history.'),
-        evidence: item.archivedReason === 'dismissed' ? 'Saved from the homepage when you dismissed it.' : item.archivedReason === 'replaced' ? 'Saved from the homepage when a more relevant update took its place.' : 'Saved from the homepage after it had been visible for a few days.',
+        evidence: getArchivedMomentEvidence(item),
         signals: item.signals,
         confidence: item.confidence,
         source: 'archive',
@@ -257,7 +297,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         date: item.date,
         title: item.title,
         description: tidySentence(item.body, 'A helpful pattern was saved to your history.'),
-        evidence: item.archivedReason === 'dismissed' ? 'Saved from the homepage when you dismissed it.' : item.archivedReason === 'replaced' ? 'Saved from the homepage when a more relevant update took its place.' : 'Saved from the homepage after it had been visible for a few days.',
+        evidence: getArchivedMomentEvidence(item),
         signals: item.signals,
         confidence: item.confidence,
         source: 'archive',
@@ -273,7 +313,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         date: item.date,
         title: item.title,
         description: tidySentence(item.body, 'A rhythm update was saved to your history.'),
-        evidence: item.archivedReason === 'dismissed' ? 'Saved from the homepage when you dismissed it.' : item.archivedReason === 'replaced' ? 'Saved from the homepage when a more relevant update took its place.' : 'Saved from the homepage after it had been visible for a few days.',
+        evidence: getArchivedMomentEvidence(item),
         signals: item.signals,
         confidence: item.confidence,
         source: 'archive',
@@ -291,7 +331,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         date: item.date,
         title: item.title,
         description: tidySentence(item.body, 'A companion update was saved to your history.'),
-        evidence: item.archivedReason === 'dismissed' ? 'Saved from the homepage when you dismissed it.' : item.archivedReason === 'replaced' ? 'Saved from the homepage when a more relevant update took its place.' : 'Saved from the homepage after it had been visible for a few days.',
+        evidence: getArchivedMomentEvidence(item),
         signals: item.signals,
         confidence: item.confidence,
         source: 'archive',

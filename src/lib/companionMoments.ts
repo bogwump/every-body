@@ -30,7 +30,7 @@ export type ArchivedCompanionMoment = {
   type: CompanionMomentType;
   date: string;
   archivedAtISO: string;
-  archivedReason: 'expired' | 'dismissed' | 'replaced';
+  archivedReason: 'expired' | 'dismissed' | 'replaced' | 'interacted';
   eyebrow?: string;
   title: string;
   body: string;
@@ -113,7 +113,7 @@ function normaliseArchive(value: unknown): ArchivedCompanionMoment | null {
     type: item.type as CompanionMomentType,
     date: item.date,
     archivedAtISO: typeof item.archivedAtISO === 'string' ? item.archivedAtISO : new Date().toISOString(),
-    archivedReason: item.archivedReason === 'expired' || item.archivedReason === 'dismissed' || item.archivedReason === 'replaced' ? item.archivedReason : 'expired',
+    archivedReason: item.archivedReason === 'expired' || item.archivedReason === 'dismissed' || item.archivedReason === 'replaced' || item.archivedReason === 'interacted' ? item.archivedReason : 'expired',
     eyebrow: typeof item.eyebrow === 'string' ? item.eyebrow : undefined,
     title: typeof item.title === 'string' ? item.title : 'Saved update',
     body: typeof item.body === 'string' ? item.body : '',
@@ -351,11 +351,11 @@ export function createMoment(input: {
   return next;
 }
 
-export function dismissMoment(id: string) {
+export function dismissMoment(id: string, reason: ArchivedCompanionMoment['archivedReason'] = 'dismissed') {
   const moments = getCompanionMoments();
   const remaining = moments.filter((moment) => {
     if (moment.id === id) {
-      archiveMoment(moment, 'dismissed');
+      archiveMoment(moment, reason);
       return false;
     }
     return true;
