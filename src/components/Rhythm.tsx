@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info, GraduationCap } from 'lucide-react';
+import { Moon, Sprout, Sparkles, Shield, Eye, Leaf, Compass, Info, GraduationCap, ChevronDown } from 'lucide-react';
 import { RhythmHero } from './RhythmHero';
 import { PhaseHistoryCard } from './PhaseHistoryCard';
 import { useEntries, useExperimentHistory } from '../lib/appStore';
