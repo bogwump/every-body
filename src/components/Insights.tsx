@@ -3675,8 +3675,8 @@ const tryNextPrompts = useMemo(() => {
 
         <div className="mt-4 space-y-3">
           <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
-            <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{heroInsightState.heading}</div>
-            <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.65)]">
+            <div className="eb-hero-panel-label">{heroInsightState.heading}</div>
+            <div className="mt-2 space-y-2">
               {heroInsightState.items.length ? (
                 heroInsightState.items.map((item) => (
                   <div key={item.id} className="leading-6">
@@ -3686,22 +3686,22 @@ const tryNextPrompts = useMemo(() => {
                         <span>New pattern spotted</span>
                       </div>
                     ) : null}
-                    <div className="text-[rgba(0,0,0,0.65)]">{item.text}</div>
-                    {item.contextLine ? <div className="mt-1 text-xs text-[rgba(0,0,0,0.58)]">{item.contextLine}</div> : null}
+                    <div className="eb-hero-panel-body">{item.text}</div>
+                    {item.contextLine ? <div className="mt-1 eb-hero-panel-note">{item.contextLine}</div> : null}
                     {item.repeatLine ? <div className="mt-1 text-xs font-medium text-[rgba(0,0,0,0.60)]">{item.repeatLine}</div> : null}
                   </div>
                 ))
               ) : (
-                <p className="leading-6 text-[rgba(0,0,0,0.65)]">We will start spotting clearer trends after a few more check-ins.</p>
+                <p className="eb-hero-panel-body">We will start spotting clearer trends after a few more check-ins.</p>
               )}
             </div>
           </div>
 
           <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
-            <div className="text-sm font-semibold text-black">Over the next few days you might notice</div>
-            <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.68)]">
+            <div className="eb-hero-panel-label">Over the next few days you might notice</div>
+            <div className="mt-2 space-y-2">
               {bodyWeatherLines.slice(0, 3).map((line) => (
-                <div key={line} className="leading-6">{line}</div>
+                <div key={line} className="eb-hero-panel-body">{line}</div>
               ))}
             </div>
           </div>

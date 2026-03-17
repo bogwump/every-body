@@ -3,7 +3,7 @@ import React from 'react';
 export function RhythmPhaseHeader(props: {
   icon: React.ReactNode;
   phaseTitle: string;
-  phaseSubtitle: string;
+  phaseSubtitle?: string;
   description: string;
   confidenceLabel: string;
   phaseStatusLabel?: string;
@@ -15,7 +15,7 @@ export function RhythmPhaseHeader(props: {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h3 className="eb-hero-title eb-hero-on-dark text-white">{props.phaseTitle}</h3>
-          <div className="mt-1 eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{props.phaseSubtitle}</div>
+          {props.phaseSubtitle ? <div className="mt-1 eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{props.phaseSubtitle}</div> : null}
         </div>
         <div className="text-right shrink-0 flex flex-col items-end gap-2">
           <div className="eb-icon-frame eb-icon-frame--hero">{props.icon}</div>

@@ -15,7 +15,7 @@ export function RhythmHero(props: {
   userData: UserData;
   phaseKey: RhythmPhaseKey;
   phaseTitle: string;
-  phaseSubtitle: string;
+  phaseSubtitle?: string;
   phaseDescription: string;
   confidenceLabel: string;
   phaseStatusLabel?: string;

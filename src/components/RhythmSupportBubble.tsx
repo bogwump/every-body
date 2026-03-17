@@ -8,11 +8,11 @@ export function RhythmSupportBubble(props: { title?: string; body: string }) {
 
   return (
     <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
-      <div className="text-sm font-semibold !text-neutral-800">
+      <div className="eb-hero-panel-label">
         <span>{props.title ?? 'Gentle reminder'}</span>
       </div>
-      <div className="mt-2 space-y-2 text-sm leading-6 !text-neutral-800" style={{ color: 'rgba(0,0,0,0.72)' }}>
-        {lines.length ? lines.map((line, index) => <p key={index}>{line}</p>) : <p>{props.body}</p>}
+      <div className="mt-2 space-y-2">
+        {lines.length ? lines.map((line, index) => <p key={index} className="eb-hero-panel-body">{line}</p>) : <p className="eb-hero-panel-body">{props.body}</p>}
       </div>
     </div>
   );

@@ -831,30 +831,30 @@ export function Dashboard({
 
           {/* Today in your rhythm */}
           <div className="eb-inset rounded-2xl p-4">
-            <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{dashboardRhythm.title}</div>
+            <div className="eb-hero-panel-label">{dashboardRhythm.title}</div>
             {dashboardRhythm.headline ? (
-              <div className="mt-1 text-lg font-semibold text-black">{dashboardRhythm.headline}</div>
+              <div className="mt-1 eb-hero-panel-title">{dashboardRhythm.headline}</div>
             ) : null}
-            <div className="mt-2 text-sm text-[rgba(0,0,0,0.65)]">{dashboardRhythm.body}</div>
+            <div className="mt-2 eb-hero-panel-body">{dashboardRhythm.body}</div>
             {rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'stale' ? (
-              <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Estimated current phase after a longer gap in logging. A few more check-ins will help firm this up again.</div>
+              <div className="mt-2 eb-hero-panel-note">Estimated current phase after a longer gap in logging. A few more check-ins will help firm this up again.</div>
             ) : rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'catchup' ? (
-              <div className="mt-2 text-xs text-[rgba(0,0,0,0.55)]">Estimated current phase after a gap in logging. Rhythm has caught up using elapsed time and recent anchors.</div>
+              <div className="mt-2 eb-hero-panel-note">Estimated current phase after a gap in logging. Rhythm has caught up using elapsed time and recent anchors.</div>
             ) : null}
           </div>
 
           {/* How you've been */}
           <div className="mt-4 eb-inset rounded-2xl p-4">
-            <div className="text-sm font-semibold text-black">{heroModel.howTitle}</div>
-            <div className="mt-2 space-y-1">
+            <div className="eb-hero-panel-label">{heroModel.howTitle}</div>
+            <div className="mt-2 space-y-1.5">
               {heroModel.howLines.map((line: string, i: number) => (
-                <div key={i} className="text-sm text-[rgba(0,0,0,0.65)]">
+                <div key={i} className="eb-hero-panel-body">
                   {line}
                 </div>
               ))}
             </div>
             {heroModel.relationshipLine ? (
-              <div className="mt-3 text-sm text-[rgba(0,0,0,0.65)]">
+              <div className="mt-3 eb-hero-panel-body">
                 {heroModel.relationshipLine}
               </div>
             ) : null}

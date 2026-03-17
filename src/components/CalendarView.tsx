@@ -943,18 +943,18 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
           <div className="mt-4 min-w-0 eb-inset p-4 bg-[rgba(255,255,255,0.12)] border-[rgba(255,255,255,0.16)]">
             {hasCycleAnchor ? (
               <>
-                <div className="font-semibold text-[15px] sm:text-base text-black">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
-                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">{cycleTrust.predictionTrust === 'stale' ? 'Rhythm is waiting for a fresh cycle anchor before it resumes forward predictions.' : cycleTrust.predictionTrust === 'early' ? 'Early estimate based on your latest cycle start. This will tighten as more cycles are logged.' : cycleTrust.phaseTrust === 'confirmed' ? (rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing') : 'Estimated from your recent logs and cycle timing.'}</div>
+                <div className="eb-hero-panel-title">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
+                <div className="mt-1 eb-hero-panel-body">{cycleTrust.predictionTrust === 'stale' ? 'Rhythm is waiting for a fresh cycle anchor before it resumes forward predictions.' : cycleTrust.predictionTrust === 'early' ? 'Early estimate based on your latest cycle start. This will tighten as more cycles are logged.' : cycleTrust.phaseTrust === 'confirmed' ? (rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing') : 'Estimated from your recent logs and cycle timing.'}</div>
               </>
             ) : cycleEnabled ? (
               <>
-                <div className="font-semibold text-[15px] sm:text-base text-black">Still learning your cycle</div>
-                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Log your first period or mark a cycle start in Edit cycle before the calendar starts predicting phase or fertile windows.</div>
+                <div className="eb-hero-panel-title">Still learning your cycle</div>
+                <div className="mt-1 eb-hero-panel-body">Log your first period or mark a cycle start in Edit cycle before the calendar starts predicting phase or fertile windows.</div>
               </>
             ) : (
               <>
-                <div className="font-semibold text-[15px] sm:text-base text-black">Symptom calendar</div>
-                <div className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">Cycle timing is off right now, but you can still use Calendar to log and review symptoms.</div>
+                <div className="eb-hero-panel-title">Symptom calendar</div>
+                <div className="mt-1 eb-hero-panel-body">Cycle timing is off right now, but you can still use Calendar to log and review symptoms.</div>
               </>
             )}
             </div>
