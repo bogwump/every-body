@@ -780,7 +780,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         </div>
 
         {/* Why this happens */}
-        <div className="eb-inset-callout rounded-2xl p-6">
+        <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
           <details className="eb-disclosure eb-disclosure--plain">
             <summary className="font-medium text-neutral-900 px-0 py-0">
               <span className="flex items-start justify-between gap-3 w-full">
@@ -791,7 +791,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 <span className="eb-icon-frame self-start"><Info className="w-5 h-5" /></span>
               </span>
             </summary>
-            <div className="mt-3 space-y-2 text-[rgb(var(--color-text-secondary))]">
+            <div className="mt-3 space-y-4 text-[rgb(var(--color-text-secondary))]">
               {content.whyBody.map((p) => (
                 <p key={p}>{p}</p>
               ))}

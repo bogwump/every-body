@@ -22,7 +22,7 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
     <>
       {/* Mobile Navigation */}
       <nav className="eb-mobile-nav fixed bottom-0 left-0 right-0 border-t border-[rgb(var(--color-border)/0.9)] bg-[rgb(var(--color-surface)/0.88)] backdrop-blur-xl md:hidden z-50 shadow-[0_-8px_24px_rgba(31,41,55,0.08)]">
-        <div className="flex items-center justify-around px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+        <div className="grid grid-cols-6 items-start gap-1 px-1.5 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentScreen === item.id;
@@ -30,14 +30,14 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`flex min-w-[4.25rem] flex-col items-center gap-1.5 px-3 py-2.5 rounded-2xl transition-all ${
+                className={`flex w-full min-w-0 flex-col items-center gap-1.5 px-1.5 py-2.5 rounded-2xl transition-all ${
                   isActive
                     ? 'text-[rgb(var(--color-primary-dark))] bg-[rgb(var(--color-primary)/0.12)] shadow-[0_8px_20px_rgba(31,41,55,0.06)]'
                     : 'text-[rgb(var(--color-text-secondary))] hover:text-[rgb(var(--color-text))]'
                 }`}
               >
                 <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${isActive ? 'bg-white/70' : 'bg-[rgb(var(--color-background)/0.92)]'}`}><Icon className="w-4 h-4" /></span>
-                <span className="text-xs">{item.label}</span>
+                <span className="text-[11px] leading-tight text-center whitespace-nowrap">{item.label}</span>
               </button>
             );
           })}
