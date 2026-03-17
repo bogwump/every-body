@@ -256,6 +256,36 @@ body.eb-chat-typing .eb-mobile-nav {
     margin: 0;
   }
 
+  .eb-hero-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .eb-hero-header-main {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .eb-hero-header-side {
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .eb-hero-panel {
+    color: rgb(var(--color-text));
+  }
+
+  .eb-hero-panel .eb-hero-panel-label,
+  .eb-hero-panel .eb-hero-panel-title,
+  .eb-hero-panel .eb-hero-panel-body,
+  .eb-hero-panel .eb-hero-panel-note {
+    font-family: inherit;
+  }
+
   .eb-chart {
     @apply p-4;
     border-radius: var(--eb-radius-card);
@@ -867,15 +897,16 @@ p {
     linear-gradient(135deg, rgb(var(--color-primary-dark)), rgb(var(--color-primary)));
 }
 
+.eb-hero-rich .eb-hero-panel,
 .eb-hero-rich .eb-inset,
 .eb-hero-rich .eb-inset-soft {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, rgb(var(--color-primary-light)) 32%, white),
-    color-mix(in srgb, rgb(var(--color-primary-light)) 24%, white)
+    color-mix(in srgb, rgb(var(--color-primary-light)) 26%, white 74%),
+    color-mix(in srgb, rgb(var(--color-primary-light)) 18%, white 82%)
   );
-  border-color: color-mix(in srgb, rgb(var(--color-primary-light)) 42%, rgb(var(--color-border)) 58%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 2px rgba(0, 0, 0, 0.03);
+  border-color: color-mix(in srgb, rgb(var(--color-primary-light)) 34%, rgb(var(--color-border)) 66%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.44), 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 /* Default hero text is black (eg "Symptom tracking") */
@@ -886,6 +917,10 @@ p {
 /* White text ONLY when explicitly opted in */
 .eb-hero-on-dark {
   color: rgba(255, 255, 255, 0.95);
+}
+
+.eb-hero-on-dark .eb-hero-panel {
+  color: rgb(var(--color-text));
 }
 
 .eb-hero-on-dark-muted {

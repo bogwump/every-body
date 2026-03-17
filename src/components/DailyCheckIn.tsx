@@ -1026,9 +1026,9 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
         {/* Mood */}
         <div className="eb-card eb-hero eb-hero-rich eb-hero-md eb-hero-on-dark mb-6 p-6">
-          <h3 className="mb-1 eb-hero-title eb-hero-on-dark text-white">Overall mood</h3>
+          <h3 className="mb-1 eb-hero-title text-white">Overall mood</h3>
 
-          <p className="mb-4 eb-hero-subtitle eb-hero-on-dark" style={{ color: 'rgb(255 255 255)' }}>
+          <p className="mb-4 eb-hero-subtitle text-white">
             How are you feeling today?
           </p>
 

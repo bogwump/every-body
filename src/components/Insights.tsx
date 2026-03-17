@@ -3663,18 +3663,20 @@ const tryNextPrompts = useMemo(() => {
 
       {/* Personalised insight hero */}
       <div className="eb-card eb-hero eb-hero-rich eb-hero-lg eb-hero-on-dark rounded-[28px] p-6 shadow-sm">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="eb-hero-title eb-hero-on-dark">{heroInsightState.heading}</h3>
+        <div className="eb-hero-header">
+          <div className="eb-hero-header-main">
+            <h3 className="eb-hero-title text-white">{heroInsightState.heading}</h3>
             <p className="eb-hero-subtitle mt-1 eb-hero-on-dark-muted">
               {heroInsightState.subtitle}
             </p>
           </div>
-          <div className="eb-icon-frame eb-icon-frame--hero"><Sparkles className="w-5 h-5 shrink-0" /></div>
+          <div className="eb-hero-header-side">
+            <div className="eb-icon-frame eb-icon-frame--hero"><Sparkles className="w-5 h-5 shrink-0" /></div>
+          </div>
         </div>
 
         <div className="mt-4 space-y-3">
-          <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
+          <div className="eb-inset eb-hero-panel rounded-2xl p-4 insights-hero-bubble">
             <div className="eb-hero-panel-label">{heroInsightState.heading}</div>
             <div className="mt-2 space-y-2">
               {heroInsightState.items.length ? (
@@ -3688,7 +3690,7 @@ const tryNextPrompts = useMemo(() => {
                     ) : null}
                     <div className="eb-hero-panel-body">{item.text}</div>
                     {item.contextLine ? <div className="mt-1 eb-hero-panel-note">{item.contextLine}</div> : null}
-                    {item.repeatLine ? <div className="mt-1 text-xs font-medium text-[rgba(0,0,0,0.60)]">{item.repeatLine}</div> : null}
+                    {item.repeatLine ? <div className="mt-1 eb-hero-panel-note">{item.repeatLine}</div> : null}
                   </div>
                 ))
               ) : (
@@ -3697,7 +3699,7 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
+          <div className="eb-inset eb-hero-panel rounded-2xl p-4 insights-hero-bubble">
             <div className="eb-hero-panel-label">Over the next few days you might notice</div>
             <div className="mt-2 space-y-2">
               {bodyWeatherLines.slice(0, 3).map((line) => (

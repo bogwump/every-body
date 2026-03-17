@@ -15,10 +15,8 @@ export function RhythmHero(props: {
   userData: UserData;
   phaseKey: RhythmPhaseKey;
   phaseTitle: string;
-  phaseSubtitle?: string;
   phaseDescription: string;
   confidenceLabel: string;
-  phaseStatusLabel?: string;
   phaseIcon: React.ReactNode;
 }) {
   const distinctDays = useMemo(
@@ -53,10 +51,8 @@ export function RhythmHero(props: {
       <RhythmPhaseHeader
         icon={props.phaseIcon}
         phaseTitle={props.phaseTitle}
-        phaseSubtitle={props.phaseSubtitle}
         description={props.phaseDescription}
         confidenceLabel={props.confidenceLabel}
-        phaseStatusLabel={props.phaseStatusLabel}
         timingCopy={timingModel.timingCopy}
         progressPercent={timingModel.progressPercent}
       />

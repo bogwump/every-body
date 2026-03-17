@@ -12,10 +12,9 @@ export function RhythmPhaseHeader(props: {
 }) {
   return (
     <div>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="eb-hero-title eb-hero-on-dark text-white">{props.phaseTitle}</h3>
-          {props.phaseSubtitle ? <div className="mt-1 eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{props.phaseSubtitle}</div> : null}
+      <div className="eb-hero-header">
+        <div className="eb-hero-header-main">
+          <h3 className="eb-hero-title text-white">{props.phaseTitle}</h3>
         </div>
         <div className="text-right shrink-0 flex flex-col items-end gap-2">
           <div className="eb-icon-frame eb-icon-frame--hero">{props.icon}</div>
@@ -25,9 +24,9 @@ export function RhythmPhaseHeader(props: {
           </div>
         </div>
       </div>
-      <div className="text-sm text-white/90 mt-3">{props.description}</div>
+      <div className="mt-3 eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{props.description}</div>
       {props.timingCopy ? (
-        <div className="mt-3 text-xs sm:text-sm text-white/80">{props.timingCopy}</div>
+        <div className="mt-3 eb-hero-subtitle eb-hero-on-dark-muted text-white/80">{props.timingCopy}</div>
       ) : null}
       <div className="mt-3">
         <div className="mb-1 text-[11px] uppercase tracking-[0.18em] text-white/65">Phase progress</div>

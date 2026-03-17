@@ -96,7 +96,7 @@ export function History({ onNavigate }: HistoryProps) {
         <div className="eb-card-header">
           <div className="min-w-0 flex-1">
             <h2 className="eb-hero-title text-white">Your story so far</h2>
-            <p className="mt-3 text-sm text-white/85">
+            <p className="mt-2 eb-hero-subtitle text-white/85">
               {summary.patterns} pattern{summary.patterns === 1 ? '' : 's'} discovered · {summary.helpfulExperiments} experiment{summary.helpfulExperiments === 1 ? '' : 's'} looked helpful · {summary.phaseChanges} phase shift{summary.phaseChanges === 1 ? '' : 's'} recorded
             </p>
           </div>
