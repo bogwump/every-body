@@ -959,35 +959,36 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             )}
             </div>
         </section>
-        <div className="eb-card eb-card-soft mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center justify-between gap-3 sm:justify-start">
-            <button
-              type="button"
-              className="eb-btn-secondary"
-              onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1)))}
-            >
-              Prev
-            </button>
-            <div className="font-semibold tracking-[-0.01em]">{monthLabel}</div>
-            <button type="button" className="eb-btn-secondary" onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)))}>
-              Next
-            </button>
+        <section className="eb-card eb-card-soft mb-4 sm:mb-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center justify-between gap-3 sm:justify-start">
+              <button
+                type="button"
+                className="eb-btn-secondary"
+                onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1)))}
+              >
+                Prev
+              </button>
+              <div className="font-semibold tracking-[-0.01em]">{monthLabel}</div>
+              <button type="button" className="eb-btn-secondary" onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)))}>
+                Next
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 sm:justify-end">
+              <div className="text-sm text-[rgb(var(--color-text-secondary))]">Overlay</div>
+              <select className="eb-input !h-10 !py-2" value={overlayKey} onChange={(e) => setOverlayKey(e.target.value as any)}>
+                {availableOverlayKeys.map((key) => (
+                  <option key={key} value={key}>{overlayLabel(key)}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:justify-end">
-            <div className="text-sm text-[rgb(var(--color-text-secondary))]">Overlay</div>
-            <select className="eb-input !h-10 !py-2" value={overlayKey} onChange={(e) => setOverlayKey(e.target.value as any)}>
-              {availableOverlayKeys.map((key) => (
-                <option key={key} value={key}>{overlayLabel(key)}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-7 gap-x-2 gap-y-1.5 sm:gap-y-2">
-          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d) => (
-            <div key={d} className="text-xs text-[rgb(var(--color-text-secondary))] px-1">{d}</div>
-          ))}
+          <div className="mt-4 grid grid-cols-7 gap-x-2 gap-y-1.5 sm:gap-y-2">
+            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d) => (
+              <div key={d} className="text-xs text-[rgb(var(--color-text-secondary))] px-1">{d}</div>
+            ))}
 
           {days.map((d) => {
             const iso = toISO(d);
@@ -1175,6 +1176,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             </div>
           </>
         )}
+        </section>
 
 {/* Cycle edit toggle (sticky within page-inner so it aligns with the calendar grid, not the viewport edge) */}
 <div className="sticky bottom-6 mt-6 flex justify-end pointer-events-none">

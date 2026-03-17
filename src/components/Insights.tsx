@@ -3725,34 +3725,31 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
-            <div className="text-sm font-semibold text-black">Explore deeper insights</div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                className="eb-btn eb-btn-primary w-full min-h-[3rem] px-4 text-center leading-5"
-                onClick={() => {
-                  setDataEvidenceOpen(true);
-                  scrollToInsightsSection('eb-insights-settings');
-                }}
-              >
-                See your data
-              </button>
-              <button
-                type="button"
-                className="eb-btn eb-btn-primary w-full min-h-[3rem] px-4 text-center leading-5"
-                onClick={() => scrollToInsightsSection('eb-experiments')}
-              >
-                Run experiment
-              </button>
-              <button
-                type="button"
-                className="eb-btn eb-btn-primary col-span-2 w-full min-h-[3rem] px-4 text-center leading-5"
-                onClick={() => scrollToInsightsSection('eb-insights-settings')}
-              >
-                Change metrics
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
+            <button
+              type="button"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
+              onClick={() => {
+                setDataEvidenceOpen(true);
+                scrollToInsightsSection('eb-insights-settings');
+              }}
+            >
+              See your data
+            </button>
+            <button
+              type="button"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
+              onClick={() => scrollToInsightsSection('eb-experiments')}
+            >
+              Run experiment
+            </button>
+            <button
+              type="button"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
+              onClick={() => scrollToInsightsSection('eb-insights-settings')}
+            >
+              Change metrics
+            </button>
           </div>
         </div>
       </div>
