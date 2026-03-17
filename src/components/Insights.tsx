@@ -3232,32 +3232,33 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          {!done ? (
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-              {/* Only show when it is useful */}
-              {started && !hasLoggedToday && onOpenCheckIn ? (
-                <button type="button" className="eb-btn eb-btn-primary" onClick={() => onOpenCheckIn(todayISO)}>
-                  Log today
-                </button>
-              ) : null}
-              <button type="button" className="eb-btn eb-btn-secondary eb-btn-soft-choice min-w-[9rem] sm:min-w-[10rem]" onClick={() => extendExperiment(2)}>
-                Extend 2 days
-              </button>
-              <button type="button" className="eb-btn eb-btn-tertiary" onClick={() => setStopExperimentConfirmOpen(true)}>
-                Stop
-              </button>
-            </div>
-          ) : (
+          {done ? (
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <button type="button" className="eb-btn eb-btn-secondary" onClick={() => clearExperiment()}>
                 Clear
               </button>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Comparison / progress block */}
         {done ? renderExperimentComparisonBlock('conclusion') : renderExperimentComparisonBlock('progress')}
+
+        {!done ? (
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            {started && !hasLoggedToday && onOpenCheckIn ? (
+              <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => onOpenCheckIn(todayISO)}>
+                Log today
+              </button>
+            ) : null}
+            <button type="button" className="eb-btn eb-btn-secondary eb-btn-soft-choice w-full sm:w-auto min-w-[9rem] sm:min-w-[10rem]" onClick={() => extendExperiment(2)}>
+              Extend 2 days
+            </button>
+            <button type="button" className="eb-btn eb-btn-tertiary w-full sm:w-auto" onClick={() => setStopExperimentConfirmOpen(true)}>
+              Stop
+            </button>
+          </div>
+        ) : null}
 
         {/* Outcome actions / saved outcome */}
         {done ? (
@@ -3388,41 +3389,32 @@ const tryNextPrompts = useMemo(() => {
           <div className="text-sm font-semibold">{title}</div>
           <div className="mt-1 text-sm eb-muted">{subtitle}</div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <span className="text-xs eb-muted">Compared with:</span>
-          <button
-            type="button"
-            className={
-              experimentCompareMode === 'quick'
-                ? 'eb-choice-pill'
-                : 'eb-choice-pill'
-            }
-            data-selected={experimentCompareMode === 'quick' ? 'true' : undefined}
-            onClick={() => setExperimentCompareMode('quick')}
-          >
-            Just before
-          </button>
-          <button
-            type="button"
-            className={
-              hasUsual
-                ? (experimentCompareMode === 'usual'
-                    ? 'eb-choice-pill'
-                    : 'eb-choice-pill'
-                  )
-                : 'eb-choice-pill'
-            }
-            data-selected={experimentCompareMode === 'usual' && hasUsual ? 'true' : undefined}
-            disabled={!hasUsual}
-            aria-disabled={!hasUsual}
-            onClick={() => {
-              if (hasUsual) setExperimentCompareMode('usual');
-            }}
-            title={hasUsual ? 'Compare with your usual pattern' : `Needs ${usualNeed} baseline days before you started (you have ${usualUsed}).`}
-          >
-            Usual month
-          </button>
-          <span className="text-xs eb-muted">{compareLabel}</span>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <button
+              type="button"
+              className="eb-choice-pill"
+              data-selected={experimentCompareMode === 'quick' ? 'true' : undefined}
+              onClick={() => setExperimentCompareMode('quick')}
+            >
+              Just before
+            </button>
+            <button
+              type="button"
+              className="eb-choice-pill"
+              data-selected={experimentCompareMode === 'usual' && hasUsual ? 'true' : undefined}
+              disabled={!hasUsual}
+              aria-disabled={!hasUsual}
+              onClick={() => {
+                if (hasUsual) setExperimentCompareMode('usual');
+              }}
+              title={hasUsual ? 'Compare with your usual pattern' : `Needs ${usualNeed} baseline days before you started (you have ${usualUsed}).`}
+            >
+              Usual month
+            </button>
+          </div>
+          <span className="text-xs eb-muted sm:ml-1">{compareLabel}</span>
         </div>
           <div className="mt-3 text-sm eb-muted">
             {experimentCompareMode === 'usual' && !hasUsual ? `Still early days. Usual month unlocks after ${usualNeed} baseline day(s) before you started (you have ${usualUsed}).` : 'Still early days. Keep logging and we’ll firm this up after a few more days.'}
@@ -3451,41 +3443,32 @@ const tryNextPrompts = useMemo(() => {
         <div className="text-sm font-semibold">{title}</div>
         <div className="mt-1 text-sm eb-muted">{subtitle}</div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <span className="text-xs eb-muted">Compared with:</span>
-          <button
-            type="button"
-            className={
-              experimentCompareMode === 'quick'
-                ? 'eb-choice-pill'
-                : 'eb-choice-pill'
-            }
-            data-selected={experimentCompareMode === 'quick' ? 'true' : undefined}
-            onClick={() => setExperimentCompareMode('quick')}
-          >
-            Just before
-          </button>
-          <button
-            type="button"
-            className={
-              hasUsual
-                ? (experimentCompareMode === 'usual'
-                    ? 'eb-choice-pill'
-                    : 'eb-choice-pill'
-                  )
-                : 'eb-choice-pill'
-            }
-            data-selected={experimentCompareMode === 'usual' && hasUsual ? 'true' : undefined}
-            disabled={!hasUsual}
-            aria-disabled={!hasUsual}
-            onClick={() => {
-              if (hasUsual) setExperimentCompareMode('usual');
-            }}
-            title={hasUsual ? 'Compare with your usual pattern' : `Needs ${usualNeed} baseline days before you started (you have ${usualUsed}).`}
-          >
-            Usual month
-          </button>
-          <span className="text-xs eb-muted">{compareLabel}</span>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <button
+              type="button"
+              className="eb-choice-pill"
+              data-selected={experimentCompareMode === 'quick' ? 'true' : undefined}
+              onClick={() => setExperimentCompareMode('quick')}
+            >
+              Just before
+            </button>
+            <button
+              type="button"
+              className="eb-choice-pill"
+              data-selected={experimentCompareMode === 'usual' && hasUsual ? 'true' : undefined}
+              disabled={!hasUsual}
+              aria-disabled={!hasUsual}
+              onClick={() => {
+                if (hasUsual) setExperimentCompareMode('usual');
+              }}
+              title={hasUsual ? 'Compare with your usual pattern' : `Needs ${usualNeed} baseline days before you started (you have ${usualUsed}).`}
+            >
+              Usual month
+            </button>
+          </div>
+          <span className="text-xs eb-muted sm:ml-1">{compareLabel}</span>
         </div>
         <div className="mt-2 text-xs eb-muted">
           {canShowConclusionSummary && !cmp.enoughData
@@ -4445,7 +4428,7 @@ const tryNextPrompts = useMemo(() => {
                       const isOpen = openHistoryCardId === id;
                       return (
                         <CarouselItem key={id} className="basis-full md:basis-1/2">
-                          <div className="eb-inset rounded-2xl p-5 h-full flex flex-col">
+                          <div className="eb-inset-white rounded-2xl p-5 h-full flex flex-col">
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <div className="text-sm font-semibold">{item?.title || 'Past experiment'}</div>
@@ -4668,10 +4651,10 @@ const tryNextPrompts = useMemo(() => {
             </button>
           ))}</div>
 
-        <div className="mt-5 flex items-end justify-between gap-4">
+        <div className="mt-5 flex flex-col gap-4">
           <div className="min-w-0">
           <div className="text-xs text-[rgb(var(--color-primary))]">Selected metrics</div>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2 items-center">
             {selected.length ? (
               selected.map((m) => (
                 <span
@@ -4687,7 +4670,7 @@ const tryNextPrompts = useMemo(() => {
           </div>
           </div>
 
-          <div className="shrink-0 flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-start">
             <button type="button" className="eb-btn eb-btn-primary" onClick={() => setDataEvidenceOpen((prev) => !prev)}>
               {dataEvidenceOpen ? 'Hide your data' : 'See your data'}
             </button>

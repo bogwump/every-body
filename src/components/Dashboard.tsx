@@ -1072,7 +1072,7 @@ export function Dashboard({
             {[0, 1, 2].map((idx) => (
               <select
                 key={idx}
-                className="eb-input !py-2 !px-3 !text-sm flex-1"
+                className="eb-input !py-2 !px-3 !text-sm flex-1 bg-[rgb(var(--color-primary-light)/0.16)] border-[rgb(var(--color-primary-light)/0.36)]"
                 value={chartMetrics[idx as 0 | 1 | 2]}
                 onChange={(e) => setChartMetric(idx as 0 | 1 | 2, e.target.value as DashboardMetric)}
               >

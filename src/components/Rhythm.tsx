@@ -674,12 +674,12 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             );
           })()}
 
-          <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="mt-3 flex items-start justify-between gap-3">
             {userData?.cycleTrackingMode === 'cycle' ? (
               <button
                 type="button"
                 onClick={() => setCycleModalOpen(true)}
-                className="min-w-0 max-w-[70%] rounded-full bg-[rgb(var(--color-accent)/0.12)] border border-[rgb(var(--color-accent)/0.22)] px-2.5 py-1 text-xs sm:px-3 sm:text-sm text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent)/0.18)] transition whitespace-nowrap overflow-hidden text-ellipsis"
+                className="min-w-0 max-w-[62%] rounded-full bg-[rgb(var(--color-accent)/0.12)] border border-[rgb(var(--color-accent)/0.22)] px-2 py-1 text-[11px] sm:px-3 sm:text-sm text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent)/0.18)] transition whitespace-nowrap overflow-hidden text-ellipsis"
                 title="Cycle length"
               >
                 <span className="font-medium">Cycle length</span>
@@ -696,15 +696,15 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         
 
-        <div className="eb-card p-6">
-          <div className="eb-card-header">
-            <div className="min-w-0 flex-1 space-y-4">
-              <div>
-                <h3 className="mb-1">What this can look like</h3>
-              </div>
-              <p className="text-neutral-700">{content.lookLikeIntro}</p>
+        <div className="eb-card p-6 relative">
+          <div className="absolute top-0 right-0 eb-icon-frame"><Eye className="w-5 h-5" /></div>
+          <div className="space-y-4">
+            <div>
+              <h3 className="mb-1">What this can look like</h3>
+            </div>
+            <p className="text-neutral-700">{content.lookLikeIntro}</p>
 
-              <ul className="space-y-3">
+            <ul className="space-y-3">
             {content.lookLikeBullets.map((t, i) => {
               const dot =
                 i % 3 === 0
@@ -721,22 +721,20 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             })}
               </ul>
 
-              <p className="text-neutral-700">{content.lookLikeDuration}</p>
-            </div>
-            <div className="eb-icon-frame"><Eye className="w-5 h-5" /></div>
+            <p className="text-neutral-700">{content.lookLikeDuration}</p>
           </div>
         </div>
 
         {/* What you can do */}
-        <div className="eb-card p-6">
-          <div className="eb-card-header">
-            <div className="min-w-0 flex-1 space-y-4">
-              <div>
-                <h3 className="mb-1 font-semibold tracking-tight">What you can do about it</h3>
-              </div>
-              <p className="text-neutral-700">{content.doIntro}</p>
+        <div className="eb-card p-6 relative">
+          <div className="absolute top-0 right-0 eb-icon-frame"><GraduationCap className="w-5 h-5" /></div>
+          <div className="space-y-4">
+            <div>
+              <h3 className="mb-1 font-semibold tracking-tight">What you can do about it</h3>
+            </div>
+            <p className="text-neutral-700">{content.doIntro}</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="eb-inset-callout rounded-xl p-4">
               <div className="eb-inset-label !text-base !font-medium !text-neutral-800">Permission</div>
               <div className="eb-inset-value !text-base !font-normal !text-neutral-800">{content.doCards.permission}</div>
@@ -753,32 +751,28 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
               <div className="eb-inset-label !text-base !font-medium !text-neutral-800">Body</div>
               <div className="eb-inset-value !text-base !font-normal !text-neutral-800">{content.doCards.body}</div>
             </div>
-              </div>
             </div>
-            <div className="eb-icon-frame"><GraduationCap className="w-5 h-5" /></div>
           </div>
         </div>
 
         <PhaseHistoryCard history={phaseHistory} />
 
         {/* What usually comes next */}
-        <div className="eb-card p-6">
-          <div className="eb-card-header">
-            <div className="min-w-0 flex-1 space-y-4">
-              <div>
-                <h3 className="mb-1 font-semibold tracking-tight">What usually comes next</h3>
-              </div>
-
-              <p className="text-neutral-700">
-            If this rhythm follows your usual pattern, you’ll likely shift into your <span className="font-medium opacity-90">{computed.nextPhase}</span> ({computed.nextSci}) in around <span className="font-medium opacity-90">{computed.daysToNext ?? 5} days</span>.
-          </p>
-
-              <div className="eb-inset-callout rounded-xl p-4">
-                <div className="text-base font-medium text-neutral-800">{nextPhasePlanning.title}</div>
-                <div className="mt-1 text-base text-neutral-800 font-normal">{nextPhasePlanning.body}</div>
-              </div>
+        <div className="eb-card p-6 relative">
+          <div className="absolute top-0 right-0 eb-icon-frame"><Compass className="w-5 h-5" /></div>
+          <div className="space-y-4">
+            <div>
+              <h3 className="mb-1 font-semibold tracking-tight">What usually comes next</h3>
             </div>
-            <div className="eb-icon-frame"><Compass className="w-5 h-5" /></div>
+
+            <p className="text-neutral-700">
+              If this rhythm follows your usual pattern, you’ll likely shift into your <span className="font-medium opacity-90">{computed.nextPhase}</span> ({computed.nextSci}) in around <span className="font-medium opacity-90">{computed.daysToNext ?? 5} days</span>.
+            </p>
+
+            <div className="eb-inset-callout rounded-xl p-4">
+              <div className="text-base font-medium text-neutral-800">{nextPhasePlanning.title}</div>
+              <div className="mt-1 text-base text-neutral-800 font-normal">{nextPhasePlanning.body}</div>
+            </div>
           </div>
         </div>
 
