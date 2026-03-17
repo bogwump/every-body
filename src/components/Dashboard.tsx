@@ -818,14 +818,6 @@ export function Dashboard({
             <Calendar className="w-5 h-5" />
           </button>
 
-          {/* View full rhythm */}
-          <button
-            type="button"
-            onClick={() => onNavigate('rhythm')}
-            className="absolute top-4 right-12 z-10 text-sm text-white/85 hover:text-white transition"
-          >
-            View full rhythm
-          </button>
 
           <div className="eb-hero-header mb-3">
             <div className="eb-hero-header-main">
@@ -878,8 +870,7 @@ export function Dashboard({
           <div className="eb-card eb-card-soft">
             <div className="eb-card-header">
               <div className="min-w-0 flex-1">
-                <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Guide</div>
-                <h3 className="mt-1 mb-1">{guideCard.title}</h3>
+                <h3 className="mb-1">{guideCard.title}</h3>
                 <p className="text-sm text-[rgba(0,0,0,0.72)]">{guideCard.body}</p>
                 {guideCard.supporting ? (
                   <p className="text-sm text-[rgba(0,0,0,0.60)] mt-2">{guideCard.supporting}</p>
@@ -910,8 +901,7 @@ export function Dashboard({
         <div className="eb-card eb-card-soft">
           <div className="eb-card-header">
             <div className="min-w-0 flex-1">
-              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Today</div>
-              <h3 className="mt-1 mb-1">{checkedInToday ? 'Today is logged' : 'Today is ready for a check-in'}</h3>
+              <h3 className="mb-1">{checkedInToday ? 'Today is logged' : 'Today is ready for a check-in'}</h3>
               <p className="text-sm text-[rgba(0,0,0,0.68)]">
                 {checkedInToday
                   ? 'You have already logged today. Reopen it if anything changed.'
@@ -999,8 +989,7 @@ export function Dashboard({
         <div className="eb-card eb-card-soft">
           <div className="eb-card-header w-full">
             <div className="min-w-0 flex-1">
-              <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Snapshot</div>
-              <h3 className="mt-1 mb-2">What looks most useful right now</h3>
+              <h3 className="mb-2">What looks most useful right now</h3>
             </div>
             <div className="eb-icon-frame">
               <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
