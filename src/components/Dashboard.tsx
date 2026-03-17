@@ -928,7 +928,7 @@ export function Dashboard({
                   <div className="mt-1 font-semibold">{daysTracked}</div>
                 </div>
                 {experiment && !(experiment as any)?.outcome?.completedAtISO ? (
-                  <div className="eb-inset rounded-2xl p-3 sm:col-span-2">
+                  <div className="eb-inset rounded-2xl p-3 col-span-2">
                     <div className="text-xs text-[rgb(var(--color-text-secondary))]">Active experiment</div>
                     <div className="mt-1 font-semibold">{(experiment as any)?.title || 'Your experiment'}</div>
                   </div>
@@ -996,41 +996,42 @@ export function Dashboard({
             <div className="min-w-0 flex-1">
               <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">Snapshot</div>
               <h3 className="mt-1 mb-2">What looks most useful right now</h3>
-              {quickHookLines.length > 0 ? (
-                <div className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
-                  {quickHookLines.map((l, idx) => (
-                    <div key={idx}>{l}</div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-[rgba(0,0,0,0.75)]">
-                  Log a few days and your first patterns will show up here.
-                </p>
-              )}
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="eb-inset rounded-2xl p-3">
-                  <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
-                  <div className="mt-1 font-semibold">{insightsReady ? 'Ready' : `${insightsRemaining} to unlock`}</div>
-                </div>
-                <div className="eb-inset rounded-2xl p-3">
-                  <div className="text-xs text-[rgb(var(--color-text-secondary))]">Best next page</div>
-                  <div className="mt-1 font-semibold">{insightsReady ? 'Insights' : 'Check-in'}</div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => (insightsReady ? onNavigate('insights') : onOpenCheckIn(todayISO))}
-                className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
-              >
-                {insightsReady ? 'View insights' : "Do today’s check-in"} <ArrowRight className="w-4 h-4" />
-              </button>
             </div>
             <div className="eb-icon-frame">
               <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
           </div>
+
+          {quickHookLines.length > 0 ? (
+            <div className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
+              {quickHookLines.map((l, idx) => (
+                <div key={idx}>{l}</div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[rgba(0,0,0,0.75)]">
+              Log a few days and your first patterns will show up here.
+            </p>
+          )}
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="eb-inset rounded-2xl p-3">
+              <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
+              <div className="mt-1 font-semibold">{insightsReady ? 'Ready' : `${insightsRemaining} to unlock`}</div>
+            </div>
+            <div className="eb-inset rounded-2xl p-3">
+              <div className="text-xs text-[rgb(var(--color-text-secondary))]">Best next page</div>
+              <div className="mt-1 font-semibold">{insightsReady ? 'Insights' : 'Check-in'}</div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => (insightsReady ? onNavigate('insights') : onOpenCheckIn(todayISO))}
+            className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+          >
+            {insightsReady ? 'View insights' : "Do today’s check-in"} <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
 
         <div className="eb-card">
@@ -1072,7 +1073,7 @@ export function Dashboard({
             {[0, 1, 2].map((idx) => (
               <select
                 key={idx}
-                className="eb-input !py-2 !px-3 !text-sm flex-1 bg-[color-mix(in_srgb,rgb(var(--color-primary-light))_18%,white)] border-[color-mix(in_srgb,rgb(var(--color-primary-dark))_18%,white)]"
+                className="eb-input !py-2 !px-3 !text-sm flex-1 bg-[color-mix(in_srgb,rgb(var(--color-primary-light))_28%,white)] border-[color-mix(in_srgb,rgb(var(--color-primary-dark))_22%,white)]"
                 value={chartMetrics[idx as 0 | 1 | 2]}
                 onChange={(e) => setChartMetric(idx as 0 | 1 | 2, e.target.value as DashboardMetric)}
               >
