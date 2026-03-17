@@ -959,25 +959,25 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             )}
             </div>
         </section>
-        <section className="eb-card eb-card-soft mb-4 sm:mb-5">
+        <section className="eb-card eb-card-soft mb-4 sm:mb-5 px-3 py-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center justify-between gap-3 sm:justify-start">
+            <div className="flex items-center justify-between gap-2 sm:justify-start">
               <button
                 type="button"
-                className="eb-btn-secondary"
+                className="eb-btn-secondary !px-4 !py-2 sm:!px-4 sm:!py-2.5"
                 onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1)))}
               >
                 Prev
               </button>
               <div className="font-semibold tracking-[-0.01em]">{monthLabel}</div>
-              <button type="button" className="eb-btn-secondary" onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)))}>
+              <button type="button" className="eb-btn-secondary !px-4 !py-2 sm:!px-4 sm:!py-2.5" onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)))}>
                 Next
               </button>
             </div>
 
-            <div className="flex items-center gap-2 sm:justify-end">
+            <div className="flex items-center gap-2 sm:justify-end min-w-0">
               <div className="text-sm text-[rgb(var(--color-text-secondary))]">Overlay</div>
-              <select className="eb-input !h-10 !py-2" value={overlayKey} onChange={(e) => setOverlayKey(e.target.value as any)}>
+              <select className="eb-input !h-10 !py-2 min-w-0 flex-1 sm:flex-none" value={overlayKey} onChange={(e) => setOverlayKey(e.target.value as any)}>
                 {availableOverlayKeys.map((key) => (
                   <option key={key} value={key}>{overlayLabel(key)}</option>
                 ))}
@@ -985,7 +985,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-7 gap-x-2 gap-y-1.5 sm:gap-y-2">
+          <div className="mt-4 grid grid-cols-7 gap-x-1 gap-y-1.5 sm:gap-x-2 sm:gap-y-2">
             {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d) => (
               <div key={d} className="text-xs text-[rgb(var(--color-text-secondary))] px-1">{d}</div>
             ))}
@@ -1034,7 +1034,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                   if (editMode) setEditISO(iso);
                   else setSummaryISO(iso);
                 }}
-                className={`relative rounded-2xl border text-left p-2 min-h-[64px] transition shadow-sm active:scale-[0.99] ${
+                className={`relative rounded-2xl border text-left p-1.5 sm:p-2 min-h-[56px] sm:min-h-[64px] transition shadow-sm active:scale-[0.99] ${
                   inMonth ? 'bg-white border-[rgba(0,0,0,0.08)] hover:shadow-md hover:-translate-y-[1px]' : 'bg-white border-[rgba(0,0,0,0.04)]'
                 } ${isToday ? 'outline outline-2 outline-[rgb(var(--color-primary-dark))] outline-offset-0' : ''} ${isFertile ? 'eb-fertile' : ''}`}
                 style={{
@@ -1047,7 +1047,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
                   <div className="flex items-start justify-between gap-2">
                     <div className={`text-sm font-medium leading-none ${inMonth ? '' : 'opacity-40'}`}>{d.getDate()}</div>
 
-                    <div className="flex min-h-[12px] flex-col items-end justify-start gap-1 text-[rgb(var(--color-primary-dark))] sm:flex-row sm:items-center sm:justify-end">
+                    <div className="flex min-h-[12px] flex-row flex-wrap items-start justify-end gap-0.5 text-[rgb(var(--color-primary-dark))]">
                       {dayMarkers.map((marker) => (
                         <span
                           key={marker.key}

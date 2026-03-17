@@ -918,7 +918,7 @@ export function Dashboard({
             </div>
           </div>
 
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="eb-inset rounded-2xl p-3">
                   <div className="text-xs text-[rgb(var(--color-text-secondary))]">Status</div>
                   <div className="mt-1 font-semibold">{checkedInToday ? 'Logged today' : 'Not logged yet'}</div>
@@ -1008,7 +1008,7 @@ export function Dashboard({
                 </p>
               )}
 
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="eb-inset rounded-2xl p-3">
                   <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
                   <div className="mt-1 font-semibold">{insightsReady ? 'Ready' : `${insightsRemaining} to unlock`}</div>

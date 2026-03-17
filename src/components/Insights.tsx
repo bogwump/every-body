@@ -3212,8 +3212,8 @@ const tryNextPrompts = useMemo(() => {
 
     return (
       <div className="eb-inset-white rounded-2xl p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">{ex.title || 'Your experiment'}</div>
             <div className="mt-1 text-sm eb-muted">
               {done
@@ -3233,14 +3233,14 @@ const tryNextPrompts = useMemo(() => {
           </div>
 
           {!done ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               {/* Only show when it is useful */}
               {started && !hasLoggedToday && onOpenCheckIn ? (
                 <button type="button" className="eb-btn eb-btn-primary" onClick={() => onOpenCheckIn(todayISO)}>
                   Log today
                 </button>
               ) : null}
-              <button type="button" className="eb-btn eb-btn-secondary eb-btn-soft-choice min-w-[10rem]" onClick={() => extendExperiment(2)}>
+              <button type="button" className="eb-btn eb-btn-secondary eb-btn-soft-choice min-w-[9rem] sm:min-w-[10rem]" onClick={() => extendExperiment(2)}>
                 Extend 2 days
               </button>
               <button type="button" className="eb-btn eb-btn-tertiary" onClick={() => setStopExperimentConfirmOpen(true)}>
@@ -3248,7 +3248,7 @@ const tryNextPrompts = useMemo(() => {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <button type="button" className="eb-btn eb-btn-secondary" onClick={() => clearExperiment()}>
                 Clear
               </button>

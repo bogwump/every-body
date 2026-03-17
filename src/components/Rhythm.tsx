@@ -679,15 +679,15 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
               <button
                 type="button"
                 onClick={() => setCycleModalOpen(true)}
-                className="rounded-full bg-[rgb(var(--color-accent)/0.12)] border border-[rgb(var(--color-accent)/0.22)] px-3 py-1 text-sm text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent)/0.18)] transition"
+                className="min-w-0 max-w-[70%] rounded-full bg-[rgb(var(--color-accent)/0.12)] border border-[rgb(var(--color-accent)/0.22)] px-2.5 py-1 text-xs sm:px-3 sm:text-sm text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent)/0.18)] transition whitespace-nowrap overflow-hidden text-ellipsis"
                 title="Cycle length"
               >
                 <span className="font-medium">Cycle length</span>
-                <span className="mx-2 opacity-60">•</span>
+                <span className="mx-1.5 opacity-60">•</span>
                 <span className="font-semibold">{avgCycleText}</span>
               </button>
             ) : <div />}
-            <div className="text-xs text-neutral-600 flex items-center gap-2">
+            <div className="text-xs text-neutral-600 flex items-center gap-2 shrink-0">
               <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--color-primary-dark))]" />
               You’re here
             </div>
