@@ -933,17 +933,20 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
           <p className="eb-page-support">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
         </div>
         <section className="eb-card eb-hero eb-hero-rich eb-hero-md eb-hero-on-dark mb-4 sm:mb-5">
-          <div className="eb-card-header">
-            <div className="min-w-0 flex-1">
-              <h2 className="eb-hero-title text-white">Your month at a glance</h2>
-              <p className="mt-1 eb-hero-subtitle text-white/80">Review symptoms, period windows, and predicted timing in one place.</p>
+          <div className="eb-hero-header">
+            <div className="eb-hero-header-main">
+              <h3 className="eb-hero-title text-white">Your month at a glance</h3>
+              <p className="mt-1 eb-hero-subtitle eb-hero-on-dark-muted">Review symptoms, period windows, and predicted timing in one place.</p>
             </div>
-            <div className="eb-icon-frame eb-icon-frame--hero"><CalendarDays className="h-5 w-5" /></div>
+            <div className="eb-hero-header-side">
+              <div className="eb-icon-frame eb-icon-frame--hero"><CalendarDays className="h-5 w-5" /></div>
+            </div>
           </div>
           <div className="mt-4 min-w-0 eb-inset eb-hero-panel p-4">
             {hasCycleAnchor ? (
               <>
-                <div className="eb-hero-panel-label">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}{rhythmTiming.currentDay ? ` · Day ${rhythmTiming.currentDay} in phase` : ''}</div>
+                <div className="eb-hero-panel-label">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}</div>
+                {rhythmTiming.currentDay ? <div className="mt-1 eb-hero-panel-title">Day {rhythmTiming.currentDay} in phase</div> : null}
                 <div className="mt-1 eb-hero-panel-body">{cycleTrust.predictionTrust === 'stale' ? 'Rhythm is waiting for a fresh cycle anchor before it resumes forward predictions.' : cycleTrust.predictionTrust === 'early' ? 'Early estimate based on your latest cycle start. This will tighten as more cycles are logged.' : cycleTrust.phaseTrust === 'confirmed' ? (rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing') : 'Estimated from your recent logs and cycle timing.'}</div>
               </>
             ) : cycleEnabled ? (

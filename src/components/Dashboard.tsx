@@ -837,7 +837,7 @@ export function Dashboard({
           <div className="eb-inset eb-hero-panel rounded-2xl p-4">
             <div className="eb-hero-panel-label">{dashboardRhythm.title}</div>
             {dashboardRhythm.headline ? (
-              <div className="mt-1 eb-hero-panel-title">{dashboardRhythm.headline}</div>
+              <div className="mt-1 text-[1.02rem] font-semibold tracking-[-0.015em] text-[rgba(0,0,0,0.9)]">{dashboardRhythm.headline}</div>
             ) : null}
             <div className="mt-2 eb-hero-panel-body">{dashboardRhythm.body}</div>
             {rhythmPhaseState && (rhythmPhaseState as any).gapMode === 'stale' ? (

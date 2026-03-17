@@ -203,48 +203,51 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   .eb-hero-title {
-    font-size: clamp(1.18rem, 1.05rem + 0.5vw, 1.34rem);
-    line-height: 1.18;
-    font-weight: 600;
-    letter-spacing: -0.025em;
-    margin: 0;
-    font-family: inherit;
+    font-size: 1.12rem !important;
+    line-height: 1.24 !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.02em !important;
+    margin: 0 !important;
+    font-family: inherit !important;
   }
 
   .eb-hero-subtitle {
-    font-size: 1rem;
-    line-height: 1.5;
-    font-weight: 400;
-    letter-spacing: -0.01em;
-    margin: 0;
-    font-family: inherit;
+    font-size: 0.98rem !important;
+    line-height: 1.5 !important;
+    font-weight: 400 !important;
+    letter-spacing: -0.01em !important;
+    margin: 0 !important;
+    font-family: inherit !important;
   }
 
   .eb-hero-panel-label {
-    font-size: 0.98rem;
-    line-height: 1.35;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: rgba(0, 0, 0, 0.8);
-    margin: 0;
+    font-size: 0.98rem !important;
+    line-height: 1.35 !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.02em !important;
+    color: rgba(0, 0, 0, 0.8) !important;
+    margin: 0 !important;
+    font-family: inherit !important;
   }
 
   .eb-hero-panel-title {
-    font-size: clamp(1rem, 0.95rem + 0.35vw, 1.12rem);
-    line-height: 1.28;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: rgba(0, 0, 0, 0.94);
-    margin: 0;
+    font-size: 0.9rem !important;
+    line-height: 1.35 !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.01em !important;
+    color: rgba(0, 0, 0, 0.76) !important;
+    margin: 0 !important;
+    font-family: inherit !important;
   }
 
   .eb-hero-panel-body {
-    font-size: 0.98rem;
-    line-height: 1.55;
-    font-weight: 400;
-    letter-spacing: -0.01em;
-    color: rgba(0, 0, 0, 0.7);
-    margin: 0;
+    font-size: 0.98rem !important;
+    line-height: 1.55 !important;
+    font-weight: 400 !important;
+    letter-spacing: -0.01em !important;
+    color: rgba(0, 0, 0, 0.72) !important;
+    margin: 0 !important;
+    font-family: inherit !important;
   }
 
   .eb-hero-panel-note {
