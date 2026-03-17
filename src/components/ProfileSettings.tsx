@@ -996,7 +996,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
           </div>
 
 	          {/* Interactive content: a single white card (avoid redundant nested borders) */}
-	          <details className="eb-disclosure mt-4 overflow-hidden group">
+	          <details className="eb-disclosure eb-disclosure--white mt-4 overflow-hidden group">
             <summary className="p-3 sm:p-4 flex items-center justify-between">
               <span className="font-medium">Customise symptoms</span>
               <ChevronRight className="w-5 h-5 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />

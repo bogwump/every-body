@@ -3211,7 +3211,7 @@ const tryNextPrompts = useMemo(() => {
     ));
 
     return (
-      <div className="eb-inset rounded-2xl p-5">
+      <div className="eb-inset-white rounded-2xl p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold">{ex.title || 'Your experiment'}</div>
@@ -3796,7 +3796,7 @@ const tryNextPrompts = useMemo(() => {
                   <div className="mt-2 text-sm eb-muted">{supportingLine}</div>
                   {p.contextLine ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
                   <div className="flex-1" />
-                  <details className="eb-disclosure mt-3">
+                  <details className="eb-disclosure eb-disclosure--white mt-3">
                     <summary><span>Why am I seeing this?</span><ChevronDown className="w-4 h-4" /></summary>
                     <div className="mt-2 text-sm eb-muted space-y-1">
                       {(p.why ?? []).map((w, i) => (
@@ -3813,7 +3813,7 @@ const tryNextPrompts = useMemo(() => {
 
                     if (shouldAsk) {
                       return (
-                        <div className="mt-4 eb-inset-soft rounded-2xl px-4 py-4">
+                        <div className="mt-4 eb-inset-white rounded-2xl px-4 py-4">
                           {!contradictionOpen ? (
                             <>
                               <div className="text-sm font-medium">Does this match your experience?</div>
