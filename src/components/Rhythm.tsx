@@ -603,11 +603,12 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
   
   return (
-    <div className="eb-container space-y-6 pt-8 pb-12">
+    <div className="eb-page">
+      <div className="eb-page-inner">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="mb-2">Your Rhythm</h1>
-          <p>A calm, phase-based story that becomes more personal the more you check in.</p>
+        <div className="eb-page-header">
+          <h1 className="eb-page-title">Your Rhythm</h1>
+          <p className="eb-page-support">A calm, phase-based story that becomes more personal the more you check in.</p>
         </div>
 
         {/* Where you are */}
@@ -854,6 +855,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         )}
 
     </div>
+      </div>
   );
 
 }

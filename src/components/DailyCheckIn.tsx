@@ -992,14 +992,15 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
       </Dialog>
 
       <div className="eb-page-inner">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="mb-1">Daily check-in</h1>
-            <p className="text-[rgb(var(--color-text-secondary))]">
-              {dateLabel}
-              {activeDateISO !== todayISO ? ' (edit)' : ''}
-            </p>
-          </div>
+        <div className="eb-page-header mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="eb-page-title">Daily check-in</h1>
+              <p className="eb-page-support">
+                {dateLabel}
+                {activeDateISO !== todayISO ? ' (edit)' : ''}
+              </p>
+            </div>
 
           {onNavigate && (
             <button
@@ -1012,6 +1013,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
               Calendar
             </button>
           )}
+          </div>
         </div>
 
         {userData.cycleTrackingMode === 'no-cycle' && (

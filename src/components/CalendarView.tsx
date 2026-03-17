@@ -928,14 +928,17 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     <div className="eb-page">
       {/* Keep a more phone-like density on wide screens */}
       <div className="eb-page-inner">
+        <div className="eb-page-header">
+          <h1 className="eb-page-title">Calendar</h1>
+          <p className="eb-page-support">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
+        </div>
         <section className="eb-card eb-hero eb-hero-surface eb-hero-md eb-hero-on-dark mb-4 sm:mb-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="eb-page-kicker !text-white/72">Calendar</div>
-              <h1 className="mb-2 text-white">Calendar</h1>
-              <p className="text-white/85">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
+          <div className="eb-card-header">
+            <div>
+              <div className="text-sm font-semibold text-white/90">Your month at a glance</div>
+              <p className="mt-1 text-sm text-white/80">Review symptoms, period windows, and predicted timing in one place.</p>
             </div>
-            <CalendarDays className="mt-1 h-5 w-5 shrink-0 text-white/75" />
+            <div className="eb-icon-frame eb-icon-frame--hero"><CalendarDays className="h-5 w-5" /></div>
           </div>
           <div className="mt-4 min-w-0 eb-inset p-4 bg-[rgba(255,255,255,0.12)] border-[rgba(255,255,255,0.16)]">
             {hasCycleAnchor ? (

@@ -142,7 +142,22 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   .eb-page-header {
-    @apply space-y-2;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .eb-page-title {
+    @apply text-[2rem] font-semibold tracking-[-0.03em] leading-tight;
+    color: rgb(var(--color-text));
+  }
+
+  .eb-page-support {
+    @apply text-[0.98rem] leading-7;
+    color: rgb(var(--color-text-secondary));
+  }
+
+  .eb-page-meta {
+    @apply flex flex-wrap gap-2 pt-1;
   }
 
   .eb-page-kicker {

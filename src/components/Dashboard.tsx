@@ -800,9 +800,8 @@ export function Dashboard({
       <div className="eb-page-inner">
         {/* Header */}
         <div className="eb-page-header">
-          <div className="eb-page-kicker">Home</div>
-          <h1 className="mb-2">Welcome back{userName ? `, ${userName}` : ''}</h1>
-          <p className="eb-subtitle">{todayLabel}</p>
+          <h1 className="eb-page-title">Welcome back{userName ? `, ${userName}` : ''}</h1>
+          <p className="eb-page-support">{todayLabel}</p>
         </div>
 
 

@@ -680,8 +680,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="mb-1">Personal information</h1>
-              <p className="text-[rgb(var(--color-text-secondary))]">Update your name and photo</p>
+              <h1 className="eb-page-title text-[1.9rem]">Personal information</h1>
+              <p className="eb-page-support">Update your name and photo</p>
             </div>
           </div>
 
@@ -806,9 +806,9 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
   ) : (
 <div className="eb-page overflow-x-hidden">
       <div className="eb-page-inner !max-w-4xl">
-        <div className="mb-8">
-          <h1 className="mb-2">Profile & Settings</h1>
-          <p className="text-[rgb(var(--color-text-secondary))]">Make it personal</p>
+        <div className="eb-page-header mb-2">
+          <h1 className="eb-page-title">Profile &amp; Settings</h1>
+          <p className="eb-page-support">Make it personal</p>
         </div>
 
         {/* Profile hero card */}

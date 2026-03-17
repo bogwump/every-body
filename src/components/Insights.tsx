@@ -3663,13 +3663,14 @@ const tryNextPrompts = useMemo(() => {
 
 
   return (
-    <div className="eb-container space-y-6 pt-8 pb-12 overflow-x-hidden">
+    <div className="eb-page overflow-x-hidden">
+      <div className="eb-page-inner">
       {/* Header */}
-      <div className="pt-2">
-        <h1 className="mb-1">Insights &amp; Patterns</h1>
-        <p className="text-[rgb(var(--color-text-secondary))]">Discover connections between your symptoms and cycle.</p>
+      <div className="eb-page-header">
+        <h1 className="eb-page-title">Insights &amp; Patterns</h1>
+        <p className="eb-page-support">Discover connections between your symptoms and cycle.</p>
 
-        <div className="mt-3 flex flex-wrap gap-2 justify-start">
+        <div className="eb-page-meta">
           <span className="eb-pill">
             Check-ins (last {days} days) • {entriesSorted.length} · Total • {entriesAllSorted.length}
           </span>
@@ -5259,6 +5260,7 @@ const tryNextPrompts = useMemo(() => {
 
 
     </div>
+      </div>
   );
 }
 

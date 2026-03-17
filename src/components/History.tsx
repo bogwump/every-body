@@ -88,11 +88,14 @@ export function History({ onNavigate }: HistoryProps) {
   return (
     <div className="eb-page">
       <div className="eb-page-inner">
+      <div className="eb-page-header">
+        <h1 className="eb-page-title">History</h1>
+        <p className="eb-page-support">A timeline of patterns, experiments, and rhythm shifts you have corrected or confirmed.</p>
+      </div>
       <section className="eb-card eb-hero eb-hero-surface eb-hero-lg eb-hero-on-dark overflow-hidden">
         <div className="eb-card-header">
           <div className="min-w-0 flex-1">
-            <div className="eb-page-kicker !text-white/72">History</div>
-            <h1 className="mt-1 text-white">Your story so far</h1>
+            <h2 className="text-white text-[1.9rem] font-semibold tracking-[-0.03em] leading-tight">Your story so far</h2>
             <p className="mt-3 text-sm text-white/85">
               {summary.patterns} pattern{summary.patterns === 1 ? '' : 's'} discovered · {summary.helpfulExperiments} experiment{summary.helpfulExperiments === 1 ? '' : 's'} looked helpful · {summary.phaseChanges} phase shift{summary.phaseChanges === 1 ? '' : 's'} recorded
             </p>
