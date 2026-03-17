@@ -1487,7 +1487,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                  <div className="mt-4 eb-inset rounded-2xl p-4">
                     <p className="font-medium">{aiExportPreview.meta.title}</p>
                     <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
                       {aiExportPreview.meta.description}
@@ -1520,7 +1520,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                     <p className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">{aiExportMessage}</p>
                   ) : null}
                   {showAIExportPanel ? (
-                    <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                    <div className="mt-4 eb-inset rounded-2xl p-4">
                       <p className="font-medium">Other AI assistants</p>
                       <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
                         Use the current preset with Claude, Gemini, Perplexity, Copilot or ChatGPT, or download a structured JSON export.
@@ -1814,7 +1814,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 							  Insights exports are separate and can’t be restored here. You can download them anytime from this Privacy & Security section.
 							</p>
 
-							<div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+							<div className="mt-4 eb-inset rounded-2xl p-4">
                                 <p className="font-medium mb-1">Reset app data</p>
                                 <p className="text-sm text-[rgb(var(--color-text-secondary))]">
                                   Useful if you want to start fresh on this device. Resetting can’t be undone.
@@ -1890,7 +1890,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               </div>
 
 
-                              <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                              <div className="mt-4 flex items-center justify-between gap-4 eb-inset rounded-2xl p-4">
                                 <div className="min-w-0">
                                   <p className="font-medium mb-1">Fitbit import</p>
                                   <p className="text-sm text-[rgb(var(--color-text-secondary))]">
@@ -1919,7 +1919,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                 </button>
                               </div>
 
-                          <div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
+                          <div className="mt-4 eb-inset-soft rounded-xl p-3">
                             <p className="text-sm font-medium mb-1">Coming soon</p>
                             <ul className="text-sm text-[rgb(var(--color-text-secondary))] list-disc pl-5 space-y-1">
                               <li>Passcode / Face ID lock</li>                            </ul>
@@ -2039,7 +2039,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                           </div>
 
                           {/* Feedback / contact */}
-                          <div className="mt-4 rounded-2xl border border-neutral-200 p-4 bg-white">
+                          <div className="mt-4 eb-inset rounded-2xl p-4">
                             <p className="font-medium mb-1">Contact / feedback</p>
                             <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
                               Send a quick note. Your message goes straight to the app maker.
@@ -2112,7 +2112,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                           </div>
 
                           
-                          <div className="mt-4 rounded-2xl border border-neutral-200 p-4 bg-white">
+                          <div className="mt-4 eb-inset rounded-2xl p-4">
                             <p className="font-medium mb-1">Cloud sync (optional)</p>
                             <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-3">
                               Local-first by default. Enable this only if you want backup and cross-device syncing. (Beta)
@@ -2256,7 +2256,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                               </div>
                             )}
                           </div>
-<div className="mt-4 rounded-xl border border-neutral-200 p-3 bg-white">
+<div className="mt-4 eb-inset-soft rounded-xl p-3">
                             <p className="text-sm font-medium mb-1">Coming soon</p>
                             <ul className="text-sm text-[rgb(var(--color-text-secondary))] list-disc pl-5 space-y-1">
                               <li>Searchable FAQ</li>

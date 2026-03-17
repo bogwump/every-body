@@ -4463,7 +4463,7 @@ const tryNextPrompts = useMemo(() => {
                             </div>
 
                             {isOpen ? (
-                              <div className="mt-4 rounded-2xl border border-black/8 bg-white p-4 text-sm">
+                              <div className="mt-4 eb-inset-soft rounded-2xl p-4 text-sm">
                                 <div className="font-medium">What happened</div>
                                 <div className="mt-1 eb-muted">Started {fmtDateUi(String(item?.startDateISO || ''), true)} · {Number(item?.durationDays ?? 3)} day(s)</div>
                                 {digest?.quick?.metrics?.length ? (
@@ -4482,13 +4482,13 @@ const tryNextPrompts = useMemo(() => {
                                   const comparisonLine = compareExperimentOutcomes(previousRun?.outcome?.status, outcomeStatus);
                                   if (!comparisonLine) return null;
                                   return (
-                                    <div className="mt-3 rounded-xl border border-black/8 bg-black/3 p-3 text-sm eb-muted">
+                                    <div className="mt-3 eb-inset-soft rounded-xl p-3 text-sm eb-muted">
                                       <span className="font-medium text-neutral-900">Compared with last time:</span> {comparisonLine}
                                     </div>
                                   );
                                 })()}
                                 {item?.outcome?.note ? (
-                                  <div className="mt-3 rounded-xl border border-black/8 bg-black/3 p-3 whitespace-pre-wrap eb-muted">{item.outcome.note}</div>
+                                  <div className="mt-3 eb-inset-soft rounded-xl p-3 whitespace-pre-wrap eb-muted">{item.outcome.note}</div>
                                 ) : null}
                               </div>
                             ) : null}
@@ -4919,7 +4919,7 @@ const tryNextPrompts = useMemo(() => {
                           const sleepVal = typeof p?.sleep === 'number' ? p.sleep : null;
                           const overlay = p?.overlay;
                           return (
-                            <div className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm shadow">
+                            <div className="eb-inset-soft rounded-2xl px-3 py-2 text-sm">
                               <div className="font-medium">{label}</div>
                               {sleepVal !== null && <div>Sleep: {sleepVal}/10</div>}
                               {overlay && <div>{overlay}</div>}
