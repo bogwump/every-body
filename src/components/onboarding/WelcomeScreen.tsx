@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 
 import { importBackupFile, looksLikeInsightsExport, parseBackupJson } from '../../lib/backup';
 
-import appLogo from '../../assets/everybody-logo-512.png';
+import appLogo from '../../assets/everybody-logo-256.png';
 
 interface WelcomeScreenProps {
   onContinue: (name: string) => void;
@@ -45,7 +45,7 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
       <div className="max-w-md w-full">
         <div className="text-center mb-12">
           <div className="eb-appicon inline-flex items-center justify-center w-20 h-20 rounded-3xl mb-6 p-2">
-            <img src={appLogo} alt="EveryBody" className="w-full h-full" />
+            <img src={appLogo} alt="EveryBody" className="w-full h-full object-contain" />
           </div>
           <h1 className="mb-4">Welcome to EveryBody</h1>
           <p className="text-lg">A calm place to track symptoms and spot patterns, one day at a time</p>

@@ -829,7 +829,8 @@ export function Dashboard({
 
           <div className="eb-hero-header mb-3">
             <div className="eb-hero-header-main">
-              <h3 className="eb-hero-title text-white">Symptom tracking</h3>
+              <h3 className="eb-hero-title text-white">Understand your patterns</h3>
+              <p className="eb-hero-subtitle text-white/80 mt-1">The app that explains your hormonal patterns.</p>
             </div>
           </div>
 

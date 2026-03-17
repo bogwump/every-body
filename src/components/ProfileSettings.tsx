@@ -39,7 +39,6 @@ import { calculateStreak, isoToday } from '../lib/analytics';
 import { getSymptomCoverage } from '../lib/symptomCoverage';
 import { buildAIExportContext, buildChatGPTPrompt, getPresetMeta, type AIExportPreset } from '../lib/aiExportBuilder';
 
-import appLogo from '../assets/everybody-logo-256.png';
 
 interface ProfileSettingsProps {
   userData: UserData;
@@ -839,10 +838,6 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               </div>
             </div>
 
-            {/* App icon (helps brand recognition on mobile) */}
-            <div className="eb-appicon w-12 h-12 p-1 shrink-0" aria-label="EveryBody">
-              <img src={appLogo} alt="EveryBody" className="w-full h-full" />
-            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-[rgba(255,255,255,0.22)]">
