@@ -791,19 +791,21 @@ p {
 
 .eb-hero-rich {
   background:
-    radial-gradient(circle at 16% 18%, rgb(var(--color-accent) / 0.24), transparent 32%),
-    radial-gradient(circle at 72% 12%, rgb(255 255 255 / 0.10), transparent 26%),
-    radial-gradient(circle at 84% 20%, rgb(var(--color-accent) / 0.42), transparent 34%),
-    radial-gradient(circle at 86% 82%, rgb(var(--color-primary-light) / 0.22), transparent 40%),
-    linear-gradient(140deg,
-      color-mix(in srgb, rgb(var(--color-primary-dark)) 88%, black 12%) 0%,
-      rgb(var(--color-primary-dark) / 0.985) 34%,
-      color-mix(in srgb, rgb(var(--color-primary)) 82%, rgb(var(--color-accent)) 18%) 66%,
-      rgb(var(--color-primary) / 0.96) 100%);
-  border-color: color-mix(in srgb, rgb(var(--color-accent)) 28%, rgb(var(--color-primary-light)) 72%);
+    radial-gradient(120% 72% at 50% 14%, rgb(255 255 255 / 0.18), transparent 42%),
+    radial-gradient(96% 62% at 50% 42%, rgb(var(--color-primary-light) / 0.24), transparent 54%),
+    radial-gradient(82% 58% at 52% 64%, rgb(var(--color-accent) / 0.22), transparent 58%),
+    radial-gradient(circle at 14% 16%, rgb(var(--color-accent) / 0.18), transparent 28%),
+    radial-gradient(circle at 86% 16%, rgb(var(--color-accent) / 0.24), transparent 30%),
+    radial-gradient(circle at 88% 84%, rgb(var(--color-primary-light) / 0.14), transparent 34%),
+    linear-gradient(145deg,
+      color-mix(in srgb, rgb(var(--color-primary-dark)) 78%, black 22%) 0%,
+      color-mix(in srgb, rgb(var(--color-primary-dark)) 72%, rgb(var(--color-primary)) 28%) 24%,
+      color-mix(in srgb, rgb(var(--color-primary)) 74%, rgb(var(--color-primary-light)) 26%) 56%,
+      color-mix(in srgb, rgb(var(--color-primary)) 80%, rgb(var(--color-accent)) 20%) 100%);
+  border-color: color-mix(in srgb, rgb(var(--color-accent)) 34%, rgb(var(--color-primary-light)) 66%);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.08),
-    inset 0 -18px 30px rgb(var(--color-primary-dark) / 0.10);
+    inset 0 1px 0 rgb(255 255 255 / 0.10),
+    inset 0 -14px 22px rgb(var(--color-primary-dark) / 0.06);
 }
 .eb-hero-surface {
   background:
