@@ -181,7 +181,18 @@ body.eb-chat-typing .eb-mobile-nav {
     right: 0;
   }
 
-  .eb-card-title {
+  
+  @media (max-width: 640px) {
+    .eb-card-header > :first-child {
+      padding-right: 2.1rem;
+    }
+
+    .eb-card-header > .eb-icon-frame {
+      top: 0.15rem;
+      right: 0.1rem;
+    }
+  }
+.eb-card-title {
     @apply text-[1.05rem] font-semibold tracking-[-0.01em];
     color: rgb(var(--color-text));
   }

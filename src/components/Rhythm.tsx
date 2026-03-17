@@ -696,12 +696,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         
 
-        <div className="eb-card p-6 relative">
-          <div className="absolute top-0 right-0 eb-icon-frame"><Eye className="w-5 h-5" /></div>
-          <div className="space-y-4">
-            <div>
+        <div className="eb-card p-6">
+          <div className="eb-card-header mb-4">
+            <div className="min-w-0 flex-1">
               <h3 className="mb-1">What this can look like</h3>
             </div>
+            <div className="eb-icon-frame"><Eye className="w-5 h-5" /></div>
+          </div>
+          <div className="space-y-4">
             <p className="text-neutral-700">{content.lookLikeIntro}</p>
 
             <ul className="space-y-3">
@@ -726,12 +728,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         </div>
 
         {/* What you can do */}
-        <div className="eb-card p-6 relative">
-          <div className="absolute top-0 right-0 eb-icon-frame"><GraduationCap className="w-5 h-5" /></div>
-          <div className="space-y-4">
-            <div>
+        <div className="eb-card p-6">
+          <div className="eb-card-header mb-4">
+            <div className="min-w-0 flex-1">
               <h3 className="mb-1 font-semibold tracking-tight">What you can do about it</h3>
             </div>
+            <div className="eb-icon-frame"><GraduationCap className="w-5 h-5" /></div>
+          </div>
+          <div className="space-y-4">
             <p className="text-neutral-700">{content.doIntro}</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -758,13 +762,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         <PhaseHistoryCard history={phaseHistory} />
 
         {/* What usually comes next */}
-        <div className="eb-card p-6 relative">
-          <div className="absolute top-0 right-0 eb-icon-frame"><Compass className="w-5 h-5" /></div>
-          <div className="space-y-4">
-            <div>
+        <div className="eb-card p-6">
+          <div className="eb-card-header mb-4">
+            <div className="min-w-0 flex-1">
               <h3 className="mb-1 font-semibold tracking-tight">What usually comes next</h3>
             </div>
-
+            <div className="eb-icon-frame"><Compass className="w-5 h-5" /></div>
+          </div>
+          <div className="space-y-4">
             <p className="text-neutral-700">
               If this rhythm follows your usual pattern, you’ll likely shift into your <span className="font-medium opacity-90">{computed.nextPhase}</span> ({computed.nextSci}) in around <span className="font-medium opacity-90">{computed.daysToNext ?? 5} days</span>.
             </p>

@@ -3212,34 +3212,32 @@ const tryNextPrompts = useMemo(() => {
 
     return (
       <div className="eb-inset-white rounded-2xl p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold">{ex.title || 'Your experiment'}</div>
-            <div className="mt-1 text-sm eb-muted">
-              {done
-                ? experimentStatus.awaitingOutcome
-                  ? `Finished on ${fmtDateUi(experimentStatus.endDateISO, false)} · reflection pending`
-                  : 'Finished'
-                : started
-                  ? `Day ${experimentStatus.day} of ${ex.durationDays ?? 3}`
-                  : `Starts ${fmtDateUi(ex.startDateISO, false)}`}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">{metricPills}</div>
-            <div className="mt-3 eb-inset-soft rounded-2xl p-4 text-sm">
-              <div className="font-medium">What you are trying</div>
-              <div className="mt-1 eb-muted">{experimentTemplateMeta.actionLabel}</div>
-              <div className="mt-2 eb-muted">{experimentTemplateMeta.explanation}</div>
-            </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">{ex.title || 'Your experiment'}</div>
+          <div className="mt-1 text-sm eb-muted">
+            {done
+              ? experimentStatus.awaitingOutcome
+                ? `Finished on ${fmtDateUi(experimentStatus.endDateISO, false)} · reflection pending`
+                : 'Finished'
+              : started
+                ? `Day ${experimentStatus.day} of ${ex.durationDays ?? 3}`
+                : `Starts ${fmtDateUi(ex.startDateISO, false)}`}
           </div>
-
-          {done ? (
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => clearExperiment()}>
-                Clear
-              </button>
-            </div>
-          ) : null}
+          <div className="mt-3 flex flex-wrap gap-2">{metricPills}</div>
+          <div className="mt-3 eb-inset-soft rounded-2xl p-4 text-sm w-full">
+            <div className="font-medium">What you are trying</div>
+            <div className="mt-1 eb-muted">{experimentTemplateMeta.actionLabel}</div>
+            <div className="mt-2 eb-muted">{experimentTemplateMeta.explanation}</div>
+          </div>
         </div>
+
+        {done ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2 lg:justify-end">
+            <button type="button" className="eb-btn eb-btn-secondary" onClick={() => clearExperiment()}>
+              Clear
+            </button>
+          </div>
+        ) : null}
 
         {/* Comparison / progress block */}
         {done ? renderExperimentComparisonBlock('conclusion') : renderExperimentComparisonBlock('progress')}
@@ -3389,7 +3387,7 @@ const tryNextPrompts = useMemo(() => {
           <div className="text-sm font-semibold">{title}</div>
           <div className="mt-1 text-sm eb-muted">{subtitle}</div>
 
-        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="mt-2 flex flex-col gap-2">
           <span className="text-xs eb-muted">Compared with:</span>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
@@ -3443,7 +3441,7 @@ const tryNextPrompts = useMemo(() => {
         <div className="text-sm font-semibold">{title}</div>
         <div className="mt-1 text-sm eb-muted">{subtitle}</div>
 
-        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="mt-2 flex flex-col gap-2">
           <span className="text-xs eb-muted">Compared with:</span>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
@@ -4651,10 +4649,10 @@ const tryNextPrompts = useMemo(() => {
             </button>
           ))}</div>
 
-        <div className="mt-5 flex flex-col gap-4">
+        <div className="mt-5 grid grid-cols-1 gap-4">
           <div className="min-w-0">
           <div className="text-xs text-[rgb(var(--color-primary))]">Selected metrics</div>
-          <div className="mt-2 flex flex-wrap gap-2 items-center">
+          <div className="mt-2 flex flex-wrap gap-2 items-center content-start">
             {selected.length ? (
               selected.map((m) => (
                 <span
@@ -4670,15 +4668,15 @@ const tryNextPrompts = useMemo(() => {
           </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 justify-start">
-            <button type="button" className="eb-btn eb-btn-primary" onClick={() => setDataEvidenceOpen((prev) => !prev)}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 justify-start">
+            <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => setDataEvidenceOpen((prev) => !prev)}>
               {dataEvidenceOpen ? 'Hide your data' : 'See your data'}
             </button>
             <Dialog>
             <DialogTrigger asChild>
               <button
                 type="button"
-                className="eb-btn eb-btn-secondary"
+                className="eb-btn eb-btn-secondary w-full sm:w-auto"
               >
                 Change metrics
               </button>
