@@ -812,7 +812,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
         </div>
 
         {/* Profile hero card */}
-        <div className="eb-card eb-hero eb-hero-surface eb-hero-lg eb-hero-on-dark mb-6 overflow-hidden">
+        <div className="eb-card eb-hero eb-hero-rich eb-hero-lg eb-hero-on-dark mb-6 overflow-hidden">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-[rgba(255,255,255,0.22)] border border-[rgba(255,255,255,0.28)] flex items-center justify-center overflow-hidden">

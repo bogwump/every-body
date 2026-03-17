@@ -3662,7 +3662,7 @@ const tryNextPrompts = useMemo(() => {
       </div>
 
       {/* Personalised insight hero */}
-      <div className="eb-hero eb-hero-surface rounded-[28px] p-6 shadow-sm">
+      <div className="eb-card eb-hero eb-hero-rich eb-hero-lg eb-hero-on-dark rounded-[28px] p-6 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="eb-hero-title eb-hero-on-dark">{heroInsightState.heading}</h3>
@@ -3670,7 +3670,7 @@ const tryNextPrompts = useMemo(() => {
               {heroInsightState.subtitle}
             </p>
           </div>
-          <Sparkles className="w-5 h-5 shrink-0 text-white/80" />
+          <div className="eb-icon-frame eb-icon-frame--hero"><Sparkles className="w-5 h-5 shrink-0" /></div>
         </div>
 
         <div className="mt-4 space-y-3">

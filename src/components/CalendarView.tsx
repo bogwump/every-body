@@ -932,11 +932,11 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
           <h1 className="eb-page-title">Calendar</h1>
           <p className="eb-page-support">Tap any day to check in or edit. Use Overlay to spot patterns.</p>
         </div>
-        <section className="eb-card eb-hero eb-hero-surface eb-hero-md eb-hero-on-dark mb-4 sm:mb-5">
+        <section className="eb-card eb-hero eb-hero-rich eb-hero-md eb-hero-on-dark mb-4 sm:mb-5">
           <div className="eb-card-header">
             <div>
-              <div className="text-sm font-semibold text-white/90">Your month at a glance</div>
-              <p className="mt-1 text-sm text-white/80">Review symptoms, period windows, and predicted timing in one place.</p>
+              <h2 className="eb-hero-title text-white">Your month at a glance</h2>
+              <p className="eb-hero-subtitle mt-1 text-white/80">Review symptoms, period windows, and predicted timing in one place.</p>
             </div>
             <div className="eb-icon-frame eb-icon-frame--hero"><CalendarDays className="h-5 w-5" /></div>
           </div>

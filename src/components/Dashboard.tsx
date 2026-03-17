@@ -822,7 +822,7 @@ export function Dashboard({
           <button
             type="button"
             onClick={() => onNavigate('rhythm')}
-            className="absolute top-4 right-12 z-10 text-sm font-medium tracking-[0.01em] text-white/92 hover:text-white transition"
+            className="absolute top-4 right-12 z-10 text-sm text-white/85 hover:text-white transition"
           >
             View full rhythm
           </button>
