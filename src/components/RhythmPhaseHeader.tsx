@@ -15,6 +15,7 @@ export function RhythmPhaseHeader(props: {
       <div className="eb-hero-header">
         <div className="eb-hero-header-main">
           <h3 className="eb-hero-title text-white">{props.phaseTitle}</h3>
+          <p className="mt-1 eb-hero-subtitle eb-hero-on-dark-muted">{props.description}</p>
         </div>
         <div className="text-right shrink-0 flex flex-col items-end gap-2">
           <div className="eb-icon-frame eb-icon-frame--hero">{props.icon}</div>
@@ -24,7 +25,6 @@ export function RhythmPhaseHeader(props: {
           </div>
         </div>
       </div>
-      <div className="mt-3 eb-hero-subtitle eb-hero-on-dark-muted text-white/90">{props.description}</div>
       {props.timingCopy ? (
         <div className="mt-3 eb-hero-subtitle eb-hero-on-dark-muted text-white/80">{props.timingCopy}</div>
       ) : null}

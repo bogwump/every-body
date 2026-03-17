@@ -203,17 +203,17 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   .eb-hero-title {
-    font-size: clamp(1.45rem, 1.15rem + 1vw, 1.72rem);
-    line-height: 1.08;
+    font-size: clamp(1.18rem, 1.05rem + 0.5vw, 1.34rem);
+    line-height: 1.18;
     font-weight: 600;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.025em;
     margin: 0;
     font-family: inherit;
   }
 
   .eb-hero-subtitle {
-    font-size: 0.98rem;
-    line-height: 1.6;
+    font-size: 1rem;
+    line-height: 1.5;
     font-weight: 400;
     letter-spacing: -0.01em;
     margin: 0;
@@ -221,38 +221,38 @@ body.eb-chat-typing .eb-mobile-nav {
   }
 
   .eb-hero-panel-label {
-    font-size: 0.95rem;
+    font-size: 0.98rem;
     line-height: 1.35;
     font-weight: 600;
     letter-spacing: -0.02em;
-    color: rgba(0, 0, 0, 0.72);
+    color: rgba(0, 0, 0, 0.8);
     margin: 0;
   }
 
   .eb-hero-panel-title {
-    font-size: clamp(1.28rem, 1.08rem + 0.7vw, 1.58rem);
-    line-height: 1.14;
+    font-size: clamp(1rem, 0.95rem + 0.35vw, 1.12rem);
+    line-height: 1.28;
     font-weight: 600;
-    letter-spacing: -0.03em;
-    color: rgba(0, 0, 0, 0.96);
+    letter-spacing: -0.02em;
+    color: rgba(0, 0, 0, 0.94);
     margin: 0;
   }
 
   .eb-hero-panel-body {
     font-size: 0.98rem;
-    line-height: 1.62;
+    line-height: 1.55;
     font-weight: 400;
     letter-spacing: -0.01em;
-    color: rgba(0, 0, 0, 0.68);
+    color: rgba(0, 0, 0, 0.7);
     margin: 0;
   }
 
   .eb-hero-panel-note {
-    font-size: 0.8rem;
+    font-size: 0.88rem;
     line-height: 1.5;
     font-weight: 400;
     letter-spacing: -0.01em;
-    color: rgba(0, 0, 0, 0.56);
+    color: rgba(0, 0, 0, 0.58);
     margin: 0;
   }
 
@@ -902,11 +902,11 @@ p {
 .eb-hero-rich .eb-inset-soft {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, rgb(var(--color-primary-light)) 26%, white 74%),
-    color-mix(in srgb, rgb(var(--color-primary-light)) 18%, white 82%)
+    color-mix(in srgb, rgb(var(--color-primary-light)) 22%, white 78%),
+    color-mix(in srgb, rgb(var(--color-primary-light)) 14%, white 86%)
   );
-  border-color: color-mix(in srgb, rgb(var(--color-primary-light)) 34%, rgb(var(--color-border)) 66%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.44), 0 1px 2px rgba(0, 0, 0, 0.03);
+  border-color: color-mix(in srgb, rgb(var(--color-primary-light)) 30%, rgb(var(--color-border)) 70%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), 0 1px 2px rgba(0, 0, 0, 0.025);
 }
 
 /* Default hero text is black (eg "Symptom tracking") */
