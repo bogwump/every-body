@@ -20,6 +20,7 @@ import {
   X,
   RefreshCcw,
   TrendingUpDown,
+  ChevronDown,
 } from 'lucide-react';
 import { makeBackupFile, shareOrDownloadBackup, parseBackupJson, looksLikeInsightsExport, importBackupFile } from '../lib/backup';
 import type { ColorTheme, SymptomKey, SymptomKind, UserData, InfluenceKey, UserGoal } from '../types';
@@ -1330,30 +1331,28 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
         {/* Cycle tracking */}
         <div className="eb-card eb-card-soft">
-          <div className="eb-card-header items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <h3 className="mb-1">Cycle tracking</h3>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                Phase insights, fertile window settings, and bleeding-based cycle behaviour.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="eb-icon-frame">
-                <RefreshCcw className="w-5 h-5" />
+          <details
+            className="eb-disclosure eb-disclosure--plain"
+            open={showCycleTracking}
+            onToggle={(e) => setShowCycleTracking((e.currentTarget as HTMLDetailsElement).open)}
+          >
+            <summary className="list-none cursor-pointer select-none px-0 py-0 hover:bg-transparent">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-neutral-900">
+                    <ChevronDown className="w-4 h-4 text-[rgb(var(--color-text-secondary))] shrink-0 transition-transform" />
+                    <h3 className="mb-0">Cycle tracking</h3>
+                  </div>
+                  <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))] pl-6">
+                    Phase insights, fertile window settings, and bleeding-based cycle behaviour.
+                  </p>
+                </div>
+                <div className="eb-icon-frame shrink-0">
+                  <RefreshCcw className="w-5 h-5" />
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowCycleTracking((prev) => !prev)}
-                className="eb-btn-secondary !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-medium"
-                aria-expanded={showCycleTracking}
-                aria-controls="profile-cycle-tracking-panel"
-              >
-                {showCycleTracking ? 'Minimise' : 'Show'}
-              </button>
-            </div>
-          </div>
+            </summary>
 
-          {showCycleTracking ? (
             <div id="profile-cycle-tracking-panel" className="mt-4">
               <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
                 Symptoms and cycle are not mutually exclusive. You can track symptoms with no periods (coil, menopause, hysterectomy, etc).
@@ -1462,25 +1461,15 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                 Don’t bleed or have a coil? You can still mark a manual cycle start from Calendar → Edit cycle whenever you know your period has begun.
               </p>
             </div>
-          ) : (
-            <div id="profile-cycle-tracking-panel" className="mt-4 rounded-2xl border border-[rgb(var(--color-border))] bg-[rgb(var(--color-accent)/0.08)] px-4 py-3">
-              <p className="text-sm font-medium">
-                {userData.cycleTrackingMode === 'cycle' ? 'Cycle phases on' : 'Symptom-only mode'}
-                {userData.cycleTrackingMode === 'cycle' && userData.fertilityMode ? ' · Fertility mode on' : ''}
-              </p>
-              <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
-                Expand this card when you want to review phase insights, fertile window settings, or bleeding-based cycle behaviour.
-              </p>
-            </div>
-          )}
+          </details>
         </div>
 
 
 
         {/* Analyse your data */}
         <div className="mb-6">
-          <h3 className="mb-3 px-2">Analyse your data</h3>
           <div className="eb-list-card p-5">
+            <h3 className="mb-3">Analyse your data</h3>
             <p className="text-sm text-[rgb(var(--color-text-secondary))]">
               Take your patterns, insights and experiments into an AI assistant for deeper analysis.
             </p>
