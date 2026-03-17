@@ -807,7 +807,7 @@ export function Dashboard({
 
         {/* HERO: Symptom tracking */}
 
-        <div className="eb-card eb-hero eb-hero-surface eb-hero-rich eb-hero-lg relative">
+        <div className="eb-card eb-hero eb-hero-rich eb-hero-lg relative">
           {/* Calendar icon */}
           <button
             type="button"
