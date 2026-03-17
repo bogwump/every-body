@@ -788,6 +788,15 @@ p {
 /* ===== Hero / coloured section rules ===== */
 
 /* Dark/coloured hero surface (background only) */
+
+.eb-hero-rich {
+  background:
+    radial-gradient(circle at 18% 20%, rgb(var(--color-accent) / 0.12), transparent 34%),
+    radial-gradient(circle at 82% 16%, rgb(var(--color-accent) / 0.30), transparent 36%),
+    radial-gradient(circle at 78% 84%, rgb(var(--color-primary-light) / 0.10), transparent 44%),
+    linear-gradient(135deg, rgb(var(--color-primary-dark) / 0.98), rgb(var(--color-primary) / 0.94));
+  border-color: rgb(var(--color-accent) / 0.22);
+}
 .eb-hero-surface {
   background:
     radial-gradient(circle at top right, rgb(var(--color-accent) / 0.26), transparent 34%),
