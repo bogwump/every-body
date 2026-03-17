@@ -138,7 +138,12 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-page-inner {
     @apply mx-auto w-full max-w-5xl px-4 pb-28;
     display: grid;
-    gap: 1.25rem;
+    gap: 1rem;
+  }
+
+  .eb-page-inner > * {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
   }
 
   .eb-page-header {
@@ -1150,6 +1155,10 @@ p {
   .eb-page {
     padding-top: 2rem;
     padding-bottom: 2rem;
+  }
+
+  .eb-page-inner {
+    gap: 1.25rem;
   }
 
   .eb-card {
