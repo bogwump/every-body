@@ -791,11 +791,19 @@ p {
 
 .eb-hero-rich {
   background:
-    radial-gradient(circle at 18% 20%, rgb(var(--color-accent) / 0.12), transparent 34%),
-    radial-gradient(circle at 82% 16%, rgb(var(--color-accent) / 0.30), transparent 36%),
-    radial-gradient(circle at 78% 84%, rgb(var(--color-primary-light) / 0.10), transparent 44%),
-    linear-gradient(135deg, rgb(var(--color-primary-dark) / 0.98), rgb(var(--color-primary) / 0.94));
-  border-color: rgb(var(--color-accent) / 0.22);
+    radial-gradient(circle at 16% 18%, rgb(var(--color-accent) / 0.24), transparent 32%),
+    radial-gradient(circle at 72% 12%, rgb(255 255 255 / 0.10), transparent 26%),
+    radial-gradient(circle at 84% 20%, rgb(var(--color-accent) / 0.42), transparent 34%),
+    radial-gradient(circle at 86% 82%, rgb(var(--color-primary-light) / 0.22), transparent 40%),
+    linear-gradient(140deg,
+      color-mix(in srgb, rgb(var(--color-primary-dark)) 88%, black 12%) 0%,
+      rgb(var(--color-primary-dark) / 0.985) 34%,
+      color-mix(in srgb, rgb(var(--color-primary)) 82%, rgb(var(--color-accent)) 18%) 66%,
+      rgb(var(--color-primary) / 0.96) 100%);
+  border-color: color-mix(in srgb, rgb(var(--color-accent)) 28%, rgb(var(--color-primary-light)) 72%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    inset 0 -18px 30px rgb(var(--color-primary-dark) / 0.10);
 }
 .eb-hero-surface {
   background:
