@@ -4387,7 +4387,7 @@ const tryNextPrompts = useMemo(() => {
             <div className="eb-card-title">Your experiments</div>
             <div className="eb-card-sub">Your current experiment, experiment history, and anything you may want to revisit.</div>
           </div>
-          <FlaskConical className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+          <div className="eb-icon-frame"><FlaskConical className="w-5 h-5" /></div>
         </div>
 
         {/* Gentle colour splash + context */}
@@ -4526,7 +4526,7 @@ const tryNextPrompts = useMemo(() => {
             <div className="eb-card-title">Suggested experiments</div>
             <div className="eb-card-sub">Broader ideas to explore when you want a few more options.</div>
           </div>
-          <FlaskConical className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+          <div className="eb-icon-frame"><FlaskConical className="w-5 h-5" /></div>
         </div>
 
         <div className="mt-4 eb-inset rounded-2xl p-5">
@@ -4805,7 +4805,7 @@ const tryNextPrompts = useMemo(() => {
                 <div className="eb-card-title">Your data view</div>
                 <div className="eb-card-sub">The evidence underneath the story, ready when you want it.</div>
               </div>
-              <Sparkles className="w-5 h-5" style={{ color: 'rgb(var(--color-accent))' }} />
+              <div className="eb-icon-frame"><Sparkles className="w-5 h-5" /></div>
             </div>
 
             {!deepReady ? (

@@ -813,7 +813,7 @@ export function Dashboard({
           <button
             type="button"
             onClick={() => onNavigate('calendar')}
-            className="absolute top-4 right-4 z-10 opacity-80 hover:opacity-100 transition"
+            className="absolute top-4 right-4 z-10 eb-icon-frame eb-icon-frame--hero opacity-80 hover:opacity-100 transition"
             title="Calendar"
           >
             <Calendar className="w-5 h-5" />

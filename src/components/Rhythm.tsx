@@ -632,27 +632,14 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         {/* Phase timeline */}
         <div className="eb-card p-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="eb-card-header mb-3">
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold tracking-tight">Your cycle, at a glance</h3>
             </div>
-            <Compass className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
-          </div>
-
-          {userData?.cycleTrackingMode === 'cycle' ? (
-            <div className="mb-3 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setCycleModalOpen(true)}
-                className="rounded-full bg-[rgb(var(--color-accent)/0.12)] border border-[rgb(var(--color-accent)/0.22)] px-3 py-1 text-sm text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent)/0.18)] transition"
-                title="Cycle length"
-              >
-                <span className="font-medium">Cycle length</span>
-                <span className="mx-2 opacity-60">•</span>
-                <span className="font-semibold">{avgCycleText}</span>
-              </button>
+            <div className="eb-icon-frame">
+              <Compass className="w-5 h-5" />
             </div>
-          ) : null}
+          </div>
 
           {(() => {
             const steps: Array<{ key: PhaseKey; label: string; sci: string }> = [
@@ -686,7 +673,19 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             );
           })()}
 
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex items-center justify-between gap-3">
+            {userData?.cycleTrackingMode === 'cycle' ? (
+              <button
+                type="button"
+                onClick={() => setCycleModalOpen(true)}
+                className="rounded-full bg-[rgb(var(--color-accent)/0.12)] border border-[rgb(var(--color-accent)/0.22)] px-3 py-1 text-sm text-[rgb(var(--color-text))] hover:bg-[rgb(var(--color-accent)/0.18)] transition"
+                title="Cycle length"
+              >
+                <span className="font-medium">Cycle length</span>
+                <span className="mx-2 opacity-60">•</span>
+                <span className="font-semibold">{avgCycleText}</span>
+              </button>
+            ) : <div />}
             <div className="text-xs text-neutral-600 flex items-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--color-primary-dark))]" />
               You’re here
