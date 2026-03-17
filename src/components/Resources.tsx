@@ -151,14 +151,14 @@ export function Resources({ userGoal }: ResourcesProps) {
         </div>
 
         {/* Featured Resource */}
-        <div className="eb-hero-surface eb-hero-on-dark rounded-3xl p-8 mb-8 overflow-hidden shadow-sm">
+        <div className="eb-card eb-hero eb-hero-rich eb-hero-lg eb-hero-on-dark p-8 mb-8 overflow-hidden shadow-sm">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
               <span className="text-xs px-3 py-1 rounded-full bg-[rgba(255,255,255,0.45)] border border-[rgba(0,0,0,0.12)] mb-3 inline-block">
                 Featured
               </span>
-              <h2 className="mb-3 text-white">Cycle Syncing Masterclass</h2>
-              <p className="eb-hero-on-dark-muted mb-4">
+              <h2 className="eb-hero-title text-white">Cycle Syncing Masterclass</h2>
+              <p className="eb-hero-subtitle eb-hero-on-dark-muted mt-3 mb-4">
                 Learn how to align your lifestyle, nutrition, and activities with your natural hormonal rhythm
               </p>
               <button className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-[rgb(var(--color-primary))] hover:shadow-lg transition-all font-medium">

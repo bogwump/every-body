@@ -202,6 +202,24 @@ body.eb-chat-typing .eb-mobile-nav {
     color: rgb(var(--color-text-secondary));
   }
 
+  .eb-hero-title {
+    font-size: clamp(1.45rem, 1.15rem + 1vw, 1.72rem);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    margin: 0;
+    font-family: inherit;
+  }
+
+  .eb-hero-subtitle {
+    font-size: 0.98rem;
+    line-height: 1.6;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin: 0;
+    font-family: inherit;
+  }
+
   .eb-chart {
     @apply p-4;
     border-radius: var(--eb-radius-card);
@@ -470,11 +488,11 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-inset-soft {
     background: linear-gradient(
       180deg,
-      color-mix(in srgb, rgb(var(--color-primary-light)) 20%, white),
-      color-mix(in srgb, rgb(var(--color-primary-light)) 14%, white)
+      color-mix(in srgb, rgb(var(--color-primary-light)) 22%, white),
+      color-mix(in srgb, rgb(var(--color-primary-light)) 16%, white)
     );
-    border: 1px solid color-mix(in srgb, rgb(var(--color-primary-light)) 34%, rgb(var(--color-border)) 66%);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6), 0 1px 2px rgba(0, 0, 0, 0.03);
+    border: 1px solid color-mix(in srgb, rgb(var(--color-primary-light)) 36%, rgb(var(--color-border)) 64%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.56), 0 1px 2px rgba(0, 0, 0, 0.03);
     border-radius: var(--eb-radius-inset);
   }
 
@@ -812,6 +830,18 @@ p {
     radial-gradient(circle at top right, rgb(var(--color-accent) / 0.26), transparent 34%),
     linear-gradient(135deg, rgb(var(--color-primary-dark)), rgb(var(--color-primary)));
 }
+
+.eb-hero-rich .eb-inset,
+.eb-hero-rich .eb-inset-soft {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, rgb(var(--color-primary-light)) 32%, white),
+    color-mix(in srgb, rgb(var(--color-primary-light)) 24%, white)
+  );
+  border-color: color-mix(in srgb, rgb(var(--color-primary-light)) 42%, rgb(var(--color-border)) 58%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
 /* Default hero text is black (eg "Symptom tracking") */
 .eb-hero {
   color: rgba(0, 0, 0, 0.9);

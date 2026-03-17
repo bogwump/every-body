@@ -828,8 +828,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               </div>
 
               <div>
-                <h2 className="mb-1 text-white">{userData.name?.trim() || 'Friend'}</h2>
-                <p className="text-sm text-white/80">
+                <h2 className="eb-hero-title text-white">{userData.name?.trim() || 'Friend'}</h2>
+                <p className="eb-hero-subtitle mt-1 text-white/80">
                   {userData.goal === 'cycle-health' && 'Tracking cycle health'}
                   {userData.goal === 'perimenopause' && 'Perimenopause support'}
                   {userData.goal === 'post-contraception' && 'Post-contraception journey'}
