@@ -348,6 +348,22 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onN
   const [customSymptomError, setCustomSymptomError] = useState<string>('');
 
   const [lifestyleOpen, setLifestyleOpen] = useState(false);
+  const [showCycleTracking, setShowCycleTracking] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem('profile:cycle-tracking-open');
+      return raw ? JSON.parse(raw) !== false : false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('profile:cycle-tracking-open', JSON.stringify(showCycleTracking));
+    } catch {
+      // ignore
+    }
+  }, [showCycleTracking]);
 
   const setEnabledModules = (next: SymptomKey[]) => {
     onUpdateUserData((prev) => ({ ...prev, enabledModules: next }));
@@ -654,10 +670,6 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
       ],
     },
     {
-      title: 'Analyse your data',
-      items: [],
-    },
-    {
       title: 'Support',
       items: [
         { icon: HelpCircle, label: 'Help Centre', onClick: () => setShowHelpPanel(!showHelpPanel) },
@@ -856,125 +868,6 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
           </div>
         </div>
 
-        {/* Cycle tracking */}
-        <div className="eb-card eb-card-soft mb-6">
-          <div className="eb-card-header mb-2">
-            <div className="min-w-0 flex-1">
-              <h3 className="mb-2">Cycle tracking</h3>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
-                Symptoms and cycle are not mutually exclusive. You can track symptoms with no periods (coil, menopause, hysterectomy, etc).
-                Turn cycle tracking on only if you want phase-based insights.
-              </p>
-            </div>
-            <div className="eb-icon-frame">
-              <RefreshCcw className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium mb-1">Use cycle phases</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {userData.cycleTrackingMode === 'cycle'
-                  ? 'On (phase insights available when you log bleeding/spotting)'
-                  : 'Off (symptom-only mode)'}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onUpdateUserData((prev) => {
-                  const nextCycleTrackingMode = prev.cycleTrackingMode === 'cycle' ? 'no-cycle' : 'cycle';
-                  return {
-                    ...prev,
-                    cycleTrackingMode: nextCycleTrackingMode,
-                    fertilityMode: nextCycleTrackingMode === 'cycle' ? prev.fertilityMode : false,
-                    autoStartPeriodFromBleeding:
-                      nextCycleTrackingMode === 'cycle' ? prev.autoStartPeriodFromBleeding : false,
-                  };
-                })
-              }
-              className={`eb-toggle shrink-0 transition-all ${
-                userData.cycleTrackingMode === 'cycle' ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-              }`}
-            >
-              <div
-                className={`eb-toggle-thumb transition-transform ${
-                  userData.cycleTrackingMode === 'cycle' ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between">
-            <div>
-              <p className="font-medium mb-1">Fertility mode</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {userData.cycleTrackingMode === 'cycle'
-                  ? (userData.fertilityMode ? 'On (shows fertile window shading and a discreet sex log)' : 'Off')
-                  : 'Turn on cycle tracking to use fertility predictions'}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={userData.cycleTrackingMode !== 'cycle'}
-              onClick={() =>
-                onUpdateUserData((prev) => ({
-                  ...prev,
-                  fertilityMode: !prev.fertilityMode,
-                }))
-              }
-              className={`eb-toggle shrink-0 transition-all ${
-                userData.fertilityMode ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-              } ${userData.cycleTrackingMode !== 'cycle' ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <div
-                className={`eb-toggle-thumb transition-transform ${
-                  userData.fertilityMode ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between">
-            <div>
-              <p className="font-medium mb-1">Auto-start periods from bleeding</p>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                {userData.cycleTrackingMode === 'cycle'
-                  ? autoStartPeriodFromBleedingLabel
-                  : 'Turn on cycle tracking to let bleeding start a new cycle automatically'}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={userData.cycleTrackingMode !== 'cycle'}
-              onClick={() =>
-                onUpdateUserData((prev) => ({
-                  ...prev,
-                  autoStartPeriodFromBleeding: !prev.autoStartPeriodFromBleeding,
-                }))
-              }
-              className={`eb-toggle shrink-0 transition-all ${
-                autoStartPeriodFromBleeding ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
-              } ${userData.cycleTrackingMode !== 'cycle' ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <div
-                className={`eb-toggle-thumb transition-transform ${
-                  autoStartPeriodFromBleeding ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-
-          <p className="mt-4 text-xs text-[rgb(var(--color-text-secondary))]">
-            Don’t bleed or have a coil? You can still mark a manual cycle start from Calendar → Edit cycle whenever you know your period has begun.
-          </p>
-        </div>
-
-        
 {/* What to track */}
 	        <div className="mb-6 rounded-3xl border border-[rgb(var(--color-accent)/0.22)] bg-[rgb(var(--color-accent)/0.10)] p-3 sm:p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3 mb-2">
@@ -1435,6 +1328,259 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 	          </details>
 	        </div>
 
+        {/* Cycle tracking */}
+        <div className="eb-card eb-card-soft">
+          <div className="eb-card-header items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="mb-1">Cycle tracking</h3>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                Phase insights, fertile window settings, and bleeding-based cycle behaviour.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="eb-icon-frame">
+                <RefreshCcw className="w-5 h-5" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCycleTracking((prev) => !prev)}
+                className="eb-btn-secondary !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-medium"
+                aria-expanded={showCycleTracking}
+                aria-controls="profile-cycle-tracking-panel"
+              >
+                {showCycleTracking ? 'Minimise' : 'Show'}
+              </button>
+            </div>
+          </div>
+
+          {showCycleTracking ? (
+            <div id="profile-cycle-tracking-panel" className="mt-4">
+              <p className="text-sm text-[rgb(var(--color-text-secondary))] mb-4">
+                Symptoms and cycle are not mutually exclusive. You can track symptoms with no periods (coil, menopause, hysterectomy, etc).
+                Turn cycle tracking on only if you want phase-based insights.
+              </p>
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-medium mb-1">Use cycle phases</p>
+                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                    {userData.cycleTrackingMode === 'cycle'
+                      ? 'On (phase insights available when you log bleeding/spotting)'
+                      : 'Off (symptom-only mode)'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateUserData((prev) => {
+                      const nextCycleTrackingMode = prev.cycleTrackingMode === 'cycle' ? 'no-cycle' : 'cycle';
+                      return {
+                        ...prev,
+                        cycleTrackingMode: nextCycleTrackingMode,
+                        fertilityMode: nextCycleTrackingMode === 'cycle' ? prev.fertilityMode : false,
+                        autoStartPeriodFromBleeding:
+                          nextCycleTrackingMode === 'cycle' ? prev.autoStartPeriodFromBleeding : false,
+                      };
+                    })
+                  }
+                  className={`eb-toggle shrink-0 transition-all ${
+                    userData.cycleTrackingMode === 'cycle' ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                  }`}
+                >
+                  <div
+                    className={`eb-toggle-thumb transition-transform ${
+                      userData.cycleTrackingMode === 'cycle' ? 'translate-x-6' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-medium mb-1">Fertility mode</p>
+                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                    {userData.cycleTrackingMode === 'cycle'
+                      ? (userData.fertilityMode ? 'On (shows fertile window shading and a discreet sex log)' : 'Off')
+                      : 'Turn on cycle tracking to use fertility predictions'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={userData.cycleTrackingMode !== 'cycle'}
+                  onClick={() =>
+                    onUpdateUserData((prev) => ({
+                      ...prev,
+                      fertilityMode: !prev.fertilityMode,
+                    }))
+                  }
+                  className={`eb-toggle shrink-0 transition-all ${
+                    userData.fertilityMode ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                  } ${userData.cycleTrackingMode !== 'cycle' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div
+                    className={`eb-toggle-thumb transition-transform ${
+                      userData.fertilityMode ? 'translate-x-6' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-medium mb-1">Auto-start periods from bleeding</p>
+                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                    {userData.cycleTrackingMode === 'cycle'
+                      ? autoStartPeriodFromBleedingLabel
+                      : 'Turn on cycle tracking to let bleeding start a new cycle automatically'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={userData.cycleTrackingMode !== 'cycle'}
+                  onClick={() =>
+                    onUpdateUserData((prev) => ({
+                      ...prev,
+                      autoStartPeriodFromBleeding: !prev.autoStartPeriodFromBleeding,
+                    }))
+                  }
+                  className={`eb-toggle shrink-0 transition-all ${
+                    autoStartPeriodFromBleeding ? 'bg-[rgb(var(--color-primary))]' : 'bg-neutral-300'
+                  } ${userData.cycleTrackingMode !== 'cycle' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div
+                    className={`eb-toggle-thumb transition-transform ${
+                      autoStartPeriodFromBleeding ? 'translate-x-6' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <p className="mt-4 text-xs text-[rgb(var(--color-text-secondary))]">
+                Don’t bleed or have a coil? You can still mark a manual cycle start from Calendar → Edit cycle whenever you know your period has begun.
+              </p>
+            </div>
+          ) : (
+            <div id="profile-cycle-tracking-panel" className="mt-4 rounded-2xl border border-[rgb(var(--color-border))] bg-[rgb(var(--color-accent)/0.08)] px-4 py-3">
+              <p className="text-sm font-medium">
+                {userData.cycleTrackingMode === 'cycle' ? 'Cycle phases on' : 'Symptom-only mode'}
+                {userData.cycleTrackingMode === 'cycle' && userData.fertilityMode ? ' · Fertility mode on' : ''}
+              </p>
+              <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
+                Expand this card when you want to review phase insights, fertile window settings, or bleeding-based cycle behaviour.
+              </p>
+            </div>
+          )}
+        </div>
+
+
+
+        {/* Analyse your data */}
+        <div className="mb-6">
+          <h3 className="mb-3 px-2">Analyse your data</h3>
+          <div className="eb-list-card p-5">
+            <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+              Take your patterns, insights and experiments into an AI assistant for deeper analysis.
+            </p>
+            <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="eb-card-header">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">Analyse your data</p>
+                  <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
+                    This export contains a summary of your tracking data. Only share it with tools you trust.
+                  </p>
+                </div>
+                <div className="eb-icon-frame">
+                  <TrendingUpDown className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-sm font-medium">Choose a focus</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {AI_EXPORT_PRESETS.map((preset) => {
+                    const meta = getPresetMeta(preset);
+                    const selected = aiExportPreset === preset;
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          setAiExportPreset(preset);
+                          setAiExportMessage(null);
+                        }}
+                        className="eb-choice-pill"
+                        data-selected={selected ? 'true' : undefined}
+                      >
+                        {meta.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-4 eb-inset rounded-2xl p-4">
+                <p className="font-medium">{aiExportPreview.meta.title}</p>
+                <p className="mt-1 text-sm text-[rgb(var(--color-text-secondary))]">
+                  {aiExportPreview.meta.description}
+                </p>
+                <div className="mt-3 rounded-xl bg-neutral-50 p-3">
+                  {aiExportPreview.previewLines.slice(0, 4).map((line, index) => (
+                    <p key={`${line}-${index}`} className="text-sm text-[rgb(var(--color-text-secondary))] leading-6">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  className="eb-btn-primary"
+                  onClick={async () => {
+                    try {
+                      setAiExportMessage(null);
+                      const payload = buildAIExportContext({
+                        preset: aiExportPreset,
+                        userData,
+                        entries,
+                        selectedMetrics: getInsightsExportSelection(),
+                      });
+                      await navigator.clipboard.writeText(buildChatGPTPrompt(payload));
+                      setAiExportMessage('Copied. Paste this into the AI tool you trust.');
+                    } catch {
+                      setAiExportMessage('Could not copy automatically. Try download instead.');
+                    }
+                  }}
+                >
+                  Copy analysis prompt
+                </button>
+                <button
+                  type="button"
+                  className="eb-btn-secondary"
+                  onClick={() => {
+                    const payload = buildAIExportContext({
+                      preset: aiExportPreset,
+                      userData,
+                      entries,
+                      selectedMetrics: getInsightsExportSelection(),
+                    });
+                    downloadTextFile(`everybody-${aiExportPreset}-analysis.txt`, buildChatGPTPrompt(payload));
+                    setAiExportMessage('Downloaded your analysis prompt.');
+                  }}
+                >
+                  Download prompt
+                </button>
+              </div>
+
+              {aiExportMessage ? (
+                <p className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">{aiExportMessage}</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
 
         {/* Settings list */}
         {settingsSections.map((section) => (
