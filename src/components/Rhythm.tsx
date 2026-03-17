@@ -722,7 +722,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
               <p className="text-neutral-700">{content.lookLikeDuration}</p>
             </div>
-            <Eye className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
+            <div className="eb-icon-frame"><Eye className="w-5 h-5" /></div>
           </div>
         </div>
 
@@ -754,7 +754,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             </div>
               </div>
             </div>
-            <GraduationCap className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
+            <div className="eb-icon-frame"><GraduationCap className="w-5 h-5" /></div>
           </div>
         </div>
 
@@ -777,7 +777,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 <div className="mt-1 text-base text-neutral-800 font-normal">{nextPhasePlanning.body}</div>
               </div>
             </div>
-            <Compass className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
+            <div className="eb-icon-frame"><Compass className="w-5 h-5" /></div>
           </div>
         </div>
 
@@ -785,11 +785,12 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
         <div className="eb-inset-callout rounded-2xl p-6">
           <details className="eb-disclosure mt-0 bg-transparent border-0 shadow-none">
             <summary className="font-medium text-neutral-900 px-0 py-0">
-              <span className="inline-flex items-center gap-3">
-                <span className="w-10 h-10 rounded-xl bg-[rgb(var(--color-accent)/0.20)] flex items-center justify-center shrink-0">
-                  <span className="text-[rgb(var(--color-primary-dark))]"><Info className="w-5 h-5" /></span>
+              <span className="flex items-start justify-between gap-3 w-full">
+                <span className="inline-flex items-center gap-3 min-w-0 flex-1">
+                  <ChevronDown className="w-4 h-4 text-[rgb(var(--color-text-secondary))] shrink-0" />
+                  <span>{content.whyTitle}</span>
                 </span>
-                <span>{content.whyTitle}</span>
+                <span className="eb-icon-frame self-start"><Info className="w-5 h-5" /></span>
               </span>
             </summary>
             <div className="mt-3 space-y-2 text-neutral-700">

@@ -97,7 +97,7 @@ export function History({ onNavigate }: HistoryProps) {
               {summary.patterns} pattern{summary.patterns === 1 ? '' : 's'} discovered · {summary.helpfulExperiments} experiment{summary.helpfulExperiments === 1 ? '' : 's'} looked helpful · {summary.phaseChanges} phase shift{summary.phaseChanges === 1 ? '' : 's'} recorded
             </p>
           </div>
-          <Clock3 className="w-5 h-5 shrink-0 text-white/90 mt-1" />
+          <div className="eb-icon-frame eb-icon-frame--hero"><Clock3 className="w-5 h-5" /></div>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -150,7 +150,7 @@ export function History({ onNavigate }: HistoryProps) {
                         <h3>{event.title}</h3>
                         <p className="mt-2 text-sm text-[rgb(var(--color-text))]">{event.description}</p>
                       </div>
-                      <Icon className="w-5 h-5 shrink-0 text-[rgb(var(--color-primary-dark))] mt-1" />
+                      <div className="eb-icon-frame"><Icon className="w-5 h-5" /></div>
                     </div>
 
                     {(event.evidence || (event.signals && event.signals.length) || confidence) ? (

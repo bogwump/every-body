@@ -1098,7 +1098,7 @@ export function Dashboard({
                 onClick={() => setTipOffset((v) => v + 1)}
                 // Chrome can sometimes let later-flowing text overlap and steal the click.
                 // Keep this above the header/text.
-                className="text-sm text-[rgb(var(--color-primary))] hover:underline absolute top-0 right-0 z-10"
+                className="text-sm text-[rgb(var(--color-primary))] hover:underline absolute top-0 right-8 z-10"
               >
                 Another tip
               </button>
@@ -1122,7 +1122,7 @@ export function Dashboard({
               ) : null}
             </div>
             <div className="eb-icon-frame">
-              <Lightbulb className="w-5 h-5 text-[rgb(var(--color-primary))]" />
+              <Lightbulb className="w-5 h-5" />
             </div>
           </div>
         </div>
