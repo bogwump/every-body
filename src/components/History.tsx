@@ -157,7 +157,7 @@ export function History({ onNavigate }: HistoryProps) {
                     </div>
 
                     {(event.evidence || (event.signals && event.signals.length) || confidence) ? (
-                      <details className="eb-collapsible mt-4">
+                      <details className="eb-disclosure mt-4">
                         <summary>
                           <span>Why this is here</span>
                           <ChevronDown className="w-4 h-4 text-[rgb(var(--color-text-secondary))]" />

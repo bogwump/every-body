@@ -1282,7 +1282,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
                   />
 
                   {key === 'sleep' && userData.sleepDetailsEnabled ? (
-                    <details className="eb-disclosure mt-3 group eb-inset-callout">
+                    <details className="eb-disclosure mt-3 group">
                       <summary>
                         <span className="text-sm font-medium">Sleep details</span>
                         <ChevronRight className="w-4 h-4 text-[rgb(var(--color-text-secondary))] transition-transform group-open:rotate-90" />

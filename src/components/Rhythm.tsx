@@ -737,19 +737,19 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
               <p className="text-neutral-700">{content.doIntro}</p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="eb-inset rounded-xl p-4 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+            <div className="eb-inset-callout rounded-xl p-4">
               <div className="eb-inset-label !text-base !font-medium !text-neutral-800">Permission</div>
               <div className="eb-inset-value !text-base !font-normal !text-neutral-800">{content.doCards.permission}</div>
             </div>
-            <div className="eb-inset rounded-xl p-4 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+            <div className="eb-inset-callout rounded-xl p-4">
               <div className="eb-inset-label !text-base !font-medium !text-neutral-800">Plans</div>
               <div className="eb-inset-value !text-base !font-normal !text-neutral-800">{content.doCards.plans}</div>
             </div>
-            <div className="eb-inset rounded-xl p-4 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+            <div className="eb-inset-callout rounded-xl p-4">
               <div className="eb-inset-label !text-base !font-medium !text-neutral-800">Work</div>
               <div className="eb-inset-value !text-base !font-normal !text-neutral-800">{content.doCards.work}</div>
             </div>
-            <div className="eb-inset rounded-xl p-4 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+            <div className="eb-inset-callout rounded-xl p-4">
               <div className="eb-inset-label !text-base !font-medium !text-neutral-800">Body</div>
               <div className="eb-inset-value !text-base !font-normal !text-neutral-800">{content.doCards.body}</div>
             </div>
@@ -773,7 +773,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
             If this rhythm follows your usual pattern, you’ll likely shift into your <span className="font-medium opacity-90">{computed.nextPhase}</span> ({computed.nextSci}) in around <span className="font-medium opacity-90">{computed.daysToNext ?? 5} days</span>.
           </p>
 
-              <div className="eb-inset rounded-xl p-4 bg-[rgb(var(--color-accent)/0.10)] border border-[rgb(var(--color-accent)/0.18)]">
+              <div className="eb-inset-callout rounded-xl p-4">
                 <div className="text-base font-medium text-neutral-800">{nextPhasePlanning.title}</div>
                 <div className="mt-1 text-base text-neutral-800 font-normal">{nextPhasePlanning.body}</div>
               </div>
@@ -784,7 +784,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
         {/* Why this happens */}
         <div className="eb-inset-callout rounded-2xl p-6">
-          <details className="eb-disclosure mt-0 bg-transparent border-0 shadow-none">
+          <details className="eb-disclosure eb-disclosure--plain">
             <summary className="font-medium text-neutral-900 px-0 py-0">
               <span className="flex items-start justify-between gap-3 w-full">
                 <span className="inline-flex items-center gap-3 min-w-0 flex-1">
@@ -794,7 +794,7 @@ const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
                 <span className="eb-icon-frame self-start"><Info className="w-5 h-5" /></span>
               </span>
             </summary>
-            <div className="mt-3 space-y-2 text-neutral-700">
+            <div className="mt-3 space-y-2 text-[rgb(var(--color-text-secondary))]">
               {content.whyBody.map((p) => (
                 <p key={p}>{p}</p>
               ))}

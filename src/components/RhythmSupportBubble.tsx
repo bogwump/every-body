@@ -7,7 +7,7 @@ export function RhythmSupportBubble(props: { title?: string; body: string }) {
     .filter(Boolean);
 
   return (
-    <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)] insights-hero-bubble">
+    <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
       <div className="text-sm font-semibold !text-neutral-800">
         <span>{props.title ?? 'Gentle reminder'}</span>
       </div>

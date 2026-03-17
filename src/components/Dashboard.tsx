@@ -830,7 +830,7 @@ export function Dashboard({
           <h3 className="mb-3 eb-hero-title eb-hero-on-dark text-white">Symptom tracking</h3>
 
           {/* Today in your rhythm */}
-          <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)]">
+          <div className="eb-inset rounded-2xl p-4">
             <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{dashboardRhythm.title}</div>
             {dashboardRhythm.headline ? (
               <div className="mt-1 text-lg font-semibold text-black">{dashboardRhythm.headline}</div>
@@ -844,7 +844,7 @@ export function Dashboard({
           </div>
 
           {/* How you've been */}
-          <div className="mt-4 eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.16)]">
+          <div className="mt-4 eb-inset rounded-2xl p-4">
             <div className="text-sm font-semibold text-black">{heroModel.howTitle}</div>
             <div className="mt-2 space-y-1">
               {heroModel.howLines.map((line: string, i: number) => (

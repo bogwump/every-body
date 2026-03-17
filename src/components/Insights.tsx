@@ -18,7 +18,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle, Blend, Layers3 } from 'lucide-react';
+import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle, Blend, Layers3, ChevronDown } from 'lucide-react';
 import { TryNextCard, type TryNextItem } from './TryNextCard';
 import { WhatsHelpingCard } from './WhatsHelpingCard';
 import { getMomentHistory } from '../lib/companionMoments';
@@ -3693,7 +3693,7 @@ const tryNextPrompts = useMemo(() => {
         </div>
 
         <div className="mt-4 space-y-3">
-          <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.14)] border border-[rgba(255,255,255,0.18)] insights-hero-bubble">
+          <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
             <div className="text-sm font-semibold text-[rgba(0,0,0,0.70)]">{heroInsightState.heading}</div>
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.65)]">
               {heroInsightState.items.length ? (
@@ -3716,7 +3716,7 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="eb-inset rounded-2xl p-4 bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.16)] insights-hero-bubble">
+          <div className="eb-inset rounded-2xl p-4 insights-hero-bubble">
             <div className="text-sm font-semibold text-black">Over the next few days you might notice</div>
             <div className="mt-2 space-y-2 text-sm text-[rgba(0,0,0,0.68)]">
               {bodyWeatherLines.slice(0, 3).map((line) => (
@@ -3797,7 +3797,7 @@ const tryNextPrompts = useMemo(() => {
                   {p.contextLine ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
                   <div className="flex-1" />
                   <details className="eb-disclosure mt-3">
-                    <summary>Why am I seeing this?</summary>
+                    <summary><span>Why am I seeing this?</span><ChevronDown className="w-4 h-4" /></summary>
                     <div className="mt-2 text-sm eb-muted space-y-1">
                       {(p.why ?? []).map((w, i) => (
                         <div key={i}>{w}</div>
@@ -4389,7 +4389,7 @@ const tryNextPrompts = useMemo(() => {
         </div>
 
         {/* Gentle colour splash + context */}
-        <div className="mt-4 eb-inset rounded-2xl p-5 !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+        <div className="mt-4 eb-inset-callout rounded-2xl p-5">
           <div className="text-sm font-semibold">Keep it simple</div>
           <div className="mt-1 text-sm text-neutral-800">
             Pick one small change, keep everything else roughly the same, and track a few measures for a short time.
@@ -4549,7 +4549,7 @@ const tryNextPrompts = useMemo(() => {
                       <CarouselContent>
                         {visibleTryNextPrompts.map((p) => (
                           <CarouselItem key={p.id} className="basis-full md:basis-1/2">
-                            <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.10)] !border !border-[rgb(var(--color-accent)/0.18)]">
+                            <div className="eb-inset-callout rounded-2xl p-5 h-full flex flex-col">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="text-sm font-semibold">{p.title}</div>
                                 <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
@@ -4594,7 +4594,7 @@ const tryNextPrompts = useMemo(() => {
                 <div className="text-sm font-semibold">When the signal is strong</div>
                 <div className="mt-1 text-sm eb-muted">These start to appear as you log more days together.</div>
                 {visibleSuggestedExperiments.length === 0 ? (
-                  <div className="mt-3 eb-inset rounded-2xl p-5 text-sm eb-muted !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
+                  <div className="mt-3 eb-inset-callout rounded-2xl p-5 text-sm eb-muted">
                     To generate these, the app needs overlap between a behaviour like sleep, caffeine, or late nights and how you feel. If you are mainly logging body symptoms, try switching on Sleep or Stress for a few days and this section will start to fill up.
                   </div>
                 ) : (
@@ -4605,7 +4605,7 @@ const tryNextPrompts = useMemo(() => {
                           const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
                           return (
                             <CarouselItem key={s.id} className="basis-full md:basis-1/2">
-                              <div className="eb-inset rounded-2xl p-5 h-full flex flex-col !bg-[rgb(var(--color-accent)/0.08)] !border !border-[rgb(var(--color-accent)/0.16)]">
+                              <div className="eb-inset-callout rounded-2xl p-5 h-full flex flex-col">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="text-sm font-semibold">{s.title}</div>
                                   <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
