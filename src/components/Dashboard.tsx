@@ -12,13 +12,13 @@ import {
 } from 'recharts';
 
 import type { DashboardMetric, SymptomKey, UserData, UserGoal } from '../types';
-import { useEntries, useExperiment } from '../lib/appStore';
+import { useEntries, useExperiment, useExperimentHistory } from '../lib/appStore';
 import { buildHomepageHeroModel, computeCycleStats, estimatePhaseByFlow, filterByDays, isoToday, sortByDateAsc } from '../lib/analytics';
 import { isoFromDateLocal } from '../lib/date';
 import { getDailyTip } from '../lib/tips';
 import { importBackupFile, parseBackupJson, looksLikeInsightsExport } from '../lib/backup';
 import { getArchivedMomentSnapshots, getHighestPriorityMoment } from '../lib/companionMoments';
-import { getRhythmPhaseState } from '../lib/phaseChange';
+import { getRecentPhaseChange, getRhythmPhaseState } from '../lib/phaseChange';
 import { generateMoments } from '../lib/generateMoments';
 import { CompanionMomentCard } from './CompanionMomentCard';
 import { getCycleTrustModel } from '../lib/cycleTrust';
@@ -79,6 +79,96 @@ const MIXED_CHART_PALETTE = [
   'rgb(186, 216, 217)',  // ocean accent
   'rgb(160, 100, 80)',   // terracotta dark
 ];
+
+const NEXT_STEP_SWING_METRICS: DashboardMetric[] = [
+  'mood',
+  'sleep',
+  'energy',
+  'stress',
+  'anxiety',
+  'irritability',
+  'focus',
+  'pain',
+  'cramps',
+  'headache',
+  'bloating',
+  'fatigue',
+  'brainFog',
+  'nightSweats',
+  'hotFlushes',
+  'breastTenderness',
+  'jointPain',
+  'libido',
+];
+
+type NextStepRecommendation = {
+  body: string;
+  actionLabel: string;
+} & (
+  | { action: 'check-in' }
+  | { action: 'navigate'; screen: string }
+);
+
+type SwingSignal = {
+  metric: DashboardMetric;
+  label: string;
+  range: number;
+  lastDelta: number;
+  direction: 'up' | 'down';
+};
+
+function formatCountLabel(count: number, singular: string, plural?: string) {
+  return `${count} ${count === 1 ? singular : (plural || `${singular}s`)}`;
+}
+
+function dayDiff(fromISO: string, toISO: string): number {
+  const from = new Date(`${fromISO}T00:00:00`).getTime();
+  const to = new Date(`${toISO}T00:00:00`).getTime();
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return 999;
+  return Math.round((to - from) / 86400000);
+}
+
+function getRecentSwingSignal(entries: any[], candidateMetrics: DashboardMetric[]): SwingSignal | null {
+  let best: SwingSignal | null = null;
+
+  for (const metric of candidateMetrics) {
+    const values = entries
+      .map((entry) => metricValue(entry, metric))
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+
+    if (values.length < 3) continue;
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    const last = values[values.length - 1];
+    const prev = values[values.length - 2];
+    const lastDelta = last - prev;
+    const absLastDelta = Math.abs(lastDelta);
+
+    if (range < 4 && absLastDelta < 3) continue;
+
+    const label = METRIC_LABELS[metric] || metric;
+    const candidate: SwingSignal = {
+      metric,
+      label,
+      range,
+      lastDelta: absLastDelta,
+      direction: lastDelta >= 0 ? 'up' : 'down',
+    };
+
+    if (!best) {
+      best = candidate;
+      continue;
+    }
+
+    const bestScore = best.range * 10 + best.lastDelta;
+    const candidateScore = candidate.range * 10 + candidate.lastDelta;
+    if (candidateScore > bestScore) best = candidate;
+  }
+
+  return best;
+}
 
 
 function metricValue(entry: any | undefined, metric: DashboardMetric): number | undefined {
@@ -661,20 +751,100 @@ export function Dashboard({
     return buildWeekSeries(dateISOs, map, chartMetrics);
   }, [entriesSorted, chartMetrics]);
 
-  const nextStep = useMemo(() => {
+  const nextStep = useMemo<NextStepRecommendation>(() => {
     const fallbackBody = insightsRemaining === 1
       ? 'A quick check-in today will help your patterns start to emerge.'
-      : `A few more check-ins will help your patterns start to emerge. ${insightsRemaining} day${insightsRemaining === 1 ? '' : 's'} to go for your first insights.`;
+      : `A few more check-ins will help your patterns start to emerge. ${insightsRemaining} ${insightsRemaining === 1 ? 'day' : 'days'} to go for your first insights.`;
 
     if (!insightsReady) {
       return {
         body: fallbackBody,
         actionLabel: checkedInToday ? "Open today’s check-in" : "Do today’s check-in",
-        action: 'check-in' as const,
+        action: 'check-in',
       };
     }
 
-    const last7 = filterByDays(entriesSorted, 7);
+    const last7 = filterByDays(entriesSorted, 7, todayISO);
+    const last14 = filterByDays(entriesSorted, 14, todayISO);
+    const enabledMetricCandidates = Array.from(new Set<DashboardMetric>([
+      'mood',
+      ...(userData.enabledModules || []).filter((key): key is DashboardMetric => NEXT_STEP_SWING_METRICS.includes(key as DashboardMetric)),
+    ]));
+
+    const activeExperiment = experiment && !(experiment as any)?.outcome?.completedAtISO ? experiment as any : null;
+    if (activeExperiment) {
+      const durationDays = Math.max(1, Number(activeExperiment.durationDays || 3));
+      const elapsedDays = Math.max(0, dayDiff(activeExperiment.startDateISO || todayISO, todayISO)) + 1;
+      const daysLeft = Math.max(0, durationDays - elapsedDays);
+      const metricCount = Array.isArray(activeExperiment.metrics) ? activeExperiment.metrics.length : 0;
+
+      if (!checkedInToday) {
+        return {
+          body: `Your experiment is still running. Today’s check-in will make it easier to tell whether ${activeExperiment.title || 'it'} is helping${metricCount ? ` across ${formatCountLabel(metricCount, 'signal')}` : ''}.`,
+          actionLabel: 'Do today’s check-in',
+          action: 'check-in',
+        };
+      }
+
+      return {
+        body: daysLeft <= 1
+          ? `Your experiment is nearly ready to review. ${checkedInToday ? 'A quick look in Insights should help you see whether it shifted anything meaningful.' : 'One more check-in should help the result land more clearly.'}`
+          : `Your experiment is live${daysLeft > 0 ? ` with around ${formatCountLabel(daysLeft, 'day')} left` : ''}. Insights may be the best place to review how the tracked signals are moving so far.`,
+        actionLabel: 'Open Insights',
+        action: 'navigate',
+        screen: 'insights',
+      };
+    }
+
+    const latestCompletedExperiment = experimentHistory.find((item: any) => typeof item?.outcome?.completedAtISO === 'string' && item.outcome.completedAtISO);
+    const completedAgo = latestCompletedExperiment?.outcome?.completedAtISO
+      ? dayDiff(String(latestCompletedExperiment.outcome.completedAtISO), todayISO)
+      : null;
+
+    if (latestCompletedExperiment && completedAgo != null && completedAgo >= 0 && completedAgo <= 7) {
+      return {
+        body: `${latestCompletedExperiment.title || 'Your recent experiment'} has just finished. Insights may be the best place to look next if you want to see whether it changed anything meaningful.`,
+        actionLabel: 'Review in Insights',
+        action: 'navigate',
+        screen: 'insights',
+      };
+    }
+
+    const recentPhaseChange = getRecentPhaseChange();
+    if (userData.cycleTrackingMode === 'cycle' && recentPhaseChange && !recentPhaseChange.dismissed) {
+      const changedDaysAgo = dayDiff(recentPhaseChange.changedAt, todayISO);
+      if (changedDaysAgo >= 0 && changedDaysAgo <= 3) {
+        return {
+          body: `Your rhythm has just shifted into ${recentPhaseChange.phase}. Rhythm may be the best place to look next if you want context for what often changes around here.`,
+          actionLabel: 'Open Rhythm',
+          action: 'navigate',
+          screen: 'rhythm',
+        };
+      }
+    }
+
+    const todayFlow = metricValue(entriesSorted.find((e: any) => (e as any).dateISO === todayISO), 'flow');
+    const menstrualToday = userData.cycleTrackingMode === 'cycle' && (todayPhase === 'Menstrual' || (typeof todayFlow === 'number' && todayFlow > 0));
+    if (menstrualToday) {
+      return {
+        body: 'You appear to be in your reset window today. Rhythm may be the best place to look next if you want context for what commonly shifts around your period.',
+        actionLabel: 'Open Rhythm',
+        action: 'navigate',
+        screen: 'rhythm',
+      };
+    }
+
+    const recentSwing = getRecentSwingSignal(last7 as any[], enabledMetricCandidates);
+    if (recentSwing) {
+      const movement = recentSwing.direction === 'up' ? 'climbing' : 'dropping';
+      return {
+        body: `${recentSwing.label} has been moving more than usual lately and looks like one of your strongest recent shifts. Insights may be the best place to look next if you want a clearer read on what could be driving it.`,
+        actionLabel: 'Open Insights',
+        action: 'navigate',
+        screen: 'insights',
+      };
+    }
+
     const sleepEnergyPoints = last7
       .map((e) => ({
         sleep: metricValue(e as any, 'sleep'),
@@ -691,9 +861,24 @@ export function Dashboard({
 
       if (lowerSleepMean != null && higherSleepMean != null && Math.abs(higherSleepMean - lowerSleepMean) >= 1) {
         return {
-          body: 'Your recent check-ins suggest the strongest signal may be around sleep and energy. Insights may be the best place to look next.',
+          body: 'Your recent check-ins suggest one of the clearest signals may be around sleep and energy. Insights may be the best place to look next.',
           actionLabel: 'Open Insights',
-          action: 'navigate' as const,
+          action: 'navigate',
+          screen: 'insights',
+        };
+      }
+    }
+
+    const recentMoodEntries = last14
+      .map((entry) => metricValue(entry as any, 'mood'))
+      .filter((value): value is number => typeof value === 'number');
+    if (recentMoodEntries.length >= 5) {
+      const moodRange = Math.max(...recentMoodEntries) - Math.min(...recentMoodEntries);
+      if (moodRange >= 4) {
+        return {
+          body: 'Your recent mood pattern has been moving around more than usual. Insights may be the best place to look next if you want to see what tends to shift with it.',
+          actionLabel: 'Open Insights',
+          action: 'navigate',
           screen: 'insights',
         };
       }
@@ -711,7 +896,7 @@ export function Dashboard({
       return {
         body: 'Rhythm may be especially helpful today if you want context for why things feel a bit different.',
         actionLabel: 'Open Rhythm',
-        action: 'navigate' as const,
+        action: 'navigate',
         screen: 'rhythm',
       };
     }
@@ -719,10 +904,24 @@ export function Dashboard({
     return {
       body: 'You have enough recent data for a stronger read. Insights may be the best place to look next.',
       actionLabel: 'Open Insights',
-      action: 'navigate' as const,
+      action: 'navigate',
       screen: 'insights',
     };
-  }, [insightsRemaining, insightsReady, checkedInToday, entriesSorted, dashboardRhythm.headline, userData.cycleTrackingMode, cycleTrust.phaseTrust, cycleTrust.predictionTrust, todayPhase]);
+  }, [
+    insightsRemaining,
+    insightsReady,
+    checkedInToday,
+    entriesSorted,
+    todayISO,
+    dashboardRhythm.headline,
+    userData.cycleTrackingMode,
+    userData.enabledModules,
+    cycleTrust.phaseTrust,
+    cycleTrust.predictionTrust,
+    todayPhase,
+    experiment,
+    experimentHistory,
+  ]);
 
   const setChartMetric = (index: 0 | 1 | 2, next: DashboardMetric) => {
     onUpdateUserData((prev) => {
