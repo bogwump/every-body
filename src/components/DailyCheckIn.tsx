@@ -893,55 +893,60 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
         <EBDialogContent
           title="New period confirmation"
           description="Confirm whether today should be marked as the start of a new cycle."
+          className="max-w-[calc(100%-1.5rem)] rounded-[28px] border-[rgba(0,0,0,0.12)] p-0 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:max-w-xl"
         >
-          <DialogHeader>
-            <DialogTitle>Is this the start of a new period?</DialogTitle>
-            <DialogDescription>
-              If you choose <span className="font-semibold">Start period</span>, we will mark today as a cycle start and add a period window on your calendar.
-              If it is just spotting/breakthrough, we will log it as bleeding without starting a new cycle.
-            </DialogDescription>
-          </DialogHeader>
+          <div className="p-6 sm:p-7">
+            <DialogHeader className="text-left sm:text-left">
+              <DialogTitle className="text-[clamp(1.9rem,5vw,2.35rem)] leading-[1.08] tracking-[-0.03em] text-[rgb(var(--color-text))]">
+                Is this the start of a new period?
+              </DialogTitle>
+              <DialogDescription className="text-base leading-8 text-[rgb(var(--color-text))]">
+                If you choose <span className="font-semibold text-[rgb(var(--color-text))]">Start period</span>, we will mark today as a cycle start and add a period window on your calendar.
+                If it is just spotting or breakthrough bleeding, we will log it without starting a new cycle.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="eb-card mt-3">
-            <p className="text-[rgb(var(--color-text-secondary))]">We save this result so your future insights can become more meaningful.</p>
+            <div className="eb-inset mt-5 rounded-[24px] px-5 py-4">
+              <p className="text-[1.02rem] leading-8 text-[rgb(var(--color-text))]">We save this result so your future insights can become more meaningful.</p>
+            </div>
+
+            <DialogFooter className="mt-5 flex-col gap-3 sm:flex-col sm:justify-start">
+              <button
+                type="button"
+                className="eb-btn-primary w-full justify-center"
+                onClick={() => {
+                  if (!pendingEntry) return;
+                  saveEntryWithPhaseCheck({ ...(pendingEntry as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
+                  setPeriodPromptOpen(false);
+                  setPendingEntry(null);
+                }}
+              >
+                Start period
+              </button>
+              <button
+                type="button"
+                className="eb-btn-secondary w-full justify-center"
+                onClick={() => {
+                  if (!pendingEntry) return;
+                  saveEntryWithPhaseCheck({ ...(pendingEntry as any), cycleStartOverride: undefined, breakthroughBleed: true } as any);
+                  setPeriodPromptOpen(false);
+                  setPendingEntry(null);
+                }}
+              >
+                Just spotting
+              </button>
+              <button
+                type="button"
+                className="eb-btn-secondary w-full justify-center"
+                onClick={() => {
+                  setPeriodPromptOpen(false);
+                  setPendingEntry(null);
+                }}
+              >
+                Cancel
+              </button>
+            </DialogFooter>
           </div>
-
-          <DialogFooter>
-            <button
-              type="button"
-              className="eb-btn-secondary"
-              onClick={() => {
-                setPeriodPromptOpen(false);
-                setPendingEntry(null);
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="eb-btn-secondary"
-              onClick={() => {
-                if (!pendingEntry) return;
-                saveEntryWithPhaseCheck({ ...(pendingEntry as any), cycleStartOverride: undefined, breakthroughBleed: true } as any);
-                setPeriodPromptOpen(false);
-                setPendingEntry(null);
-              }}
-            >
-              Just spotting
-            </button>
-            <button
-              type="button"
-              className="eb-btn-primary"
-              onClick={() => {
-                if (!pendingEntry) return;
-                saveEntryWithPhaseCheck({ ...(pendingEntry as any), cycleStartOverride: true, breakthroughBleed: undefined } as any);
-                setPeriodPromptOpen(false);
-                setPendingEntry(null);
-              }}
-            >
-              Start period
-            </button>
-          </DialogFooter>
         </EBDialogContent>
       </Dialog>
 

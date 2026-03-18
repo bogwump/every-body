@@ -4817,8 +4817,8 @@ const tryNextPrompts = useMemo(() => {
                     </CarouselItem>
                   ))}
                 </CarouselContent>
-                <CarouselPrevious className="flex opacity-70" />
-                <CarouselNext className="flex opacity-70" />
+                {findings.length > 1 ? <CarouselPrevious className="flex opacity-70" /> : null}
+                {findings.length > 1 ? <CarouselNext className="flex opacity-70" /> : null}
               </Carousel>
             </div>
           </div>
