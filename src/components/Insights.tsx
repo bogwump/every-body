@@ -50,6 +50,7 @@ import { getBodyWeatherLines } from '../lib/companionLogic';
 import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
 import { getSuggestedDriverOptionsForMetrics } from '../lib/patternDrivers';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
+import { getMetricPolarity } from '../lib/metricSemantics';
 
 interface InsightsProps {
   userData: UserData;
