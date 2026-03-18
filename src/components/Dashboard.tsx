@@ -671,11 +671,11 @@ export function Dashboard({
     if (!insightsReady) {
       lines.push(
         insightsRemaining === 1
-          ? 'Log 1 more day to unlock your first insights.'
-          : `Log ${insightsRemaining} more days to unlock your first insights.`
+          ? 'A quick check-in today will help your patterns start to emerge.'
+          : `A few more check-ins will help your patterns start to emerge. ${insightsRemaining} day${insightsRemaining === 1 ? '' : 's'} to go for your first insights.`
       );
     } else {
-      lines.push('Insights are ready. Tap View insights to spot patterns.' );
+      lines.push('You have enough recent data for a stronger read. Insights may be the best place to look next.');
     }
 
     // 2) Pick a “best so far” from the first non-mood metric available
@@ -748,7 +748,7 @@ export function Dashboard({
         const a = mean(low);
         const b = mean(high);
         if (a != null && b != null && Math.abs(b - a) >= 1) {
-          lines.push(`Early pattern: on lower-sleep days, energy averaged ${Math.round(a)}/10 (vs ${Math.round(b)}/10 on better-sleep days).`);
+          lines.push(`Your recent check-ins suggest the strongest signal may be around sleep and energy. Insights may be the best place to look next.`);
         }
       }
     }
@@ -770,7 +770,7 @@ export function Dashboard({
     // 5) Gentle nudge to customise without making day 1 feel heavy
     const coreDefaultCount = 8;
     if (lines.length < 3 && (userData.enabledModules?.length ?? 0) <= coreDefaultCount) {
-      lines.push('Want more personalised insights? Add 1–2 symptoms in Profile (it stays lightweight).');
+      lines.push('A slightly richer symptom mix can help the next useful pattern come through more clearly.');
     }
 
     return lines.slice(0, 4);
@@ -989,7 +989,7 @@ export function Dashboard({
         <div className="eb-card eb-card-soft">
           <div className="eb-card-header w-full">
             <div className="min-w-0 flex-1">
-              <h3 className="mb-2">What looks most useful right now</h3>
+              <h3 className="mb-2">Most useful next step</h3>
             </div>
             <div className="eb-icon-frame">
               <TrendingUp className="w-5 h-5 text-[rgb(var(--color-primary))]" />
@@ -1004,7 +1004,7 @@ export function Dashboard({
             </div>
           ) : (
             <p className="text-sm text-[rgba(0,0,0,0.75)]">
-              Log a few days and your first patterns will show up here.
+              A few more check-ins will help your patterns start to emerge.
             </p>
           )}
 
