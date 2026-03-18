@@ -51,6 +51,7 @@ import { getBodyWeatherLines } from '../lib/companionLogic';
 import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
 import { getSuggestedDriverOptionsForMetrics } from '../lib/patternDrivers';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
+import { classifyPatternStateForSignal, type PairPatternStateResult } from '../lib/patternState';
 import { getMetricPolarity } from '../lib/metricSemantics';
 
 interface InsightsProps {
@@ -298,6 +299,95 @@ function qualityScore(rAbs: number, n: number): number {
   const strength = Math.min(1, Math.max(0, (rAbs - 0.35) / 0.45));
   const support = Math.min(1, n / 14);
   return Math.round(100 * (0.65 * strength + 0.35 * support));
+}
+
+function formatPatternStateLabel(state: PairPatternStateResult['state']): string {
+  return state === 'live_cluster'
+    ? 'moving together now'
+    : state === 'upcoming_cluster'
+      ? 'likely to show up soon'
+      : state === 'passed_cluster'
+        ? 'likely passed this cycle'
+        : state === 'stable_recurring_grouping'
+          ? 'recurring grouping'
+          : 'early signal';
+}
+
+function buildConnectionNarrative(args: {
+  pair: { a: string; b: string; aKey: InsightMetricKey; bKey: InsightMetricKey; r: number; n: number; confidence: 'low' | 'medium' | 'high'; contextLine?: string | null; };
+  stateResult: PairPatternStateResult | null;
+  lagPattern?: { leadLabel: string; followLabel: string; lagDays: number; direction: 'together' | 'inverse'; } | null;
+}): { supportingLine: string; contextLine: string | null; why: string[] } {
+  const { pair, stateResult, lagPattern } = args;
+  const lowA = pair.a.toLowerCase();
+  const lowB = pair.b.toLowerCase();
+  const moveTogether = pair.r >= 0;
+  const state = stateResult?.state ?? 'unclear_interesting';
+  const phaseHint = stateResult?.currentPhaseKey ? ` around your ${stateResult.currentPhaseKey.replace(/_/g, ' ')} phase` : '';
+  const hasCue = Boolean(stateResult?.leadMetric && stateResult?.followMetric && (stateResult?.leadConfidence === 'medium' || stateResult?.leadConfidence === 'high'));
+  const cueLabel = stateResult?.leadMetric ? labelFor(stateResult.leadMetric) : null;
+  const followLabel = stateResult?.followMetric ? labelFor(stateResult.followMetric) : null;
+  let supportingLine = moveTogether
+    ? `${pair.a} and ${lowB} have often risen together.`
+    : `${pair.a} and ${lowB} have often moved in opposite directions.`;
+  let contextLine = pair.contextLine ?? null;
+  const why: string[] = [];
+
+  if (state === 'live_cluster') {
+    supportingLine = moveTogether
+      ? `These seem to be moving together now${phaseHint}.`
+      : `These seem to be pulling in opposite directions right now${phaseHint}.`;
+    contextLine = moveTogether
+      ? `For the next few days, it may help to keep things gentler and notice whether both stay softer together.`
+      : `For the next few days, notice whether easing one shifts the other too.`;
+    why.push('Both symptoms have been active recently, so this looks like a live cluster rather than an older pattern.');
+  } else if (state === 'upcoming_cluster') {
+    supportingLine = `This pattern tends to show up around this point in your rhythm${phaseHint}.`;
+    contextLine = hasCue && cueLabel && followLabel
+      ? `For you, ${cueLabel.toLowerCase()} may be one of the earlier signs in this cluster. Next time it appears, use it as a cue to keep an eye on ${followLabel.toLowerCase()}.`
+      : `Keep an eye out for this pairing over the next few days, as this is often when it starts to surface.`;
+    why.push('The timing of this pair looks repeatable enough that it may be approaching again soon.');
+  } else if (state === 'passed_cluster') {
+    supportingLine = `This looks like one of your recurring clusters, but the window has probably passed this cycle.`;
+    contextLine = hasCue && cueLabel
+      ? `${cueLabel} may be one of your earlier signs here, so it may be worth noticing whether the same sequence returns next cycle.`
+      : `This is probably more useful as a reflective summary for next cycle than something to act on today.`;
+    why.push('This pairing usually shows up earlier in the cycle, and that window appears to be behind you for now.');
+  } else if (state === 'stable_recurring_grouping') {
+    supportingLine = `These tend to travel together for you across cycles.`;
+    contextLine = hasCue && cueLabel && followLabel
+      ? `For you, ${cueLabel.toLowerCase()} may be one of the earlier signs in this cluster. Next time it appears, use it as a cue to keep an eye on ${followLabel.toLowerCase()}.`
+      : `This looks less like a one-off and more like one of your recurring body groupings.`;
+    why.push('This pairing has repeated enough times that it looks more like a recurring grouping than a one-off.');
+  } else {
+    supportingLine = moveTogether
+      ? `${pair.a} and ${lowB} may be linked, but the signal is still early.`
+      : `${pair.a} and ${lowB} may be linked, but the signal is still early.`;
+    contextLine = 'Keep logging for one more cycle to see whether the same pattern repeats.';
+    why.push('There is a possible link here, but the signal is still early and may change with more data.');
+  }
+
+  if (lagPattern && (state === 'stable_recurring_grouping' || state === 'upcoming_cluster' || state === 'live_cluster')) {
+    why.push(
+      lagPattern.direction === 'inverse'
+        ? `When ${lagPattern.leadLabel.toLowerCase()} rises, ${lagPattern.followLabel.toLowerCase()} often dips ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`
+        : `${lagPattern.leadLabel} often shows up before ${lagPattern.followLabel.toLowerCase()} ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`
+    );
+  }
+
+  if (stateResult?.repeatCount) {
+    why.push(`You have logged this pairing across ${stateResult.repeatCount} cycle${stateResult.repeatCount === 1 ? '' : 's'}, and it currently reads as ${formatPatternStateLabel(state)}.`);
+  } else {
+    why.push(`You logged both metrics on ${pair.n} day${pair.n === 1 ? '' : 's'}.`);
+  }
+
+  if (hasCue && cueLabel && followLabel) {
+    why.push(`${cueLabel} tends to show up before ${followLabel.toLowerCase()} often enough that the app can use it as an early cue.`);
+  }
+
+  if (pair.contextLine && pair.contextLine !== contextLine) why.push(pair.contextLine);
+  why.push('Patterns are a hint, not proof.');
+  return { supportingLine, contextLine, why };
 }
 
 function insightQualityScore(args: {
@@ -1282,30 +1372,53 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         !((p.kindA === 'physio' || p.kindA === 'hormonal') && (p.kindB === 'physio' || p.kindB === 'hormonal'));
 
       const lagPattern = getLagPatternForPair(entriesSorted, p.aKey, p.bKey, userData);
-      const lagLine = lagPattern && lagPattern.score >= Math.abs(p.r) + 0.05
-        ? (lagPattern.direction === 'inverse'
-            ? `When ${lagPattern.leadLabel.toLowerCase()} rises, ${lagPattern.followLabel.toLowerCase()} often dips ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`
-            : `${lagPattern.leadLabel} has often been followed by ${lagPattern.followLabel.toLowerCase()} ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`)
-        : null;
+      const sourceSignal: InsightSignal = {
+        id: `pair-${String(p.aKey)}-${String(p.bKey)}`,
+        type: 'metric_pair',
+        score: p.quality,
+        confidence,
+        strength: confidence === 'high' ? 'strong' : confidence === 'medium' ? 'moderate' : 'weak',
+        metrics: [p.aKey, p.bKey],
+        phase: currentInsightsPhase ?? null,
+        direction: p.r >= 0 ? 'together' : 'inverse',
+        sampleSize: p.n,
+        summary: { metric: p.aKey, otherMetric: p.bKey, correlation: p.r },
+      };
       const contextLine = getPatternContextForSignal({ metrics: [p.aKey, p.bKey], confidence, direction: p.r >= 0 ? 'together' : 'inverse' });
+      const stateResult = classifyPatternStateForSignal({
+        entries: entriesSorted,
+        userData,
+        signal: sourceSignal,
+      });
+      const narrative = buildConnectionNarrative({
+        pair: {
+          a: p.a,
+          b: p.b,
+          aKey: p.aKey,
+          bKey: p.bKey,
+          r: p.r,
+          n: p.n,
+          confidence,
+          contextLine,
+        },
+        stateResult,
+        lagPattern,
+      });
 
       const why = [
-        `You logged both metrics on ${p.n} day${p.n === 1 ? '' : 's'}.`,
-        `This currently looks like a ${maturity}.`,
+        ...narrative.why,
         deepReady
           ? `This is calculated from your recent logs and will update as you add more days.`
           : `This is an early signal. With only a few days logged, it may change as you add more data.`,
-        lagLine,
-        contextLine,
         hormonalInvolved
           ? `Hormones can influence lots of symptoms at once, so treat this as a prompt to notice patterns, not a diagnosis.`
           : `Correlation does not mean one causes the other.`,
       ].filter(Boolean);
 
       const feedback = getFeedbackForMetrics(p.aKey, p.bKey);
-      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why, lagPattern, contextLine, feedback };
+      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why, lagPattern, contextLine: narrative.contextLine, patternState: stateResult, supportingLine: narrative.supportingLine, feedback };
     });
-  }, [deepReady, entriesSorted, selected, userData, allMetricKeys, patternFeedbackTick]);
+  }, [deepReady, entriesSorted, selected, userData, allMetricKeys, patternFeedbackTick, currentInsightsPhase]);
 
 
 
@@ -1371,20 +1484,31 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         n >= 4 &&
         !((kindA === 'physio' || kindA === 'hormonal') && (kindB === 'physio' || kindB === 'hormonal'));
       const lagPattern = getLagPatternForPair(entriesSorted, aKey, bKey, userData);
-      const lagLine = lagPattern && lagPattern.score >= Math.abs(correlation) + 0.05
-        ? (lagPattern.direction === 'inverse'
-            ? `When ${lagPattern.leadLabel.toLowerCase()} rises, ${lagPattern.followLabel.toLowerCase()} often dips ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`
-            : `${lagPattern.leadLabel} has often been followed by ${lagPattern.followLabel.toLowerCase()} ${lagPattern.lagDays === 1 ? 'the next day' : `about ${lagPattern.lagDays} days later`}.`)
-        : null;
       const contextLine = getPatternContextForSignal(signal);
+      const stateResult = classifyPatternStateForSignal({
+        entries: entriesSorted,
+        userData,
+        signal,
+      });
+      const narrative = buildConnectionNarrative({
+        pair: {
+          a: labelFor(aKey, userData),
+          b: labelFor(bKey, userData),
+          aKey,
+          bKey,
+          r: correlation,
+          n,
+          confidence,
+          contextLine,
+        },
+        stateResult,
+        lagPattern,
+      });
       const why = [
-        `You logged both metrics on ${n} day${n === 1 ? '' : 's'}.`,
-        `This currently looks like a ${maturity}.`,
+        ...narrative.why,
         deepReady
           ? `This is calculated from your recent logs and will update as you add more days.`
           : `This is an early signal. With only a few days logged, it may change as you add more data.`,
-        lagLine,
-        contextLine,
         hormonalInvolved
           ? `Hormones can influence lots of symptoms at once, so treat this as a prompt to notice patterns, not a diagnosis.`
           : `Correlation does not mean one causes the other.`,
@@ -1406,7 +1530,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         allowSuggestedExperiment,
         why,
         lagPattern,
-        contextLine,
+        contextLine: narrative.contextLine,
+        patternState: stateResult,
+        supportingLine: narrative.supportingLine,
         feedback,
         signalId: signal.id,
         sourceSignal: signal,
@@ -3895,23 +4021,10 @@ const tryNextPrompts = useMemo(() => {
         ) : (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             {connectionCards.slice(0, 3).map((p, idx) => {
-              const chainTarget = p.lagPattern
-                ? connectionCards.find((other) => other !== p && other.lagPattern && String(other.lagPattern.leadKey) === String(p.lagPattern.followKey))
-                : null;
-              const title = p.lagPattern
-                ? chainTarget?.lagPattern
-                  ? `${p.lagPattern.leadLabel} → ${p.lagPattern.followLabel} → ${chainTarget.lagPattern.followLabel}`
-                  : `${p.lagPattern.leadLabel} → ${p.lagPattern.followLabel}`
-                : `${p.a} + ${p.b}`;
-              const supportingLine = p.lagPattern
-                ? chainTarget?.lagPattern
-                  ? `${p.lagPattern.leadLabel} has often been followed by ${p.lagPattern.followLabel.toLowerCase()}. When ${p.lagPattern.followLabel.toLowerCase()} dips, ${chainTarget.lagPattern.followLabel.toLowerCase()} tends to shift ${chainTarget.lagPattern.lagDays === 1 ? 'the next day' : `about ${chainTarget.lagPattern.lagDays} days later`}.`
-                  : p.lagPattern.direction === 'inverse'
-                    ? `When ${p.lagPattern.leadLabel.toLowerCase()} rises, ${p.lagPattern.followLabel.toLowerCase()} often dips ${p.lagPattern.lagDays === 1 ? 'the next day' : `about ${p.lagPattern.lagDays} days later`}.`
-                    : `${p.lagPattern.leadLabel} has often been followed by ${p.lagPattern.followLabel.toLowerCase()} ${p.lagPattern.lagDays === 1 ? 'the next day' : `about ${p.lagPattern.lagDays} days later`}.`
-                : p.r > 0
-                  ? `${p.a} and ${p.b.toLowerCase()} have often risen together.`
-                  : `${p.a} and ${p.b.toLowerCase()} have often moved in opposite directions.`;
+              const title = `${p.a} + ${p.b}`;
+              const supportingLine = p.supportingLine ?? (p.r > 0
+                ? `${p.a} and ${p.b.toLowerCase()} have often risen together.`
+                : `${p.a} and ${p.b.toLowerCase()} have often moved in opposite directions.`);
 
               return (
                 <div key={idx} className="eb-inset rounded-2xl p-5 flex flex-col min-h-[170px]">
@@ -3925,7 +4038,6 @@ const tryNextPrompts = useMemo(() => {
                       {(p.why ?? []).map((w, i) => (
                         <div key={i}>{w}</div>
                       ))}
-                      <div className="pt-1 text-xs eb-muted">Patterns are a hint, not proof.</div>
                     </div>
                   </details>
                   {(() => {
