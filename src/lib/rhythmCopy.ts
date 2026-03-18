@@ -2,7 +2,7 @@ import type { CheckInEntry, InsightMetricKey, UserData } from '../types';
 import type { InsightSignal } from './insightEngine';
 import { generateCandidateInsights, rankInsights, scoreInsights } from './insightEngine';
 import { getExperimentsForSignal, getHelpfulPatternsForMetrics } from './experimentLearning';
-import { downgradeConfidence, getRhythmPhrase } from './confidenceCopy';
+import { downgradeConfidence, normaliseConfidence } from './confidenceCopy';
 import { getSymptomCoverage } from './symptomCoverage';
 
 export type RhythmPhaseKey = 'reset' | 'rebuilding' | 'expressive' | 'protective';
@@ -53,6 +53,24 @@ function metricLabel(key: InsightMetricKey, userData?: UserData): string {
   return fallback[String(key)] ?? String(key).toLowerCase();
 }
 
+
+function rhythmActionPhrase(level: string | null | undefined, action: 'rise' | 'feelLower' | 'startToLift' | 'feelHeavier' | 'moveOpposite' | 'riseTogether' | 'lineUp' | 'moveTogether'): string {
+  const confidence = normaliseConfidence(level);
+
+  const phrasing: Record<typeof action, Record<string, string>> = {
+    rise: { high: 'often rises', moderate: 'can rise', low: 'might rise', very_low: 'could rise' },
+    feelLower: { high: 'often feels a little lower', moderate: 'can feel a little lower', low: 'might feel a little lower', very_low: 'could feel a little lower' },
+    startToLift: { high: 'often starts to lift', moderate: 'can start to lift', low: 'might start to lift', very_low: 'could start to lift' },
+    feelHeavier: { high: 'often feels a bit heavier', moderate: 'can feel a bit heavier', low: 'might feel a bit heavier', very_low: 'could feel a bit heavier' },
+    moveOpposite: { high: 'often move in opposite directions', moderate: 'can move in opposite directions', low: 'might move in opposite directions', very_low: 'could move in opposite directions' },
+    riseTogether: { high: 'often rise together', moderate: 'can rise together', low: 'might rise together', very_low: 'could rise together' },
+    lineUp: { high: 'often lines up', moderate: 'can line up', low: 'might line up', very_low: 'could line up' },
+    moveTogether: { high: 'often move together', moderate: 'can move together', low: 'might move together', very_low: 'could move together' },
+  };
+
+  return phrasing[action][confidence];
+}
+
 function metricSupportPhrase(key: InsightMetricKey, userData?: UserData): string {
   const label = metricLabel(key, userData);
   const phrases: Record<string, string> = {
@@ -78,14 +96,14 @@ function copyForSignal(signal: InsightSignal, userData: UserData, phaseKey: Rhyt
   const b = metricB ? metricLabel(metricB, userData) : 'things';
 
   if (signal.type === 'phase_shift' && metricA) {
-    if (signal.direction === 'higher') return `Based on your logs, ${a} ${getRhythmPhrase(signal.confidence)} rises around here.`;
-    if (signal.direction === 'lower') return `Based on your logs, ${a} ${getRhythmPhrase(signal.confidence)} feels a little lower around here.`;
+    if (signal.direction === 'higher') return `Based on your logs, ${a} ${rhythmActionPhrase(signal.confidence, 'rise')} around here.`;
+    if (signal.direction === 'lower') return `Based on your logs, ${a} ${rhythmActionPhrase(signal.confidence, 'feelLower')} around here.`;
   }
 
   if (signal.type === 'trend_shift' && metricA) {
     if (signal.direction === 'higher') {
-      if (metricA === 'energy') return `Based on your logs, energy ${getRhythmPhrase(signal.confidence)} starts to lift around here.`;
-      if (metricA === 'sleep') return `Sleep ${getRhythmPhrase(signal.confidence)} feels a bit heavier around here.`;
+      if (metricA === 'energy') return `Based on your logs, energy ${rhythmActionPhrase(signal.confidence, 'startToLift')} around here.`;
+      if (metricA === 'sleep') return `Sleep ${rhythmActionPhrase(signal.confidence, 'feelHeavier')} around here.`;
       return `Lately, ${a} has been creeping up around this point.`;
     }
     if (signal.direction === 'lower') {
@@ -103,15 +121,15 @@ function copyForSignal(signal: InsightSignal, userData: UserData, phaseKey: Rhyt
       if ((metricA === 'sleep' && metricB === 'energy') || (metricA === 'energy' && metricB === 'sleep')) {
         return 'Sleep and energy often pull against each other for you here.';
       }
-      return `${a[0].toUpperCase() + a.slice(1)} and ${b} ${getRhythmPhrase(signal.confidence)} move in opposite directions for you here.`;
+      return `${a[0].toUpperCase() + a.slice(1)} and ${b} ${rhythmActionPhrase(signal.confidence, 'moveOpposite')} for you here.`;
     }
     if ((metricA === 'stress' && metricB === 'fatigue') || (metricA === 'fatigue' && metricB === 'stress')) {
-      return `Stress and fatigue ${getRhythmPhrase(signal.confidence)} rise together for you here.`;
+      return `Stress and fatigue ${rhythmActionPhrase(signal.confidence, 'riseTogether')} for you here.`;
     }
     if ((metricA === 'sleep' && metricB === 'energy') || (metricA === 'energy' && metricB === 'sleep')) {
-      return `Better sleep ${getRhythmPhrase(signal.confidence)} lines up with steadier energy here.`;
+      return `Better sleep ${rhythmActionPhrase(signal.confidence, 'lineUp')} with steadier energy here.`;
     }
-    return `${a[0].toUpperCase() + a.slice(1)} and ${b} ${getRhythmPhrase(signal.confidence)} move together for you around here.`;
+    return `${a[0].toUpperCase() + a.slice(1)} and ${b} ${rhythmActionPhrase(signal.confidence, 'moveTogether')} for you around here.`;
   }
 
   if (signal.type === 'weekday_pattern' && metricA) {

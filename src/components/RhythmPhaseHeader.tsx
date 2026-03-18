@@ -36,8 +36,8 @@ export function RhythmPhaseHeader(props: {
 
         {props.timingCopy ? (
           <div
-            className="mt-3 whitespace-nowrap px-1 text-white"
-            style={{ fontSize: 'clamp(0.9rem, 2.2vw, 1.05rem)', lineHeight: 1.25 }}
+            className="mt-3 w-full max-w-full overflow-hidden whitespace-nowrap px-1 text-white"
+            style={{ fontSize: 'clamp(0.82rem, 2vw, 1rem)', lineHeight: 1.25 }}
           >
             {props.timingCopy}
           </div>
