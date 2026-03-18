@@ -4405,120 +4405,8 @@ const tryNextPrompts = useMemo(() => {
         <div className="mt-6 eb-inset rounded-2xl p-5">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="min-w-0">
-              <div className="text-sm font-semibold">Past experiments</div>
-              <div className="mt-1 text-sm eb-muted">Past experiments, what helped, and anything you might want to rerun.</div>
-            </div>
-            <button
-              type="button"
-              className="eb-btn eb-btn-secondary"
-              onClick={() => setHistoryOpen((prev) => !prev)}
-            >
-              {historyOpen ? 'Hide past experiments' : 'Open your experiments'}
-            </button>
-          </div>
-
-          {historyOpen ? (
-            Array.isArray(experimentHistory) && experimentHistory.length > 0 ? (
-              <div className="mt-4">
-                <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
-                  <CarouselContent>
-                    {(experimentHistory as any[]).slice(0, 20).map((item: any) => {
-                      const id = String(item?.experimentId || item?.title || Math.random());
-                      const outcomeStatus = String(item?.outcome?.status || '');
-                      const outcomeLabel = getExperimentStatusMeta(outcomeStatus).label;
-                      const completedDate = fmtDateUi(isoDatePartFromDateTime(item?.outcome?.completedAtISO) || item?.startDateISO, true);
-                      const metrics = Array.isArray(item?.metrics) ? item.metrics.slice(0, 4) : [];
-                      const digest = item?.outcome?.digest;
-                      const isOpen = openHistoryCardId === id;
-                      return (
-                        <CarouselItem key={id} className="basis-full md:basis-1/2">
-                          <div className="eb-inset-white rounded-2xl p-5 h-full flex flex-col">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-semibold">{item?.title || 'Past experiment'}</div>
-                                <div className="mt-1 text-sm eb-muted">Completed {completedDate}</div>
-                              </div>
-                              <span className="eb-chip-meta">{outcomeLabel}</span>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {metrics.map((k: any) => (
-                                <span key={String(k)} className="eb-chip-meta">
-                                  {labelFor(k as any, userData)}
-                                </span>
-                              ))}
-                            </div>
-
-                            {isOpen ? (
-                              <div className="mt-4 eb-inset-soft rounded-2xl p-4 text-sm">
-                                <div className="font-medium">What happened</div>
-                                <div className="mt-1 eb-muted">Started {fmtDateUi(String(item?.startDateISO || ''), true)} · {Number(item?.durationDays ?? 3)} day(s)</div>
-                                {digest?.quick?.metrics?.length ? (
-                                  <div className="mt-3 space-y-2">
-                                    {digest.quick.metrics.slice(0, 3).map((m: any) => (
-                                      <div key={String(m?.key)} className="text-sm eb-muted">
-                                        <span className="font-medium text-neutral-900">{labelFor(m?.key as any, userData)}:</span>{' '}
-                                        {typeof m?.beforeAvg === 'number' ? m.beforeAvg.toFixed(1) : '–'}/10 before · {typeof m?.duringAvg === 'number' ? m.duringAvg.toFixed(1) : '–'}/10 during
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-                                {(() => {
-                                  const previousRun = findPreviousExperimentRun(experimentHistory as any, item as any);
-                                  if (!previousRun) return null;
-                                  const comparisonLine = compareExperimentOutcomes(previousRun?.outcome?.status, outcomeStatus);
-                                  if (!comparisonLine) return null;
-                                  return (
-                                    <div className="mt-3 eb-inset-soft rounded-xl p-3 text-sm eb-muted">
-                                      <span className="font-medium text-neutral-900">Compared with last time:</span> {comparisonLine}
-                                    </div>
-                                  );
-                                })()}
-                                {item?.outcome?.note ? (
-                                  <div className="mt-3 eb-inset-soft rounded-xl p-3 whitespace-pre-wrap eb-muted">{item.outcome.note}</div>
-                                ) : null}
-                              </div>
-                            ) : null}
-
-                            <div className="flex-1" />
-                            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setOpenHistoryCardId((prev) => prev === id ? null : id)}>
-                                {isOpen ? 'Hide details' : 'View results'}
-                              </button>
-                              <button type="button" className="eb-btn eb-btn-primary" onClick={() => rerunHistoryExperiment(item)}>
-                                Re-run experiment
-                              </button>
-                            </div>
-                          </div>
-                        </CarouselItem>
-                      );
-                    })}
-                  </CarouselContent>
-                  <CarouselPrevious className="hidden sm:flex opacity-70" />
-                  <CarouselNext className="hidden sm:flex opacity-70" />
-                </Carousel>
-              </div>
-            ) : (
-              <div className="mt-4 text-sm eb-muted">No completed experiments yet.</div>
-            )
-          ) : null}
-        </div>
-      </div>
-
-      <div className="eb-card">
-        <div className="eb-card-header">
-          <div>
-            <div className="eb-card-title">Suggested experiments</div>
-            <div className="eb-card-sub">Broader ideas to explore when you want a few more options.</div>
-          </div>
-          <div className="eb-icon-frame"><FlaskConical className="w-5 h-5" /></div>
-        </div>
-
-        <div className="mt-4 eb-inset rounded-2xl p-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold">Open suggested experiments</div>
-              <div className="mt-1 text-sm eb-muted">This keeps the page lighter until you want a deeper list of ideas.</div>
+              <div className="text-sm font-semibold">Suggested experiments</div>
+              <div className="mt-1 text-sm eb-muted">Broader ideas to explore when you want a few more options.</div>
             </div>
             <button type="button" className="eb-btn eb-btn-secondary w-full sm:w-auto" onClick={() => setSuggestedExperimentsOpen((prev) => !prev)}>
               {suggestedExperimentsOpen ? 'Hide suggestions' : 'See suggestions'}
@@ -4637,44 +4525,138 @@ const tryNextPrompts = useMemo(() => {
                         );
                       })}
                     </div>
-                    <div className="mt-3 hidden sm:block">
-                      <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
-                        <CarouselContent>
-                          {visibleSuggestedExperiments.map((s) => {
-                            const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
-                            return (
-                              <CarouselItem key={s.id} className="basis-full md:basis-1/2">
-                                <div className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
-                                  <div className="flex items-start justify-between gap-3 min-w-0">
-                                    <div className="text-sm font-semibold min-w-0">{s.title}</div>
-                                    <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
-                                  </div>
-                                  <div className="mt-2 text-sm eb-muted">{s.body}</div>
-                                  <div className="mt-3 flex flex-wrap justify-center gap-2">
-                                    {s.metrics.slice(0, 3).map((k) => (
-                                      <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
-                                    ))}
-                                  </div>
-                                  <div className="flex-1" />
-                                  <div className="mt-4 flex justify-end">
-                                    <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics)}>
-                                      <FlaskConical className="w-4 h-4" />
-                                      Try a 3-day experiment
-                                    </button>
-                                  </div>
-                                </div>
-                              </CarouselItem>
-                            );
-                          })}
-                        </CarouselContent>
-                        <CarouselPrevious className="hidden sm:flex opacity-70" />
-                        <CarouselNext className="hidden sm:flex opacity-70" />
-                      </Carousel>
+                    <div className="mt-3 hidden sm:grid sm:grid-cols-1 xl:grid-cols-2 gap-4 min-w-0">
+                      {visibleSuggestedExperiments.map((s) => {
+                        const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
+                        return (
+                          <div key={s.id} className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
+                            <div className="flex items-start justify-between gap-3 min-w-0">
+                              <div className="text-sm font-semibold min-w-0">{s.title}</div>
+                              <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
+                            </div>
+                            <div className="mt-2 text-sm eb-muted">{s.body}</div>
+                            <div className="mt-3 flex flex-wrap justify-center gap-2">
+                              {s.metrics.slice(0, 3).map((k) => (
+                                <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                              ))}
+                            </div>
+                            <div className="flex-1" />
+                            <div className="mt-4 flex justify-end">
+                              <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics)}>
+                                <FlaskConical className="w-4 h-4" />
+                                Try a 3-day experiment
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
               </div>
             </div>
+          ) : null}
+        </div>
+
+        <div className="mt-6 eb-inset rounded-2xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Past experiments</div>
+              <div className="mt-1 text-sm eb-muted">Past experiments, what helped, and anything you might want to rerun.</div>
+            </div>
+            <button
+              type="button"
+              className="eb-btn eb-btn-secondary"
+              onClick={() => setHistoryOpen((prev) => !prev)}
+            >
+              {historyOpen ? 'Hide past experiments' : 'Open your experiments'}
+            </button>
+          </div>
+
+          {historyOpen ? (
+            Array.isArray(experimentHistory) && experimentHistory.length > 0 ? (
+              <div className="mt-4">
+                <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
+                  <CarouselContent>
+                    {(experimentHistory as any[]).slice(0, 20).map((item: any) => {
+                      const id = String(item?.experimentId || item?.title || Math.random());
+                      const outcomeStatus = String(item?.outcome?.status || '');
+                      const outcomeLabel = getExperimentStatusMeta(outcomeStatus).label;
+                      const completedDate = fmtDateUi(isoDatePartFromDateTime(item?.outcome?.completedAtISO) || item?.startDateISO, true);
+                      const metrics = Array.isArray(item?.metrics) ? item.metrics.slice(0, 4) : [];
+                      const digest = item?.outcome?.digest;
+                      const isOpen = openHistoryCardId === id;
+                      return (
+                        <CarouselItem key={id} className="basis-full md:basis-1/2">
+                          <div className="eb-inset-white rounded-2xl p-5 h-full flex flex-col">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-semibold">{item?.title || 'Past experiment'}</div>
+                                <div className="mt-1 text-sm eb-muted">Completed {completedDate}</div>
+                              </div>
+                              <span className="eb-chip-meta">{outcomeLabel}</span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {metrics.map((k: any) => (
+                                <span key={String(k)} className="eb-chip-meta">
+                                  {labelFor(k as any, userData)}
+                                </span>
+                              ))}
+                            </div>
+
+                            {isOpen ? (
+                              <div className="mt-4 eb-inset-soft rounded-2xl p-4 text-sm">
+                                <div className="font-medium">What happened</div>
+                                <div className="mt-1 eb-muted">Started {fmtDateUi(String(item?.startDateISO || ''), true)} · {Number(item?.durationDays ?? 3)} day(s)</div>
+                                {digest?.quick?.metrics?.length ? (
+                                  <div className="mt-3 space-y-2">
+                                    {digest.quick.metrics.slice(0, 3).map((m: any) => (
+                                      <div key={String(m?.key)} className="text-sm eb-muted">
+                                        <span className="font-medium text-neutral-900">{labelFor(m?.key as any, userData)}:</span>{' '}
+                                        {typeof m?.beforeAvg === 'number' ? m.beforeAvg.toFixed(1) : '–'}/10 before · {typeof m?.duringAvg === 'number' ? m.duringAvg.toFixed(1) : '–'}/10 during
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {(() => {
+                                  const previousRun = findPreviousExperimentRun(experimentHistory as any, item as any);
+                                  if (!previousRun) return null;
+                                  const comparisonLine = compareExperimentOutcomes(previousRun?.outcome?.status, outcomeStatus);
+                                  if (!comparisonLine) return null;
+                                  return (
+                                    <div className="mt-3 eb-inset-soft rounded-xl p-3 text-sm eb-muted">
+                                      <span className="font-medium text-neutral-900">Compared with last time:</span> {comparisonLine}
+                                    </div>
+                                  );
+                                })()}
+                                {item?.outcome?.note ? (
+                                  <div className="mt-3 eb-inset-soft rounded-xl p-3 whitespace-pre-wrap eb-muted">{item.outcome.note}</div>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            <div className="flex-1" />
+                            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                              <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setOpenHistoryCardId((prev) => prev === id ? null : id)}>
+                                {isOpen ? 'Hide details' : 'View results'}
+                              </button>
+                              <button type="button" className="eb-btn eb-btn-primary" onClick={() => rerunHistoryExperiment(item)}>
+                                Re-run experiment
+                              </button>
+                            </div>
+                          </div>
+                        </CarouselItem>
+                      );
+                    })}
+                  </CarouselContent>
+                  <CarouselPrevious className="hidden sm:flex opacity-70" />
+                  <CarouselNext className="hidden sm:flex opacity-70" />
+                </Carousel>
+              </div>
+            ) : (
+              <div className="mt-4 text-sm eb-muted">No completed experiments yet.</div>
+            )
           ) : null}
         </div>
       </div>
