@@ -3059,34 +3059,120 @@ const tryNextPrompts = useMemo(() => {
   }, [suggestedExperiments, experimentHistory]);
 
   const mergedSuggestedExperimentCards = useMemo(() => {
-    const tryCards = visibleTryNextPrompts.map((p) => ({
-      id: p.id,
-      source: 'try' as const,
-      title: p.title,
-      body: p.description,
-      suggestion: p.suggestion,
-      metrics: p.metrics,
-      durationDays: p.durationDays || 3,
-      prompt: p,
-      sortRank: 200 + (p.rank || 0),
-    }));
+    const recentEntries = filterByDays(entriesAllSorted, 5);
+    const baselineEntries = filterByDays(entriesAllSorted, 21)
+      .filter((entry) => !recentEntries.some((recent) => String(recent?.date || '') === String(entry?.date || '')));
+    const currentPhase = userData.cycleTrackingMode === 'cycle' ? estimatePhaseByFlow(isoTodayLocal(), entriesAllSorted) : null;
 
-    const strongCards = visibleSuggestedExperiments.map((s) => ({
-      id: s.id,
-      source: 'strong' as const,
-      title: s.title,
-      body: s.body,
-      suggestion: '',
-      metrics: s.metrics,
-      durationDays: s.durationDays || 3,
-      experiment: s,
-      confidenceLabel: s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning',
-      sortRank: (s.confidence === 'high' ? 120 : s.confidence === 'medium' ? 90 : 60) + Math.max(0, 10 - Math.min((s.metrics || []).length, 10)),
-    }));
+    const meanForMetric = (items: any[], metric: MetricKey) => {
+      const values = items
+        .map((entry) => metricValue(entry, metric))
+        .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+      return values.length ? mean(values) : null;
+    };
+
+    const phaseBoostForMetric = (metric: MetricKey) => {
+      const key = String(metric);
+      if (!currentPhase) return 0;
+      if (currentPhase === 'Menstrual' && ['cramps', 'pain', 'backPain', 'headache', 'fatigue', 'bleeding'].includes(key)) return 5;
+      if (currentPhase === 'Luteal' && ['sleep', 'insomnia', 'anxiety', 'irritability', 'breastTenderness', 'appetite', 'nightSweats', 'hotFlushes', 'bloating', 'stress'].includes(key)) return 4;
+      if (currentPhase === 'Ovulation' && ['libido', 'energy', 'socialising'].includes(key)) return 2;
+      if (currentPhase === 'Follicular' && ['motivation', 'energy', 'focus'].includes(key)) return 2;
+      return 0;
+    };
+
+    const metricUrgencyScore = (metrics: MetricKey[]) => {
+      return (metrics || []).slice(0, 5).reduce((total, metric) => {
+        const recentMean = meanForMetric(recentEntries as any[], metric);
+        const baselineMean = meanForMetric(baselineEntries as any[], metric);
+        const polarity = getMetricPolarity(metric as any);
+        let score = 0;
+
+        if (recentMean !== null && baselineMean !== null) {
+          const delta = polarity === 'positive' ? baselineMean - recentMean : recentMean - baselineMean;
+          if (delta > 0.35) score += Math.min(16, delta * 7);
+        }
+
+        if (recentMean !== null) {
+          if (polarity === 'positive' && recentMean <= 4.5) score += 4.5 - recentMean;
+          if (polarity !== 'positive' && recentMean >= 6.5) score += (recentMean - 6.5) * 1.6;
+        }
+
+        score += phaseBoostForMetric(metric);
+        return total + score;
+      }, 0);
+    };
+
+    const getCooldownPenalty = (input: { title?: string; metrics?: MetricKey[]; changeKey?: string }) => {
+      const history = Array.isArray(experimentHistory) ? experimentHistory : [];
+      const targetTitle = String(input.title || '').trim().toLowerCase();
+      const targetMetrics = Array.isArray(input.metrics) ? input.metrics.map((metric) => String(metric)).sort().join('|') : '';
+      const targetChangeKey = String(input.changeKey || '').trim().toLowerCase();
+      const today = isoTodayLocal();
+      let latestGap = Number.POSITIVE_INFINITY;
+
+      history.forEach((item: any) => {
+        const completedIso = isoDatePartFromDateTime(item?.outcome?.completedAtISO) || item?.startDateISO;
+        if (!completedIso) return;
+        const itemTitle = String(item?.title || '').trim().toLowerCase();
+        const itemMetrics = Array.isArray(item?.metrics) ? item.metrics.map((metric: any) => String(metric)).sort().join('|') : '';
+        const itemChangeKey = String(item?.changeKey || '').trim().toLowerCase();
+        const sameByChange = Boolean(targetChangeKey && itemChangeKey && targetChangeKey === itemChangeKey);
+        const sameByMetrics = Boolean(targetMetrics && itemMetrics && targetMetrics === itemMetrics);
+        const sameByTitle = Boolean(targetTitle && itemTitle && targetTitle === itemTitle);
+        if (!sameByChange && !sameByMetrics && !sameByTitle) return;
+        const gap = daysBetweenIso(completedIso, today);
+        if (gap < latestGap) latestGap = gap;
+      });
+
+      if (!Number.isFinite(latestGap)) return 0;
+      if (latestGap <= 14) return 120;
+      if (latestGap <= 28) return 70;
+      if (latestGap <= 42) return 35;
+      if (latestGap <= 60) return 14;
+      return 0;
+    };
+
+    const tryCards = visibleTryNextPrompts.map((p) => {
+      const urgency = metricUrgencyScore(p.metrics || []);
+      const cooldownPenalty = getCooldownPenalty({ title: p.title, metrics: p.metrics, changeKey: p.changeKey });
+      const baseScore = 20 + ((p.rank || 0) / 3);
+      const totalScore = baseScore + urgency - cooldownPenalty;
+      return {
+        id: p.id,
+        source: 'try' as const,
+        title: p.title,
+        body: p.description,
+        suggestion: p.suggestion,
+        metrics: p.metrics,
+        durationDays: p.durationDays || 3,
+        prompt: p,
+        sortRank: totalScore,
+      };
+    });
+
+    const strongCards = visibleSuggestedExperiments.map((s) => {
+      const urgency = metricUrgencyScore(s.metrics || []);
+      const confidenceBase = s.confidence === 'high' ? 34 : s.confidence === 'medium' ? 24 : 14;
+      const cooldownPenalty = getCooldownPenalty({ title: s.title, metrics: s.metrics });
+      const totalScore = confidenceBase + urgency - cooldownPenalty;
+      return {
+        id: s.id,
+        source: 'strong' as const,
+        title: s.title,
+        body: s.body,
+        suggestion: '',
+        metrics: s.metrics,
+        durationDays: s.durationDays || 3,
+        experiment: s,
+        confidenceLabel: s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning',
+        sortRank: totalScore,
+      };
+    });
 
     return [...tryCards, ...strongCards]
       .sort((a, b) => b.sortRank - a.sortRank || a.title.localeCompare(b.title));
-  }, [visibleTryNextPrompts, visibleSuggestedExperiments]);
+  }, [visibleTryNextPrompts, visibleSuggestedExperiments, entriesAllSorted, userData, experimentHistory]);
 
   const visibleMergedSuggestedCards = useMemo(
     () => mergedSuggestedExperimentCards.slice(0, suggestedVisibleCount),
