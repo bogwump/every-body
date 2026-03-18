@@ -331,10 +331,11 @@ function promoteDisplayPatternState(args: {
   stateResult: PairPatternStateResult | null;
   n: number;
   correlation: number;
+  metricCount?: number;
   lagPattern?: { leadLabel: string; followLabel: string; lagDays: number; direction: 'together' | 'inverse'; } | null;
   feedback?: { userFeedback?: string | null } | null;
 }): ConnectionDisplayState {
-  const { stateResult, n, correlation, lagPattern, feedback } = args;
+  const { stateResult, n, correlation, metricCount = 2, lagPattern, feedback } = args;
   const raw = stateResult?.state ?? 'unclear_interesting';
   if (feedback?.userFeedback === 'yes') return 'stable_recurring_grouping';
   if (raw === 'live_cluster' || raw === 'upcoming_cluster' || raw === 'passed_cluster' || raw === 'stable_recurring_grouping') {
@@ -343,6 +344,7 @@ function promoteDisplayPatternState(args: {
 
   const absCorr = Math.abs(correlation);
   const repeatCount = stateResult?.repeatCount ?? 0;
+  const recurringScore = stateResult?.recurringScore ?? 0;
   const leadConfidence = stateResult?.leadConfidence;
   const hasCue = leadConfidence === 'medium' || leadConfidence === 'high';
   const bothRecent = Boolean(stateResult?.isMetricARecent && stateResult?.isMetricBRecent);
@@ -350,23 +352,33 @@ function promoteDisplayPatternState(args: {
   const activeNow = Boolean(stateResult?.isMetricAActiveNow || stateResult?.isMetricBActiveNow);
   const upcomingWindow = stateResult?.daysUntilLikelyWindow != null && stateResult.daysUntilLikelyWindow >= -2 && stateResult.daysUntilLikelyWindow <= 8;
   const passedWindow = stateResult?.daysSinceLikelyWindow != null && stateResult.daysSinceLikelyWindow >= 1 && stateResult.daysSinceLikelyWindow <= 18;
+  const repeatish = repeatCount >= 1 || recurringScore >= 28 || n >= 6;
+  const strongSignal = absCorr >= 0.24 || Boolean(lagPattern) || hasCue;
 
-  if ((stateResult?.isMetricAActiveNow && stateResult?.isMetricBActiveNow) || (activeNow && absCorr >= 0.25) || (bothRecent && absCorr >= 0.28)) {
+  if ((stateResult?.isMetricAActiveNow && stateResult?.isMetricBActiveNow) || (activeNow && strongSignal) || (bothRecent && absCorr >= 0.2)) {
     return 'live_cluster';
   }
-  if (upcomingWindow && !stateResult?.hasLeadSymptomLandedThisCycle && (repeatCount >= 1 || hasCue || Boolean(lagPattern) || absCorr >= 0.32)) {
+
+  if (metricCount >= 3) {
+    if (oneRecent || activeNow) return 'live_cluster';
+    if (upcomingWindow && !stateResult?.hasLeadSymptomLandedThisCycle) return 'upcoming_cluster';
+    if (passedWindow) return 'passed_cluster';
+    if (repeatish || strongSignal || n >= 4) return 'stable_recurring_grouping';
+  }
+
+  if (upcomingWindow && !stateResult?.hasLeadSymptomLandedThisCycle && (repeatish || strongSignal || absCorr >= 0.2)) {
     return 'upcoming_cluster';
   }
-  if (passedWindow && !bothRecent && (repeatCount >= 1 || hasCue || Boolean(lagPattern) || absCorr >= 0.32)) {
+  if (passedWindow && !bothRecent && (repeatish || strongSignal || absCorr >= 0.2)) {
     return 'passed_cluster';
   }
-  if (repeatCount >= 1 && (hasCue || Boolean(lagPattern) || n >= 6 || absCorr >= 0.35)) {
+  if (repeatish && strongSignal) {
     return 'stable_recurring_grouping';
   }
-  if (Boolean(lagPattern) || hasCue || (n >= 8 && absCorr >= 0.35) || absCorr >= 0.5) {
+  if (Boolean(lagPattern) || hasCue || (n >= 5 && absCorr >= 0.28) || absCorr >= 0.45) {
     return 'stable_recurring_grouping';
   }
-  if (oneRecent && absCorr >= 0.2) return 'live_cluster';
+  if (oneRecent && absCorr >= 0.15) return 'live_cluster';
   return 'unclear_interesting';
 }
 
@@ -375,7 +387,7 @@ function buildConnectionNarrative(args: {
   stateResult: PairPatternStateResult | null;
   displayState?: ConnectionDisplayState;
   lagPattern?: { leadLabel: string; followLabel: string; lagDays: number; direction: 'together' | 'inverse'; } | null;
-}): { supportingLine: string; contextLine: string | null; why: string[] } {
+}): { supportingLine: string; contextLine: string | null; why: string[]; meaningLine: string | null; watchLine: string | null } {
   const { pair, stateResult, lagPattern, displayState } = args;
   const lowA = pair.a.toLowerCase();
   const lowB = pair.b.toLowerCase();
@@ -389,41 +401,55 @@ function buildConnectionNarrative(args: {
     ? `${pair.a} and ${lowB} have often risen together.`
     : `${pair.a} and ${lowB} have often moved in opposite directions.`;
   let contextLine = pair.contextLine ?? null;
+  let meaningLine: string | null = null;
+  let watchLine: string | null = null;
   const why: string[] = [];
 
   if (state === 'live_cluster') {
     supportingLine = moveTogether
       ? `These seem to be moving together now${phaseHint}.`
       : `These seem to be pulling in opposite directions right now${phaseHint}.`;
+    meaningLine = moveTogether
+      ? `This looks more like a live cluster than two separate symptoms right now.`
+      : `This looks like a live push-pull pattern rather than two separate shifts right now.`;
     contextLine = moveTogether
       ? `For the next few days, it may help to keep things gentler and notice whether both stay softer together.`
       : `For the next few days, notice whether easing one shifts the other too.`;
+    watchLine = contextLine;
     why.push('Both symptoms have been active recently, so this looks like a live cluster rather than an older pattern.');
   } else if (state === 'upcoming_cluster') {
     supportingLine = `This pattern tends to show up around this point in your rhythm${phaseHint}.`;
+    meaningLine = `This looks less like a random overlap and more like a timing pattern in your rhythm.`;
     contextLine = hasCue && cueLabel && followLabel
       ? `For you, ${cueLabel.toLowerCase()} may be one of the earlier signs in this cluster. Next time it appears, use it as a cue to keep an eye on ${followLabel.toLowerCase()}.`
       : `Keep an eye out for this pairing over the next few days, as this is often when it starts to surface.`;
+    watchLine = contextLine;
     why.push('The timing of this pair looks repeatable enough that it may be approaching again soon.');
   } else if (state === 'passed_cluster') {
     supportingLine = `This looks like one of your recurring clusters, but the window has probably passed this cycle.`;
+    meaningLine = `This looks recurring, but probably not like something to act on today.`;
     contextLine = hasCue && cueLabel
       ? `${cueLabel} may be one of your earlier signs here, so it may be worth noticing whether the same sequence returns next cycle.`
       : `This is probably more useful as a reflective summary for next cycle than something to act on today.`;
+    watchLine = contextLine;
     why.push('This pairing usually shows up earlier in the cycle, and that window appears to be behind you for now.');
   } else if (state === 'stable_recurring_grouping') {
     supportingLine = `These tend to travel together for you across cycles.`;
+    meaningLine = `This looks less like a one-off and more like one of your recurring body groupings.`;
     contextLine = hasCue && cueLabel && followLabel
       ? `For you, ${cueLabel.toLowerCase()} may be one of the earlier signs in this cluster. Next time it appears, use it as a cue to keep an eye on ${followLabel.toLowerCase()}.`
       : `This looks less like a one-off and more like one of your recurring body groupings.`;
+    watchLine = contextLine;
     why.push('This pairing has repeated enough times that it looks more like a recurring grouping than a one-off.');
   } else {
     supportingLine = moveTogether
       ? `${pair.a} and ${lowB} may be starting to move together, but it is still early.`
       : `${pair.a} and ${lowB} may be connected, but the pattern is still taking shape.`;
+    meaningLine = null;
     contextLine = hasCue && cueLabel && followLabel
       ? `A light early hint is that ${cueLabel.toLowerCase()} may show up before ${followLabel.toLowerCase()}, but the app needs another cycle to be surer.`
       : `This is an early hint rather than a settled pattern, so one more cycle of logging should make it clearer.`;
+    watchLine = contextLine;
     why.push('There is a possible link here, but the signal is still early and may change with more data.');
   }
 
@@ -447,7 +473,7 @@ function buildConnectionNarrative(args: {
 
   if (pair.contextLine && pair.contextLine !== contextLine) why.push(pair.contextLine);
   why.push('Patterns are a hint, not proof.');
-  return { supportingLine, contextLine, why };
+  return { supportingLine, contextLine, why, meaningLine, watchLine };
 }
 
 function insightQualityScore(args: {
@@ -1627,6 +1653,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         correlation,
         lagPattern,
         feedback,
+        metricCount: metricKeys.length,
       });
       if (metricKeys.length > 2 && displayState === 'unclear_interesting' && (n >= 5 || Math.abs(correlation) >= 0.3 || Boolean(lagPattern))) {
         displayState = stateResult?.daysUntilLikelyWindow != null && stateResult.daysUntilLikelyWindow >= -2 && stateResult.daysUntilLikelyWindow <= 8
@@ -1692,6 +1719,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         patternState: stateResult,
         displayState,
         supportingLine: narrative.supportingLine,
+        meaningLine: narrative.meaningLine,
+        watchLine: narrative.watchLine,
         feedback,
         signalId: signal.id,
         sourceSignal: signal,
@@ -4257,12 +4286,18 @@ const tryNextPrompts = useMemo(() => {
                     <div className="min-w-0">
                       <div className="text-sm font-semibold">{title}</div>
                       <div className="mt-2">
-                        <span className="eb-choice-pill text-xs" data-selected="true">{getDisplayStateLabel((((p as any).displayState) ?? p.patternState?.state ?? 'unclear_interesting') as ConnectionDisplayState)}</span>
+                        <span className="eb-choice-pill text-xs font-semibold shadow-sm" data-selected="true">{getDisplayStateLabel((((p as any).displayState) ?? p.patternState?.state ?? 'unclear_interesting') as ConnectionDisplayState)}</span>
                       </div>
                     </div>
                   </div>
                   <div className="mt-3 text-sm eb-muted">{supportingLine}</div>
-                  {p.contextLine ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
+                  {((((p as any).displayState) ?? p.patternState?.state ?? 'unclear_interesting') as ConnectionDisplayState) !== 'unclear_interesting' ? (
+                    <div className="mt-3 eb-inset-white rounded-2xl px-4 py-3">
+                      {(p as any).meaningLine ? <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">{(p as any).meaningLine}</div> : null}
+                      {(p as any).watchLine ? <div className="mt-1 text-xs eb-muted">{(p as any).watchLine}</div> : null}
+                    </div>
+                  ) : null}
+                  {p.contextLine && ((((p as any).displayState) ?? p.patternState?.state ?? 'unclear_interesting') as ConnectionDisplayState) === 'unclear_interesting' ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
                   <details className="eb-disclosure eb-disclosure--white mt-3">
                     <summary><span>Why am I seeing this?</span><ChevronDown className="w-4 h-4" /></summary>
                     <div className="mt-2 text-sm eb-muted space-y-1">
