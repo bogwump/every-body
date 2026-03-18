@@ -54,8 +54,8 @@ type CycleActivation = {
 };
 
 const ACTIVE_WINDOW_DAYS = 3;
-const UPCOMING_WINDOW_DAYS = 4;
-const PASSED_WINDOW_BUFFER_DAYS = 1;
+const UPCOMING_WINDOW_DAYS = 5;
+const PASSED_WINDOW_BUFFER_DAYS = 0;
 const PAIR_LINK_WINDOW_DAYS = 6;
 
 function daysBetweenISO(fromISO: string, toISO: string): number {
@@ -247,19 +247,28 @@ export function classifyPatternStateForPairKeys(args: {
   const reasons: PairPatternReason[] = [];
   let state: PairPatternState = 'unclear_interesting';
 
+  const bothRecent = isMetricARecent && isMetricBRecent;
+  const hasStrongTiming = timingConfidence === 'high' || timingConfidence === 'medium';
+  const hasMeaningfulLeadCue = lead.confidence === 'high' || lead.confidence === 'medium';
+  const recurringLooksReal = repeatCount >= 2 && (hasStrongTiming || hasMeaningfulLeadCue || recurringScore >= 38);
+
   if (isMetricAActiveNow && isMetricBActiveNow) {
     state = 'live_cluster';
     reasons.push('active_now');
-  } else if ((isMetricARecent || isMetricBRecent) && daysSinceLikelyWindow != null && daysSinceLikelyWindow >= -1 && daysSinceLikelyWindow <= 2) {
+  } else if (
+    bothRecent
+    || ((isMetricARecent || isMetricBRecent) && daysSinceLikelyWindow != null && daysSinceLikelyWindow >= -2 && daysSinceLikelyWindow <= 3)
+  ) {
     state = 'live_cluster';
     reasons.push('recent_activity');
   } else if (
     likelyWindowDay != null
     && rhythm.dayInCycle != null
     && daysUntilLikelyWindow != null
-    && daysUntilLikelyWindow >= 0
+    && daysUntilLikelyWindow >= -1
     && daysUntilLikelyWindow <= UPCOMING_WINDOW_DAYS
     && !hasLeadSymptomLandedThisCycle
+    && (repeatCount >= 2 || hasStrongTiming || recurringScore >= 34)
   ) {
     state = 'upcoming_cluster';
     reasons.push('approaching_window');
@@ -268,13 +277,14 @@ export function classifyPatternStateForPairKeys(args: {
     && rhythm.dayInCycle != null
     && daysSinceLikelyWindow != null
     && daysSinceLikelyWindow > PASSED_WINDOW_BUFFER_DAYS
+    && daysSinceLikelyWindow <= 14
     && !isMetricARecent
     && !isMetricBRecent
-    && repeatCount >= 2
+    && recurringLooksReal
   ) {
     state = 'passed_cluster';
     reasons.push('window_passed');
-  } else if (repeatCount >= 3 || recurringScore >= 45) {
+  } else if (repeatCount >= 3 || recurringScore >= 45 || recurringLooksReal) {
     state = 'stable_recurring_grouping';
     reasons.push('recurs_across_cycles');
   } else {

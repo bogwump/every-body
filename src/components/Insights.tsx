@@ -51,7 +51,7 @@ import { getBodyWeatherLines } from '../lib/companionLogic';
 import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, getResurfacingNoteForPair, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
 import { getSuggestedDriverOptionsForMetrics } from '../lib/patternDrivers';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
-import { classifyPatternStateForSignal, type PairPatternStateResult } from '../lib/patternState';
+import { classifyPatternStateForSignal, getPatternStateSummaryScore, type PairPatternStateResult } from '../lib/patternState';
 import { getMetricPolarity } from '../lib/metricSemantics';
 
 interface InsightsProps {
@@ -1528,6 +1528,12 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       const feedback = getFeedbackForMetrics(aKey, bKey);
       const resurfacingNote = getResurfacingNoteForPair(aKey, bKey, typeof signal.score === 'number' ? signal.score : undefined);
       const contextLine = [resurfacingNote, narrative.contextLine].filter(Boolean).join(' ');
+      const baseScore = typeof signal.score === 'number' ? signal.score : qualityScore(Math.abs(correlation), n);
+      const stateScore = getPatternStateSummaryScore(stateResult);
+      const cueBoost = stateResult?.leadConfidence === 'high' ? 12 : stateResult?.leadConfidence === 'medium' ? 6 : 0;
+      const resurfacingBoost = resurfacingNote ? 9 : 0;
+      const hormonalBoost = hormonalInvolved ? 3 : 0;
+      const displayRank = baseScore + stateScore + cueBoost + resurfacingBoost + hormonalBoost;
       return {
         a: labelFor(aKey, userData),
         b: labelFor(bKey, userData),
@@ -1535,7 +1541,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         n,
         aKey,
         bKey,
-        quality: typeof signal.score === 'number' ? signal.score : qualityScore(Math.abs(correlation), n),
+        quality: baseScore,
         kindA,
         kindB,
         hormonalInvolved,
@@ -1550,7 +1556,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         feedback,
         signalId: signal.id,
         sourceSignal: signal,
-        displayRank: typeof signal.score === 'number' ? signal.score : qualityScore(Math.abs(correlation), n),
+        displayRank,
       };
     };
 
@@ -1585,23 +1591,60 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       .filter((signal) => signal.type === 'metric_pair' && Array.isArray(signal.metrics) && signal.metrics.length >= 2)
       .map((signal) => getPatternFeedbackIdFromMetrics(signal.metrics[0], signal.metrics[1]));
 
-    const ordered = Array.from(byId.values()).sort((a, b) => (b.displayRank ?? 0) - (a.displayRank ?? 0));
+    const statePriority = (card: ConnectionCard): number => {
+      const state = card.patternState?.state ?? 'unclear_interesting';
+      return state === 'live_cluster'
+        ? 5
+        : state === 'upcoming_cluster'
+          ? 4
+          : state === 'stable_recurring_grouping'
+            ? 3
+            : state === 'passed_cluster'
+              ? 2
+              : 1;
+    };
+
+    const ordered = Array.from(byId.values()).sort((a, b) => {
+      const stateDelta = statePriority(b) - statePriority(a);
+      if (stateDelta !== 0) return stateDelta;
+      return (b.displayRank ?? 0) - (a.displayRank ?? 0);
+    });
     const prioritized: ConnectionCard[] = [];
     const seen = new Set<string>();
+    const seenStates = new Set<string>();
 
-    heroMetricPairIds.forEach((id) => {
-      const card = byId.get(id);
-      if (!card || seen.has(id)) return;
-      seen.add(id);
-      prioritized.push(card);
-    });
-
-    ordered.forEach((card) => {
+    const tryAdd = (card?: ConnectionCard | null, options?: { force?: boolean }) => {
+      if (!card) return;
       const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
       if (seen.has(id)) return;
+      const state = card.patternState?.state ?? 'unclear_interesting';
+      const richerStatesExist = ordered.some((item) => (item.patternState?.state ?? 'unclear_interesting') !== 'unclear_interesting');
+      if (!options?.force && state === 'unclear_interesting' && richerStatesExist && prioritized.length < 3) {
+        const alreadyHasEarly = prioritized.some((item) => (item.patternState?.state ?? 'unclear_interesting') === 'unclear_interesting');
+        if (alreadyHasEarly) return;
+      }
+      if (!options?.force && state !== 'unclear_interesting' && prioritized.length < 3 && seenStates.has(state)) {
+        const alternative = ordered.find((item) => {
+          const altState = item.patternState?.state ?? 'unclear_interesting';
+          const altId = getPatternFeedbackIdFromMetrics(item.aKey, item.bKey);
+          return !seen.has(altId) && !seenStates.has(altState) && altState !== 'unclear_interesting';
+        });
+        if (alternative && alternative !== card) return;
+      }
       seen.add(id);
+      seenStates.add(state);
       prioritized.push(card);
+    };
+
+    heroMetricPairIds.forEach((id) => tryAdd(byId.get(id), { force: true }));
+
+    const richerFirst = ordered.filter((card) => (card.patternState?.state ?? 'unclear_interesting') !== 'unclear_interesting');
+    richerFirst.forEach((card) => {
+      if (prioritized.length >= 3) return;
+      tryAdd(card);
     });
+
+    ordered.forEach((card) => tryAdd(card));
 
     return prioritized;
   }, [corrPairs, metricPairSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady]);
