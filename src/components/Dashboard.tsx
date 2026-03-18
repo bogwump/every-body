@@ -23,6 +23,7 @@ import { generateMoments } from '../lib/generateMoments';
 import { CompanionMomentCard } from './CompanionMomentCard';
 import { getCycleTrustModel } from '../lib/cycleTrust';
 import { compareExperimentOutcomes, findPreviousExperimentRun } from '../lib/experimentMeta';
+import { getMoodLabel, isPositiveMetric } from '../lib/metricSemantics';
 
 interface DashboardProps {
   userName: string;
@@ -208,6 +209,18 @@ function formatPoints(value: number): string {
 function metricSentenceLabel(metric: DashboardMetric): string {
   const label = METRIC_LABELS[metric] || metric;
   return label.charAt(0).toLowerCase() + label.slice(1);
+}
+
+function formatDashboardMetricValue(metric: DashboardMetric, value: number | null | undefined): string {
+  if (metric === 'mood') return getMoodLabel(value) || '—';
+  const rounded = Math.round((value ?? 0) * 10) / 10;
+  return Number.isInteger(rounded) ? `${Math.trunc(rounded)}/10` : `${rounded.toFixed(1)}/10`;
+}
+
+function describeDirectionalDelta(metric: DashboardMetric, delta: number): string {
+  if (metric === 'mood') return delta > 0 ? 'better' : 'lower';
+  if (isPositiveMetric(metric)) return delta > 0 ? 'higher' : 'lower';
+  return delta > 0 ? 'higher' : 'lower';
 }
 
 function formatPhaseName(phase: string | null | undefined): string {
@@ -1070,11 +1083,11 @@ export function Dashboard({
         swingBody = `${recentSwing.label} has swung more sharply this week than it did over the rest of the last month.`;
         swingScore = 89;
         if (recentAvg != null && previousAvg != null && Math.abs(recentAvg - previousAvg) >= 1) {
-          swingBody += ` It is also sitting about ${formatPoints(Math.abs(recentAvg - previousAvg))} point${Math.abs(recentAvg - previousAvg) >= 1.5 ? 's' : ''} ${recentAvg > previousAvg ? 'higher' : 'lower'} than your recent baseline.`;
+          swingBody += ` It is also sitting about ${formatPoints(Math.abs(recentAvg - previousAvg))} point${Math.abs(recentAvg - previousAvg) >= 1.5 ? 's' : ''} ${describeDirectionalDelta(recentSwing.metric, recentAvg - previousAvg)} than your recent baseline.`;
           swingScore = 91;
         }
       } else if (recentAvg != null && previousAvg != null && Math.abs(recentAvg - previousAvg) >= 1) {
-        swingBody = `${recentSwing.label} is one of your clearest recent shifts, sitting about ${formatPoints(Math.abs(recentAvg - previousAvg))} point${Math.abs(recentAvg - previousAvg) >= 1.5 ? 's' : ''} ${recentAvg > previousAvg ? 'higher' : 'lower'} than your recent baseline.`;
+        swingBody = `${recentSwing.label} is one of your clearest recent shifts, sitting about ${formatPoints(Math.abs(recentAvg - previousAvg))} point${Math.abs(recentAvg - previousAvg) >= 1.5 ? 's' : ''} ${describeDirectionalDelta(recentSwing.metric, recentAvg - previousAvg)} than your recent baseline.`;
         swingScore = 87;
       }
       pushCandidate(swingScore, {

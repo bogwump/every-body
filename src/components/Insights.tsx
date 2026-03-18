@@ -926,19 +926,20 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [entriesSorted, distributionMetric]);
 
   const highSymptomDays = useMemo(() => {
-    // For each selected metric, count days where value >= 7.
+    // Keep this polarity-aware so positive metrics like mood, energy, or sleep
+    // do not get framed as 'bad symptoms' when they are high.
     const items = selected.map((k) => {
       let count = 0;
       entriesSorted.forEach((e) => {
         const v = getMetricValue(e, k, userData);
         if (typeof v === 'number' && v >= 7) count += 1;
       });
-      return { key: k, count };
+      return { key: k, count, polarity: getMetricPolarity(k) };
     });
 
     items.sort((a, b) => b.count - a.count);
     return items.filter((x) => x.count > 0).slice(0, 4);
-  }, [entriesSorted, selected]);
+  }, [entriesSorted, selected, userData]);
 
   // --- Highlights / findings ---
   const minDaysForDeep = 7;
@@ -5066,22 +5067,22 @@ const tryNextPrompts = useMemo(() => {
         <div className="eb-card">
           <div className="eb-card-header">
             <div>
-              <div className="eb-card-title">High symptom days</div>
-              <div className="eb-card-sub">Days where a symptom hit 7/10 or higher.</div>
+              <div className="eb-card-title">Notable intensity days</div>
+              <div className="eb-card-sub">Days where a metric sat at the stronger end of its scale.</div>
             </div>
           </div>
 
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
             {highSymptomDays.length === 0 ? (
               <div className="eb-inset rounded-2xl p-4 text-sm eb-muted">
-                No "high" days yet in this timeframe. Keep logging and this section will start to light up.
+                No notable intensity days yet in this timeframe. Keep logging and this section will start to light up.
               </div>
             ) : (
               highSymptomDays.map((it) => (
                 <div key={String(it.key)} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
                   <div className="text-sm font-semibold">{labelFor(it.key, userData)}</div>
                   <div className="mt-1 text-sm eb-muted">
-                    {it.count} day{it.count === 1 ? '' : 's'} at 7+ in the last {days}.
+                    {describeHighValue(it.key as any, it.count, days)}
                   </div>
                 </div>
               ))

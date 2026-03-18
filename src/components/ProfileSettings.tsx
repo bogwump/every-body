@@ -91,7 +91,8 @@ function buildInsightsReportHtml(args: { userData: UserData; entries: any[]; sel
       const values = selectedMetrics
         .map((metric) => {
           const raw = metric === 'mood' ? entry?.mood : entry?.values?.[metric];
-          return `<td>${raw ?? '–'}</td>`;
+          const display = formatMetricDisplayValue(metric, typeof raw === 'number' ? raw : null) ?? (raw ?? '–');
+          return `<td>${display}</td>`;
         })
         .join('');
       return `<tr><td>${entry?.dateISO || ''}</td>${values}</tr>`;
