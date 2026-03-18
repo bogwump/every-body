@@ -661,120 +661,68 @@ export function Dashboard({
     return buildWeekSeries(dateISOs, map, chartMetrics);
   }, [entriesSorted, chartMetrics]);
 
-  const quickHookLines = useMemo(() => {
-    // Generate 2-3 lines that feel useful even from day 1.
-    if (entriesSorted.length === 0) return [] as string[];
-    const last7 = filterByDays(entriesSorted, 7);
-    const lines: string[] = [];
+  const nextStep = useMemo(() => {
+    const fallbackBody = insightsRemaining === 1
+      ? 'A quick check-in today will help your patterns start to emerge.'
+      : `A few more check-ins will help your patterns start to emerge. ${insightsRemaining} day${insightsRemaining === 1 ? '' : 's'} to go for your first insights.`;
 
-    // 1) Encourage progress toward insights
     if (!insightsReady) {
-      lines.push(
-        insightsRemaining === 1
-          ? 'A quick check-in today will help your patterns start to emerge.'
-          : `A few more check-ins will help your patterns start to emerge. ${insightsRemaining} day${insightsRemaining === 1 ? '' : 's'} to go for your first insights.`
-      );
-    } else {
-      lines.push('You have enough recent data for a stronger read. Insights may be the best place to look next.');
+      return {
+        body: fallbackBody,
+        actionLabel: checkedInToday ? "Open today’s check-in" : "Do today’s check-in",
+        action: 'check-in' as const,
+      };
     }
 
-    // 2) Pick a “best so far” from the first non-mood metric available
-    const bestMetric = chartMetrics.find((m) => m !== 'mood') ?? chartMetrics[0];
-    let best: { iso: string; v: number } | null = null;
-    for (const e of last7) {
-      const v = metricValue(e as any, bestMetric);
-      if (typeof v !== 'number') continue;
-      if (!best || v > best.v) best = { iso: (e as any).dateISO, v };
-    }
-    if (best) {
-      const day = labelDayShort(best.iso);
-      lines.push(`${METRIC_LABELS[bestMetric]} peak (last 7 days): ${best.v}/10 on ${day}.`);
-    }
+    const last7 = filterByDays(entriesSorted, 7);
+    const sleepEnergyPoints = last7
+      .map((e) => ({
+        sleep: metricValue(e as any, 'sleep'),
+        energy: metricValue(e as any, 'energy'),
+      }))
+      .filter((p) => typeof p.sleep === 'number' && typeof p.energy === 'number') as Array<{ sleep: number; energy: number }>;
 
-    // 3) Mood line if available
-    let bestMood: { iso: string; v: number } | null = null;
-    for (const e of last7) {
-      const v = metricValue(e as any, 'mood');
-      if (typeof v !== 'number') continue;
-      if (!bestMood || v > bestMood.v) bestMood = { iso: (e as any).dateISO, v };
-    }
-    if (bestMood) {
-      const day = labelDayShort(bestMood.iso);
-      lines.push(`Best mood (last 7 days): ${bestMood.v}/10 on ${day}.`);
-    }
+    if (sleepEnergyPoints.length >= 4) {
+      const lowSleepEnergy = sleepEnergyPoints.filter((p) => p.sleep <= 5).map((p) => p.energy);
+      const highSleepEnergy = sleepEnergyPoints.filter((p) => p.sleep >= 7).map((p) => p.energy);
+      const mean = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+      const lowerSleepMean = mean(lowSleepEnergy);
+      const higherSleepMean = mean(highSleepEnergy);
 
-    // 4) Add a tiny "stability" hint if we have a few points
-    if (last7.length >= 3 && lines.length < 4) {
-      const candidates = (chartMetrics.length ? chartMetrics : (['mood', 'energy', 'sleep', 'stress'] as any))
-        .slice(0, 6);
-
-      const stats = candidates
-        .map((k: any) => {
-          const vals = last7
-            .map((e) => metricValue(e as any, k))
-            .filter((v) => typeof v === 'number') as number[];
-          if (vals.length < 3) return null;
-          const min = Math.min(...vals);
-          const max = Math.max(...vals);
-          return { k, range: max - min };
-        })
-        .filter(Boolean) as Array<{ k: any; range: number }>;
-
-      if (stats.length) {
-        stats.sort((a, b) => a.range - b.range);
-        const mostConsistent = stats[0];
-        const biggestSwing = stats[stats.length - 1];
-        lines.push(`Most consistent (last 7 days): ${METRIC_LABELS[mostConsistent.k]}.`);
-        if (lines.length < 4) {
-          lines.push(`Biggest swing (last 7 days): ${METRIC_LABELS[biggestSwing.k]}.`);
-        }
+      if (lowerSleepMean != null && higherSleepMean != null && Math.abs(higherSleepMean - lowerSleepMean) >= 1) {
+        return {
+          body: 'Your recent check-ins suggest the strongest signal may be around sleep and energy. Insights may be the best place to look next.',
+          actionLabel: 'Open Insights',
+          action: 'navigate' as const,
+          screen: 'insights',
+        };
       }
     }
 
+    const phaseHeadline = typeof dashboardRhythm.headline === 'string' ? dashboardRhythm.headline.toLowerCase() : '';
+    const shouldPointToRhythm = userData.cycleTrackingMode === 'cycle' && (
+      cycleTrust.phaseTrust !== 'confirmed'
+      || cycleTrust.predictionTrust !== 'steady'
+      || phaseHeadline.includes('estimated')
+      || Boolean(todayPhase)
+    );
 
-    // 3b) A lightweight "micro-insight" if we have enough sleep+energy points
-    if (lines.length < 3) {
-      const pts = last7
-        .map((e) => ({
-          sleep: metricValue(e as any, 'sleep'),
-          energy: metricValue(e as any, 'energy'),
-        }))
-        .filter((p) => typeof p.sleep === 'number' && typeof p.energy === 'number') as Array<{ sleep: number; energy: number }>;
-
-      if (pts.length >= 4) {
-        const low = pts.filter((p) => p.sleep <= 5).map((p) => p.energy);
-        const high = pts.filter((p) => p.sleep >= 7).map((p) => p.energy);
-        const mean = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
-        const a = mean(low);
-        const b = mean(high);
-        if (a != null && b != null && Math.abs(b - a) >= 1) {
-          lines.push(`Your recent check-ins suggest the strongest signal may be around sleep and energy. Insights may be the best place to look next.`);
-        }
-      }
+    if (shouldPointToRhythm) {
+      return {
+        body: 'Rhythm may be especially helpful today if you want context for why things feel a bit different.',
+        actionLabel: 'Open Rhythm',
+        action: 'navigate' as const,
+        screen: 'rhythm',
+      };
     }
 
-    // 4) A simple “since yesterday” comparison (if we have both days)
-    if (todayEntry && yesterdayEntry) {
-      const candidates: DashboardMetric[] = ['mood', ...chartMetrics.filter((m) => m !== 'mood')];
-      for (const m of candidates) {
-        const a = metricValue(todayEntry as any, m);
-        const b = metricValue(yesterdayEntry as any, m);
-        if (typeof a === 'number' && typeof b === 'number') {
-          const arrow = a > b ? '↑' : a < b ? '↓' : '→';
-          lines.push(`Since yesterday: ${METRIC_LABELS[m]} ${b}→${a} ${arrow}`);
-          break;
-        }
-      }
-    }
-
-    // 5) Gentle nudge to customise without making day 1 feel heavy
-    const coreDefaultCount = 8;
-    if (lines.length < 3 && (userData.enabledModules?.length ?? 0) <= coreDefaultCount) {
-      lines.push('A slightly richer symptom mix can help the next useful pattern come through more clearly.');
-    }
-
-    return lines.slice(0, 4);
-  }, [entriesSorted, chartMetrics, insightsReady, insightsRemaining, todayEntry, yesterdayEntry, userData.enabledModules]);
+    return {
+      body: 'You have enough recent data for a stronger read. Insights may be the best place to look next.',
+      actionLabel: 'Open Insights',
+      action: 'navigate' as const,
+      screen: 'insights',
+    };
+  }, [insightsRemaining, insightsReady, checkedInToday, entriesSorted, dashboardRhythm.headline, userData.cycleTrackingMode, cycleTrust.phaseTrust, cycleTrust.predictionTrust, todayPhase]);
 
   const setChartMetric = (index: 0 | 1 | 2, next: DashboardMetric) => {
     onUpdateUserData((prev) => {
@@ -996,36 +944,25 @@ export function Dashboard({
             </div>
           </div>
 
-          {quickHookLines.length > 0 ? (
-            <div className="text-sm text-[rgba(0,0,0,0.75)] space-y-1">
-              {quickHookLines.map((l, idx) => (
-                <div key={idx}>{l}</div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-[rgba(0,0,0,0.75)]">
-              A few more check-ins will help your patterns start to emerge.
-            </p>
-          )}
+          <p className="text-sm text-[rgba(0,0,0,0.75)]">
+            {nextStep.body}
+          </p>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="eb-inset rounded-2xl p-3">
-              <div className="text-xs text-[rgb(var(--color-text-secondary))]">Insights</div>
-              <div className="mt-1 font-semibold">{insightsReady ? 'Ready' : `${insightsRemaining} to unlock`}</div>
-            </div>
-            <div className="eb-inset rounded-2xl p-3">
-              <div className="text-xs text-[rgb(var(--color-text-secondary))]">Best next page</div>
-              <div className="mt-1 font-semibold">{insightsReady ? 'Insights' : 'Check-in'}</div>
-            </div>
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (nextStep.action === 'check-in') {
+                  onOpenCheckIn(todayISO);
+                  return;
+                }
+                onNavigate(nextStep.screen);
+              }}
+              className="eb-btn eb-btn-secondary inline-flex items-center gap-2"
+            >
+              {nextStep.actionLabel} <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => (insightsReady ? onNavigate('insights') : onOpenCheckIn(todayISO))}
-            className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
-          >
-            {insightsReady ? 'View insights' : "Do today’s check-in"} <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
 
         <div className="eb-card">
