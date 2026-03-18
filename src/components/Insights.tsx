@@ -361,9 +361,11 @@ function buildConnectionNarrative(args: {
     why.push('This pairing has repeated enough times that it looks more like a recurring grouping than a one-off.');
   } else {
     supportingLine = moveTogether
-      ? `${pair.a} and ${lowB} may be linked, but the signal is still early.`
-      : `${pair.a} and ${lowB} may be linked, but the signal is still early.`;
-    contextLine = 'Keep logging for one more cycle to see whether the same pattern repeats.';
+      ? `${pair.a} and ${lowB} may be starting to move together, but it is still early.`
+      : `${pair.a} and ${lowB} may be connected, but the pattern is still taking shape.`;
+    contextLine = hasCue && cueLabel && followLabel
+      ? `A light early hint is that ${cueLabel.toLowerCase()} may show up before ${followLabel.toLowerCase()}, but the app needs another cycle to be surer.`
+      : `This is an early hint rather than a settled pattern, so one more cycle of logging should make it clearer.`;
     why.push('There is a possible link here, but the signal is still early and may change with more data.');
   }
 
@@ -4211,7 +4213,7 @@ const tryNextPrompts = useMemo(() => {
                             ? 'This one is more useful as a marker for next cycle than something to act on today.'
                             : state === 'stable_recurring_grouping'
                               ? 'This looks more like a recurring body pattern than a one-off.'
-                              : 'Keep logging for one more cycle to see whether the same pattern repeats.';
+                              : 'This still looks early, so another cycle should help confirm whether the same pairing comes back.';
 
                       return <div className="text-sm eb-muted">{actionNote}</div>;
                     })()}
