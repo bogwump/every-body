@@ -1181,6 +1181,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const [patternFeedbackTick, setPatternFeedbackTick] = useState(0);
   const [pendingContradiction, setPendingContradiction] = useState<PendingContradiction | null>(null);
+  const [visibleConnectionCount, setVisibleConnectionCount] = useState(3);
 
   const cycleTrust = useMemo(() => getCycleTrustModel(entriesAllSorted as any, userData, isoTodayLocal()), [entriesAllSorted, userData]);
 
@@ -1646,14 +1647,34 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     ordered.forEach((card) => tryAdd(card));
 
-    return prioritized;
+    const queued = [...prioritized];
+    ordered.forEach((card) => {
+      const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      if (!seen.has(id)) queued.push(card);
+    });
+
+    return queued;
   }, [corrPairs, metricPairSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady]);
 
+  const visibleConnectionCards = useMemo(() => {
+    const untouched = connectionCards.filter((card) => {
+      const feedbackId = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      return !card.feedback || (card.feedback.status === 'active' && card.feedback.userFeedback !== 'yes' && shouldPromptPatternFeedback(feedbackId));
+    });
+
+    const reviewed = connectionCards.filter((card) => {
+      const feedbackId = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      return !!card.feedback && (!shouldPromptPatternFeedback(feedbackId) || card.feedback.status !== 'active' || card.feedback.userFeedback === 'yes');
+    });
+
+    return [...untouched.slice(0, visibleConnectionCount), ...reviewed];
+  }, [connectionCards, visibleConnectionCount]);
+
   useEffect(() => {
-    const seenSignals = connectionCards.slice(0, 3).map((card) => card.sourceSignal).filter(Boolean);
+    const seenSignals = visibleConnectionCards.slice(0, 3).map((card) => card.sourceSignal).filter(Boolean);
     if (!seenSignals.length) return;
     markPatternsDiscovered(seenSignals);
-  }, [connectionCards]);
+  }, [visibleConnectionCards]);
 
   const handlePatternFeedback = (kind: 'yes' | 'no' | 'unsure', pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }, driverHint?: PatternDriverHint) => {
     const confidenceScore = pair.confidence === 'high' ? 0.82 : pair.confidence === 'medium' ? 0.66 : 0.5;
@@ -4076,8 +4097,9 @@ const tryNextPrompts = useMemo(() => {
         {connectionCards.length < 1 ? (
           <div className="mt-2 text-sm eb-muted">Log a few days with the same metrics to reveal relationships.</div>
         ) : (
+          <>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {connectionCards.slice(0, 3).map((p, idx) => {
+            {visibleConnectionCards.map((p, idx) => {
               const title = `${p.a} + ${p.b}`;
               const supportingLine = p.supportingLine ?? (p.r > 0
                 ? `${p.a} and ${p.b.toLowerCase()} have often risen together.`
@@ -4088,7 +4110,6 @@ const tryNextPrompts = useMemo(() => {
                   <div className="text-sm font-semibold">{title}</div>
                   <div className="mt-2 text-sm eb-muted">{supportingLine}</div>
                   {p.contextLine ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
-                  <div className="flex-1" />
                   <details className="eb-disclosure eb-disclosure--white mt-3">
                     <summary><span>Why am I seeing this?</span><ChevronDown className="w-4 h-4" /></summary>
                     <div className="mt-2 text-sm eb-muted space-y-1">
@@ -4265,6 +4286,21 @@ const tryNextPrompts = useMemo(() => {
               );
             })}
           </div>
+          {connectionCards.filter((card) => {
+            const feedbackId = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+            return !card.feedback || (card.feedback.status === 'active' && card.feedback.userFeedback !== 'yes' && shouldPromptPatternFeedback(feedbackId));
+          }).length > visibleConnectionCount ? (
+            <div className="mt-4 flex justify-center sm:justify-start">
+              <button
+                type="button"
+                className="eb-btn-secondary"
+                onClick={() => setVisibleConnectionCount((count) => count + 3)}
+              >
+                See more connections
+              </button>
+            </div>
+          ) : null}
+          </>
         )}
       </div>
 
