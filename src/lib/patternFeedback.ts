@@ -108,13 +108,21 @@ export function canonicalPairKey(a: InsightMetricKey | string, b: InsightMetricK
   return [String(a), String(b)].sort().join('::');
 }
 
+export function canonicalMetricSetKey(metrics: Array<InsightMetricKey | string>): string {
+  return Array.from(new Set(metrics.map(String))).sort().join('::');
+}
+
 export function getPatternFeedbackIdFromMetrics(a: InsightMetricKey | string, b: InsightMetricKey | string): string {
   return `pair:${canonicalPairKey(a, b)}`;
 }
 
+export function getPatternFeedbackIdFromMetricSet(metrics: Array<InsightMetricKey | string>): string {
+  return `pair:${canonicalMetricSetKey(metrics)}`;
+}
+
 export function getPatternFeedbackIdFromSignal(signal: Pick<InsightSignal, 'type' | 'metrics'>): string | null {
   if (!signal || signal.type !== 'metric_pair' || !Array.isArray(signal.metrics) || signal.metrics.length < 2) return null;
-  return getPatternFeedbackIdFromMetrics(signal.metrics[0], signal.metrics[1]);
+  return getPatternFeedbackIdFromMetricSet(signal.metrics);
 }
 
 export function listPatternFeedback(): PatternFeedbackRecord[] {
@@ -139,7 +147,7 @@ export function suppressPattern(args: { id: string; patternId?: string; metrics:
   const record = upsert({
     id: args.id,
     patternId: args.patternId ?? args.id,
-    canonicalMetrics: args.metrics.map(String).slice(0, 2).sort(),
+    canonicalMetrics: Array.from(new Set(args.metrics.map(String))).slice(0, 3).sort(),
     status: 'suppressed',
     userContradicted: true,
     userFeedback: 'no',
@@ -170,7 +178,7 @@ export function confirmPattern(args: { id: string; patternId?: string; metrics: 
   const record = upsert({
     id: args.id,
     patternId: args.patternId ?? args.id,
-    canonicalMetrics: args.metrics.map(String).slice(0, 2).sort(),
+    canonicalMetrics: Array.from(new Set(args.metrics.map(String))).slice(0, 3).sort(),
     status: 'confirmed',
     userContradicted: false,
     userFeedback: 'yes',
@@ -200,7 +208,7 @@ export function markPatternUnsure(args: { id: string; patternId?: string; metric
   const record = upsert({
     id: args.id,
     patternId: args.patternId ?? args.id,
-    canonicalMetrics: args.metrics.map(String).slice(0, 2).sort(),
+    canonicalMetrics: Array.from(new Set(args.metrics.map(String))).slice(0, 3).sort(),
     status: existing?.status ?? 'active',
     userContradicted: Boolean(existing?.userContradicted),
     userFeedback: 'unsure',
@@ -291,6 +299,10 @@ export function shouldPromptPatternFeedback(id: string | null | undefined, cycle
 
 export function getFeedbackForMetrics(a: InsightMetricKey | string, b: InsightMetricKey | string): PatternFeedbackRecord | null {
   return getPatternFeedback(getPatternFeedbackIdFromMetrics(a, b));
+}
+
+export function getFeedbackForMetricSet(metrics: Array<InsightMetricKey | string>): PatternFeedbackRecord | null {
+  return getPatternFeedback(getPatternFeedbackIdFromMetricSet(metrics));
 }
 
 export function isSuppressedPair(a: InsightMetricKey | string, b: InsightMetricKey | string, currentScore?: number): boolean {

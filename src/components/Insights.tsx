@@ -48,7 +48,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
-import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, getResurfacingNoteForPair, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
+import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetricSet, getFeedbackForMetrics, getPatternFeedbackIdFromMetricSet, getPatternFeedbackIdFromMetrics, getResurfacingNoteForPair, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
 import { getSuggestedDriverOptionsForMetrics } from '../lib/patternDrivers';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 import { classifyPatternStateForSignal, getPatternStateSummaryScore, type PairPatternStateResult } from '../lib/patternState';
@@ -1511,8 +1511,70 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     return daysSinceISO(feedback.lastFeedback) >= 45 || countEntriesSince(feedback.lastFeedback) >= 20;
   };
 
+  const getConnectionId = (metrics: Array<InsightMetricKey | string>) => getPatternFeedbackIdFromMetricSet(metrics.slice(0, 3));
+
+  const triadSignals = useMemo(() => {
+    const pairSignals = metricPairSignals
+      .filter((signal) => signal.type === 'metric_pair' && Array.isArray(signal.metrics) && signal.metrics.length >= 2)
+      .map((signal) => ({
+        signal,
+        a: signal.metrics[0] as InsightMetricKey,
+        b: signal.metrics[1] as InsightMetricKey,
+        key: [String(signal.metrics[0]), String(signal.metrics[1])].sort().join('::'),
+        corr: typeof signal.summary?.correlation === 'number' ? signal.summary.correlation : (signal.direction === 'inverse' ? -0.35 : 0.35),
+      }));
+
+    const pairMap = new Map(pairSignals.map((item) => [item.key, item]));
+    const metricRank = new Map<string, number>();
+    pairSignals.forEach(({ signal, a, b }) => {
+      const score = Number(signal.score || 0);
+      metricRank.set(String(a), Math.max(metricRank.get(String(a)) || 0, score));
+      metricRank.set(String(b), Math.max(metricRank.get(String(b)) || 0, score));
+    });
+
+    const metricUniverse = Array.from(metricRank.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([key]) => key as InsightMetricKey);
+
+    const triads: InsightSignal[] = [];
+    for (let i = 0; i < metricUniverse.length; i += 1) {
+      for (let j = i + 1; j < metricUniverse.length; j += 1) {
+        for (let k = j + 1; k < metricUniverse.length; k += 1) {
+          const metrics = [metricUniverse[i], metricUniverse[j], metricUniverse[k]] as InsightMetricKey[];
+          const edges = [
+            pairMap.get([String(metrics[0]), String(metrics[1])].sort().join('::')),
+            pairMap.get([String(metrics[0]), String(metrics[2])].sort().join('::')),
+            pairMap.get([String(metrics[1]), String(metrics[2])].sort().join('::')),
+          ].filter(Boolean) as Array<typeof pairSignals[number]>;
+          if (edges.length < 2) continue;
+          const avgAbsCorr = edges.reduce((sum, edge) => sum + Math.abs(edge.corr), 0) / edges.length;
+          const avgScore = edges.reduce((sum, edge) => sum + Number(edge.signal.score || 0), 0) / edges.length;
+          const minSample = Math.min(...edges.map((edge) => Number(edge.signal.sampleSize || 0)).filter((n) => n > 0));
+          if (avgAbsCorr < 0.28 && avgScore < 74) continue;
+          triads.push({
+            id: `triad-${metrics.slice().sort().join('-')}`,
+            type: 'metric_pair',
+            metrics: metrics.slice().sort() as InsightMetricKey[],
+            score: Math.round(avgScore + (edges.length === 3 ? 10 : 4)),
+            confidence: avgScore >= 88 || avgAbsCorr >= 0.58 ? 'high' : avgScore >= 76 || avgAbsCorr >= 0.42 ? 'medium' : 'low',
+            strength: avgScore >= 88 || avgAbsCorr >= 0.58 ? 'strong' : avgScore >= 72 || avgAbsCorr >= 0.36 ? 'moderate' : 'weak',
+            phase: currentInsightsPhase ?? null,
+            direction: 'together',
+            sampleSize: Number.isFinite(minSample) ? minSample : 4,
+            summary: { metric: metrics[0], otherMetric: metrics[1], correlation: avgAbsCorr },
+          });
+        }
+      }
+    }
+
+    return triads
+      .sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
+      .slice(0, 6);
+  }, [metricPairSignals, currentInsightsPhase]);
+
   const connectionCards = useMemo(() => {
-    type ConnectionCard = (typeof corrPairs)[number] & { signalId: string; sourceSignal: InsightSignal; displayRank: number; displayState?: ConnectionDisplayState; };
+    type ConnectionCard = (typeof corrPairs)[number] & { signalId: string; sourceSignal: InsightSignal; displayRank: number; displayState?: ConnectionDisplayState; metricKeys: InsightMetricKey[]; metricLabels: string[]; triad?: boolean; };
 
     const makeSignalFromPair = (pair: (typeof corrPairs)[number]): InsightSignal => ({
       id: `pair-${String(pair.aKey)}-${String(pair.bKey)}`,
@@ -1529,8 +1591,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     const makeCardFromSignal = (signal: InsightSignal): ConnectionCard | null => {
       if (signal.type !== 'metric_pair' || !Array.isArray(signal.metrics) || signal.metrics.length < 2) return null;
-      const aKey = signal.metrics[0] as InsightMetricKey;
-      const bKey = signal.metrics[1] as InsightMetricKey;
+      const metricKeys = Array.from(new Set(signal.metrics.slice(0, 3))) as InsightMetricKey[];
+      const aKey = metricKeys[0] as InsightMetricKey;
+      const bKey = metricKeys[1] as InsightMetricKey;
       const confidence = signal.confidence === 'high' || signal.confidence === 'medium' ? signal.confidence : 'low';
       const n = Math.max(Number(signal.sampleSize || 0), 4);
       const correlation = typeof signal.summary?.correlation === 'number'
@@ -1557,14 +1620,21 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         userData,
         signal,
       });
-      const feedback = getFeedbackForMetrics(aKey, bKey);
-      const displayState = promoteDisplayPatternState({
+      const feedback = getFeedbackForMetricSet(metricKeys) ?? getFeedbackForMetrics(aKey, bKey);
+      let displayState = promoteDisplayPatternState({
         stateResult,
         n,
         correlation,
         lagPattern,
         feedback,
       });
+      if (metricKeys.length > 2 && displayState === 'unclear_interesting' && (n >= 5 || Math.abs(correlation) >= 0.3 || Boolean(lagPattern))) {
+        displayState = stateResult?.daysUntilLikelyWindow != null && stateResult.daysUntilLikelyWindow >= -2 && stateResult.daysUntilLikelyWindow <= 8
+          ? 'upcoming_cluster'
+          : stateResult?.daysSinceLikelyWindow != null && stateResult.daysSinceLikelyWindow >= 1 && stateResult.daysSinceLikelyWindow <= 18
+            ? 'passed_cluster'
+            : 'stable_recurring_grouping';
+      }
       const narrative = buildConnectionNarrative({
         pair: {
           a: labelFor(aKey, userData),
@@ -1594,7 +1664,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           : `Correlation does not mean one causes the other.`,
       ].filter(Boolean);
       const resurfacingNote = getResurfacingNoteForPair(aKey, bKey, typeof signal.score === 'number' ? signal.score : undefined);
-      const contextLine = [resurfacingNote, narrative.contextLine].filter(Boolean).join(' ');
+      const triadLine = metricKeys.length > 2 ? `${labelFor(metricKeys[2], userData)} is also tending to join this cluster.` : '';
+      const contextLine = [resurfacingNote, narrative.contextLine, triadLine].filter(Boolean).join(' ');
       const baseScore = typeof signal.score === 'number' ? signal.score : qualityScore(Math.abs(correlation), n);
       const stateScore = getPatternStateSummaryScore({ ...(stateResult ?? {} as any), state: displayState } as PairPatternStateResult);
       const cueBoost = stateResult?.leadConfidence === 'high' ? 12 : stateResult?.leadConfidence === 'medium' ? 6 : 0;
@@ -1624,7 +1695,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         feedback,
         signalId: signal.id,
         sourceSignal: signal,
-        displayRank,
+        metricKeys,
+        metricLabels: metricKeys.map((key) => labelFor(key, userData)),
+        triad: metricKeys.length > 2,
+        displayRank: displayRank + (metricKeys.length > 2 ? 14 : 0),
       };
     };
 
@@ -1633,7 +1707,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     corrPairs.forEach((pair, index) => {
       const sourceSignal = makeSignalFromPair(pair);
       const built = makeCardFromSignal(sourceSignal);
-      const id = getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey);
+      const id = getConnectionId([pair.aKey, pair.bKey]);
       if (built) {
         byId.set(id, { ...built, displayRank: Math.max(built.displayRank ?? 0, 100 - index) });
         return;
@@ -1646,10 +1720,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       });
     });
 
-    metricPairSignals.forEach((signal, index) => {
+    [...metricPairSignals, ...triadSignals].forEach((signal, index) => {
       const card = makeCardFromSignal(signal);
       if (!card) return;
-      const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      const id = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
       const existing = byId.get(id);
       if (!existing) {
         byId.set(id, { ...card, displayRank: Math.max(0, 120 - index) });
@@ -1662,7 +1736,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     const heroMetricPairIds = heroSignals
       .filter((signal) => signal.type === 'metric_pair' && Array.isArray(signal.metrics) && signal.metrics.length >= 2)
-      .map((signal) => getPatternFeedbackIdFromMetrics(signal.metrics[0], signal.metrics[1]));
+      .map((signal) => getConnectionId(signal.metrics));
 
     const statePriority = (card: ConnectionCard): number => {
       const state = (card as any).displayState ?? card.patternState?.state ?? 'unclear_interesting';
@@ -1688,7 +1762,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     const tryAdd = (card?: ConnectionCard | null, options?: { force?: boolean }) => {
       if (!card) return;
-      const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      const id = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
       if (seen.has(id)) return;
       const state = (card as any).displayState ?? card.patternState?.state ?? 'unclear_interesting';
       const richerStatesExist = ordered.some((item) => (((item as any).displayState) ?? item.patternState?.state ?? 'unclear_interesting') !== 'unclear_interesting');
@@ -1698,8 +1772,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       }
       if (!options?.force && state !== 'unclear_interesting' && prioritized.length < 3 && seenStates.has(state)) {
         const alternative = ordered.find((item) => {
-          const altState = item.patternState?.state ?? 'unclear_interesting';
-          const altId = getPatternFeedbackIdFromMetrics(item.aKey, item.bKey);
+          const altState = ((item as any).displayState) ?? item.patternState?.state ?? 'unclear_interesting';
+          const altId = getConnectionId(item.metricKeys ?? [item.aKey, item.bKey]);
           return !seen.has(altId) && !seenStates.has(altState) && altState !== 'unclear_interesting';
         });
         if (alternative && alternative !== card) return;
@@ -1711,7 +1785,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     heroMetricPairIds.forEach((id) => tryAdd(byId.get(id), { force: true }));
 
-    const richerFirst = ordered.filter((card) => (card.patternState?.state ?? 'unclear_interesting') !== 'unclear_interesting');
+    const richerFirst = ordered.filter((card) => (((card as any).displayState) ?? card.patternState?.state ?? 'unclear_interesting') !== 'unclear_interesting');
     richerFirst.forEach((card) => {
       if (prioritized.length >= 3) return;
       tryAdd(card);
@@ -1721,21 +1795,21 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     const queued = [...prioritized];
     ordered.forEach((card) => {
-      const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      const id = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
       if (!seen.has(id)) queued.push(card);
     });
 
     return queued;
-  }, [corrPairs, metricPairSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady]);
+  }, [corrPairs, metricPairSignals, triadSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady]);
 
   const visibleConnectionCards = useMemo(() => {
     const untouched = connectionCards.filter((card) => {
-      const feedbackId = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      const feedbackId = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
       return !card.feedback || (card.feedback.status === 'active' && card.feedback.userFeedback !== 'yes' && shouldPromptPatternFeedback(feedbackId));
     });
 
     const reviewed = connectionCards.filter((card) => {
-      const feedbackId = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+      const feedbackId = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
       return !!card.feedback && (!shouldPromptPatternFeedback(feedbackId) || card.feedback.status !== 'active' || card.feedback.userFeedback === 'yes');
     });
 
@@ -1751,8 +1825,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const handlePatternFeedback = (kind: 'yes' | 'no' | 'unsure', pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }, driverHint?: PatternDriverHint) => {
     const confidenceScore = pair.confidence === 'high' ? 0.82 : pair.confidence === 'medium' ? 0.66 : 0.5;
     const args = {
-      id: getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey),
-      metrics: [pair.aKey, pair.bKey],
+      id: getConnectionId((pair as any).metricKeys ?? [pair.aKey, pair.bKey]),
+      metrics: ((pair as any).metricKeys ?? [pair.aKey, pair.bKey]),
       previousScore: pair.quality,
       confidence: confidenceScore,
       driverHint,
@@ -1775,7 +1849,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const openContradictionPrompt = (pair: { aKey: InsightMetricKey; bKey: InsightMetricKey; quality: number; confidence?: 'low' | 'medium' | 'high'; }) => {
     setPendingContradiction({
-      id: getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey),
+      id: getConnectionId((pair as any).metricKeys ?? [pair.aKey, pair.bKey]),
       pair,
     });
   };
@@ -4172,7 +4246,7 @@ const tryNextPrompts = useMemo(() => {
           <>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             {visibleConnectionCards.map((p, idx) => {
-              const title = `${p.a} + ${p.b}`;
+              const title = (p.metricLabels && p.metricLabels.length ? p.metricLabels : [p.a, p.b]).join(' + ');
               const supportingLine = p.supportingLine ?? (p.r > 0
                 ? `${p.a} and ${p.b.toLowerCase()} have often risen together.`
                 : `${p.a} and ${p.b.toLowerCase()} have often moved in opposite directions.`);
@@ -4198,7 +4272,7 @@ const tryNextPrompts = useMemo(() => {
                     </div>
                   </details>
                   {(() => {
-                    const feedbackId = getPatternFeedbackIdFromMetrics(p.aKey, p.bKey);
+                    const feedbackId = getConnectionId(p.metricKeys ?? [p.aKey, p.bKey]);
                     const contradictionOpen = pendingContradiction?.id === feedbackId;
                     const shouldAsk = !p.feedback || (p.feedback.status === 'active' && p.feedback.userFeedback !== 'yes' && shouldPromptPatternFeedback(feedbackId));
                     const showReassess = canReassessFeedback(p.feedback);
@@ -4238,7 +4312,7 @@ const tryNextPrompts = useMemo(() => {
                               <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">This pattern didn’t feel right for you, so we’ll stop surfacing it.</div>
                               <div className="mt-3 text-sm eb-muted">Do you know what tends to drive this instead?</div>
                               <div className="mt-3 flex flex-wrap gap-2">
-                                {getSuggestedDriverOptionsForMetrics([p.aKey, p.bKey]).map((option) => (
+                                {getSuggestedDriverOptionsForMetrics((p.metricKeys ?? [p.aKey, p.bKey]).slice(0, 2)).map((option) => (
                                   <button
                                     key={option.key}
                                     type="button"
@@ -4341,7 +4415,7 @@ const tryNextPrompts = useMemo(() => {
                       if (p.allowSuggestedExperiment) {
                         const ctaLabel = state === 'upcoming_cluster' ? 'Set up for next time' : 'Try this now';
                         return (
-                          <button type="button" className="eb-btn-primary" onClick={() => openExperiment([p.aKey, p.bKey])}>
+                          <button type="button" className="eb-btn-primary" onClick={() => openExperiment((p.metricKeys ?? [p.aKey, p.bKey]).slice(0, 3))}>
                             <FlaskConical className="w-4 h-4" />
                             {ctaLabel}
                           </button>
@@ -4366,7 +4440,7 @@ const tryNextPrompts = useMemo(() => {
             })}
           </div>
           {connectionCards.filter((card) => {
-            const feedbackId = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
+            const feedbackId = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
             return !card.feedback || (card.feedback.status === 'active' && card.feedback.userFeedback !== 'yes' && shouldPromptPatternFeedback(feedbackId));
           }).length > visibleConnectionCount ? (
             <div className="mt-4 flex justify-center sm:justify-start">
