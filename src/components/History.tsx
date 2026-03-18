@@ -228,7 +228,7 @@ export function History({ onNavigate }: HistoryProps) {
 
                           {(event.actionLabel && event.actionTarget) || (event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string') ? (
                             <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-                              <div className="flex flex-wrap gap-3">
+                              <div className="order-2 ml-auto flex flex-wrap justify-end gap-3 sm:order-2">
                                 {event.actionLabel && event.actionTarget ? (
                                   <button
                                     type="button"
@@ -251,7 +251,7 @@ export function History({ onNavigate }: HistoryProps) {
                                   </button>
                                 ) : null}
                               </div>
-                              <div className="text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap sm:text-right">{fmtDate(event.date)}</div>
+                              <div className="order-1 mr-auto text-left text-xs text-[rgb(var(--color-text-secondary))] whitespace-nowrap sm:order-1">{fmtDate(event.date)}</div>
                             </div>
                           ) : (
                             <div className="mt-4 flex justify-end">
