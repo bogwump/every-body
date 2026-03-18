@@ -433,19 +433,22 @@ function patternFeedbackActionText(item: PatternFeedbackHistoryEntry): { title: 
 }
 
 function buildPatternFeedbackEvents(): TimelineEvent[] {
+  const discoveredIds = new Set(getDiscoveredPatterns().map((item) => item.id));
   return listPatternFeedbackHistory()
+    .filter((item) => item.action === 'confirmed')
     .map((item) => {
       const metrics = Array.isArray(item.canonicalMetrics) ? item.canonicalMetrics.slice(0, 2) : [];
       if (metrics.length < 2) return null;
+      const signalId = `pair-${metrics[0]}-${metrics[1]}`;
+      if (discoveredIds.has(signalId)) return null;
       const labels = metrics.map((metric) => metricLabel(metric));
-      const action = patternFeedbackActionText(item);
       return {
         id: `pattern-feedback:${item.eventId}`,
-        type: action.type,
+        type: 'pattern_strengthened' as const,
         date: item.date,
-        title: action.title,
-        description: `${labels[0]} + ${labels[1]} · ${action.description}`,
-        evidence: action.evidence,
+        title: 'Connection confirmed',
+        description: `${labels[0]} + ${labels[1]} · You said this connection matched your experience.`,
+        evidence: 'Saved because you confirmed this connection before it was strong enough to earn its own automatic history stamp.',
         signals: labels,
         confidence: typeof item.confidence === 'number' ? (item.confidence >= 0.78 ? 'high' : item.confidence >= 0.58 ? 'medium' : 'low') : undefined,
         source: 'insights' as const,
@@ -453,8 +456,6 @@ function buildPatternFeedbackEvents(): TimelineEvent[] {
         actionTarget: 'insights:connections',
         metadata: {
           patternFeedbackId: item.patternFeedbackId,
-          patternDismissed: item.action === 'suppressed',
-          patternRestored: item.action === 'restored' || item.action === 'reopened',
           patternFeedbackAction: item.action,
         },
       } as TimelineEvent;

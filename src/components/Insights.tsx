@@ -48,7 +48,7 @@ import { pushRuntimeDebug } from '../lib/runtimeDebug';
 import { safeFormatDate, safeScrollIntoView } from '../lib/browserSafe';
 import { getConfidencePhrase } from '../lib/confidenceCopy';
 import { getBodyWeatherLines } from '../lib/companionLogic';
-import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
+import { confirmPattern, filterSignalsByPatternFeedback, getFeedbackForMetrics, getPatternFeedbackIdFromMetrics, getResurfacingNoteForPair, isSuppressedPair, markPatternUnsure, reopenPatternForReview, restorePattern, shouldPromptPatternFeedback, suppressPattern, type PatternDriverHint } from '../lib/patternFeedback';
 import { getSuggestedDriverOptionsForMetrics } from '../lib/patternDrivers';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 import { classifyPatternStateForSignal, type PairPatternStateResult } from '../lib/patternState';
@@ -1399,7 +1399,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           r: p.r,
           n: p.n,
           confidence,
-          contextLine,
+          contextLine: baseContextLine,
         },
         stateResult,
         lagPattern,
@@ -1416,7 +1416,9 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       ].filter(Boolean);
 
       const feedback = getFeedbackForMetrics(p.aKey, p.bKey);
-      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why, lagPattern, contextLine: narrative.contextLine, patternState: stateResult, supportingLine: narrative.supportingLine, feedback };
+      const resurfacingNote = getResurfacingNoteForPair(p.aKey, p.bKey, p.quality);
+      const contextLine = [resurfacingNote, narrative.contextLine].filter(Boolean).join(' ');
+      return { ...p, hormonalInvolved, confidence, maturity, allowSuggestedExperiment, why, lagPattern, contextLine, patternState: stateResult, supportingLine: narrative.supportingLine, feedback };
     });
   }, [deepReady, entriesSorted, selected, userData, allMetricKeys, patternFeedbackTick, currentInsightsPhase]);
 
@@ -1484,7 +1486,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         n >= 4 &&
         !((kindA === 'physio' || kindA === 'hormonal') && (kindB === 'physio' || kindB === 'hormonal'));
       const lagPattern = getLagPatternForPair(entriesSorted, aKey, bKey, userData);
-      const contextLine = getPatternContextForSignal(signal);
+      const baseContextLine = getPatternContextForSignal(signal);
       const stateResult = classifyPatternStateForSignal({
         entries: entriesSorted,
         userData,
@@ -1499,7 +1501,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           r: correlation,
           n,
           confidence,
-          contextLine,
+          contextLine: baseContextLine,
         },
         stateResult,
         lagPattern,
@@ -1514,6 +1516,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           : `Correlation does not mean one causes the other.`,
       ].filter(Boolean);
       const feedback = getFeedbackForMetrics(aKey, bKey);
+      const resurfacingNote = getResurfacingNoteForPair(aKey, bKey, typeof signal.score === 'number' ? signal.score : undefined);
+      const contextLine = [resurfacingNote, narrative.contextLine].filter(Boolean).join(' ');
       return {
         a: labelFor(aKey, userData),
         b: labelFor(bKey, userData),
@@ -1530,7 +1534,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         allowSuggestedExperiment,
         why,
         lagPattern,
-        contextLine: narrative.contextLine,
+        contextLine,
         patternState: stateResult,
         supportingLine: narrative.supportingLine,
         feedback,

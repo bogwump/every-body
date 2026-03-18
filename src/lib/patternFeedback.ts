@@ -178,6 +178,7 @@ export function confirmPattern(args: { id: string; patternId?: string; metrics: 
     confidence: Math.min(0.98, nextConfidenceBase + 0.12),
     previousScore: typeof args.previousScore === 'number' ? args.previousScore : existing?.previousScore,
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
+    historyNote: 'Marked by you as a good fit.',
     userDriverHint: args.driverHint ?? existing?.userDriverHint,
   });
   appendHistoryEvent({
@@ -279,7 +280,9 @@ export function shouldPromptPatternFeedback(id: string | null | undefined, cycle
   const record = getPatternFeedback(id);
   if (!record) return true;
   if (record.status === 'suppressed') return false;
-  if (record.suppressPromptUntil && record.suppressPromptUntil >= toISODate()) return false;
+  const today = toISODate();
+  if (record.userFeedback === 'unsure' && record.suppressPromptUntil && record.suppressPromptUntil >= today) return false;
+  if (record.suppressPromptUntil && record.suppressPromptUntil >= today && record.userFeedback !== 'unsure') return false;
   if (record.status === 'confirmed' && cycleScoped && currentCycleKey) {
     return !String(record.lastFeedback || '').startsWith(currentCycleKey);
   }
@@ -300,7 +303,13 @@ export function isSuppressedPair(a: InsightMetricKey | string, b: InsightMetricK
 
 export function getResurfacingNoteForPair(a: InsightMetricKey | string, b: InsightMetricKey | string, currentScore?: number): string | null {
   const record = getFeedbackForMetrics(a, b);
-  if (!record || record.status !== 'suppressed') return null;
+  if (!record) return null;
+  const today = toISODate();
+  if (record.userFeedback === 'unsure') {
+    if (record.suppressPromptUntil && record.suppressPromptUntil >= today) return null;
+    return 'Last time you marked this as unsure. The same pattern has shown up again, so it may be worth another look now.';
+  }
+  if (record.status !== 'suppressed') return null;
   const baseline = Number(record.previousScore ?? 0);
   if (typeof currentScore === 'number' && baseline > 0 && currentScore > baseline * 2) {
     return 'Earlier this pattern didn’t feel accurate, but new data suggests it may be worth another look.';
@@ -314,6 +323,10 @@ export function filterSignalsByPatternFeedback(signals: InsightSignal[]): Insigh
       const id = getPatternFeedbackIdFromSignal(signal);
       if (!id) return true;
       const score = typeof signal.score === 'number' ? signal.score : undefined;
+      const feedback = getPatternFeedback(id);
+      if (feedback?.userFeedback === 'unsure' && feedback.suppressPromptUntil && feedback.suppressPromptUntil >= toISODate()) {
+        return false;
+      }
       return !isSuppressedPair(signal.metrics[0], signal.metrics[1], score);
     })
     .map((signal) => {
