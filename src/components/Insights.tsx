@@ -3711,10 +3711,10 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 px-1 pt-1">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-1">
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full !px-2 !py-0 text-[0.95rem] font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.05rem] !w-full min-w-0 !px-1.5 sm:!px-2 !py-0 text-[0.82rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => {
                 setDataEvidenceOpen(true);
                 scrollToInsightsSection('eb-insights-settings');
@@ -3724,14 +3724,14 @@ const tryNextPrompts = useMemo(() => {
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full !px-2 !py-0 text-[0.95rem] font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.05rem] !w-full min-w-0 !px-1.5 sm:!px-2 !py-0 text-[0.82rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => scrollToInsightsSection('eb-experiments')}
             >
               Run experiment
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full !px-2 !py-0 text-[0.95rem] font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.05rem] !w-full min-w-0 !px-1.5 sm:!px-2 !py-0 text-[0.82rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => scrollToInsightsSection('eb-insights-settings')}
             >
               Change metrics
@@ -4419,7 +4419,7 @@ const tryNextPrompts = useMemo(() => {
           {historyOpen ? (
             Array.isArray(experimentHistory) && experimentHistory.length > 0 ? (
               <div className="mt-4">
-                <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden px-10 sm:px-0">
+                <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
                   <CarouselContent>
                     {(experimentHistory as any[]).slice(0, 20).map((item: any) => {
                       const id = String(item?.experimentId || item?.title || Math.random());
@@ -4493,8 +4493,8 @@ const tryNextPrompts = useMemo(() => {
                       );
                     })}
                   </CarouselContent>
-                  <CarouselPrevious className="flex opacity-70" />
-                  <CarouselNext className="flex opacity-70" />
+                  <CarouselPrevious className="hidden sm:flex opacity-70" />
+                  <CarouselNext className="hidden sm:flex opacity-70" />
                 </Carousel>
               </div>
             ) : (
@@ -4531,7 +4531,7 @@ const tryNextPrompts = useMemo(() => {
                   <div className="text-sm font-semibold">Try next</div>
                   <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
                   <div className="mt-3">
-                    <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden px-10 sm:px-0">
+                    <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
                       <CarouselContent>
                         {visibleTryNextPrompts.map((p) => (
                           <CarouselItem key={p.id} className="basis-full md:basis-1/2">
@@ -4569,8 +4569,8 @@ const tryNextPrompts = useMemo(() => {
                           </CarouselItem>
                         ))}
                       </CarouselContent>
-                      <CarouselPrevious className="flex opacity-70" />
-                      <CarouselNext className="flex opacity-70" />
+                      <CarouselPrevious className="hidden sm:flex opacity-70" />
+                      <CarouselNext className="hidden sm:flex opacity-70" />
                     </Carousel>
                   </div>
                 </div>
@@ -4585,7 +4585,7 @@ const tryNextPrompts = useMemo(() => {
                   </div>
                 ) : (
                   <div className="mt-3">
-                    <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden px-10 sm:px-0">
+                    <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
                       <CarouselContent>
                         {visibleSuggestedExperiments.map((s) => {
                           const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
@@ -4614,8 +4614,8 @@ const tryNextPrompts = useMemo(() => {
                           );
                         })}
                       </CarouselContent>
-                      <CarouselPrevious className="flex opacity-70" />
-                      <CarouselNext className="flex opacity-70" />
+                      <CarouselPrevious className="hidden sm:flex opacity-70" />
+                      <CarouselNext className="hidden sm:flex opacity-70" />
                     </Carousel>
                   </div>
                 )}
@@ -4797,7 +4797,7 @@ const tryNextPrompts = useMemo(() => {
             ) : null}
 
             <div className="mt-4">
-              <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden px-10 sm:px-0">
+              <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
                 <CarouselContent>
                   {findings.map((f, idx) => (
                     <CarouselItem key={idx} className="basis-full md:basis-1/2">
@@ -4822,8 +4822,8 @@ const tryNextPrompts = useMemo(() => {
                     </CarouselItem>
                   ))}
                 </CarouselContent>
-                {findings.length > 1 ? <CarouselPrevious className="flex opacity-70" /> : null}
-                {findings.length > 1 ? <CarouselNext className="flex opacity-70" /> : null}
+                {findings.length > 1 ? <CarouselPrevious className="hidden sm:flex opacity-70" /> : null}
+                {findings.length > 1 ? <CarouselNext className="hidden sm:flex opacity-70" /> : null}
               </Carousel>
             </div>
           </div>
@@ -5051,9 +5051,9 @@ const tryNextPrompts = useMemo(() => {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 flex justify-center sm:justify-start">
+            <div className="mt-4">
               <select
-                className="eb-input !w-auto min-w-[13rem] !py-2"
+                className="eb-input w-full sm:!w-auto sm:min-w-[13rem] !py-2"
                 value={String(distributionMetric)}
                 onChange={(e) => setDistributionMetric(e.target.value as any)}
                 aria-label="Choose distribution metric"
