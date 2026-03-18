@@ -87,7 +87,7 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
           {iconForType(props.moment.type)}
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="mt-4 flex flex-wrap justify-end gap-3">
             <button type="button" className="eb-btn-primary" onClick={handlePrimaryAction}>{copy.button}</button>
             <button
               type="button"

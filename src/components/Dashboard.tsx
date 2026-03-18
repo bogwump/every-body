@@ -1318,20 +1318,22 @@ export function Dashboard({
                   <p className="text-sm text-[rgba(0,0,0,0.60)] mt-2">{guideCard.supporting}</p>
                 ) : null}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const memory = readGuideMemory();
-                    const existing = memory[guideCard.id] ?? {};
-                    memory[guideCard.id] = { ...existing, lastClickedAtISO: todayISO };
-                    writeGuideMemory(memory);
-                    if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
-                    else onNavigate(guideCard.cta.screen);
-                  }}
-                  className={`mt-4 eb-btn ${guideCard.id === 'history-saved' ? 'eb-btn-primary sm:w-auto' : 'eb-btn-secondary sm:w-auto'} w-full justify-center`}
-                >
-                  {guideCard.cta.label}
-                </button>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const memory = readGuideMemory();
+                      const existing = memory[guideCard.id] ?? {};
+                      memory[guideCard.id] = { ...existing, lastClickedAtISO: todayISO };
+                      writeGuideMemory(memory);
+                      if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
+                      else onNavigate(guideCard.cta.screen);
+                    }}
+                    className={`eb-btn ${guideCard.id === 'history-saved' ? 'eb-btn-primary sm:w-auto' : 'eb-btn-secondary sm:w-auto'} w-full justify-center`}
+                  >
+                    {guideCard.cta.label}
+                  </button>
+                </div>
               </div>
               <div className="eb-icon-frame">
                 {guideCard.icon}
@@ -1372,7 +1374,7 @@ export function Dashboard({
                 ) : null}
               </div>
 
-              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
                 <button type="button" className="eb-btn-primary" onClick={() => onOpenCheckIn(todayISO)}>
                   {checkedInToday ? "Open today’s check-in" : "Do today’s check-in"}
                 </button>
@@ -1442,7 +1444,7 @@ export function Dashboard({
             {nextStep.body}
           </p>
 
-          <div className="mt-4">
+          <div className="mt-4 flex justify-end">
             <button
               type="button"
               onClick={() => {
