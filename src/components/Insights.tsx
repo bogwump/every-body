@@ -3711,10 +3711,10 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-1">
+          <div className="pt-1 flex items-stretch gap-2 [&>*]:flex-1 [&>*]:basis-0">
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.05rem] !w-full min-w-0 !px-1.5 sm:!px-2 !py-0 text-[0.82rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => {
                 setDataEvidenceOpen(true);
                 scrollToInsightsSection('eb-insights-settings');
@@ -3724,14 +3724,14 @@ const tryNextPrompts = useMemo(() => {
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.05rem] !w-full min-w-0 !px-1.5 sm:!px-2 !py-0 text-[0.82rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => scrollToInsightsSection('eb-experiments')}
             >
               Run experiment
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.05rem] !w-full min-w-0 !px-1.5 sm:!px-2 !py-0 text-[0.82rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => scrollToInsightsSection('eb-insights-settings')}
             >
               Change metrics
@@ -4530,21 +4530,55 @@ const tryNextPrompts = useMemo(() => {
                 <div>
                   <div className="text-sm font-semibold">Try next</div>
                   <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-3 sm:hidden">
+                    {visibleTryNextPrompts.map((p) => (
+                      <div key={p.id} className="eb-inset-callout rounded-2xl p-5 min-w-0 overflow-hidden flex flex-col">
+                        <div className="flex items-start justify-between gap-3 min-w-0">
+                          <div className="text-sm font-semibold min-w-0">{p.title}</div>
+                          <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
+                        </div>
+                        <div className="mt-2 text-sm font-medium text-neutral-900">{p.suggestion}</div>
+                        <div className="mt-2 text-sm eb-muted">{p.description}</div>
+                        <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
+                        {whyOpen?.[p.id] ? (
+                          <div className="mt-2 text-sm eb-muted min-w-0">
+                            {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
+                            <ul className="list-disc pl-5 space-y-1">
+                              {(p.why || []).slice(1, 3).map((w, idx) => (
+                                <li key={`${p.id}-why-${idx}`}>{w}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {p.metrics.slice(0, 5).map((k) => (
+                            <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                          ))}
+                        </div>
+                        <div className="mt-4">
+                          <button type="button" className="eb-btn eb-btn-primary w-full justify-center" onClick={() => openTryNextPrompt(p as any)}>
+                            <FlaskConical className="w-4 h-4" />
+                            Set up {p.durationDays || 3}-day experiment
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 hidden sm:block">
                     <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
                       <CarouselContent>
                         {visibleTryNextPrompts.map((p) => (
                           <CarouselItem key={p.id} className="basis-full md:basis-1/2">
-                            <div className="eb-inset-callout rounded-2xl p-5 h-full flex flex-col">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="text-sm font-semibold">{p.title}</div>
-                                <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
+                            <div className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
+                              <div className="flex items-start justify-between gap-3 min-w-0">
+                                <div className="text-sm font-semibold min-w-0">{p.title}</div>
+                                <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
                               </div>
                               <div className="mt-2 text-sm font-medium text-neutral-900">{p.suggestion}</div>
                               <div className="mt-2 text-sm eb-muted">{p.description}</div>
                               <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
                               {whyOpen?.[p.id] ? (
-                                <div className="mt-2 text-sm eb-muted">
+                                <div className="mt-2 text-sm eb-muted min-w-0">
                                   {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
                                   <ul className="list-disc pl-5 space-y-1">
                                     {(p.why || []).slice(1, 3).map((w, idx) => (
@@ -4584,40 +4618,67 @@ const tryNextPrompts = useMemo(() => {
                     To generate these, the app needs overlap between a behaviour like sleep, caffeine, or late nights and how you feel. If you are mainly logging body symptoms, try switching on Sleep or Stress for a few days and this section will start to fill up.
                   </div>
                 ) : (
-                  <div className="mt-3">
-                    <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
-                      <CarouselContent>
-                        {visibleSuggestedExperiments.map((s) => {
-                          const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
-                          return (
-                            <CarouselItem key={s.id} className="basis-full md:basis-1/2">
-                              <div className="eb-inset-callout rounded-2xl p-5 h-full flex flex-col">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="text-sm font-semibold">{s.title}</div>
-                                  <span className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
+                  <>
+                    <div className="mt-3 space-y-3 sm:hidden">
+                      {visibleSuggestedExperiments.map((s) => {
+                        const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
+                        return (
+                          <div key={s.id} className="eb-inset-callout rounded-2xl p-5 min-w-0 overflow-hidden flex flex-col">
+                            <div className="flex items-start justify-between gap-3 min-w-0">
+                              <div className="text-sm font-semibold min-w-0">{s.title}</div>
+                              <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
+                            </div>
+                            <div className="mt-2 text-sm eb-muted">{s.body}</div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {s.metrics.slice(0, 3).map((k) => (
+                                <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                              ))}
+                            </div>
+                            <div className="mt-4">
+                              <button type="button" className="eb-btn eb-btn-primary w-full justify-center" onClick={() => openExperiment(s.metrics)}>
+                                <FlaskConical className="w-4 h-4" />
+                                Try a 3-day experiment
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 hidden sm:block">
+                      <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
+                        <CarouselContent>
+                          {visibleSuggestedExperiments.map((s) => {
+                            const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
+                            return (
+                              <CarouselItem key={s.id} className="basis-full md:basis-1/2">
+                                <div className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
+                                  <div className="flex items-start justify-between gap-3 min-w-0">
+                                    <div className="text-sm font-semibold min-w-0">{s.title}</div>
+                                    <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
+                                  </div>
+                                  <div className="mt-2 text-sm eb-muted">{s.body}</div>
+                                  <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                                    {s.metrics.slice(0, 3).map((k) => (
+                                      <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                                    ))}
+                                  </div>
+                                  <div className="flex-1" />
+                                  <div className="mt-4 flex justify-end">
+                                    <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics)}>
+                                      <FlaskConical className="w-4 h-4" />
+                                      Try a 3-day experiment
+                                    </button>
+                                  </div>
                                 </div>
-                                <div className="mt-2 text-sm eb-muted">{s.body}</div>
-                                <div className="mt-3 flex flex-wrap gap-2 justify-end">
-                                  {s.metrics.slice(0, 3).map((k) => (
-                                    <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
-                                  ))}
-                                </div>
-                                <div className="flex-1" />
-                                <div className="mt-4 flex justify-end">
-                                  <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics)}>
-                                    <FlaskConical className="w-4 h-4" />
-                                    Try a 3-day experiment
-                                  </button>
-                                </div>
-                              </div>
-                            </CarouselItem>
-                          );
-                        })}
-                      </CarouselContent>
-                      <CarouselPrevious className="hidden sm:flex opacity-70" />
-                      <CarouselNext className="hidden sm:flex opacity-70" />
-                    </Carousel>
-                  </div>
+                              </CarouselItem>
+                            );
+                          })}
+                        </CarouselContent>
+                        <CarouselPrevious className="hidden sm:flex opacity-70" />
+                        <CarouselNext className="hidden sm:flex opacity-70" />
+                      </Carousel>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -5013,7 +5074,7 @@ const tryNextPrompts = useMemo(() => {
       {/* Distribution + high symptom days */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="eb-card">
-          <div className="eb-card-header">
+          <div className="eb-card-header items-start gap-3 flex-col sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
               <div className="eb-card-title">Symptom distribution</div>
               <div className="eb-card-sub">How often your chosen metric sits low, mid, or high.</div>
@@ -5051,7 +5112,7 @@ const tryNextPrompts = useMemo(() => {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4">
+            <div className="mt-4 flex justify-start">
               <select
                 className="eb-input w-full sm:!w-auto sm:min-w-[13rem] !py-2"
                 value={String(distributionMetric)}
