@@ -771,8 +771,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               </div>
 
               <div className="mt-4">
-                <p className="text-sm font-medium mb-2">Or choose an icon</p>
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+                <p className="text-sm font-medium mb-2 text-center">Or choose an icon</p>
+                <div className="mx-auto grid max-w-[13.5rem] grid-cols-3 place-items-center gap-3">
                   {STOCK_AVATARS.map((a) => {
                     const selected = draftAvatarStockId === a.id;
                     return (
@@ -1489,8 +1489,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               </div>
 
               <div className="mt-4">
-                <p className="text-sm font-medium">Choose a focus</p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <p className="text-sm font-medium text-center">Choose a focus</p>
+                <div className="mt-2 flex flex-wrap justify-center gap-2">
                   {AI_EXPORT_PRESETS.map((preset) => {
                     const meta = getPresetMeta(preset);
                     const selected = aiExportPreset === preset;
@@ -1597,8 +1597,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                   </div>
 
                   <div className="mt-4">
-                    <p className="text-sm font-medium">Choose a focus</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <p className="text-sm font-medium text-center">Choose a focus</p>
+                    <div className="mt-2 flex flex-wrap justify-center gap-2">
                       {AI_EXPORT_PRESETS.map((preset) => {
                         const meta = getPresetMeta(preset);
                         const selected = aiExportPreset === preset;
@@ -2199,7 +2199,8 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                 onChange={(e) => setFeedbackEmail(e.target.value)}
                               />
 
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center justify-end gap-3">
+                                <div className="rounded-full border border-[rgb(var(--color-border))] bg-white p-1 shadow-sm">
                                 <button
                                   type="button"
                                   className="eb-btn"
@@ -2237,6 +2238,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                                 >
                                   {feedbackBusy ? 'Sending…' : 'Send'}
                                 </button>
+                                </div>
                                 {feedbackStatus ? (
                                   <div className="text-sm text-[rgb(var(--color-text-secondary))]">{feedbackStatus}</div>
                                 ) : null}
