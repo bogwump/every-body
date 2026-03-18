@@ -1832,17 +1832,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [corrPairs, metricPairSignals, triadSignals, heroSignals, entriesSorted, userData, currentInsightsPhase, deepReady]);
 
   const visibleConnectionCards = useMemo(() => {
-    const untouched = connectionCards.filter((card) => {
-      const feedbackId = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
-      return !card.feedback || (card.feedback.status === 'active' && card.feedback.userFeedback !== 'yes' && shouldPromptPatternFeedback(feedbackId));
-    });
-
-    const reviewed = connectionCards.filter((card) => {
-      const feedbackId = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
-      return !!card.feedback && (!shouldPromptPatternFeedback(feedbackId) || card.feedback.status !== 'active' || card.feedback.userFeedback === 'yes');
-    });
-
-    return [...untouched.slice(0, visibleConnectionCount), ...reviewed];
+    return connectionCards.slice(0, visibleConnectionCount);
   }, [connectionCards, visibleConnectionCount]);
 
   useEffect(() => {
@@ -4474,10 +4464,7 @@ const tryNextPrompts = useMemo(() => {
               );
             })}
           </div>
-          {connectionCards.filter((card) => {
-            const feedbackId = getConnectionId(card.metricKeys ?? [card.aKey, card.bKey]);
-            return !card.feedback || (card.feedback.status === 'active' && card.feedback.userFeedback !== 'yes' && shouldPromptPatternFeedback(feedbackId));
-          }).length > visibleConnectionCount ? (
+          {connectionCards.length > visibleConnectionCount ? (
             <div className="mt-4 flex justify-center sm:justify-start">
               <button
                 type="button"
