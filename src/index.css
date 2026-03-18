@@ -346,6 +346,7 @@ body.eb-chat-typing .eb-mobile-nav {
     line-height: 1.2;
     white-space: nowrap;
     cursor: pointer;
+  touch-action: pan-y;
     user-select: none;
     border: 1px solid rgb(var(--color-primary-dark) / 0.18);
     background: rgb(var(--color-primary-light) / 0.14);
@@ -998,7 +999,7 @@ p {
   --eb-top-space: 28px;
   position: relative;
   padding: var(--eb-top-space) 0 0;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .eb-range-value-bubble{
@@ -1037,6 +1038,7 @@ p {
   background-color: transparent;
   transition: background-size 120ms ease, filter 120ms ease;
   cursor: pointer;
+  touch-action: pan-y;
 }
 
 .eb-range:focus{

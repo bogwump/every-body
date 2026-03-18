@@ -301,6 +301,8 @@ function Slider10({
   const [thumbWidth, setThumbWidth] = useState(32);
   const dragValueRef = useRef(clamp(value, 0, 10));
   const draggingRef = useRef(false);
+  const pointerModeRef = useRef<'idle' | 'pending' | 'dragging' | 'scrolling'>('idle');
+  const pointerStartRef = useRef<{ x: number; y: number; value: number } | null>(null);
 
   useEffect(() => {
     if (!draggingRef.current) {
@@ -364,28 +366,75 @@ function Slider10({
     updateVisual(Math.round(ratio * 10));
   }, [updateVisual]);
 
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLInputElement>) => {
     if ((e as any).isPrimary === false) return;
-    draggingRef.current = true;
-    setFromClientX(e.clientX);
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    if (e.pointerType === 'mouse') {
+      draggingRef.current = true;
+      pointerModeRef.current = 'dragging';
+      return;
+    }
+    pointerModeRef.current = 'pending';
+    pointerStartRef.current = { x: e.clientX, y: e.clientY, value: dragValueRef.current };
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    setFromClientX(e.clientX);
+  const onPointerMove = (e: React.PointerEvent<HTMLInputElement>) => {
+    if (e.pointerType === 'mouse') return;
+    const start = pointerStartRef.current;
+    if (!start) return;
+
+    if (pointerModeRef.current === 'pending') {
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+
+      if (absY >= 8 && absY > absX + 4) {
+        pointerModeRef.current = 'scrolling';
+        draggingRef.current = false;
+        setDraftValue(start.value);
+        dragValueRef.current = start.value;
+        return;
+      }
+
+      if (absX >= 8 && absX > absY) {
+        pointerModeRef.current = 'dragging';
+        draggingRef.current = true;
+      }
+    }
   };
 
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onPointerUp = () => {
+    if (pointerModeRef.current === 'scrolling') {
+      const start = pointerStartRef.current;
+      if (start) {
+        setDraftValue(start.value);
+        dragValueRef.current = start.value;
+        onPreviewChange?.(start.value);
+      }
+      pointerModeRef.current = 'idle';
+      pointerStartRef.current = null;
+      draggingRef.current = false;
+      return;
+    }
+
+    pointerModeRef.current = 'idle';
+    pointerStartRef.current = null;
     if (!draggingRef.current) return;
-    setFromClientX(e.clientX);
     commitCurrent();
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
   };
 
   const onPointerCancel = () => {
-    if (!draggingRef.current) return;
-    commitCurrent();
+    const start = pointerStartRef.current;
+    if (pointerModeRef.current === 'scrolling' && start) {
+      setDraftValue(start.value);
+      dragValueRef.current = start.value;
+      onPreviewChange?.(start.value);
+    } else if (draggingRef.current) {
+      commitCurrent();
+    }
+    pointerModeRef.current = 'idle';
+    pointerStartRef.current = null;
+    draggingRef.current = false;
   };
 
   const pct = `${(draftValue / 10) * 100}%`;
@@ -398,10 +447,6 @@ function Slider10({
       <div
         ref={wrapRef}
         className="eb-range-wrap"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
       >
         <div className="eb-range-value-bubble" aria-hidden="true" style={{ left: `${bubbleLeftPx}px` }}>
           {draftValue}
@@ -415,9 +460,19 @@ function Slider10({
           step={1}
           value={draftValue}
           onChange={(e) => {
+            if (pointerModeRef.current === 'scrolling') {
+              const start = pointerStartRef.current;
+              const reset = start?.value ?? dragValueRef.current;
+              updateVisual(reset);
+              return;
+            }
             const next = parseInt(e.target.value, 10);
             updateVisual(next);
           }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
           onMouseUp={commitCurrent}
           onTouchEnd={commitCurrent}
           className="eb-range w-full"
