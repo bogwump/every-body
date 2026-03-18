@@ -1349,16 +1349,18 @@ export function Dashboard({
           <div className="eb-card-header">
             <div className="min-w-0 flex-1">
               <h3 className="mb-1">{checkedInToday ? 'Today is logged' : 'Today is ready for a check-in'}</h3>
-              <p className="text-sm text-[rgba(0,0,0,0.68)]">
-                {checkedInToday
-                  ? 'You have already logged today. Reopen it if anything changed.'
-                  : 'A quick check-in today helps the app make better sense of what matters right now.'}
-              </p>
             </div>
             <div className="eb-icon-frame">
               <Calendar className="w-5 h-5 text-[rgb(var(--color-primary))]" />
             </div>
           </div>
+
+          <div className="min-w-0">
+            <p className="text-sm text-[rgba(0,0,0,0.68)]">
+              {checkedInToday
+                ? 'You have already logged today. Reopen it if anything changed.'
+                : 'A quick check-in today helps the app make better sense of what matters right now.'}
+            </p>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="eb-inset rounded-2xl p-3">
@@ -1385,6 +1387,7 @@ export function Dashboard({
                   Open calendar
                 </button>
               </div>
+          </div>
         </div>
 
         {/* Restore from backup nudge (only when there is no data yet) */}
@@ -1522,38 +1525,43 @@ export function Dashboard({
         {/* Tip for today */}
         <div className="bg-gradient-to-br from-[rgb(var(--color-accent))] from-opacity-20 to-transparent rounded-2xl p-6 border border-[rgb(var(--color-accent))] border-opacity-30">
           <div className="eb-card-header w-full">
-            <div className="relative min-w-0 flex-1">
+            <div className="min-w-0 flex-1">
+              <h3 className="mb-1">Tip for today</h3>
+            </div>
+            <div className="eb-icon-frame">
+              <Lightbulb className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex justify-end">
               <button
                 type="button"
                 onClick={() => setTipOffset((v) => v + 1)}
-                // Chrome can sometimes let later-flowing text overlap and steal the click.
-                // Keep this above the header/text.
-                className="text-sm text-[rgb(var(--color-primary))] hover:underline absolute top-0 right-8 z-10"
+                className="text-sm text-[rgb(var(--color-primary))] hover:underline"
               >
                 Another tip
               </button>
+            </div>
 
-              <h3 className="mb-1 pr-24">Tip for today</h3>
-              <p className="text-sm font-semibold pr-24">{tip.title}</p>
+            <p className="text-sm font-semibold mt-2">{tip.title}</p>
 
-              <p className="text-sm text-[rgba(0,0,0,0.75)] mt-2">{tip.body}</p>
+            <p className="text-sm text-[rgba(0,0,0,0.75)] mt-2">{tip.body}</p>
 
-              {tip.cta ? (
+            {tip.cta ? (
+              <div className="mt-3 flex justify-end">
                 <button
                   type="button"
                   onClick={() => {
                     if (tip.cta?.screen === 'check-in') onOpenCheckIn(todayISO);
                     else onNavigate(tip.cta.screen);
                   }}
-                  className="mt-3 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
+                  className="inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
                 >
                   {tip.cta.label} <ArrowRight className="w-4 h-4" />
                 </button>
-              ) : null}
-            </div>
-            <div className="eb-icon-frame">
-              <Lightbulb className="w-5 h-5" />
-            </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

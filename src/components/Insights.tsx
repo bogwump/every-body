@@ -4694,14 +4694,15 @@ const tryNextPrompts = useMemo(() => {
         <div className="eb-card-header">
           <div className="min-w-0 flex-1">
             <h3 className="mb-1">Data &amp; settings</h3>
-            <p className="text-[rgba(0,0,0,0.75)]">
-              Keep it simple: 3-5 metrics gives you the cleanest signals, then open your graphs only when you want the evidence view.
-            </p>
           </div>
           <div className="eb-icon-frame">
             <Layers3 className="w-5 h-5" />
           </div>
         </div>
+
+        <p className="text-[rgba(0,0,0,0.75)]">
+          Keep it simple: 3-5 metrics gives you the cleanest signals, then open your graphs only when you want the evidence view.
+        </p>
 
         <div className="mt-3 flex flex-wrap gap-2 items-center">
           {TIMEFRAMES.map((t) => (

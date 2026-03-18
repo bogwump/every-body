@@ -81,12 +81,12 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
         <div className="min-w-0 flex-1">
           <div className="text-xs uppercase tracking-[0.08em] text-[rgba(0,0,0,0.52)] font-semibold">{copy.eyebrow ?? 'For you'}</div>
           <h3 className="mt-1 mb-1">{copy.title}</h3>
-          <p className="text-sm text-[rgba(0,0,0,0.68)]">{copy.body}</p>
         </div>
         <div className="eb-icon-frame">
           {iconForType(props.moment.type)}
         </div>
       </div>
+      <p className="text-sm text-[rgba(0,0,0,0.68)]">{copy.body}</p>
       <div className="mt-4 flex flex-wrap justify-end gap-3">
             <button type="button" className="eb-btn-primary" onClick={handlePrimaryAction}>{copy.button}</button>
             <button
