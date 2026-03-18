@@ -207,17 +207,8 @@ export function markPatternUnsure(args: { id: string; patternId?: string; metric
     confidence: typeof args.confidence === 'number' ? args.confidence : existing?.confidence,
     previousScore: typeof args.previousScore === 'number' ? args.previousScore : existing?.previousScore,
     suppressPromptUntil: addDays(today, FEEDBACK_COOLDOWN_DAYS),
+    historyNote: 'You marked this as not sure yet.',
     userDriverHint: args.driverHint ?? existing?.userDriverHint,
-  });
-  appendHistoryEvent({
-    patternFeedbackId: record.id,
-    patternId: record.patternId,
-    canonicalMetrics: record.canonicalMetrics,
-    action: 'unsure',
-    date: today,
-    confidence: record.confidence,
-    previousScore: record.previousScore,
-    userDriverHint: record.userDriverHint,
   });
   return record;
 }
@@ -252,6 +243,7 @@ export function restorePattern(id: string, reducedConfidence = 0.45): PatternFee
 }
 
 export function reopenPatternForReview(id: string, reducedConfidence = 0.45): PatternFeedbackRecord | null {
+
   const existing = getPatternFeedback(id);
   if (!existing) return null;
   const today = toISODate();
@@ -279,6 +271,9 @@ export function reopenPatternForReview(id: string, reducedConfidence = 0.45): Pa
   });
   return record;
 }
+export function clearPatternUnsure(id: string, reducedConfidence = 0.45) {
+  return reopenPatternForReview(id, reducedConfidence);
+	}
 
 export function shouldPromptPatternFeedback(id: string | null | undefined, cycleScoped = false, currentCycleKey?: string | null): boolean {
   const record = getPatternFeedback(id);

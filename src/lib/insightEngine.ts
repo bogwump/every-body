@@ -469,7 +469,9 @@ export function getTopInsights(
   selectedMetrics: InsightMetricKey[] = [],
 ): InsightSignal[] {
   const scored = rankInsights(scoreInsights(generateCandidateInsights(entries, userData, selectedMetrics)));
-  return applyCoverageToSignals(scored, userData).slice(0, limit);
+  const adjusted = applyCoverageToSignals(scored, userData);
+  markPatternsDiscovered(adjusted);
+  return adjusted.slice(0, limit);
 }
 
 function safeReadJson<T>(key: string, fallback: T): T {

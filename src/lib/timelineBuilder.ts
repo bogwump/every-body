@@ -358,7 +358,13 @@ function applyPatternFeedbackToEvent(event: TimelineEvent): TimelineEvent {
   const description = feedback.historyNote
     ? `${event.description} ${feedback.historyNote}`.trim()
     : event.description;
-  const metadata = { ...(event.metadata ?? {}), patternFeedbackId: feedback.id, patternDismissed: feedback.status === 'suppressed', patternRestored: feedback.status === 'active' && Boolean(feedback.restoredAt) };
+  const metadata = {
+    ...(event.metadata ?? {}),
+    patternFeedbackId: feedback.id,
+    patternDismissed: feedback.status === 'suppressed',
+    patternRestored: feedback.status === 'active' && Boolean(feedback.restoredAt),
+    patternUnsure: feedback.userFeedback === 'unsure',
+  };
   return {
     ...event,
     description,

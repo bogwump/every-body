@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, CheckCircle2, ChevronDown, Clock3, FlaskConical, Heart, RefreshCw, Sparkles, ChevronRight } from 'lucide-react';
 import { buildTimelineEvents, filterTimelineEvents, getTimelineSummary, groupEventsByMonth, type TimelineEvent, type TimelineFilter } from '../lib/timelineBuilder';
-import { reopenPatternForReview } from '../lib/patternFeedback';
+import { clearPatternUnsure, reopenPatternForReview } from '../lib/patternFeedback';
 import { safeFormatISODate } from '../lib/browserSafe';
 
 interface HistoryProps {
@@ -226,7 +226,7 @@ export function History({ onNavigate }: HistoryProps) {
                             </details>
                           ) : null}
 
-                          {(event.actionLabel && event.actionTarget) || (event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string') ? (
+                          {(event.actionLabel && event.actionTarget) || ((event.metadata?.patternDismissed || event.metadata?.patternUnsure) && typeof event.metadata?.patternFeedbackId === 'string') ? (
                             <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
                               <div className="order-2 ml-auto flex flex-wrap justify-end gap-3 sm:order-2">
                                 {event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
@@ -239,6 +239,18 @@ export function History({ onNavigate }: HistoryProps) {
                                     }}
                                   >
                                     Undo correction
+                                  </button>
+                                ) : null}
+                                {event.metadata?.patternUnsure && typeof event.metadata?.patternFeedbackId === 'string' ? (
+                                  <button
+                                    type="button"
+                                    className="eb-btn eb-btn-secondary"
+                                    onClick={() => {
+                                      clearPatternUnsure(String(event.metadata?.patternFeedbackId));
+                                      setHistoryTick((v) => v + 1);
+                                    }}
+                                  >
+                                    Undo
                                   </button>
                                 ) : null}
                                 {event.actionLabel && event.actionTarget ? (
