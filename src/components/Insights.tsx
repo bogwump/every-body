@@ -785,39 +785,48 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   // --- metric selection (for analysis) ---
   const selectableKeys: MetricKey[] = useMemo(() => {
-    // Prefer enabled modules first so the list feels personal, then add the rest.
-    const enabled = (userData.enabledModules ?? []) as SymptomKey[];
-    const customs = (userData.customSymptoms ?? []).filter((s) => s && s.enabled).map((s) => (`custom:${s.id}` as MetricKey));
-    const all: SymptomKey[] = [
+    const customs = (userData.customSymptoms ?? [])
+      .filter((s) => s && s.enabled)
+      .map((s) => (`custom:${s.id}` as MetricKey));
+
+    // Keep the built-in picker order visually balanced for the modal's wrapped chip layout.
+    // This is intentionally hand-curated rather than driven by module order so the pills wrap
+    // into calmer-looking rows across common mobile and tablet widths.
+    const preferredOrder: SymptomKey[] = [
       'energy',
-      'sleep',
       'stress',
+      'jointPain',
+      'anxiety',
+      'brainFog',
+      'appetite',
+      'nightSweats',
+      'sleep',
+      'nausea',
+      'hairShedding',
+      'fatigue',
+      'flow',
+      'acidReflux',
+      'breastTenderness',
+      'headache',
+      'libido',
+      'facialSpots',
+      'digestion',
+      'dizziness',
+      'irritability',
+      'hotFlushes',
+      'cysts',
       'focus',
+      'cramps',
       'bloating',
       'pain',
-      'fatigue',
-      'brainFog',
-      'nightSweats',
-      'hairShedding',
-      'facialSpots',
-      'cysts',
-      'flow',
-      'headache',
-      'anxiety',
-      'irritability',
-      'digestion',
-      'nausea',
-      'cramps',
-      'jointPain',
-      'hotFlushes',
-      'dizziness',
-      'appetite',
-      'libido',
-      'breastTenderness',
     ].filter(Boolean) as SymptomKey[];
 
-    const dedup = (arr: MetricKey[]) => Array.from(new Set(arr));
-    return dedup([...(enabled as any), ...all, ...customs]);
+    const enabled = new Set((userData.enabledModules ?? []) as SymptomKey[]);
+    const ordered = preferredOrder.filter((key) => enabled.has(key));
+    const remainingEnabled = Array.from(enabled).filter((key) => !ordered.includes(key));
+    const allBuiltIns = [...ordered, ...preferredOrder.filter((key) => !ordered.includes(key)), ...remainingEnabled];
+
+    return Array.from(new Set<MetricKey>([...allBuiltIns, ...customs]));
   }, [userData.enabledModules, userData.customSymptoms]);
 
   // Backwards-compatible alias: older logic refers to allMetricKeys.
@@ -4587,7 +4596,7 @@ const tryNextPrompts = useMemo(() => {
                                   </ul>
                                 </div>
                               ) : null}
-                              <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                              <div className="mt-3 flex flex-wrap justify-center gap-2">
                                 {p.metrics.slice(0, 5).map((k) => (
                                   <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
                                 ))}
@@ -4657,7 +4666,7 @@ const tryNextPrompts = useMemo(() => {
                                     <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
                                   </div>
                                   <div className="mt-2 text-sm eb-muted">{s.body}</div>
-                                  <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                                  <div className="mt-3 flex flex-wrap justify-center gap-2">
                                     {s.metrics.slice(0, 3).map((k) => (
                                       <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
                                     ))}
@@ -4795,7 +4804,7 @@ const tryNextPrompts = useMemo(() => {
                   <div className="text-sm eb-muted">Selected: {metricsSummary || 'None'}</div>
 
 
-                  <div className="mt-3 flex flex-wrap gap-2 justify-end">
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
 
                     <button type="button" className={chipClass(selected.includes('mood'))} data-selected={selected.includes('mood') ? 'true' : undefined} onClick={() => toggleMetric('mood')}>
 
