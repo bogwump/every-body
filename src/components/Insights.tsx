@@ -19,7 +19,7 @@ import {
   Legend,
 } from 'recharts';
 import { ArrowRight, FlaskConical, Sparkles, Moon, CheckCircle2, XCircle, HelpCircle, Blend, Layers3, ChevronDown } from 'lucide-react';
-import { TryNextCard, type TryNextItem } from './TryNextCard';
+import type { TryNextItem } from './TryNextCard';
 import { WhatsHelpingCard } from './WhatsHelpingCard';
 import { getMomentHistory } from '../lib/companionMoments';
 import type { CheckInEntry, CyclePhase, SymptomKey, SymptomKind, UserData, ExperimentPlan, InsightMetricKey } from '../types';
@@ -3956,14 +3956,6 @@ const tryNextPrompts = useMemo(() => {
         )}
       </div>
 
-      <TryNextCard
-        items={tryNextActions.map((item) => ({ id: item.id, title: item.title, description: item.description, label: item.label, saved: item.saved }))}
-        onStart={startSignalExperiment}
-        onSave={saveSignalExperiment}
-        onDismiss={dismissSignalExperiment}
-        hasActiveExperiment={Boolean(experimentStatus && !experimentStatus.done)}
-        onViewActiveExperiment={viewActiveExperiment}
-      />
 
 {/* Experiment dialog */}
       <Dialog open={experimentOpen} onOpenChange={setExperimentOpen}>
