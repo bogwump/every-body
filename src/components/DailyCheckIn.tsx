@@ -1095,7 +1095,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           </p>
 
           {prevMoodLabel && (
-            <p className="text-xs eb-hero-on-dark-muted" style={{ color: 'rgba(255,255,255,0.85)' }}>
+            <p className="text-xs eb-hero-on-dark-muted" style={{ color: 'rgb(255,255,255)', opacity: 1 }}>
               Yesterday: <span className="font-semibold">{prevMoodLabel}</span>
             </p>
           )}

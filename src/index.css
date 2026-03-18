@@ -555,7 +555,7 @@ body.eb-chat-typing .eb-mobile-nav {
   .eb-icon-frame--hero,
   .eb-icon-frame--hero svg {
     background: transparent;
-    color: rgb(255 255 255 / 0.92) !important;
+    color: rgb(255 255 255) !important;
     border-color: transparent;
   }
 
@@ -929,7 +929,17 @@ p {
 
 /* White text ONLY when explicitly opted in */
 .eb-hero-on-dark {
-  color: rgba(255, 255, 255, 0.95);
+  color: rgb(255 255 255);
+}
+
+.eb-hero-on-dark .eb-hero-title {
+  color: rgb(255 255 255) !important;
+  font-weight: 700 !important;
+}
+
+.eb-hero-on-dark .eb-hero-subtitle {
+  color: rgb(255 255 255) !important;
+  font-weight: 500 !important;
 }
 
 .eb-hero-on-dark .eb-hero-panel {
@@ -937,7 +947,8 @@ p {
 }
 
 .eb-hero-on-dark-muted {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgb(255 255 255) !important;
+  opacity: 1 !important;
 }
 
 /* ===== Light inset cards (Checked in / Goal etc) ===== */

@@ -832,7 +832,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
               {(userData as any).avatarDataUrl ? (
                 <img src={(userData as any).avatarDataUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (userData as any).avatarStockId ? (
-                <div className="text-white/90">
+                <div className="text-white">
                   <StockAvatar id={(userData as any).avatarStockId} className="w-10 h-10" />
                 </div>
               ) : (
@@ -842,7 +842,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
               <div>
                 <h2 className="eb-hero-title text-white">{userData.name?.trim() || 'Friend'}</h2>
-                <p className="mt-1 eb-hero-subtitle text-white/80">
+                <p className="mt-1 eb-hero-subtitle text-white">
                   {userData.goal === 'cycle-health' && 'Tracking cycle health'}
                   {userData.goal === 'perimenopause' && 'Perimenopause support'}
                   {userData.goal === 'post-contraception' && 'Post-contraception journey'}
@@ -856,15 +856,15 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
 
           <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-[rgba(255,255,255,0.22)]">
             <div>
-              <p className="text-xs text-white/80 mb-1">Days tracked</p>
+              <p className="text-xs text-white mb-1">Days tracked</p>
               <p className="text-xl font-medium text-white">{daysTracked}</p>
             </div>
             <div>
-              <p className="text-xs text-white/80 mb-1">Check-ins</p>
+              <p className="text-xs text-white mb-1">Check-ins</p>
               <p className="text-xl font-medium text-white">{streak}</p>
             </div>
             <div>
-              <p className="text-xs text-white/80 mb-1">Insights</p>
+              <p className="text-xs text-white mb-1">Insights</p>
               <p className="text-xl font-medium text-white">{insightsUnlocked}</p>
             </div>
           </div>

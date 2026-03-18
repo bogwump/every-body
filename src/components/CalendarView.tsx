@@ -937,16 +937,16 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             <div className="eb-hero-header-main min-w-0">
               <h3 className="eb-hero-title text-white">Your month at a glance</h3>
               <p className="mt-1 eb-hero-subtitle eb-hero-on-dark-muted">Review symptoms, period windows, and predicted timing in one place.</p>
-              <div className="mt-3 text-sm text-white/90">
+              <div className="mt-3 text-sm text-white">
                 {hasCycleAnchor ? (
                   <>
                     <span className="font-semibold">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}</span>
-                    {rhythmTiming.currentDay ? <span className="ml-2 text-white/80">Day {rhythmTiming.currentDay} in phase</span> : null}
+                    {rhythmTiming.currentDay ? <span className="ml-2 text-white">Day {rhythmTiming.currentDay} in phase</span> : null}
                   </>
                 ) : cycleEnabled ? (
-                  <span className="text-white/85">Still learning your cycle timing</span>
+                  <span className="text-white">Still learning your cycle timing</span>
                 ) : (
-                  <span className="text-white/85">Cycle timing is off, but you can still log and review patterns here.</span>
+                  <span className="text-white">Cycle timing is off, but you can still log and review patterns here.</span>
                 )}
               </div>
             </div>
