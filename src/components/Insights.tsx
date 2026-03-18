@@ -33,6 +33,7 @@ import { isMetricInScope } from '../lib/insightsScope';
 import { type InsightSignal, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
 import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { getSupportSuggestion } from '../lib/patternSupport';
+import { describeHighValue } from '../lib/metricSemantics';
 import { getExperimentForSignal, scoreExperimentSuggestion } from '../lib/experimentSuggestions';
 import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, saveAction } from '../lib/savedActions';
 import { clearExperimentOutcomeRecord, recordExperimentOutcome } from '../lib/experimentOutcomes';
