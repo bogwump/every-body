@@ -1182,3 +1182,9 @@ p {
 button, [role="button"] {
   -webkit-tap-highlight-color: transparent;
 }
+
+[data-slot="carousel-previous"]:disabled,
+[data-slot="carousel-next"]:disabled {
+  opacity: 0;
+  pointer-events: none;
+}

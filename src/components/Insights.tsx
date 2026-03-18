@@ -3711,10 +3711,10 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
+          <div className="grid grid-cols-3 gap-2 px-1 pt-1">
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full !px-2 !py-0 text-[0.95rem] font-semibold whitespace-nowrap justify-center"
               onClick={() => {
                 setDataEvidenceOpen(true);
                 scrollToInsightsSection('eb-insights-settings');
@@ -3724,14 +3724,14 @@ const tryNextPrompts = useMemo(() => {
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full !px-2 !py-0 text-[0.95rem] font-semibold whitespace-nowrap justify-center"
               onClick={() => scrollToInsightsSection('eb-experiments')}
             >
               Run experiment
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full !px-2 !py-0 text-[0.95rem] font-semibold whitespace-nowrap justify-center"
               onClick={() => scrollToInsightsSection('eb-insights-settings')}
             >
               Change metrics
@@ -4419,7 +4419,7 @@ const tryNextPrompts = useMemo(() => {
           {historyOpen ? (
             Array.isArray(experimentHistory) && experimentHistory.length > 0 ? (
               <div className="mt-4">
-                <Carousel opts={{ align: 'start' }} className="w-full">
+                <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden px-10 sm:px-0">
                   <CarouselContent>
                     {(experimentHistory as any[]).slice(0, 20).map((item: any) => {
                       const id = String(item?.experimentId || item?.title || Math.random());
@@ -4531,7 +4531,7 @@ const tryNextPrompts = useMemo(() => {
                   <div className="text-sm font-semibold">Try next</div>
                   <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
                   <div className="mt-3">
-                    <Carousel opts={{ align: 'start' }} className="w-full">
+                    <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden px-10 sm:px-0">
                       <CarouselContent>
                         {visibleTryNextPrompts.map((p) => (
                           <CarouselItem key={p.id} className="basis-full md:basis-1/2">
@@ -4560,7 +4560,7 @@ const tryNextPrompts = useMemo(() => {
                               </div>
                               <div className="flex-1" />
                               <div className="mt-4 flex items-center justify-end gap-3">
-                                <button type="button" className="eb-btn eb-btn-primary" onClick={() => openTryNextPrompt(p as any)}>
+                                <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openTryNextPrompt(p as any)}>
                                   <FlaskConical className="w-4 h-4" />
                                   Set up {p.durationDays || 3}-day experiment
                                 </button>
@@ -4585,7 +4585,7 @@ const tryNextPrompts = useMemo(() => {
                   </div>
                 ) : (
                   <div className="mt-3">
-                    <Carousel opts={{ align: 'start' }} className="w-full">
+                    <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden px-10 sm:px-0">
                       <CarouselContent>
                         {visibleSuggestedExperiments.map((s) => {
                           const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
@@ -4604,7 +4604,7 @@ const tryNextPrompts = useMemo(() => {
                                 </div>
                                 <div className="flex-1" />
                                 <div className="mt-4 flex justify-end">
-                                  <button type="button" className="eb-btn eb-btn-primary" onClick={() => openExperiment(s.metrics)}>
+                                  <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics)}>
                                     <FlaskConical className="w-4 h-4" />
                                     Try a 3-day experiment
                                   </button>
@@ -4797,7 +4797,7 @@ const tryNextPrompts = useMemo(() => {
             ) : null}
 
             <div className="mt-4">
-              <Carousel opts={{ align: 'start' }} className="w-full">
+              <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden px-10 sm:px-0">
                 <CarouselContent>
                   {findings.map((f, idx) => (
                     <CarouselItem key={idx} className="basis-full md:basis-1/2">
@@ -5014,23 +5014,9 @@ const tryNextPrompts = useMemo(() => {
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="eb-card">
           <div className="eb-card-header">
-            <div className="flex items-start justify-between gap-4 w-full">
-              <div>
-                <div className="eb-card-title">Symptom distribution</div>
-                <div className="eb-card-sub">How often your chosen metric sits low, mid, or high.</div>
-              </div>
-              <select
-                className="eb-input !w-auto !py-2"
-                value={String(distributionMetric)}
-                onChange={(e) => setDistributionMetric(e.target.value as any)}
-                aria-label="Choose distribution metric"
-              >
-                {selected.map((k) => (
-                  <option key={String(k)} value={String(k)}>
-                    {labelFor(k, userData)}
-                  </option>
-                ))}
-              </select>
+            <div className="min-w-0 flex-1">
+              <div className="eb-card-title">Symptom distribution</div>
+              <div className="eb-card-sub">How often your chosen metric sits low, mid, or high.</div>
             </div>
           </div>
 
@@ -5064,6 +5050,20 @@ const tryNextPrompts = useMemo(() => {
                   <Legend verticalAlign="bottom" height={28} />
                 </PieChart>
               </ResponsiveContainer>
+            </div>
+            <div className="mt-4 flex justify-center sm:justify-start">
+              <select
+                className="eb-input !w-auto min-w-[13rem] !py-2"
+                value={String(distributionMetric)}
+                onChange={(e) => setDistributionMetric(e.target.value as any)}
+                aria-label="Choose distribution metric"
+              >
+                {selected.map((k) => (
+                  <option key={String(k)} value={String(k)}>
+                    {labelFor(k, userData)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
