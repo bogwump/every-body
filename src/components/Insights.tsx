@@ -1364,7 +1364,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         : p.n >= 8 && Math.abs(p.r) >= 0.5
           ? 'repeating pattern'
           : 'emerging pattern';
-      const allowSuggestedExperiment =
+      const baseAllowSuggestedExperiment =
         (p.kindA === 'behaviour' || p.kindB === 'behaviour') &&
         // avoid suggesting experiments when the relationship is based on very few points
         p.n >= 4 &&
@@ -1404,6 +1404,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         stateResult,
         lagPattern,
       });
+
+      const allowSuggestedExperiment =
+        baseAllowSuggestedExperiment &&
+        (stateResult.state === 'live_cluster' || stateResult.state === 'upcoming_cluster');
 
       const why = [
         ...narrative.why,
@@ -1481,7 +1485,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         : n >= 8 && Math.abs(correlation) >= 0.5
           ? 'repeating pattern'
           : 'emerging pattern';
-      const allowSuggestedExperiment =
+      const baseAllowSuggestedExperiment =
         (kindA === 'behaviour' || kindB === 'behaviour') &&
         n >= 4 &&
         !((kindA === 'physio' || kindA === 'hormonal') && (kindB === 'physio' || kindB === 'hormonal'));
@@ -1506,6 +1510,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         stateResult,
         lagPattern,
       });
+      const allowSuggestedExperiment =
+        baseAllowSuggestedExperiment &&
+        (stateResult.state === 'live_cluster' || stateResult.state === 'upcoming_cluster');
+
       const why = [
         ...narrative.why,
         deepReady
@@ -4182,16 +4190,31 @@ const tryNextPrompts = useMemo(() => {
                   })()}
 
                   <div className="pt-4 flex items-center justify-between gap-2">
-                    {p.allowSuggestedExperiment ? (
-                      <button type="button" className="eb-btn-primary" onClick={() => openExperiment([p.aKey, p.bKey])}>
-                        <FlaskConical className="w-4 h-4" />
-                        Try 3-day experiment
-                      </button>
-                    ) : p.hormonalInvolved ? (
-                      <div className="text-sm eb-muted">Track for one more cycle.</div>
-                    ) : (
-                      <div className="text-sm eb-muted">Keep logging for a clearer signal.</div>
-                    )}
+                    {(() => {
+                      const state = p.patternState?.state ?? 'unclear_interesting';
+
+                      if (p.allowSuggestedExperiment) {
+                        const ctaLabel = state === 'upcoming_cluster' ? 'Set up for next time' : 'Try this now';
+                        return (
+                          <button type="button" className="eb-btn-primary" onClick={() => openExperiment([p.aKey, p.bKey])}>
+                            <FlaskConical className="w-4 h-4" />
+                            {ctaLabel}
+                          </button>
+                        );
+                      }
+
+                      const actionNote = state === 'live_cluster'
+                        ? 'Notice whether both stay softer together over the next few days.'
+                        : state === 'upcoming_cluster'
+                          ? 'Keep an eye out for the first sign in this cluster over the next few days.'
+                          : state === 'passed_cluster'
+                            ? 'This one is more useful as a marker for next cycle than something to act on today.'
+                            : state === 'stable_recurring_grouping'
+                              ? 'This looks more like a recurring body pattern than a one-off.'
+                              : 'Keep logging for one more cycle to see whether the same pattern repeats.';
+
+                      return <div className="text-sm eb-muted">{actionNote}</div>;
+                    })()}
                   </div>
                 </div>
               );
