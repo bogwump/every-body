@@ -1337,7 +1337,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             onToggle={(e) => setShowCycleTracking((e.currentTarget as HTMLDetailsElement).open)}
           >
             <summary className="list-none cursor-pointer select-none px-0 py-0 hover:bg-transparent">
-              <div className="flex items-start justify-between gap-3">
+              <div className="eb-card-header items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-neutral-900">
                     <ChevronDown className="w-4 h-4 text-[rgb(var(--color-text-secondary))] shrink-0 transition-transform" />
@@ -1347,7 +1347,7 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
                     Phase insights, fertile window settings, and bleeding-based cycle behaviour.
                   </p>
                 </div>
-                <div className="eb-icon-frame shrink-0">
+                <div className="eb-icon-frame shrink-0 self-start">
                   <RefreshCcw className="w-5 h-5" />
                 </div>
               </div>
@@ -1469,21 +1469,22 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
         {/* Analyse your data */}
         <div className="mb-6">
           <div className="eb-list-card p-5">
-            <h3 className="mb-3">Analyse your data</h3>
-            <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-              Take your patterns, insights and experiments into an AI assistant for deeper analysis.
-            </p>
+            <div className="eb-card-header items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-3">Analyse your data</h3>
+                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                  Take your patterns, insights and experiments into an AI assistant for deeper analysis.
+                </p>
+              </div>
+              <div className="eb-icon-frame self-start">
+                <TrendingUpDown className="w-5 h-5" />
+              </div>
+            </div>
             <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-              <div className="eb-card-header">
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">Analyse your data</p>
-                  <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
-                    This export contains a summary of your tracking data. Only share it with tools you trust.
-                  </p>
-                </div>
-                <div className="eb-icon-frame">
-                  <TrendingUpDown className="w-5 h-5" />
-                </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                  This export contains a summary of your tracking data. Only share it with tools you trust.
+                </p>
               </div>
 
               <div className="mt-4">
@@ -1577,20 +1578,21 @@ To restore, choose a file named everybody-backup-YYYY-MM-DD.json.`
             <h3 className="mb-3 px-2">{section.title}</h3>
             {section.title === 'Analyse your data' ? (
               <div className="eb-list-card p-5">
-                <p className="text-sm text-[rgb(var(--color-text-secondary))]">
-                  Take your patterns, insights and experiments into an AI assistant for deeper analysis.
-                </p>
+                <div className="eb-card-header items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                      Take your patterns, insights and experiments into an AI assistant for deeper analysis.
+                    </p>
+                  </div>
+                  <div className="eb-icon-frame self-start">
+                    <TrendingUpDown className="w-5 h-5" />
+                  </div>
+                </div>
                 <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-                  <div className="eb-card-header">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">Analyse your data</p>
-                      <p className="mt-2 text-sm text-[rgb(var(--color-text-secondary))]">
-                        This export contains a summary of your tracking data. Only share it with tools you trust.
-                      </p>
-                    </div>
-                    <div className="eb-icon-frame">
-                      <TrendingUpDown className="w-5 h-5" />
-                    </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-[rgb(var(--color-text-secondary))]">
+                      This export contains a summary of your tracking data. Only share it with tools you trust.
+                    </p>
                   </div>
 
                   <div className="mt-4">
