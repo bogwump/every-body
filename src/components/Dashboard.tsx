@@ -493,6 +493,7 @@ export function Dashboard({
 }: DashboardProps) {
   const { entries: entriesAll } = useEntries();
   const { experiment } = useExperiment();
+  const { history: experimentHistory } = useExperimentHistory();
   const entriesSorted = useMemo(() => sortByDateAsc(entriesAll), [entriesAll]);
 
   const todayISO = isoToday();
