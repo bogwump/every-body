@@ -13,23 +13,6 @@ import type { UserData } from '../types';
 
 type ConfidenceLevel = 'Learning' | 'Emerging' | 'Established';
 
-function confidenceLabel(daysLogged: number): ConfidenceLevel {
-  if (daysLogged >= 60) return 'Established';
-  if (daysLogged >= 21) return 'Emerging';
-  return 'Learning';
-}
-
-function confidenceCopy(level: ConfidenceLevel): string {
-  switch (level) {
-    case 'Established':
-      return 'We have enough history now to recognise your rhythm more reliably.';
-    case 'Emerging':
-      return 'Early patterns are starting to show. This will get clearer with a little more time.';
-    default:
-      return 'It’s early days. For now, we’ll keep things gentle and learn as you log.';
-  }
-}
-
 type PhaseKey = 'reset' | 'rebuilding' | 'expressive' | 'protective';
 
 type PhaseContent = {
@@ -467,7 +450,6 @@ export function Rhythm({ userData }: { userData?: UserData }) {
       return 0;
     }
   }, [entries]);
-const level = useMemo(() => confidenceLabel(daysLogged), [daysLogged]);
 
   const computed = useMemo(() => {
     const sorted = sortByDateAsc(entries);
