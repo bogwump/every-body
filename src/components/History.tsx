@@ -127,7 +127,12 @@ export function History({ onNavigate }: HistoryProps) {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setFilter(item.key)}
+                onClick={() => {
+                  setFilter(item.key);
+                  if (item.key === 'all') {
+                    setCollapsedMonths({});
+                  }
+                }}
                 className="eb-choice-pill"
                 data-selected={active ? 'true' : undefined}
               >
