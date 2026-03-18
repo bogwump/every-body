@@ -1384,7 +1384,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         sampleSize: p.n,
         summary: { metric: p.aKey, otherMetric: p.bKey, correlation: p.r },
       };
-      const contextLine = getPatternContextForSignal({ metrics: [p.aKey, p.bKey], confidence, direction: p.r >= 0 ? 'together' : 'inverse' });
+      const baseContextLine = getPatternContextForSignal({ metrics: [p.aKey, p.bKey], confidence, direction: p.r >= 0 ? 'together' : 'inverse' });
       const stateResult = classifyPatternStateForSignal({
         entries: entriesSorted,
         userData,
