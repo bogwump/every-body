@@ -229,15 +229,6 @@ export function History({ onNavigate }: HistoryProps) {
                           {(event.actionLabel && event.actionTarget) || (event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string') ? (
                             <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
                               <div className="order-2 ml-auto flex flex-wrap justify-end gap-3 sm:order-2">
-                                {event.actionLabel && event.actionTarget ? (
-                                  <button
-                                    type="button"
-                                    className="eb-btn eb-btn-primary"
-                                    onClick={() => navigateToTarget(event.actionTarget, onNavigate)}
-                                  >
-                                    {event.actionLabel}
-                                  </button>
-                                ) : null}
                                 {event.metadata?.patternDismissed && typeof event.metadata?.patternFeedbackId === 'string' ? (
                                   <button
                                     type="button"
@@ -248,6 +239,15 @@ export function History({ onNavigate }: HistoryProps) {
                                     }}
                                   >
                                     Undo correction
+                                  </button>
+                                ) : null}
+                                {event.actionLabel && event.actionTarget ? (
+                                  <button
+                                    type="button"
+                                    className="eb-btn eb-btn-primary"
+                                    onClick={() => navigateToTarget(event.actionTarget, onNavigate)}
+                                  >
+                                    {event.actionLabel}
                                   </button>
                                 ) : null}
                               </div>

@@ -88,7 +88,6 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
       </div>
       <p className="text-sm text-[rgba(0,0,0,0.68)]">{copy.body}</p>
       <div className="mt-4 flex flex-wrap justify-end gap-3">
-            <button type="button" className="eb-btn-primary" onClick={handlePrimaryAction}>{copy.button}</button>
             <button
               type="button"
               className="eb-btn-secondary inline-flex items-center gap-2"
@@ -100,6 +99,7 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
               <X className="w-4 h-4" />
               Dismiss
             </button>
+            <button type="button" className="eb-btn-primary" onClick={handlePrimaryAction}>{copy.button}</button>
       </div>
     </div>
   );
