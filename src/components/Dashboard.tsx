@@ -22,6 +22,7 @@ import { getRecentPhaseChange, getRhythmPhaseState } from '../lib/phaseChange';
 import { generateMoments } from '../lib/generateMoments';
 import { CompanionMomentCard } from './CompanionMomentCard';
 import { getCycleTrustModel } from '../lib/cycleTrust';
+import { compareExperimentOutcomes, findPreviousExperimentRun } from '../lib/experimentMeta';
 
 interface DashboardProps {
   userName: string;
@@ -194,6 +195,42 @@ function buildWeekSeries(dateISOs: string[], entriesByDate: Map<string, any>, me
   });
 }
 
+function average(values: number[]): number | null {
+  if (!Array.isArray(values) || values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function formatPoints(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(Math.trunc(rounded)) : rounded.toFixed(1);
+}
+
+function metricSentenceLabel(metric: DashboardMetric): string {
+  const label = METRIC_LABELS[metric] || metric;
+  return label.charAt(0).toLowerCase() + label.slice(1);
+}
+
+function formatPhaseName(phase: string | null | undefined): string {
+  const raw = String(phase || '').trim();
+  if (!raw) return 'this phase';
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function pickTopMetricDelta(entries: any[], metrics: DashboardMetric[]): { metric: DashboardMetric; beforeAvg: number; afterAvg: number; delta: number } | null {
+  let best: { metric: DashboardMetric; beforeAvg: number; afterAvg: number; delta: number } | null = null;
+  for (const metric of metrics) {
+    const values = entries.map((entry) => metricValue(entry, metric)).filter((value): value is number => typeof value === 'number');
+    if (values.length < 4) continue;
+    const midpoint = Math.max(2, Math.floor(values.length / 2));
+    const beforeAvg = average(values.slice(0, midpoint));
+    const afterAvg = average(values.slice(midpoint));
+    if (beforeAvg == null || afterAvg == null) continue;
+    const delta = afterAvg - beforeAvg;
+    if (Math.abs(delta) < 1) continue;
+    if (!best || Math.abs(delta) > Math.abs(best.delta)) best = { metric, beforeAvg, afterAvg, delta };
+  }
+  return best;
+}
 
 
 
@@ -767,6 +804,8 @@ export function Dashboard({
 
     const last7 = filterByDays(entriesSorted, 7, todayISO);
     const last14 = filterByDays(entriesSorted, 14, todayISO);
+    const last35 = filterByDays(entriesSorted, 35, todayISO);
+    const previous28 = last35.slice(0, Math.max(0, last35.length - last7.length));
     const enabledMetricCandidates = Array.from(new Set<DashboardMetric>([
       'mood',
       ...(userData.enabledModules || []).filter((key): key is DashboardMetric => NEXT_STEP_SWING_METRICS.includes(key as DashboardMetric)),
@@ -777,20 +816,42 @@ export function Dashboard({
       const durationDays = Math.max(1, Number(activeExperiment.durationDays || 3));
       const elapsedDays = Math.max(0, dayDiff(activeExperiment.startDateISO || todayISO, todayISO)) + 1;
       const daysLeft = Math.max(0, durationDays - elapsedDays);
-      const metricCount = Array.isArray(activeExperiment.metrics) ? activeExperiment.metrics.length : 0;
+      const experimentMetrics = (Array.isArray(activeExperiment.metrics) ? activeExperiment.metrics : [])
+        .filter((metric): metric is DashboardMetric => typeof metric === 'string' && metric in METRIC_LABELS) as DashboardMetric[];
+      const experimentWindow = entriesSorted.filter((entry: any) => String(entry?.dateISO || '') >= String(activeExperiment.startDateISO || todayISO));
+      const baselineWindow = entriesSorted.filter((entry: any) => String(entry?.dateISO || '') < String(activeExperiment.startDateISO || todayISO)).slice(-7);
 
       if (!checkedInToday) {
         return {
-          body: `Your experiment is still running. Today’s check-in will make it easier to tell whether ${activeExperiment.title || 'it'} is helping${metricCount ? ` across ${formatCountLabel(metricCount, 'signal')}` : ''}.`,
+          body: `Your ${activeExperiment.title || 'experiment'} is still running. Today’s check-in will make it easier to see whether anything is starting to shift.`,
           actionLabel: 'Do today’s check-in',
           action: 'check-in',
         };
       }
 
+      let experimentBody = `Your ${activeExperiment.title || 'experiment'} is running${daysLeft > 0 ? ` with about ${formatCountLabel(daysLeft, 'day')} left` : ''}. Open Insights for the fuller picture.`;
+
+      const bestMetric = experimentMetrics.reduce<{ metric: DashboardMetric; baselineAvg: number; duringAvg: number; delta: number } | null>((best, metric) => {
+        const baselineValues = baselineWindow.map((entry: any) => metricValue(entry, metric)).filter((value): value is number => typeof value === 'number');
+        const duringValues = experimentWindow.map((entry: any) => metricValue(entry, metric)).filter((value): value is number => typeof value === 'number');
+        const baselineAvg = average(baselineValues);
+        const duringAvg = average(duringValues);
+        if (baselineAvg == null || duringAvg == null || duringValues.length < 2) return best;
+        const delta = duringAvg - baselineAvg;
+        const candidate = { metric, baselineAvg, duringAvg, delta };
+        if (!best || Math.abs(delta) > Math.abs(best.delta)) return candidate;
+        return best;
+      }, null);
+
+      if (bestMetric && Math.abs(bestMetric.delta) >= 0.8) {
+        const directionWord = bestMetric.delta > 0 ? 'higher' : 'lower';
+        experimentBody = `Your ${activeExperiment.title || 'experiment'} is showing an early shift in ${metricSentenceLabel(bestMetric.metric)} so far, averaging about ${formatPoints(Math.abs(bestMetric.delta))} point${Math.abs(bestMetric.delta) >= 1.5 ? 's' : ''} ${directionWord} than the days just before it.`;
+      } else if (experimentWindow.length >= 2) {
+        experimentBody = `Your ${activeExperiment.title || 'experiment'} is underway. You have ${formatCountLabel(experimentWindow.length, 'logged day')} so far, so the pattern is starting to take shape even if it is still early.`;
+      }
+
       return {
-        body: daysLeft <= 1
-          ? `Your experiment is nearly ready to review. ${checkedInToday ? 'A quick look in Insights should help you see whether it shifted anything meaningful.' : 'One more check-in should help the result land more clearly.'}`
-          : `Your experiment is live${daysLeft > 0 ? ` with around ${formatCountLabel(daysLeft, 'day')} left` : ''}. Insights may be the best place to review how the tracked signals are moving so far.`,
+        body: experimentBody,
         actionLabel: 'Open Insights',
         action: 'navigate',
         screen: 'insights',
@@ -803,8 +864,27 @@ export function Dashboard({
       : null;
 
     if (latestCompletedExperiment && completedAgo != null && completedAgo >= 0 && completedAgo <= 7) {
+      const digestQuick = latestCompletedExperiment?.outcome?.digest?.quick || latestCompletedExperiment?.outcome?.digest;
+      const topDigestMetric = Array.isArray(digestQuick?.metrics)
+        ? [...digestQuick.metrics]
+            .filter((metric: any) => typeof metric?.delta === 'number' && typeof metric?.key === 'string')
+            .sort((a: any, b: any) => Math.abs(Number(b?.delta || 0)) - Math.abs(Number(a?.delta || 0)))[0]
+        : null;
+      const previousRun = findPreviousExperimentRun(experimentHistory as any, latestCompletedExperiment as any);
+      const comparisonLine = compareExperimentOutcomes(previousRun?.outcome?.status, latestCompletedExperiment?.outcome?.status);
+
+      let completedBody = `${latestCompletedExperiment.title || 'Your recent experiment'} has just finished. Open Insights to review what shifted.`;
+      if (topDigestMetric && Math.abs(Number(topDigestMetric.delta || 0)) >= 0.8) {
+        const delta = Number(topDigestMetric.delta || 0);
+        const directionWord = delta > 0 ? 'higher' : 'lower';
+        completedBody = `${latestCompletedExperiment.title || 'Your recent experiment'} has just finished. ${topDigestMetric.label || METRIC_LABELS[topDigestMetric.key as DashboardMetric] || 'That signal'} ended up about ${formatPoints(Math.abs(delta))} point${Math.abs(delta) >= 1.5 ? 's' : ''} ${directionWord} during the run.`;
+      }
+      if (comparisonLine) {
+        completedBody += ` ${comparisonLine}`;
+      }
+
       return {
-        body: `${latestCompletedExperiment.title || 'Your recent experiment'} has just finished. Insights may be the best place to look next if you want to see whether it changed anything meaningful.`,
+        body: completedBody,
         actionLabel: 'Review in Insights',
         action: 'navigate',
         screen: 'insights',
@@ -815,8 +895,24 @@ export function Dashboard({
     if (userData.cycleTrackingMode === 'cycle' && recentPhaseChange && !recentPhaseChange.dismissed) {
       const changedDaysAgo = dayDiff(recentPhaseChange.changedAt, todayISO);
       if (changedDaysAgo >= 0 && changedDaysAgo <= 3) {
+        const changedAtIndex = entriesSorted.findIndex((entry: any) => String(entry?.dateISO || '') >= recentPhaseChange.changedAt);
+        const beforeShift = changedAtIndex > 0 ? entriesSorted.slice(Math.max(0, changedAtIndex - 4), changedAtIndex) : [];
+        const afterShift = changedAtIndex >= 0 ? entriesSorted.slice(changedAtIndex, changedAtIndex + 4) : last7;
+        const likelyDriver = pickTopMetricDelta([...beforeShift, ...afterShift], enabledMetricCandidates.filter((metric) => metric !== 'flow'));
+        let phaseBody = `Your rhythm has just shifted into ${formatPhaseName(recentPhaseChange.phase)}.`;
+        if (likelyDriver) {
+          const directionText = likelyDriver.delta > 0 ? 'rose' : 'eased';
+          phaseBody += ` ${likelyDriver.metric === 'energy' ? 'Energy' : METRIC_LABELS[likelyDriver.metric]} ${directionText} from about ${formatPoints(likelyDriver.beforeAvg)} to ${formatPoints(likelyDriver.afterAvg)}, which is one reason the app inferred the shift.`;
+        } else {
+          const recentFlow = afterShift.some((entry: any) => {
+            const flow = metricValue(entry, 'flow');
+            return typeof flow === 'number' && flow > 0;
+          });
+          if (recentFlow) phaseBody += ' Recent bleeding is one reason the app inferred the shift.';
+          else phaseBody += ' Open Rhythm for the fuller context behind that change.';
+        }
         return {
-          body: `Your rhythm has just shifted into ${recentPhaseChange.phase}. Rhythm may be the best place to look next if you want context for what often changes around here.`,
+          body: phaseBody,
           actionLabel: 'Open Rhythm',
           action: 'navigate',
           screen: 'rhythm',
@@ -824,11 +920,25 @@ export function Dashboard({
       }
     }
 
-    const todayFlow = metricValue(entriesSorted.find((e: any) => (e as any).dateISO === todayISO), 'flow');
+    const todayEntry = entriesSorted.find((e: any) => (e as any).dateISO === todayISO);
+    const todayFlow = metricValue(todayEntry as any, 'flow');
     const menstrualToday = userData.cycleTrackingMode === 'cycle' && (todayPhase === 'Menstrual' || (typeof todayFlow === 'number' && todayFlow > 0));
     if (menstrualToday) {
+      const recentPain = last7.map((entry) => metricValue(entry as any, 'pain')).filter((value): value is number => typeof value === 'number');
+      const recentEnergy = last7.map((entry) => metricValue(entry as any, 'energy')).filter((value): value is number => typeof value === 'number');
+      const painAvg = average(recentPain);
+      const energyAvg = average(recentEnergy);
+      let periodBody = 'You appear to be in your reset window today.';
+      if (painAvg != null || energyAvg != null) {
+        const parts = [];
+        if (painAvg != null) parts.push(`pain is averaging ${formatPoints(painAvg)}/10`);
+        if (energyAvg != null) parts.push(`energy is averaging ${formatPoints(energyAvg)}/10`);
+        periodBody += ` So far, ${parts.join(' while ')}.`;
+      } else {
+        periodBody += ' Rhythm may be the best place to look next if you want context for what commonly shifts around your period.';
+      }
       return {
-        body: 'You appear to be in your reset window today. Rhythm may be the best place to look next if you want context for what commonly shifts around your period.',
+        body: periodBody,
         actionLabel: 'Open Rhythm',
         action: 'navigate',
         screen: 'rhythm',
@@ -837,9 +947,20 @@ export function Dashboard({
 
     const recentSwing = getRecentSwingSignal(last7 as any[], enabledMetricCandidates);
     if (recentSwing) {
-      const movement = recentSwing.direction === 'up' ? 'climbing' : 'dropping';
+      const previousValues = previous28
+        .map((entry) => metricValue(entry as any, recentSwing.metric))
+        .filter((value): value is number => typeof value === 'number');
+      const recentValues = last7
+        .map((entry) => metricValue(entry as any, recentSwing.metric))
+        .filter((value): value is number => typeof value === 'number');
+      const previousRange = previousValues.length >= 3 ? Math.max(...previousValues) - Math.min(...previousValues) : null;
+      const recentRange = recentValues.length >= 3 ? Math.max(...recentValues) - Math.min(...recentValues) : null;
+      let swingBody = `${recentSwing.label} has been swinging more sharply over the last week and looks like one of your strongest recent shifts.`;
+      if (recentRange != null && previousRange != null && recentRange > previousRange + 1) {
+        swingBody = `${recentSwing.label} has swung more sharply this week than it did over the rest of the last month, which makes it one of your clearest recent changes.`;
+      }
       return {
-        body: `${recentSwing.label} has been moving more than usual lately and looks like one of your strongest recent shifts. Insights may be the best place to look next if you want a clearer read on what could be driving it.`,
+        body: swingBody,
         actionLabel: 'Open Insights',
         action: 'navigate',
         screen: 'insights',
@@ -856,13 +977,15 @@ export function Dashboard({
     if (sleepEnergyPoints.length >= 4) {
       const lowSleepEnergy = sleepEnergyPoints.filter((p) => p.sleep <= 5).map((p) => p.energy);
       const highSleepEnergy = sleepEnergyPoints.filter((p) => p.sleep >= 7).map((p) => p.energy);
-      const mean = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
-      const lowerSleepMean = mean(lowSleepEnergy);
-      const higherSleepMean = mean(highSleepEnergy);
+      const lowerSleepMean = average(lowSleepEnergy);
+      const higherSleepMean = average(highSleepEnergy);
 
       if (lowerSleepMean != null && higherSleepMean != null && Math.abs(higherSleepMean - lowerSleepMean) >= 1) {
+        const gap = Math.abs(higherSleepMean - lowerSleepMean);
+        const dayType = higherSleepMean > lowerSleepMean ? 'lower-sleep days' : 'higher-sleep days';
+        const resultDirection = higherSleepMean > lowerSleepMean ? 'lower' : 'higher';
         return {
-          body: 'Your recent check-ins suggest one of the clearest signals may be around sleep and energy. Insights may be the best place to look next.',
+          body: `Sleep and energy are moving together quite clearly right now. On ${dayType}, energy has been about ${formatPoints(gap)} point${gap >= 1.5 ? 's' : ''} ${resultDirection}.`,
           actionLabel: 'Open Insights',
           action: 'navigate',
           screen: 'insights',
@@ -894,11 +1017,18 @@ export function Dashboard({
     );
 
     if (shouldPointToRhythm) {
+      if (checkedInToday) {
+        return {
+          body: 'Your rhythm looks a little harder to place right now. A few more check-ins should make this phase clearer.',
+          actionLabel: 'Open Rhythm',
+          action: 'navigate',
+          screen: 'rhythm',
+        };
+      }
       return {
-        body: 'Rhythm may be especially helpful today if you want context for why things feel a bit different.',
-        actionLabel: 'Open Rhythm',
-        action: 'navigate',
-        screen: 'rhythm',
+        body: 'Your rhythm looks a little harder to place right now. A check-in today should make this phase clearer.',
+        actionLabel: 'Do today’s check-in',
+        action: 'check-in',
       };
     }
 
