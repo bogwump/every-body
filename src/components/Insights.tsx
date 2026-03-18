@@ -2615,6 +2615,7 @@ const uniq = new Map<string, (typeof items)[number]>();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [openHistoryCardId, setOpenHistoryCardId] = useState<string | null>(null);
   const [suggestedExperimentsOpen, setSuggestedExperimentsOpen] = useState(false);
+  const [suggestedVisibleCount, setSuggestedVisibleCount] = useState(3);
   const [dataEvidenceOpen, setDataEvidenceOpen] = useState(false);
 
   const daysBetweenIso = (fromIso: string, toIso: string) => {
@@ -3031,6 +3032,12 @@ const tryNextPrompts = useMemo(() => {
 
   const visibleTryNextPrompts = useMemo(() => tryNextPrompts, [tryNextPrompts]);
 
+  useEffect(() => {
+    if (!suggestedExperimentsOpen) {
+      setSuggestedVisibleCount(3);
+    }
+  }, [suggestedExperimentsOpen]);
+
   const visibleSuggestedExperiments = useMemo(() => {
     const today = isoTodayLocal();
     const recentlyCompleted = new Set<string>();
@@ -3050,6 +3057,41 @@ const tryNextPrompts = useMemo(() => {
       return !recentlyCompleted.has(`title:${titleKey}`) && !recentlyCompleted.has(`metrics:${metricsKey}`);
     });
   }, [suggestedExperiments, experimentHistory]);
+
+  const mergedSuggestedExperimentCards = useMemo(() => {
+    const tryCards = visibleTryNextPrompts.map((p) => ({
+      id: p.id,
+      source: 'try' as const,
+      title: p.title,
+      body: p.description,
+      suggestion: p.suggestion,
+      metrics: p.metrics,
+      durationDays: p.durationDays || 3,
+      prompt: p,
+      sortRank: 200 + (p.rank || 0),
+    }));
+
+    const strongCards = visibleSuggestedExperiments.map((s) => ({
+      id: s.id,
+      source: 'strong' as const,
+      title: s.title,
+      body: s.body,
+      suggestion: '',
+      metrics: s.metrics,
+      durationDays: s.durationDays || 3,
+      experiment: s,
+      confidenceLabel: s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning',
+      sortRank: (s.confidence === 'high' ? 120 : s.confidence === 'medium' ? 90 : 60) + Math.max(0, 10 - Math.min((s.metrics || []).length, 10)),
+    }));
+
+    return [...tryCards, ...strongCards]
+      .sort((a, b) => b.sortRank - a.sortRank || a.title.localeCompare(b.title));
+  }, [visibleTryNextPrompts, visibleSuggestedExperiments]);
+
+  const visibleMergedSuggestedCards = useMemo(
+    () => mergedSuggestedExperimentCards.slice(0, suggestedVisibleCount),
+    [mergedSuggestedExperimentCards, suggestedVisibleCount],
+  );
 
   const [outcomeNote, setOutcomeNote] = useState<string>('');
   const lastOutcomeNoteExperimentIdRef = useRef<string | null>(null);
@@ -4415,145 +4457,160 @@ const tryNextPrompts = useMemo(() => {
 
           {suggestedExperimentsOpen ? (
             <div className="mt-4">
-              {visibleTryNextPrompts.length > 0 ? (
-                <div>
-                  <div className="text-sm font-semibold">Try next</div>
-                  <div className="mt-1 text-sm eb-muted">Based on your recent logs. Tiny, reversible tests.</div>
-                  <div className="mt-3 space-y-3 sm:hidden">
-                    {visibleTryNextPrompts.map((p) => (
-                      <div key={p.id} className="eb-inset-callout rounded-2xl p-5 min-w-0 overflow-hidden flex flex-col">
-                        <div className="flex items-start justify-between gap-3 min-w-0">
-                          <div className="text-sm font-semibold min-w-0">{p.title}</div>
-                          <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
-                        </div>
-                        <div className="mt-2 text-sm font-medium text-neutral-900">{p.suggestion}</div>
-                        <div className="mt-2 text-sm eb-muted">{p.description}</div>
-                        <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
-                        {whyOpen?.[p.id] ? (
-                          <div className="mt-2 text-sm eb-muted min-w-0">
-                            {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
-                            <ul className="list-disc pl-5 space-y-1">
-                              {(p.why || []).slice(1, 3).map((w, idx) => (
-                                <li key={`${p.id}-why-${idx}`}>{w}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {p.metrics.slice(0, 5).map((k) => (
-                            <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
-                          ))}
-                        </div>
-                        <div className="mt-4">
-                          <button type="button" className="eb-btn eb-btn-primary w-full justify-center" onClick={() => openTryNextPrompt(p as any)}>
-                            <FlaskConical className="w-4 h-4" />
-                            Set up {p.durationDays || 3}-day experiment
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 hidden sm:grid sm:grid-cols-1 xl:grid-cols-2 gap-4 min-w-0">
-                    {visibleTryNextPrompts.map((p) => (
-                      <div key={p.id} className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
-                        <div className="flex items-start justify-between gap-3 min-w-0">
-                          <div className="text-sm font-semibold min-w-0">{p.title}</div>
-                          <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
-                        </div>
-                        <div className="mt-2 text-sm font-medium text-neutral-900">{p.suggestion}</div>
-                        <div className="mt-2 text-sm eb-muted">{p.description}</div>
-                        <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
-                        {whyOpen?.[p.id] ? (
-                          <div className="mt-2 text-sm eb-muted min-w-0">
-                            {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
-                            <ul className="list-disc pl-5 space-y-1">
-                              {(p.why || []).slice(1, 3).map((w, idx) => (
-                                <li key={`${p.id}-why-${idx}`}>{w}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
-                        <div className="mt-3 flex flex-wrap justify-center gap-2">
-                          {p.metrics.slice(0, 5).map((k) => (
-                            <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
-                          ))}
-                        </div>
-                        <div className="flex-1" />
-                        <div className="mt-4 flex items-center justify-end gap-3">
-                          <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openTryNextPrompt(p as any)}>
-                            <FlaskConical className="w-4 h-4" />
-                            Set up {p.durationDays || 3}-day experiment
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {mergedSuggestedExperimentCards.length === 0 ? (
+                <div className="eb-inset-callout rounded-2xl p-5 text-sm eb-muted">
+                  To generate these, the app needs overlap between a behaviour like sleep, caffeine, or late nights and how you feel. If you are mainly logging body symptoms, try switching on Sleep or Stress for a few days and this section will start to fill up.
                 </div>
-              ) : null}
-
-              <div className={visibleTryNextPrompts.length ? 'mt-6' : ''}>
-                <div className="text-sm font-semibold">When the signal is strong</div>
-                <div className="mt-1 text-sm eb-muted">These start to appear as you log more days together.</div>
-                {visibleSuggestedExperiments.length === 0 ? (
-                  <div className="mt-3 eb-inset-callout rounded-2xl p-5 text-sm eb-muted">
-                    To generate these, the app needs overlap between a behaviour like sleep, caffeine, or late nights and how you feel. If you are mainly logging body symptoms, try switching on Sleep or Stress for a few days and this section will start to fill up.
-                  </div>
-                ) : (
-                  <>
-                    <div className="mt-3 space-y-3 sm:hidden">
-                      {visibleSuggestedExperiments.map((s) => {
-                        const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
+              ) : (
+                <>
+                  <div className="space-y-3 sm:hidden">
+                    {visibleMergedSuggestedCards.map((card) => {
+                      if (card.source === 'try') {
+                        const p = card.prompt;
                         return (
-                          <div key={s.id} className="eb-inset-callout rounded-2xl p-5 min-w-0 overflow-hidden flex flex-col">
+                          <div key={card.id} className="eb-inset-callout rounded-2xl p-5 min-w-0 overflow-hidden flex flex-col">
                             <div className="flex items-start justify-between gap-3 min-w-0">
-                              <div className="text-sm font-semibold min-w-0">{s.title}</div>
-                              <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
+                              <div className="text-sm font-semibold min-w-0">{card.title}</div>
+                              <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
                             </div>
-                            <div className="mt-2 text-sm eb-muted">{s.body}</div>
+                            <div className="mt-2 text-sm font-medium text-neutral-900">{card.suggestion}</div>
+                            <div className="mt-2 text-sm eb-muted">{card.body}</div>
+                            <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
+                            {whyOpen?.[p.id] ? (
+                              <div className="mt-2 text-sm eb-muted min-w-0">
+                                {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
+                                <ul className="list-disc pl-5 space-y-1">
+                                  {(p.why || []).slice(1, 3).map((w, idx) => (
+                                    <li key={`${p.id}-why-${idx}`}>{w}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
                             <div className="mt-3 flex flex-wrap gap-2">
-                              {s.metrics.slice(0, 3).map((k) => (
+                              {card.metrics.slice(0, 5).map((k) => (
                                 <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
                               ))}
                             </div>
                             <div className="mt-4">
-                              <button type="button" className="eb-btn eb-btn-primary w-full justify-center" onClick={() => openExperiment(s.metrics)}>
+                              <button type="button" className="eb-btn eb-btn-primary w-full justify-center" onClick={() => openTryNextPrompt(p as any)}>
                                 <FlaskConical className="w-4 h-4" />
-                                Try a 3-day experiment
+                                Set up {card.durationDays}-day experiment
                               </button>
                             </div>
                           </div>
                         );
-                      })}
-                    </div>
-                    <div className="mt-3 hidden sm:grid sm:grid-cols-1 xl:grid-cols-2 gap-4 min-w-0">
-                      {visibleSuggestedExperiments.map((s) => {
-                        const conf = s.confidence === 'high' ? 'Established' : s.confidence === 'medium' ? 'Emerging' : 'Learning';
+                      }
+
+                      const s = card.experiment;
+                      return (
+                        <div key={card.id} className="eb-inset-callout rounded-2xl p-5 min-w-0 overflow-hidden flex flex-col">
+                          <div className="flex items-start justify-between gap-3 min-w-0">
+                            <div className="text-sm font-semibold min-w-0">{card.title}</div>
+                            <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{card.confidenceLabel}</span>
+                          </div>
+                          <div className="mt-2 text-sm eb-muted">{card.body}</div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {card.metrics.slice(0, 3).map((k) => (
+                              <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                            ))}
+                          </div>
+                          <div className="mt-4">
+                            <button type="button" className="eb-btn eb-btn-primary w-full justify-center" onClick={() => openExperiment(s.metrics)}>
+                              <FlaskConical className="w-4 h-4" />
+                              Try a {card.durationDays}-day experiment
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="hidden sm:grid sm:grid-cols-1 xl:grid-cols-2 gap-4 min-w-0">
+                    {visibleMergedSuggestedCards.map((card) => {
+                      if (card.source === 'try') {
+                        const p = card.prompt;
                         return (
-                          <div key={s.id} className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
+                          <div key={card.id} className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
                             <div className="flex items-start justify-between gap-3 min-w-0">
-                              <div className="text-sm font-semibold min-w-0">{s.title}</div>
-                              <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{conf}</span>
+                              <div className="text-sm font-semibold min-w-0">{card.title}</div>
+                              <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
                             </div>
-                            <div className="mt-2 text-sm eb-muted">{s.body}</div>
+                            <div className="mt-2 text-sm font-medium text-neutral-900">{card.suggestion}</div>
+                            <div className="mt-2 text-sm eb-muted">{card.body}</div>
+                            <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
+                            {whyOpen?.[p.id] ? (
+                              <div className="mt-2 text-sm eb-muted min-w-0">
+                                {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
+                                <ul className="list-disc pl-5 space-y-1">
+                                  {(p.why || []).slice(1, 3).map((w, idx) => (
+                                    <li key={`${p.id}-why-${idx}`}>{w}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
                             <div className="mt-3 flex flex-wrap justify-center gap-2">
-                              {s.metrics.slice(0, 3).map((k) => (
+                              {card.metrics.slice(0, 5).map((k) => (
                                 <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
                               ))}
                             </div>
                             <div className="flex-1" />
-                            <div className="mt-4 flex justify-end">
-                              <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics)}>
+                            <div className="mt-4 flex items-center justify-end gap-3">
+                              <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openTryNextPrompt(p as any)}>
                                 <FlaskConical className="w-4 h-4" />
-                                Try a 3-day experiment
+                                Set up {card.durationDays}-day experiment
                               </button>
                             </div>
                           </div>
                         );
-                      })}
+                      }
+
+                      const s = card.experiment;
+                      return (
+                        <div key={card.id} className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
+                          <div className="flex items-start justify-between gap-3 min-w-0">
+                            <div className="text-sm font-semibold min-w-0">{card.title}</div>
+                            <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{card.confidenceLabel}</span>
+                          </div>
+                          <div className="mt-2 text-sm eb-muted">{card.body}</div>
+                          <div className="mt-3 flex flex-wrap justify-center gap-2">
+                            {card.metrics.slice(0, 3).map((k) => (
+                              <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                            ))}
+                          </div>
+                          <div className="flex-1" />
+                          <div className="mt-4 flex justify-end">
+                            <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics)}>
+                              <FlaskConical className="w-4 h-4" />
+                              Try a {card.durationDays}-day experiment
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {mergedSuggestedExperimentCards.length > 3 ? (
+                    <div className="mt-4 flex justify-end">
+                      {visibleMergedSuggestedCards.length < mergedSuggestedExperimentCards.length ? (
+                        <button
+                          type="button"
+                          className="eb-btn eb-btn-secondary w-full sm:w-auto"
+                          onClick={() => setSuggestedVisibleCount((prev) => Math.min(prev + 3, mergedSuggestedExperimentCards.length))}
+                        >
+                          See more suggestions
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="eb-btn eb-btn-secondary w-full sm:w-auto"
+                          onClick={() => setSuggestedVisibleCount(3)}
+                        >
+                          Show fewer
+                        </button>
+                      )}
                     </div>
-                  </>
-                )}
-              </div>
+                  ) : null}
+                </>
+              )}
             </div>
           ) : null}
         </div>
