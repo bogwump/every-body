@@ -878,6 +878,11 @@ export function Dashboard({
       ...(userData.enabledModules || []).filter((key): key is DashboardMetric => NEXT_STEP_SWING_METRICS.includes(key as DashboardMetric)),
     ]));
 
+    const candidates: Array<NextStepRecommendation & { score: number }> = [];
+    const pushCandidate = (score: number, recommendation: NextStepRecommendation) => {
+      candidates.push({ score, ...recommendation });
+    };
+
     const activeExperiment = experiment && !(experiment as any)?.outcome?.completedAtISO ? experiment as any : null;
     if (activeExperiment) {
       const durationDays = Math.max(1, Number(activeExperiment.durationDays || 3));
@@ -889,40 +894,43 @@ export function Dashboard({
       const baselineWindow = entriesSorted.filter((entry: any) => String(entry?.dateISO || '') < String(activeExperiment.startDateISO || todayISO)).slice(-7);
 
       if (!checkedInToday) {
-        return {
+        pushCandidate(94, {
           body: `Your ${activeExperiment.title || 'experiment'} is still running. Today’s check-in will make it easier to see whether anything is starting to shift.`,
           actionLabel: 'Do today’s check-in',
           action: 'check-in',
-        };
+        });
+      } else {
+        let experimentBody = `Your ${activeExperiment.title || 'experiment'} is running${daysLeft > 0 ? ` with about ${formatCountLabel(daysLeft, 'day')} left` : ''}. Open Insights for the fuller picture.`;
+        let experimentScore = 90;
+
+        const bestMetric = experimentMetrics.reduce<{ metric: DashboardMetric; baselineAvg: number; duringAvg: number; delta: number } | null>((best, metric) => {
+          const baselineValues = baselineWindow.map((entry: any) => metricValue(entry, metric)).filter((value): value is number => typeof value === 'number');
+          const duringValues = experimentWindow.map((entry: any) => metricValue(entry, metric)).filter((value): value is number => typeof value === 'number');
+          const baselineAvg = average(baselineValues);
+          const duringAvg = average(duringValues);
+          if (baselineAvg == null || duringAvg == null || duringValues.length < 2) return best;
+          const delta = duringAvg - baselineAvg;
+          const candidate = { metric, baselineAvg, duringAvg, delta };
+          if (!best || Math.abs(delta) > Math.abs(best.delta)) return candidate;
+          return best;
+        }, null);
+
+        if (bestMetric && Math.abs(bestMetric.delta) >= 0.8) {
+          const directionWord = bestMetric.delta > 0 ? 'higher' : 'lower';
+          experimentBody = `Your ${activeExperiment.title || 'experiment'} is showing an early shift in ${metricSentenceLabel(bestMetric.metric)} so far, averaging about ${formatPoints(Math.abs(bestMetric.delta))} point${Math.abs(bestMetric.delta) >= 1.5 ? 's' : ''} ${directionWord} than the days just before it.`;
+          experimentScore = 98;
+        } else if (experimentWindow.length >= 2) {
+          experimentBody = `Your ${activeExperiment.title || 'experiment'} is underway. You have ${formatCountLabel(experimentWindow.length, 'logged day')} so far, so the pattern is starting to take shape even if it is still early.`;
+          experimentScore = 92;
+        }
+
+        pushCandidate(experimentScore, {
+          body: experimentBody,
+          actionLabel: 'Open Insights',
+          action: 'navigate',
+          screen: 'insights',
+        });
       }
-
-      let experimentBody = `Your ${activeExperiment.title || 'experiment'} is running${daysLeft > 0 ? ` with about ${formatCountLabel(daysLeft, 'day')} left` : ''}. Open Insights for the fuller picture.`;
-
-      const bestMetric = experimentMetrics.reduce<{ metric: DashboardMetric; baselineAvg: number; duringAvg: number; delta: number } | null>((best, metric) => {
-        const baselineValues = baselineWindow.map((entry: any) => metricValue(entry, metric)).filter((value): value is number => typeof value === 'number');
-        const duringValues = experimentWindow.map((entry: any) => metricValue(entry, metric)).filter((value): value is number => typeof value === 'number');
-        const baselineAvg = average(baselineValues);
-        const duringAvg = average(duringValues);
-        if (baselineAvg == null || duringAvg == null || duringValues.length < 2) return best;
-        const delta = duringAvg - baselineAvg;
-        const candidate = { metric, baselineAvg, duringAvg, delta };
-        if (!best || Math.abs(delta) > Math.abs(best.delta)) return candidate;
-        return best;
-      }, null);
-
-      if (bestMetric && Math.abs(bestMetric.delta) >= 0.8) {
-        const directionWord = bestMetric.delta > 0 ? 'higher' : 'lower';
-        experimentBody = `Your ${activeExperiment.title || 'experiment'} is showing an early shift in ${metricSentenceLabel(bestMetric.metric)} so far, averaging about ${formatPoints(Math.abs(bestMetric.delta))} point${Math.abs(bestMetric.delta) >= 1.5 ? 's' : ''} ${directionWord} than the days just before it.`;
-      } else if (experimentWindow.length >= 2) {
-        experimentBody = `Your ${activeExperiment.title || 'experiment'} is underway. You have ${formatCountLabel(experimentWindow.length, 'logged day')} so far, so the pattern is starting to take shape even if it is still early.`;
-      }
-
-      return {
-        body: experimentBody,
-        actionLabel: 'Open Insights',
-        action: 'navigate',
-        screen: 'insights',
-      };
     }
 
     const latestCompletedExperiment = experimentHistory.find((item: any) => typeof item?.outcome?.completedAtISO === 'string' && item.outcome.completedAtISO);
@@ -942,23 +950,26 @@ export function Dashboard({
       const status = String(latestCompletedExperiment?.outcome?.status || '');
 
       let completedBody = `${latestCompletedExperiment.title || 'Your recent experiment'} has just finished.`;
+      let completedScore = 91;
       if (topDigestMetric && Math.abs(Number(topDigestMetric.delta || 0)) >= 0.8) {
         const delta = Number(topDigestMetric.delta || 0);
         const directionWord = delta > 0 ? 'higher' : 'lower';
         completedBody = `${latestCompletedExperiment.title || 'Your recent experiment'} just finished. Its clearest shift was ${String(topDigestMetric.label || METRIC_LABELS[topDigestMetric.key as DashboardMetric] || 'that signal').toLowerCase()}, which ran about ${formatPoints(Math.abs(delta))} point${Math.abs(delta) >= 1.5 ? 's' : ''} ${directionWord} during the test.`;
+        completedScore = 97;
       } else if (status === 'helped') {
         completedBody = `${latestCompletedExperiment.title || 'Your recent experiment'} just finished and looked genuinely helpful overall.`;
+        completedScore = 94;
       } else if (status === 'notReally') {
         completedBody = `${latestCompletedExperiment.title || 'Your recent experiment'} just finished, but it did not show a strong enough shift to look clearly helpful.`;
       }
       if (comparisonLine) completedBody += ` ${comparisonLine}`;
 
-      return {
+      pushCandidate(completedScore, {
         body: completedBody,
         actionLabel: 'Review results',
         action: 'navigate',
         screen: 'insights',
-      };
+      });
     }
 
     const recentPhaseChange = getRecentPhaseChange();
@@ -970,23 +981,29 @@ export function Dashboard({
         const afterShift = changedAtIndex >= 0 ? entriesSorted.slice(changedAtIndex, changedAtIndex + 4) : last7;
         const topDrivers = pickTopMetricDeltasForWindows(beforeShift, afterShift, enabledMetricCandidates.filter((metric) => metric !== 'flow'), 2);
         let phaseBody = `Your rhythm looks to have shifted into ${formatPhaseName(recentPhaseChange.phase)}.`;
+        let phaseScore = 88;
         if (topDrivers.length > 0) {
           const driverText = topDrivers.map((driver) => `${metricSentenceLabel(driver.metric)} ${driver.delta > 0 ? 'rose' : 'eased'}`);
           phaseBody += ` ${joinNatural(driverText)} across your recent check-ins, which is part of why the app inferred the change.`;
+          phaseScore = 93;
         } else {
           const recentFlow = afterShift.some((entry: any) => {
             const flow = metricValue(entry, 'flow');
             return typeof flow === 'number' && flow > 0;
           });
-          if (recentFlow) phaseBody += ' Recent bleeding is one reason the app inferred the change.';
-          else phaseBody += ' The recent signal mix looks different enough that Rhythm is probably the best place to look next.';
+          if (recentFlow) {
+            phaseBody += ' Recent bleeding is one reason the app inferred the change.';
+            phaseScore = 90;
+          } else {
+            phaseBody += ' The recent signal mix looks different enough that Rhythm is probably the best place to look next.';
+          }
         }
-        return {
+        pushCandidate(phaseScore, {
           body: phaseBody,
           actionLabel: 'Open Rhythm',
           action: 'navigate',
           screen: 'rhythm',
-        };
+        });
       }
     }
 
@@ -1004,6 +1021,7 @@ export function Dashboard({
       const relativeStart = currentCycleLength != null && avgRecentCycleLength != null ? describeRelativeStart(currentCycleLength - avgRecentCycleLength) : null;
 
       let periodBody = 'You appear to be in your reset window today.';
+      let periodScore = 87;
       if (currentStartISO && previousStartISO) {
         const currentWindow = entriesSorted.filter((entry: any) => String(entry?.dateISO || '') >= currentStartISO).slice(0, 3);
         const previousWindow = entriesSorted.filter((entry: any) => String(entry?.dateISO || '') >= previousStartISO && String(entry?.dateISO || '') < currentStartISO).slice(0, 3);
@@ -1014,9 +1032,11 @@ export function Dashboard({
         const comparisons: string[] = [];
         if (currentFlowAvg != null && previousFlowAvg != null && Math.abs(currentFlowAvg - previousFlowAvg) >= 1) {
           comparisons.push(`flow looks ${currentFlowAvg > previousFlowAvg ? 'heavier' : 'lighter'} than your last reset so far`);
+          periodScore = 92;
         }
         if (currentPain != null && previousPain != null && Math.abs(currentPain - previousPain) >= 1) {
           comparisons.push(`pain looks ${currentPain > previousPain ? 'stronger' : 'steadier'} than last time`);
+          periodScore = Math.max(periodScore, 91);
         }
         if (comparisons.length > 0) periodBody += ` So far, ${joinNatural(comparisons)}.`;
         else if (relativeStart) periodBody += ` ${relativeStart}`;
@@ -1024,12 +1044,12 @@ export function Dashboard({
       } else {
         periodBody += ' Pain, energy, and bleeding are likely to be the clearest things to watch over the next couple of days.';
       }
-      return {
+      pushCandidate(periodScore, {
         body: periodBody,
         actionLabel: 'Open Rhythm',
         action: 'navigate',
         screen: 'rhythm',
-      };
+      });
     }
 
     const recentSwing = getRecentSwingSignal(last7 as any[], enabledMetricCandidates);
@@ -1045,20 +1065,24 @@ export function Dashboard({
       const previousAvg = average(previousValues);
       const recentAvg = average(recentValues);
       let swingBody = `${recentSwing.label} has been swinging more sharply over the last week and looks like one of your strongest recent shifts.`;
+      let swingScore = 82;
       if (recentRange != null && previousRange != null && recentRange > previousRange + 1) {
         swingBody = `${recentSwing.label} has swung more sharply this week than it did over the rest of the last month.`;
+        swingScore = 89;
         if (recentAvg != null && previousAvg != null && Math.abs(recentAvg - previousAvg) >= 1) {
           swingBody += ` It is also sitting about ${formatPoints(Math.abs(recentAvg - previousAvg))} point${Math.abs(recentAvg - previousAvg) >= 1.5 ? 's' : ''} ${recentAvg > previousAvg ? 'higher' : 'lower'} than your recent baseline.`;
+          swingScore = 91;
         }
       } else if (recentAvg != null && previousAvg != null && Math.abs(recentAvg - previousAvg) >= 1) {
         swingBody = `${recentSwing.label} is one of your clearest recent shifts, sitting about ${formatPoints(Math.abs(recentAvg - previousAvg))} point${Math.abs(recentAvg - previousAvg) >= 1.5 ? 's' : ''} ${recentAvg > previousAvg ? 'higher' : 'lower'} than your recent baseline.`;
+        swingScore = 87;
       }
-      return {
+      pushCandidate(swingScore, {
         body: swingBody,
         actionLabel: 'Open Insights',
         action: 'navigate',
         screen: 'insights',
-      };
+      });
     }
 
     const sleepEnergyPoints = last7
@@ -1078,12 +1102,12 @@ export function Dashboard({
         const gap = Math.abs(higherSleepMean - lowerSleepMean);
         const dayType = higherSleepMean > lowerSleepMean ? 'lower-sleep days' : 'higher-sleep days';
         const resultDirection = higherSleepMean > lowerSleepMean ? 'lower' : 'higher';
-        return {
+        pushCandidate(gap >= 1.8 ? 85 : 79, {
           body: `Sleep and energy are moving together quite clearly right now. On ${dayType}, energy has been about ${formatPoints(gap)} point${gap >= 1.5 ? 's' : ''} ${resultDirection}.`,
           actionLabel: 'Open Insights',
           action: 'navigate',
           screen: 'insights',
-        };
+        });
       }
     }
 
@@ -1099,17 +1123,19 @@ export function Dashboard({
       if (moodRange >= 4) {
         const moodLink = findMoodCompanionSignal(last14 as any[]);
         let body = 'Your recent mood pattern has been moving around more than usual.';
+        let moodScore = 74;
         if (previousMoodRange != null && moodRange > previousMoodRange + 1) {
           body = `Your recent mood pattern has been more up-and-down than it was over the rest of the last month.`;
+          moodScore = 81;
         }
         if (moodLink?.direction) body += ` ${moodLink.direction}`;
         else body += ' Insights may be the best place to look next if you want to see what tends to shift with it.';
-        return {
+        pushCandidate(moodScore, {
           body,
           actionLabel: 'Open Insights',
           action: 'navigate',
           screen: 'insights',
-        };
+        });
       }
     }
 
@@ -1136,26 +1162,33 @@ export function Dashboard({
       if (!energyRecent) clarityHints.push('energy');
       const hintText = clarityHints.length ? ` Logging ${joinNatural(clarityHints.slice(0, 2))} over the next couple of days should help.` : '';
       if (checkedInToday) {
-        return {
+        pushCandidate(68, {
           body: `Your rhythm looks a little harder to place right now. The recent signal mix points in more than one direction.${hintText}`,
           actionLabel: 'Open Rhythm',
           action: 'navigate',
           screen: 'rhythm',
-        };
+        });
+      } else {
+        pushCandidate(72, {
+          body: `Your rhythm looks a little harder to place right now. A check-in today should make the next few days clearer.${hintText}`,
+          actionLabel: 'Do today’s check-in',
+          action: 'check-in',
+        });
       }
+    }
+
+    if (candidates.length === 0) {
       return {
-        body: `Your rhythm looks a little harder to place right now. A check-in today should make the next few days clearer.${hintText}`,
-        actionLabel: 'Do today’s check-in',
-        action: 'check-in',
+        body: 'You have enough recent data for a stronger read. Insights may be the best place to look next.',
+        actionLabel: 'Open Insights',
+        action: 'navigate',
+        screen: 'insights',
       };
     }
 
-    return {
-      body: 'You have enough recent data for a stronger read. Insights may be the best place to look next.',
-      actionLabel: 'Open Insights',
-      action: 'navigate',
-      screen: 'insights',
-    };
+    candidates.sort((a, b) => b.score - a.score);
+    const { score: _score, ...winner } = candidates[0];
+    return winner;
   }, [
     insightsRemaining,
     insightsReady,
@@ -1406,7 +1439,7 @@ export function Dashboard({
                 }
                 onNavigate(nextStep.screen);
               }}
-              className="eb-btn eb-btn-secondary inline-flex items-center justify-center border-[rgb(var(--color-accent)/0.32)] bg-[rgb(var(--color-accent)/0.18)] hover:bg-[rgb(var(--color-accent)/0.24)]"
+              className="eb-btn eb-btn-soft-choice inline-flex items-center justify-center"
             >
               {nextStep.actionLabel}
             </button>
