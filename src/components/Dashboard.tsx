@@ -1310,33 +1310,36 @@ export function Dashboard({
 
         {guideCard ? (
           <div className="eb-card eb-card-soft">
-            <div className="eb-card-header">
+            <div className="eb-card-header w-full">
               <div className="min-w-0 flex-1">
                 <h3 className="mb-1">{guideCard.title}</h3>
-                <p className="text-sm text-[rgba(0,0,0,0.72)]">{guideCard.body}</p>
-                {guideCard.supporting ? (
-                  <p className="text-sm text-[rgba(0,0,0,0.60)] mt-2">{guideCard.supporting}</p>
-                ) : null}
-
-                <div className="mt-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const memory = readGuideMemory();
-                      const existing = memory[guideCard.id] ?? {};
-                      memory[guideCard.id] = { ...existing, lastClickedAtISO: todayISO };
-                      writeGuideMemory(memory);
-                      if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
-                      else onNavigate(guideCard.cta.screen);
-                    }}
-                    className={`eb-btn ${guideCard.id === 'history-saved' ? 'eb-btn-primary sm:w-auto' : 'eb-btn-secondary sm:w-auto'} w-full justify-center`}
-                  >
-                    {guideCard.cta.label}
-                  </button>
-                </div>
               </div>
               <div className="eb-icon-frame">
                 {guideCard.icon}
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-sm text-[rgba(0,0,0,0.72)]">{guideCard.body}</p>
+              {guideCard.supporting ? (
+                <p className="text-sm text-[rgba(0,0,0,0.60)] mt-2">{guideCard.supporting}</p>
+              ) : null}
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const memory = readGuideMemory();
+                    const existing = memory[guideCard.id] ?? {};
+                    memory[guideCard.id] = { ...existing, lastClickedAtISO: todayISO };
+                    writeGuideMemory(memory);
+                    if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
+                    else onNavigate(guideCard.cta.screen);
+                  }}
+                  className={`eb-btn ${guideCard.id === 'history-saved' ? 'eb-btn-primary w-auto max-w-full whitespace-normal text-center px-4' : 'eb-btn-secondary sm:w-auto'} ${guideCard.id === 'history-saved' ? '' : 'w-full justify-center'}`}
+                >
+                  {guideCard.cta.label}
+                </button>
               </div>
             </div>
           </div>
