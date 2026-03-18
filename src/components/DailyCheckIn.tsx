@@ -303,6 +303,8 @@ function Slider10({
   const draggingRef = useRef(false);
   const pointerModeRef = useRef<'idle' | 'pending' | 'dragging' | 'scrolling'>('idle');
   const pointerStartRef = useRef<{ x: number; y: number; value: number } | null>(null);
+  const TOUCH_SCROLL_INTENT_PX = 10;
+  const TOUCH_DRAG_INTENT_PX = 10;
 
   useEffect(() => {
     if (!draggingRef.current) {
@@ -388,7 +390,7 @@ function Slider10({
       const absX = Math.abs(dx);
       const absY = Math.abs(dy);
 
-      if (absY >= 8 && absY > absX + 4) {
+      if (absY >= TOUCH_SCROLL_INTENT_PX && absY > absX + 4) {
         pointerModeRef.current = 'scrolling';
         draggingRef.current = false;
         setDraftValue(start.value);
@@ -396,7 +398,7 @@ function Slider10({
         return;
       }
 
-      if (absX >= 8 && absX > absY) {
+      if (absX >= TOUCH_DRAG_INTENT_PX && absX > absY + 2) {
         pointerModeRef.current = 'dragging';
         draggingRef.current = true;
       }
@@ -460,7 +462,7 @@ function Slider10({
           step={1}
           value={draftValue}
           onChange={(e) => {
-            if (pointerModeRef.current === 'scrolling') {
+            if (pointerModeRef.current === 'scrolling' || pointerModeRef.current === 'pending') {
               const start = pointerStartRef.current;
               const reset = start?.value ?? dragValueRef.current;
               updateVisual(reset);
