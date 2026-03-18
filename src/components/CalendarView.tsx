@@ -934,58 +934,40 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
         </div>
         <section className="eb-card eb-hero eb-hero-rich eb-hero-md eb-hero-on-dark mb-4 sm:mb-5">
           <div className="eb-hero-header">
-            <div className="eb-hero-header-main">
+            <div className="eb-hero-header-main min-w-0">
               <h3 className="eb-hero-title text-white">Your month at a glance</h3>
               <p className="mt-1 eb-hero-subtitle eb-hero-on-dark-muted">Review symptoms, period windows, and predicted timing in one place.</p>
+              <div className="mt-3 text-sm text-white/90">
+                {hasCycleAnchor ? (
+                  <>
+                    <span className="font-semibold">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}</span>
+                    {rhythmTiming.currentDay ? <span className="ml-2 text-white/80">Day {rhythmTiming.currentDay} in phase</span> : null}
+                  </>
+                ) : cycleEnabled ? (
+                  <span className="text-white/85">Still learning your cycle timing</span>
+                ) : (
+                  <span className="text-white/85">Cycle timing is off, but you can still log and review patterns here.</span>
+                )}
+              </div>
             </div>
             <div className="eb-hero-header-side">
               <div className="eb-icon-frame eb-icon-frame--hero"><CalendarDays className="h-5 w-5" /></div>
             </div>
           </div>
-          <div className="mt-4 min-w-0 eb-inset eb-hero-panel p-4">
-            {hasCycleAnchor ? (
-              <>
-                <div className="eb-hero-panel-label">{cycleTrust.phaseTrust === 'confirmed' ? rhythmContextLabel : `Estimated ${rhythmContextLabel}`}</div>
-                {rhythmTiming.currentDay ? <div className="mt-1 eb-hero-panel-title">Day {rhythmTiming.currentDay} in phase</div> : null}
-                <div className="mt-1 eb-hero-panel-body">{cycleTrust.predictionTrust === 'stale' ? 'Rhythm is waiting for a fresh cycle anchor before it resumes forward predictions.' : cycleTrust.predictionTrust === 'early' ? 'Early estimate based on your latest cycle start. This will tighten as more cycles are logged.' : cycleTrust.phaseTrust === 'confirmed' ? (rhythmTiming.currentDay ? shortPhaseCue(rhythmModel.phaseKey) : 'Still learning the timing') : 'Estimated from your recent logs and cycle timing.'}</div>
-              </>
-            ) : cycleEnabled ? (
-              <>
-                <div className="eb-hero-panel-label">Still learning your cycle</div>
-                <div className="mt-1 eb-hero-panel-body">Log your first period or mark a cycle start in Edit cycle before the calendar starts predicting phase or fertile windows.</div>
-              </>
-            ) : (
-              <>
-                <div className="eb-hero-panel-label">Symptom calendar</div>
-                <div className="mt-1 eb-hero-panel-body">Cycle timing is off right now, but you can still use Calendar to log and review symptoms.</div>
-              </>
-            )}
-            </div>
         </section>
         <section className="eb-card eb-card-soft mb-4 sm:mb-5 px-3 py-4 sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center justify-between gap-2 sm:justify-start">
-              <button
-                type="button"
-                className="eb-btn-secondary !px-4 !py-2 sm:!px-4 sm:!py-2.5"
-                onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1)))}
-              >
-                Prev
-              </button>
-              <div className="font-semibold tracking-[-0.01em]">{monthLabel}</div>
-              <button type="button" className="eb-btn-secondary !px-4 !py-2 sm:!px-4 sm:!py-2.5" onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)))}>
-                Next
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 sm:justify-end min-w-0">
-              <div className="text-sm text-[rgb(var(--color-text-secondary))]">Overlay</div>
-              <select className="eb-input !h-10 !py-2 min-w-0 flex-1 sm:flex-none" value={overlayKey} onChange={(e) => setOverlayKey(e.target.value as any)}>
-                {availableOverlayKeys.map((key) => (
-                  <option key={key} value={key}>{overlayLabel(key)}</option>
-                ))}
-              </select>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="eb-btn-secondary !px-4 !py-2 sm:!px-4 sm:!py-2.5"
+              onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1)))}
+            >
+              Prev
+            </button>
+            <div className="font-semibold tracking-[-0.01em] text-center">{monthLabel}</div>
+            <button type="button" className="eb-btn-secondary !px-4 !py-2 sm:!px-4 sm:!py-2.5" onClick={() => setMonthCursor(startOfMonth(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)))}>
+              Next
+            </button>
           </div>
 
           <div className="mt-4 grid grid-cols-7 gap-x-1 gap-y-1.5 sm:gap-x-2 sm:gap-y-2">
@@ -1087,6 +1069,19 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
 
         {/* Cycle edit sheet */}
         {cycleEditModal}
+
+        <div className="mt-4 flex flex-col gap-2 min-w-0 sm:flex-row sm:items-center sm:justify-end">
+          <div className="text-sm text-[rgb(var(--color-text-secondary))] sm:shrink-0">Overlay</div>
+          <select
+            className="eb-input !h-10 !py-2 w-full min-w-0 sm:w-auto sm:min-w-[220px]"
+            value={overlayKey}
+            onChange={(e) => setOverlayKey(e.target.value as any)}
+          >
+            {availableOverlayKeys.map((key) => (
+              <option key={key} value={key}>{overlayLabel(key)}</option>
+            ))}
+          </select>
+        </div>
 
         {showLegend && (
           <>
