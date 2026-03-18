@@ -4090,15 +4090,15 @@ const tryNextPrompts = useMemo(() => {
         <EBDialogContent
           title={experimentPlan?.title ?? 'Experiment'}
           description="Set up a tiny experiment and keep logging a few metrics so you can spot what changes."
-          className="w-[88vw] max-w-[380px] sm:max-w-lg rounded-2xl max-h-[90vh] overflow-hidden flex flex-col"
+          className="w-[92vw] max-w-[380px] sm:max-w-lg rounded-2xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-hidden flex flex-col p-0 top-[max(env(safe-area-inset-top),0.75rem)] translate-y-0 sm:top-[50%] sm:translate-y-[-50%]"
         >
-          <DialogHeader>
+          <DialogHeader className="px-5 pt-5 sm:px-6 sm:pt-6">
             <DialogTitle>{experimentPlan?.title ?? 'Experiment'}</DialogTitle>
             <DialogDescription>
               Set up a tiny experiment and keep logging a few metrics so you can spot what changes.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3 pb-4">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pr-1 sm:px-6 sm:pr-2 space-y-3 pb-4">
             <div className="text-sm eb-muted">
               Tiny, realistic actions. You are testing what helps your body, not trying to "fix everything".
             </div>
@@ -4240,7 +4240,7 @@ const tryNextPrompts = useMemo(() => {
 
           </div>
 
-	          <div className="pt-3 shrink-0 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+	          <div className="pt-4 shrink-0 border-t border-black/5 bg-white px-5 sm:px-6 flex flex-col sm:flex-row sm:justify-end gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
 	            <button
 	              type="button"
 	              className="eb-btn eb-btn-primary min-h-[3rem] px-6"
@@ -4601,7 +4601,7 @@ const tryNextPrompts = useMemo(() => {
                             ))}
                           </div>
                           <div className="mt-4">
-                            <button type="button" className="eb-btn eb-btn-primary w-full justify-center" onClick={() => openExperiment(s.metrics)}>
+                            <button type="button" className="eb-btn eb-btn-primary w-full justify-center" onClick={() => openExperiment(s.metrics, { durationDays: card.durationDays })}>
                               <FlaskConical className="w-4 h-4" />
                               Try a {card.durationDays}-day experiment
                             </button>
@@ -4664,7 +4664,7 @@ const tryNextPrompts = useMemo(() => {
                           </div>
                           <div className="flex-1" />
                           <div className="mt-4 flex justify-end">
-                            <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics)}>
+                            <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openExperiment(s.metrics, { durationDays: card.durationDays })}>
                               <FlaskConical className="w-4 h-4" />
                               Try a {card.durationDays}-day experiment
                             </button>
