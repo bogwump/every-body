@@ -3711,10 +3711,10 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 px-1 pt-1">
+          <div className="grid grid-cols-3 gap-1.5 px-0.5 pt-1 insights-hero-actions">
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice min-w-0 !min-h-[2.125rem] !px-2.5 !py-0 text-[0.95rem] font-semibold whitespace-nowrap"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice w-full min-w-0 !min-h-[2.125rem] !px-1.5 !py-0 text-[0.82rem] leading-none tracking-[-0.01em] font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
               onClick={() => {
                 setDataEvidenceOpen(true);
                 scrollToInsightsSection('eb-insights-settings');
@@ -3724,14 +3724,14 @@ const tryNextPrompts = useMemo(() => {
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice min-w-0 !min-h-[2.125rem] !px-2.5 !py-0 text-[0.95rem] font-semibold whitespace-nowrap"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice w-full min-w-0 !min-h-[2.125rem] !px-1.5 !py-0 text-[0.82rem] leading-none tracking-[-0.01em] font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
               onClick={() => scrollToInsightsSection('eb-experiments')}
             >
               Run experiment
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice min-w-0 !min-h-[2.125rem] !px-2.5 !py-0 text-[0.95rem] font-semibold whitespace-nowrap"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice w-full min-w-0 !min-h-[2.125rem] !px-1.5 !py-0 text-[0.82rem] leading-none tracking-[-0.01em] font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
               onClick={() => scrollToInsightsSection('eb-insights-settings')}
             >
               Change metrics

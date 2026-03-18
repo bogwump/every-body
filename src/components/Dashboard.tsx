@@ -1328,7 +1328,7 @@ export function Dashboard({
                     if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
                     else onNavigate(guideCard.cta.screen);
                   }}
-                  className="mt-4 eb-btn eb-btn-secondary eb-btn-soft-choice"
+                  className="mt-4 eb-btn eb-btn-secondary inline-flex items-center justify-center"
                 >
                   {guideCard.cta.label}
                 </button>
