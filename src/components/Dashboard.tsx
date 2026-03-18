@@ -1328,7 +1328,7 @@ export function Dashboard({
                     if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
                     else onNavigate(guideCard.cta.screen);
                   }}
-                  className="mt-4 eb-btn eb-btn-secondary w-full sm:w-auto justify-center"
+                  className={`mt-4 eb-btn ${guideCard.id === 'history-saved' ? 'eb-btn-primary sm:w-auto' : 'eb-btn-secondary sm:w-auto'} w-full justify-center`}
                 >
                   {guideCard.cta.label}
                 </button>

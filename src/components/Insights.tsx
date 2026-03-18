@@ -3227,7 +3227,7 @@ const tryNextPrompts = useMemo(() => {
                 : `Starts ${fmtDateUi(ex.startDateISO, false)}`}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">{metricPills}</div>
-          <div className="mt-3 eb-inset-white rounded-2xl p-4 text-sm w-full">
+          <div className="mt-3 eb-inset-soft rounded-2xl p-4 text-sm w-full">
             <div className="font-medium">What you are trying</div>
             <div className="mt-1 eb-muted">{experimentTemplateMeta.actionLabel}</div>
             <div className="mt-2 eb-muted">{experimentTemplateMeta.explanation}</div>
@@ -3252,7 +3252,7 @@ const tryNextPrompts = useMemo(() => {
                 Log today
               </button>
             ) : null}
-            <button type="button" className="eb-btn eb-btn-secondary eb-btn-soft-choice w-full sm:w-auto min-w-[9rem] sm:min-w-[10rem]" onClick={() => extendExperiment(2)}>
+            <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto min-w-[9rem] sm:min-w-[10rem]" onClick={() => extendExperiment(2)}>
               Extend 2 days
             </button>
             <button type="button" className="eb-btn eb-btn-tertiary w-full sm:w-auto" onClick={() => setStopExperimentConfirmOpen(true)}>
@@ -3714,7 +3714,7 @@ const tryNextPrompts = useMemo(() => {
           <div className="pt-1 flex items-stretch gap-2 [&>*]:flex-1 [&>*]:basis-0">
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !rounded-xl shadow-[0_6px_14px_rgba(0,0,0,0.08)] !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => {
                 setDataEvidenceOpen(true);
                 scrollToInsightsSection('eb-insights-settings');
@@ -3724,14 +3724,14 @@ const tryNextPrompts = useMemo(() => {
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !rounded-xl shadow-[0_6px_14px_rgba(0,0,0,0.08)] !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => scrollToInsightsSection('eb-experiments')}
             >
               Run experiment
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !rounded-xl shadow-[0_6px_14px_rgba(0,0,0,0.08)] !min-h-[2.15rem] !w-full min-w-0 !px-1 !py-0 text-[0.76rem] sm:text-[0.95rem] tracking-tight font-semibold whitespace-nowrap justify-center"
               onClick={() => scrollToInsightsSection('eb-insights-settings')}
             >
               Change metrics
@@ -4893,18 +4893,8 @@ const tryNextPrompts = useMemo(() => {
         <div id="eb-sleep-trend" className="eb-card p-6">
           <div className="eb-card-header items-start">
             <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="mb-0.5">Sleep</h2>
-                  <p className="text-sm text-[rgb(var(--color-text-secondary))]">{sleepGentleHint}</p>
-                </div>
-
-                <button type="button" className="eb-btn eb-btn-secondary shrink-0" onClick={() => setSleepExploreOpen(true)}>
-                  Explore sleep
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-
+              <h2 className="mb-0.5">Sleep</h2>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">{sleepGentleHint}</p>
               <div className="mt-3 text-sm text-[rgb(var(--color-text-secondary))]">
                 Extra sleep details logged on <span className="font-medium">{sleepExtrasCount}</span> day{sleepExtrasCount === 1 ? '' : 's'}.
               </div>
@@ -4925,6 +4915,13 @@ const tryNextPrompts = useMemo(() => {
                 <Line type="monotone" dataKey="sleep" dot={false} stroke={chartColors.primary} strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
+          </div>
+
+          <div className="mt-4">
+            <button type="button" className="eb-btn eb-btn-secondary w-full sm:w-auto" onClick={() => setSleepExploreOpen(true)}>
+              Explore sleep
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Explore modal */}
@@ -5253,28 +5250,10 @@ const tryNextPrompts = useMemo(() => {
       {/* Weekday pattern */}
       <div className="eb-card">
         <div className="eb-card-header">
-          <div className="flex items-start justify-between gap-4 w-full">
-            <div>
-              <div className="eb-card-title">Week pattern</div>
-              <div className="eb-card-sub">
-                Average by weekday for: {labelFor((weekdayMetric as any) ?? (selected[0] ?? 'mood'), userData)}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm eb-muted">Metric</span>
-              <select
-                className="eb-input !w-auto !py-2 !h-10"
-                value={weekdayMetric as any}
-                onChange={(e) => setWeekdayMetric(e.target.value as any)}
-                aria-label="Week pattern metric"
-              >
-                {selected.map((k) => (
-                  <option key={String(k)} value={k as any}>
-                    {labelFor(k as any, userData)}
-                  </option>
-                ))}
-              </select>
+          <div className="min-w-0 flex-1">
+            <div className="eb-card-title">Week pattern</div>
+            <div className="eb-card-sub">
+              Average by weekday for your chosen metric.
             </div>
           </div>
         </div>
@@ -5293,6 +5272,20 @@ const tryNextPrompts = useMemo(() => {
                 <Bar dataKey="avg" fill="rgb(var(--color-primary))" radius={[10, 10, 10, 10]} />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+          <div className="mt-4">
+            <select
+              className="eb-input !w-full !py-2 !h-10"
+              value={weekdayMetric as any}
+              onChange={(e) => setWeekdayMetric(e.target.value as any)}
+              aria-label="Week pattern metric"
+            >
+              {selected.map((k) => (
+                <option key={String(k)} value={k as any}>
+                  {labelFor(k as any, userData)}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="mt-2 text-sm eb-muted">If you spot a dip on one day, that is a great candidate for a tiny experiment.</div>
         </div>

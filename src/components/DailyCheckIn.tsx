@@ -1118,7 +1118,7 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
 
             {!experimentStatus.done ? (
               <>
-                <div className="mt-3 eb-inset-soft rounded-2xl p-4 text-sm">
+                <div className="mt-3 eb-inset-white rounded-2xl p-4 text-sm">
                   <div className="font-medium">What you are trying</div>
                   <div className="mt-1 text-[rgb(var(--color-text-secondary))]">{experimentTemplateMeta.actionLabel}</div>
                   <div className="mt-2 text-[rgb(var(--color-text-secondary))]">{experimentTemplateMeta.explanation}</div>
