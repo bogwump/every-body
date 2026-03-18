@@ -313,16 +313,74 @@ function formatPatternStateLabel(state: PairPatternStateResult['state']): string
           : 'early signal';
 }
 
+type ConnectionDisplayState = PairPatternStateResult['state'];
+
+function getDisplayStateLabel(state: ConnectionDisplayState): string {
+  return state === 'live_cluster'
+    ? 'Live now'
+    : state === 'upcoming_cluster'
+      ? 'Coming up'
+      : state === 'passed_cluster'
+        ? 'Passed window'
+        : state === 'stable_recurring_grouping'
+          ? 'Recurring'
+          : 'Early signal';
+}
+
+function promoteDisplayPatternState(args: {
+  stateResult: PairPatternStateResult | null;
+  n: number;
+  correlation: number;
+  lagPattern?: { leadLabel: string; followLabel: string; lagDays: number; direction: 'together' | 'inverse'; } | null;
+  feedback?: { userFeedback?: string | null } | null;
+}): ConnectionDisplayState {
+  const { stateResult, n, correlation, lagPattern, feedback } = args;
+  const raw = stateResult?.state ?? 'unclear_interesting';
+  if (feedback?.userFeedback === 'yes') return 'stable_recurring_grouping';
+  if (raw === 'live_cluster' || raw === 'upcoming_cluster' || raw === 'passed_cluster' || raw === 'stable_recurring_grouping') {
+    return raw;
+  }
+
+  const absCorr = Math.abs(correlation);
+  const repeatCount = stateResult?.repeatCount ?? 0;
+  const leadConfidence = stateResult?.leadConfidence;
+  const hasCue = leadConfidence === 'medium' || leadConfidence === 'high';
+  const bothRecent = Boolean(stateResult?.isMetricARecent && stateResult?.isMetricBRecent);
+  const oneRecent = Boolean(stateResult?.isMetricARecent || stateResult?.isMetricBRecent);
+  const activeNow = Boolean(stateResult?.isMetricAActiveNow || stateResult?.isMetricBActiveNow);
+  const upcomingWindow = stateResult?.daysUntilLikelyWindow != null && stateResult.daysUntilLikelyWindow >= -2 && stateResult.daysUntilLikelyWindow <= 8;
+  const passedWindow = stateResult?.daysSinceLikelyWindow != null && stateResult.daysSinceLikelyWindow >= 1 && stateResult.daysSinceLikelyWindow <= 18;
+
+  if ((stateResult?.isMetricAActiveNow && stateResult?.isMetricBActiveNow) || (activeNow && absCorr >= 0.25) || (bothRecent && absCorr >= 0.28)) {
+    return 'live_cluster';
+  }
+  if (upcomingWindow && !stateResult?.hasLeadSymptomLandedThisCycle && (repeatCount >= 1 || hasCue || Boolean(lagPattern) || absCorr >= 0.32)) {
+    return 'upcoming_cluster';
+  }
+  if (passedWindow && !bothRecent && (repeatCount >= 1 || hasCue || Boolean(lagPattern) || absCorr >= 0.32)) {
+    return 'passed_cluster';
+  }
+  if (repeatCount >= 1 && (hasCue || Boolean(lagPattern) || n >= 6 || absCorr >= 0.35)) {
+    return 'stable_recurring_grouping';
+  }
+  if (Boolean(lagPattern) || hasCue || (n >= 8 && absCorr >= 0.35) || absCorr >= 0.5) {
+    return 'stable_recurring_grouping';
+  }
+  if (oneRecent && absCorr >= 0.2) return 'live_cluster';
+  return 'unclear_interesting';
+}
+
 function buildConnectionNarrative(args: {
   pair: { a: string; b: string; aKey: InsightMetricKey; bKey: InsightMetricKey; r: number; n: number; confidence: 'low' | 'medium' | 'high'; contextLine?: string | null; };
   stateResult: PairPatternStateResult | null;
+  displayState?: ConnectionDisplayState;
   lagPattern?: { leadLabel: string; followLabel: string; lagDays: number; direction: 'together' | 'inverse'; } | null;
 }): { supportingLine: string; contextLine: string | null; why: string[] } {
-  const { pair, stateResult, lagPattern } = args;
+  const { pair, stateResult, lagPattern, displayState } = args;
   const lowA = pair.a.toLowerCase();
   const lowB = pair.b.toLowerCase();
   const moveTogether = pair.r >= 0;
-  const state = stateResult?.state ?? 'unclear_interesting';
+  const state = displayState ?? stateResult?.state ?? 'unclear_interesting';
   const phaseHint = stateResult?.currentPhaseKey ? ` around your ${stateResult.currentPhaseKey.replace(/_/g, ' ')} phase` : '';
   const hasCue = Boolean(stateResult?.leadMetric && stateResult?.followMetric && (stateResult?.leadConfidence === 'medium' || stateResult?.leadConfidence === 'high'));
   const cueLabel = stateResult?.leadMetric ? labelFor(stateResult.leadMetric) : null;
@@ -1454,7 +1512,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   };
 
   const connectionCards = useMemo(() => {
-    type ConnectionCard = (typeof corrPairs)[number] & { signalId: string; sourceSignal: InsightSignal; displayRank: number; };
+    type ConnectionCard = (typeof corrPairs)[number] & { signalId: string; sourceSignal: InsightSignal; displayRank: number; displayState?: ConnectionDisplayState; };
 
     const makeSignalFromPair = (pair: (typeof corrPairs)[number]): InsightSignal => ({
       id: `pair-${String(pair.aKey)}-${String(pair.bKey)}`,
@@ -1499,6 +1557,14 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         userData,
         signal,
       });
+      const feedback = getFeedbackForMetrics(aKey, bKey);
+      const displayState = promoteDisplayPatternState({
+        stateResult,
+        n,
+        correlation,
+        lagPattern,
+        feedback,
+      });
       const narrative = buildConnectionNarrative({
         pair: {
           a: labelFor(aKey, userData),
@@ -1511,11 +1577,12 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           contextLine: baseContextLine,
         },
         stateResult,
+        displayState,
         lagPattern,
       });
       const allowSuggestedExperiment =
         baseAllowSuggestedExperiment &&
-        (stateResult.state === 'live_cluster' || stateResult.state === 'upcoming_cluster');
+        (displayState === 'live_cluster' || displayState === 'upcoming_cluster');
 
       const why = [
         ...narrative.why,
@@ -1526,11 +1593,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
           ? `Hormones can influence lots of symptoms at once, so treat this as a prompt to notice patterns, not a diagnosis.`
           : `Correlation does not mean one causes the other.`,
       ].filter(Boolean);
-      const feedback = getFeedbackForMetrics(aKey, bKey);
       const resurfacingNote = getResurfacingNoteForPair(aKey, bKey, typeof signal.score === 'number' ? signal.score : undefined);
       const contextLine = [resurfacingNote, narrative.contextLine].filter(Boolean).join(' ');
       const baseScore = typeof signal.score === 'number' ? signal.score : qualityScore(Math.abs(correlation), n);
-      const stateScore = getPatternStateSummaryScore(stateResult);
+      const stateScore = getPatternStateSummaryScore({ ...(stateResult ?? {} as any), state: displayState } as PairPatternStateResult);
       const cueBoost = stateResult?.leadConfidence === 'high' ? 12 : stateResult?.leadConfidence === 'medium' ? 6 : 0;
       const resurfacingBoost = resurfacingNote ? 9 : 0;
       const hormonalBoost = hormonalInvolved ? 3 : 0;
@@ -1553,6 +1619,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         lagPattern,
         contextLine,
         patternState: stateResult,
+        displayState,
         supportingLine: narrative.supportingLine,
         feedback,
         signalId: signal.id,
@@ -1565,7 +1632,12 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     corrPairs.forEach((pair, index) => {
       const sourceSignal = makeSignalFromPair(pair);
+      const built = makeCardFromSignal(sourceSignal);
       const id = getPatternFeedbackIdFromMetrics(pair.aKey, pair.bKey);
+      if (built) {
+        byId.set(id, { ...built, displayRank: Math.max(built.displayRank ?? 0, 100 - index) });
+        return;
+      }
       byId.set(id, {
         ...pair,
         signalId: sourceSignal.id,
@@ -1583,8 +1655,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
         byId.set(id, { ...card, displayRank: Math.max(0, 120 - index) });
         return;
       }
-      if ((card.displayRank ?? 0) > (existing.displayRank ?? 0)) {
-        byId.set(id, { ...existing, sourceSignal: card.sourceSignal, signalId: card.signalId, displayRank: card.displayRank });
+      if ((card.displayRank ?? 0) > (existing.displayRank ?? 0) || !(existing as any).patternState) {
+        byId.set(id, { ...card, displayRank: Math.max(card.displayRank ?? 0, existing.displayRank ?? 0) });
       }
     });
 
@@ -1593,7 +1665,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       .map((signal) => getPatternFeedbackIdFromMetrics(signal.metrics[0], signal.metrics[1]));
 
     const statePriority = (card: ConnectionCard): number => {
-      const state = card.patternState?.state ?? 'unclear_interesting';
+      const state = (card as any).displayState ?? card.patternState?.state ?? 'unclear_interesting';
       return state === 'live_cluster'
         ? 5
         : state === 'upcoming_cluster'
@@ -1618,10 +1690,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       if (!card) return;
       const id = getPatternFeedbackIdFromMetrics(card.aKey, card.bKey);
       if (seen.has(id)) return;
-      const state = card.patternState?.state ?? 'unclear_interesting';
-      const richerStatesExist = ordered.some((item) => (item.patternState?.state ?? 'unclear_interesting') !== 'unclear_interesting');
+      const state = (card as any).displayState ?? card.patternState?.state ?? 'unclear_interesting';
+      const richerStatesExist = ordered.some((item) => (((item as any).displayState) ?? item.patternState?.state ?? 'unclear_interesting') !== 'unclear_interesting');
       if (!options?.force && state === 'unclear_interesting' && richerStatesExist && prioritized.length < 3) {
-        const alreadyHasEarly = prioritized.some((item) => (item.patternState?.state ?? 'unclear_interesting') === 'unclear_interesting');
+        const alreadyHasEarly = prioritized.some((item) => (((item as any).displayState) ?? item.patternState?.state ?? 'unclear_interesting') === 'unclear_interesting');
         if (alreadyHasEarly) return;
       }
       if (!options?.force && state !== 'unclear_interesting' && prioritized.length < 3 && seenStates.has(state)) {
@@ -4107,8 +4179,15 @@ const tryNextPrompts = useMemo(() => {
 
               return (
                 <div key={idx} className="eb-inset rounded-2xl p-5 flex flex-col min-h-[170px]">
-                  <div className="text-sm font-semibold">{title}</div>
-                  <div className="mt-2 text-sm eb-muted">{supportingLine}</div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold">{title}</div>
+                      <div className="mt-2">
+                        <span className="eb-choice-pill text-xs" data-selected="true">{getDisplayStateLabel((((p as any).displayState) ?? p.patternState?.state ?? 'unclear_interesting') as ConnectionDisplayState)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-sm eb-muted">{supportingLine}</div>
                   {p.contextLine ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
                   <details className="eb-disclosure eb-disclosure--white mt-3">
                     <summary><span>Why am I seeing this?</span><ChevronDown className="w-4 h-4" /></summary>
@@ -4257,7 +4336,7 @@ const tryNextPrompts = useMemo(() => {
 
                   <div className="pt-4 flex items-center justify-between gap-2">
                     {(() => {
-                      const state = p.patternState?.state ?? 'unclear_interesting';
+                      const state = ((p as any).displayState ?? p.patternState?.state ?? 'unclear_interesting') as ConnectionDisplayState;
 
                       if (p.allowSuggestedExperiment) {
                         const ctaLabel = state === 'upcoming_cluster' ? 'Set up for next time' : 'Try this now';
