@@ -3227,7 +3227,7 @@ const tryNextPrompts = useMemo(() => {
                 : `Starts ${fmtDateUi(ex.startDateISO, false)}`}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">{metricPills}</div>
-          <div className="mt-3 eb-inset-soft rounded-2xl p-4 text-sm w-full">
+          <div className="mt-3 eb-inset-white rounded-2xl p-4 text-sm w-full">
             <div className="font-medium">What you are trying</div>
             <div className="mt-1 eb-muted">{experimentTemplateMeta.actionLabel}</div>
             <div className="mt-2 eb-muted">{experimentTemplateMeta.explanation}</div>
@@ -3711,10 +3711,10 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 px-0.5 pt-1 insights-hero-actions">
+          <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice w-full min-w-0 !min-h-[2.125rem] !px-1.5 !py-0 text-[0.82rem] leading-none tracking-[-0.01em] font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
               onClick={() => {
                 setDataEvidenceOpen(true);
                 scrollToInsightsSection('eb-insights-settings');
@@ -3724,14 +3724,14 @@ const tryNextPrompts = useMemo(() => {
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice w-full min-w-0 !min-h-[2.125rem] !px-1.5 !py-0 text-[0.82rem] leading-none tracking-[-0.01em] font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
               onClick={() => scrollToInsightsSection('eb-experiments')}
             >
               Run experiment
             </button>
             <button
               type="button"
-              className="eb-btn eb-btn-secondary eb-btn-soft-choice w-full min-w-0 !min-h-[2.125rem] !px-1.5 !py-0 text-[0.82rem] leading-none tracking-[-0.01em] font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
+              className="eb-btn eb-btn-secondary eb-btn-soft-choice !min-h-[2.25rem] !px-3.5 !py-0 text-sm font-semibold"
               onClick={() => scrollToInsightsSection('eb-insights-settings')}
             >
               Change metrics
@@ -4519,7 +4519,7 @@ const tryNextPrompts = useMemo(() => {
               <div className="text-sm font-semibold">Open suggested experiments</div>
               <div className="mt-1 text-sm eb-muted">This keeps the page lighter until you want a deeper list of ideas.</div>
             </div>
-            <button type="button" className="eb-btn eb-btn-secondary" onClick={() => setSuggestedExperimentsOpen((prev) => !prev)}>
+            <button type="button" className="eb-btn eb-btn-secondary w-full sm:w-auto" onClick={() => setSuggestedExperimentsOpen((prev) => !prev)}>
               {suggestedExperimentsOpen ? 'Hide suggestions' : 'See suggestions'}
             </button>
           </div>
@@ -4801,21 +4801,23 @@ const tryNextPrompts = useMemo(() => {
                 <CarouselContent>
                   {findings.map((f, idx) => (
                     <CarouselItem key={idx} className="basis-full md:basis-1/2">
-                      <div className="eb-inset rounded-2xl p-5 h-full">
+                      <div className="eb-inset rounded-2xl p-5">
                         <div className="text-sm font-semibold">{f.title}</div>
-                        <div className="mt-1 text-sm eb-muted">{f.body}</div>
+                        <div className="mt-1 text-sm eb-muted whitespace-normal break-words">{f.body}</div>
                         {f.supportSuggestion ? (
                           <div className="mt-3 eb-inset rounded-2xl p-3">
                             <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[rgba(0,0,0,0.55)]">What could help</div>
-                            <div className="mt-1 text-sm eb-muted">{f.supportSuggestion}</div>
+                            <div className="mt-1 text-sm eb-muted whitespace-normal break-words">{f.supportSuggestion}</div>
                           </div>
                         ) : null}
-                        <div className="mt-3 flex flex-wrap gap-2 justify-end">
-                          {f.metrics?.slice(0, 2).map((m) => (
-                            <span key={String(m)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.04)' }}>{labelFor(m, userData)}</span>
-                          ))}
-                        </div>
-                        <div className="mt-4 flex justify-end">{renderExperimentCTA(f)}</div>
+                        {f.metrics?.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {f.metrics.slice(0, 2).map((m) => (
+                              <span key={String(m)} className="eb-pill" style={{ background: 'rgba(0,0,0,0.04)' }}>{labelFor(m, userData)}</span>
+                            ))}
+                          </div>
+                        ) : null}
+                        {f.cta ? <div className="mt-4">{renderExperimentCTA(f)}</div> : null}
                       </div>
                     </CarouselItem>
                   ))}

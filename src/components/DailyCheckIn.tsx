@@ -1432,10 +1432,6 @@ export function DailyCheckIn({ userData, onUpdateUserData, onDone, initialDateIS
           <button
             type="button"
             onClick={() => setInfluencesOpen((v) => !v)}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              setInfluencesOpen((v) => !v);
-            }}
             className="w-full flex items-center justify-between gap-3 py-1 cursor-pointer"
           >
             <div className="text-sm font-semibold text-[rgb(var(--color-text))]">Other influences</div>

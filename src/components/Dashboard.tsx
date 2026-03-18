@@ -1328,9 +1328,9 @@ export function Dashboard({
                     if (guideCard.cta.action === 'check-in') onOpenCheckIn(todayISO);
                     else onNavigate(guideCard.cta.screen);
                   }}
-                  className="mt-4 eb-btn eb-btn-secondary inline-flex items-center justify-center"
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
                 >
-                  {guideCard.cta.label}
+                  {guideCard.cta.label} <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
               <div className="eb-icon-frame">
