@@ -4573,48 +4573,40 @@ const tryNextPrompts = useMemo(() => {
                       </div>
                     ))}
                   </div>
-                  <div className="mt-3 hidden sm:block">
-                    <Carousel opts={{ align: 'start' }} className="w-full overflow-hidden">
-                      <CarouselContent>
-                        {visibleTryNextPrompts.map((p) => (
-                          <CarouselItem key={p.id} className="basis-full md:basis-1/2">
-                            <div className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
-                              <div className="flex items-start justify-between gap-3 min-w-0">
-                                <div className="text-sm font-semibold min-w-0">{p.title}</div>
-                                <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
-                              </div>
-                              <div className="mt-2 text-sm font-medium text-neutral-900">{p.suggestion}</div>
-                              <div className="mt-2 text-sm eb-muted">{p.description}</div>
-                              <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
-                              {whyOpen?.[p.id] ? (
-                                <div className="mt-2 text-sm eb-muted min-w-0">
-                                  {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
-                                  <ul className="list-disc pl-5 space-y-1">
-                                    {(p.why || []).slice(1, 3).map((w, idx) => (
-                                      <li key={`${p.id}-why-${idx}`}>{w}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              ) : null}
-                              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                                {p.metrics.slice(0, 5).map((k) => (
-                                  <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
-                                ))}
-                              </div>
-                              <div className="flex-1" />
-                              <div className="mt-4 flex items-center justify-end gap-3">
-                                <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openTryNextPrompt(p as any)}>
-                                  <FlaskConical className="w-4 h-4" />
-                                  Set up {p.durationDays || 3}-day experiment
-                                </button>
-                              </div>
-                            </div>
-                          </CarouselItem>
-                        ))}
-                      </CarouselContent>
-                      <CarouselPrevious className="hidden sm:flex opacity-70" />
-                      <CarouselNext className="hidden sm:flex opacity-70" />
-                    </Carousel>
+                  <div className="mt-3 hidden sm:grid sm:grid-cols-1 xl:grid-cols-2 gap-4 min-w-0">
+                    {visibleTryNextPrompts.map((p) => (
+                      <div key={p.id} className="eb-inset-callout rounded-2xl p-5 h-full min-w-0 overflow-hidden flex flex-col">
+                        <div className="flex items-start justify-between gap-3 min-w-0">
+                          <div className="text-sm font-semibold min-w-0">{p.title}</div>
+                          <span className="eb-pill shrink-0" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>Try next</span>
+                        </div>
+                        <div className="mt-2 text-sm font-medium text-neutral-900">{p.suggestion}</div>
+                        <div className="mt-2 text-sm eb-muted">{p.description}</div>
+                        <button type="button" className="mt-3 text-sm font-medium underline underline-offset-4 self-start opacity-80 hover:opacity-100" onClick={() => setWhyOpen((prev) => ({ ...(prev || {}), [p.id]: !Boolean(prev?.[p.id]) }))}>Why this suggestion?</button>
+                        {whyOpen?.[p.id] ? (
+                          <div className="mt-2 text-sm eb-muted min-w-0">
+                            {p.phaseHint ? <div className="mb-2">{p.phaseHint}</div> : null}
+                            <ul className="list-disc pl-5 space-y-1">
+                              {(p.why || []).slice(1, 3).map((w, idx) => (
+                                <li key={`${p.id}-why-${idx}`}>{w}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap justify-center gap-2">
+                          {p.metrics.slice(0, 5).map((k) => (
+                            <span key={String(k)} className="eb-pill" style={{ background: 'rgb(var(--color-accent)/0.18)' }}>{labelFor(k as any, userData)}</span>
+                          ))}
+                        </div>
+                        <div className="flex-1" />
+                        <div className="mt-4 flex items-center justify-end gap-3">
+                          <button type="button" className="eb-btn eb-btn-primary w-full sm:w-auto" onClick={() => openTryNextPrompt(p as any)}>
+                            <FlaskConical className="w-4 h-4" />
+                            Set up {p.durationDays || 3}-day experiment
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : null}
