@@ -25,15 +25,6 @@ export function RhythmPhaseHeader(props: {
         </div>
       </div>
 
-      {props.timingCopy ? (
-        <div
-          className="mt-4 whitespace-nowrap text-white"
-          style={{ fontSize: 'clamp(0.95rem, 2.55vw, 1.1rem)', lineHeight: 1.25 }}
-        >
-          {props.timingCopy}
-        </div>
-      ) : null}
-
       <div className="mt-3">
         <div className="mb-1 text-[11px] uppercase tracking-[0.18em] text-white">Phase progress</div>
         <div className="h-2 rounded-full bg-white/28 overflow-hidden border border-white/10">
@@ -42,6 +33,15 @@ export function RhythmPhaseHeader(props: {
             style={{ width: `${Math.max(8, Math.min(100, props.progressPercent ?? 36))}%`, boxShadow: '0 0 0 1px rgba(255,255,255,0.12) inset' }}
           />
         </div>
+
+        {props.timingCopy ? (
+          <div
+            className="mt-3 whitespace-nowrap px-1 text-white"
+            style={{ fontSize: 'clamp(0.9rem, 2.2vw, 1.05rem)', lineHeight: 1.25 }}
+          >
+            {props.timingCopy}
+          </div>
+        ) : null}
       </div>
     </div>
   );
