@@ -51,14 +51,18 @@ export type CompanionMomentDisplayCopy = {
 };
 
 export function getMomentFocusTarget(moment: CompanionMoment): string | undefined {
+  const labels = toSignalLabels(moment.data).join(' ').toLowerCase();
   switch (moment.type) {
     case 'experiment_suggestion':
     case 'experiment_result_ready':
       return 'insights:experiments';
-    case 'new_pattern':
     case 'helpful_pattern_detected':
+      return 'insights:helpful';
+    case 'new_pattern':
+      if (labels.includes('sleep') || labels.includes('restless legs') || labels.includes('restlesslegs')) return 'insights:sleep';
+      return 'insights:connections';
     case 'unlock_milestone':
-      return 'insights:full-insights';
+      return 'insights:connections';
     default:
       return undefined;
   }
