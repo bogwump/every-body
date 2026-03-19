@@ -405,6 +405,13 @@ type CycleStripRow = {
   durationDays: number;
 };
 
+type CycleStripPhaseSegment = {
+  key: PhaseKey;
+  label: string;
+  start: number;
+  end: number;
+};
+
 function getRhythmMetricOptions(userData: UserData | undefined): RhythmMetricOption[] {
   const ud = (userData ?? ({} as any)) as UserData;
   const enabledModules = Array.isArray(ud.enabledModules) ? ud.enabledModules : [];
@@ -475,8 +482,43 @@ function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption,
   }
 
   const recentRows = rows.slice(-maxCycles).reverse();
-  const maxLen = recentRows.reduce((maxv, row) => Math.max(maxv, row.cycleLength), 28);
-  return { rows: recentRows, displayDays: Math.max(24, Math.min(35, maxLen)) };
+  const avgLen = recentRows.length
+    ? Math.round(recentRows.reduce((sum, row) => sum + row.cycleLength, 0) / recentRows.length)
+    : 28;
+  return { rows: recentRows, displayDays: Math.max(20, Math.min(35, avgLen || 28)) };
+}
+
+function getCycleStripPhaseSegments(displayDays: number): CycleStripPhaseSegment[] {
+  const segments: CycleStripPhaseSegment[] = [];
+  let currentKey: PhaseKey | null = null;
+  let start = 1;
+  for (let day = 1; day <= displayDays; day++) {
+    const key = phaseFromDay(day, displayDays, null).key;
+    if (currentKey == null) {
+      currentKey = key;
+      start = day;
+      continue;
+    }
+    if (key !== currentKey) {
+      segments.push({
+        key: currentKey,
+        label: currentKey === 'reset' ? 'Reset' : currentKey === 'rebuilding' ? 'Rebuilding' : currentKey === 'expressive' ? 'Expressive' : 'Protective',
+        start,
+        end: day - 1,
+      });
+      currentKey = key;
+      start = day;
+    }
+  }
+  if (currentKey != null) {
+    segments.push({
+      key: currentKey,
+      label: currentKey === 'reset' ? 'Reset' : currentKey === 'rebuilding' ? 'Rebuilding' : currentKey === 'expressive' ? 'Expressive' : 'Protective',
+      start,
+      end: displayDays,
+    });
+  }
+  return segments;
 }
 
 function phaseOneLiner(key: PhaseKey, goal: UserGoal | null): string {
@@ -631,13 +673,19 @@ export function Rhythm({ userData }: { userData?: UserData }) {
     if (!selectedTimingMetric) return { rows: [], displayDays: 28 };
     return buildCycleStripRows(sorted, selectedTimingMetric, 4);
   }, [sorted, selectedTimingMetric]);
+  const timingPhaseSegments = useMemo(() => getCycleStripPhaseSegments(timingChart.displayDays), [timingChart.displayDays]);
   const timingSummary = useMemo(() => {
     const rows = timingChart.rows.filter((row) => row.firstActiveDay != null && row.durationDays > 0);
     if (!selectedTimingMetric || rows.length < 2) return null;
     const avgStart = Math.round(rows.reduce((sum, row) => sum + (row.firstActiveDay ?? 0), 0) / rows.length);
     const avgDuration = Math.round(rows.reduce((sum, row) => sum + row.durationDays, 0) / rows.length);
-    return `${selectedTimingMetric.label} usually shows up around day ${avgStart} and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
-  }, [timingChart.rows, selectedTimingMetric]);
+    const phaseLabel = phaseFromDay(avgStart, timingChart.displayDays, null).soft.replace(' Phase', '');
+    const approxDaysBeforeBleed = Math.max(0, timingChart.displayDays - avgStart + 1);
+    if (phaseLabel === 'Protective' && approxDaysBeforeBleed >= 2) {
+      return `${selectedTimingMetric.label} usually shows up in your ${phaseLabel.toLowerCase()} window, around ${approxDaysBeforeBleed} day${approxDaysBeforeBleed === 1 ? '' : 's'} before bleeding, and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
+    }
+    return `${selectedTimingMetric.label} usually shows up in your ${phaseLabel.toLowerCase()} window, around day ${avgStart}, and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
+  }, [timingChart.rows, timingChart.displayDays, selectedTimingMetric]);
   const avgCycleText = avgCycleLen ? `${avgCycleLen} days avg` : 'Not enough data yet';
   const cycleTrust = useMemo(() => getCycleTrustModel(sorted as any, ((userData ?? ({} as any)) as UserData), computed.todayISO), [sorted, userData, computed.todayISO]);
 
@@ -869,6 +917,33 @@ export function Rhythm({ userData }: { userData?: UserData }) {
               ) : null}
 
               <div className="space-y-3">
+                <div className="rounded-2xl eb-inset-callout p-3">
+                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}>
+                    {Array.from({ length: timingChart.displayDays }, (_, index) => {
+                      const day = index + 1;
+                      const phase = phaseFromDay(day, timingChart.displayDays, null).key;
+                      const bandClass = phase === 'reset'
+                        ? 'bg-[rgb(var(--color-accent)/0.18)]'
+                        : phase === 'rebuilding'
+                          ? 'bg-[rgb(var(--color-accent)/0.12)]'
+                          : phase === 'expressive'
+                            ? 'bg-[rgb(var(--color-primary)/0.12)]'
+                            : 'bg-[rgb(var(--color-primary-dark)/0.18)]';
+                      return <div key={`phase-${day}`} className={`h-2 w-full rounded-full ${bandClass}`} />;
+                    })}
+                  </div>
+                  <div className="mt-2 grid gap-2 text-[11px] text-[rgb(var(--color-text-secondary))] sm:text-xs" style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}>
+                    {timingPhaseSegments.map((segment) => (
+                      <div
+                        key={segment.key}
+                        className="text-center font-medium"
+                        style={{ gridColumn: `${segment.start} / ${segment.end + 1}` }}
+                      >
+                        {segment.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 {timingChart.rows.map((row) => (
                   <div key={row.cycleStartISO} className="space-y-2">
                     <div className="flex items-center justify-between gap-3 text-sm">
@@ -892,7 +967,17 @@ export function Rhythm({ userData }: { userData?: UserData }) {
                             <div
                               className={[
                                 'h-3 w-full rounded-full transition',
-                                !inCycle ? 'bg-black/5' : isActive ? 'bg-[rgb(var(--color-primary-dark))]' : 'bg-[rgb(var(--color-accent)/0.22)]',
+                                !inCycle
+                                  ? 'bg-black/5'
+                                  : isActive
+                                    ? 'bg-[rgb(var(--color-primary-dark))]'
+                                    : phaseFromDay(day, row.cycleLength, null).key === 'reset'
+                                      ? 'bg-[rgb(var(--color-accent)/0.24)]'
+                                      : phaseFromDay(day, row.cycleLength, null).key === 'rebuilding'
+                                        ? 'bg-[rgb(var(--color-accent)/0.16)]'
+                                        : phaseFromDay(day, row.cycleLength, null).key === 'expressive'
+                                          ? 'bg-[rgb(var(--color-primary)/0.14)]'
+                                          : 'bg-[rgb(var(--color-primary-dark)/0.16)]',
                               ].join(' ')}
                               title={`Day ${day}${isActive ? ': active' : ''}`}
                             />
