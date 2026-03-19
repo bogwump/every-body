@@ -2383,8 +2383,15 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   const helpfulPatterns = useMemo(() => {
     const phaseStartISO = userData.cycleTrackingMode === 'cycle' ? getCurrentPhaseEntry()?.startDate ?? null : null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const recentFloor = new Date(today);
+    recentFloor.setDate(recentFloor.getDate() - 7);
+    const recentFloorISO = isoFromDateLocal(recentFloor);
 
-    return getHelpfulPatternsFromExperiments({ sinceDateISO: phaseStartISO })
+    const sinceDateISO = phaseStartISO && phaseStartISO > recentFloorISO ? recentFloorISO : phaseStartISO || recentFloorISO;
+
+    return getHelpfulPatternsFromExperiments({ sinceDateISO })
       .filter((item) => item.confidence !== 'low')
       .slice(0, 3);
   }, [experimentHistory, entriesAllSorted.length, userData.cycleTrackingMode]);
