@@ -568,7 +568,7 @@ function ctaLabelForPair(aKey: MetricKey, bKey: MetricKey, userData: UserData): 
   if (has('energy')) return 'Try an energy experiment';
   if (has('bloating')) return 'Try a digestion experiment';
   if (has('pain')) return 'Try a comfort experiment';
-  if (has('focus')) return 'Try a clarity experiment';
+  if (has('focus')) return 'Try a focus experiment';
   return 'Try a small experiment';
 }
 
