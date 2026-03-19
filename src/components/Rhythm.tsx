@@ -416,8 +416,10 @@ type CycleStripPhaseSegment = {
 function getRhythmMetricOptions(userData: UserData | undefined): RhythmMetricOption[] {
   const ud = (userData ?? ({} as any)) as UserData;
   const enabledModules = Array.isArray(ud.enabledModules) ? ud.enabledModules : [];
+  const excludedTimingMetrics = new Set<SymptomKey>(['sleep', 'energy', 'focus', 'libido', 'appetite', 'stress']);
   const builtIns: RhythmMetricOption[] = enabledModules
     .filter((key): key is SymptomKey => typeof key === 'string')
+    .filter((key) => !excludedTimingMetrics.has(key))
     .map((key) => ({
       id: key,
       label: (SYMPTOM_META as any)?.[key]?.label ?? key,
