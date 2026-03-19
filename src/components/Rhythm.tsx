@@ -10,7 +10,8 @@ import { getRhythmTimingModel } from '../lib/rhythmTiming';
 import { getPhaseHistory } from '../lib/phaseHistory';
 import { getRhythmPersonalPhaseSentence } from '../lib/rhythmCopy';
 import { getRhythmPhaseState } from '../lib/phaseChange';
-import type { CheckInEntry, SymptomKey } from '../types';
+import { SYMPTOM_META } from '../lib/symptomMeta';
+import type { CheckInEntry, SymptomKey, UserGoal } from '../types';
 import type { UserData } from '../types';
 
 type ConfidenceLevel = 'Learning' | 'Emerging' | 'Established';
@@ -385,6 +386,99 @@ function formatSourceLine(source: any): string {
   return 'Based on your recent check-ins.';
 }
 
+
+
+type RhythmMetricOption = {
+  id: string;
+  label: string;
+  isCustom?: boolean;
+  symptomKey?: SymptomKey;
+  customId?: string;
+};
+
+type CycleStripRow = {
+  label: string;
+  cycleStartISO: string;
+  cycleLength: number;
+  activeDays: number[];
+  firstActiveDay: number | null;
+  durationDays: number;
+};
+
+function getRhythmMetricOptions(userData: UserData | undefined): RhythmMetricOption[] {
+  const ud = (userData ?? ({} as any)) as UserData;
+  const enabledModules = Array.isArray(ud.enabledModules) ? ud.enabledModules : [];
+  const builtIns: RhythmMetricOption[] = enabledModules
+    .filter((key): key is SymptomKey => typeof key === 'string')
+    .map((key) => ({
+      id: key,
+      label: (SYMPTOM_META as any)?.[key]?.label ?? key,
+      symptomKey: key,
+    }));
+
+  const customs: RhythmMetricOption[] = Array.isArray(ud.customSymptoms)
+    ? ud.customSymptoms
+        .filter((item: any) => item && item.enabled && typeof item.id === 'string' && typeof item.label === 'string')
+        .map((item: any) => ({
+          id: `custom:${item.id}`,
+          label: item.label,
+          isCustom: true,
+          customId: item.id,
+        }))
+    : [];
+
+  const seen = new Set<string>();
+  return [...builtIns, ...customs].filter((option) => {
+    if (seen.has(option.id)) return false;
+    seen.add(option.id);
+    return true;
+  });
+}
+
+function getEntryMetricValue(entry: CheckInEntry, option: RhythmMetricOption): number | null {
+  if (option.isCustom) {
+    const raw = option.customId ? (entry.customValues ?? {})[option.customId] : null;
+    return typeof raw === 'number' && isFinite(raw) ? Math.max(0, Math.min(10, raw)) : null;
+  }
+  if (!option.symptomKey) return null;
+  return getSymptom(entry, option.symptomKey);
+}
+
+function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption, maxCycles = 4): { rows: CycleStripRow[]; displayDays: number } {
+  const starts = detectCycleStarts(sorted);
+  if (starts.length < 2) return { rows: [], displayDays: 28 };
+
+  const rows: CycleStripRow[] = [];
+  for (let i = Math.max(0, starts.length - maxCycles - 1); i < starts.length - 1; i++) {
+    const cycleStartISO = starts[i];
+    const nextStartISO = starts[i + 1];
+    const cycleLength = Math.max(1, daysBetween(cycleStartISO, nextStartISO));
+    const cycleEntries = sorted.filter((entry) => {
+      const iso = (entry as any).dateISO;
+      return typeof iso === 'string' && iso >= cycleStartISO && iso < nextStartISO;
+    });
+    const activeDays = cycleEntries
+      .map((entry) => {
+        const value = getEntryMetricValue(entry, option);
+        if (value == null || value <= 0) return null;
+        return daysBetween(cycleStartISO, (entry as any).dateISO) + 1;
+      })
+      .filter((day): day is number => typeof day === 'number' && day >= 1 && day <= cycleLength);
+    rows.push({
+      label: `Cycle ${i + 1}`,
+      cycleStartISO,
+      cycleLength,
+      activeDays,
+      firstActiveDay: activeDays.length ? Math.min(...activeDays) : null,
+      durationDays: activeDays.length,
+    });
+  }
+
+  const recentRows = rows.slice(-maxCycles).reverse();
+  const maxLen = recentRows.reduce((maxv, row) => Math.max(maxv, row.cycleLength), 28);
+  return { rows: recentRows, displayDays: Math.max(24, Math.min(35, maxLen)) };
+}
+
 function phaseOneLiner(key: PhaseKey, goal: UserGoal | null): string {
   const peri = goal === 'perimenopause';
   switch (key) {
@@ -521,6 +615,29 @@ export function Rhythm({ userData }: { userData?: UserData }) {
   const cycleStats = useMemo(() => computeCycleStats(sorted), [sorted]);
 
   const [cycleModalOpen, setCycleModalOpen] = useState(false);
+  const rhythmMetricOptions = useMemo(() => getRhythmMetricOptions(userData), [userData]);
+  const [selectedTimingMetricId, setSelectedTimingMetricId] = useState<string>('');
+  const selectedTimingMetric = useMemo(() => {
+    if (!rhythmMetricOptions.length) return null;
+    return rhythmMetricOptions.find((option) => option.id === selectedTimingMetricId) ?? rhythmMetricOptions[0];
+  }, [rhythmMetricOptions, selectedTimingMetricId]);
+  React.useEffect(() => {
+    if (!rhythmMetricOptions.length) return;
+    if (!selectedTimingMetricId || !rhythmMetricOptions.some((option) => option.id === selectedTimingMetricId)) {
+      setSelectedTimingMetricId(rhythmMetricOptions[0].id);
+    }
+  }, [rhythmMetricOptions, selectedTimingMetricId]);
+  const timingChart = useMemo(() => {
+    if (!selectedTimingMetric) return { rows: [], displayDays: 28 };
+    return buildCycleStripRows(sorted, selectedTimingMetric, 4);
+  }, [sorted, selectedTimingMetric]);
+  const timingSummary = useMemo(() => {
+    const rows = timingChart.rows.filter((row) => row.firstActiveDay != null && row.durationDays > 0);
+    if (!selectedTimingMetric || rows.length < 2) return null;
+    const avgStart = Math.round(rows.reduce((sum, row) => sum + (row.firstActiveDay ?? 0), 0) / rows.length);
+    const avgDuration = Math.round(rows.reduce((sum, row) => sum + row.durationDays, 0) / rows.length);
+    return `${selectedTimingMetric.label} usually shows up around day ${avgStart} and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
+  }, [timingChart.rows, selectedTimingMetric]);
   const avgCycleText = avgCycleLen ? `${avgCycleLen} days avg` : 'Not enough data yet';
   const cycleTrust = useMemo(() => getCycleTrustModel(sorted as any, ((userData ?? ({} as any)) as UserData), computed.todayISO), [sorted, userData, computed.todayISO]);
 
@@ -735,6 +852,102 @@ export function Rhythm({ userData }: { userData?: UserData }) {
         </div>
 
         <PhaseHistoryCard history={phaseHistory} />
+
+        <div className="eb-card p-6">
+          <div className="eb-card-header mb-4">
+            <div className="min-w-0 flex-1">
+              <h3 className="mb-1 font-semibold tracking-tight">When this usually shows up</h3>
+              <p className="text-sm text-[rgb(var(--color-text-secondary))]">See where a symptom tends to land in your rhythm across recent cycles.</p>
+            </div>
+            <div className="eb-icon-frame"><Leaf className="w-5 h-5" /></div>
+          </div>
+
+          {selectedTimingMetric && timingChart.rows.length >= 2 ? (
+            <div className="space-y-4">
+              {timingSummary ? (
+                <p className="text-neutral-700">{timingSummary}</p>
+              ) : null}
+
+              <div className="space-y-3">
+                {timingChart.rows.map((row) => (
+                  <div key={row.cycleStartISO} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <div className="font-medium text-neutral-800">{row.label}</div>
+                      {row.durationDays > 0 ? (
+                        <div className="text-[rgb(var(--color-text-secondary))]">Starts day {row.firstActiveDay} · {row.durationDays} day{row.durationDays === 1 ? '' : 's'}</div>
+                      ) : (
+                        <div className="text-[rgb(var(--color-text-secondary))]">No logged days this cycle</div>
+                      )}
+                    </div>
+                    <div
+                      className="grid gap-1.5 rounded-2xl eb-inset-callout p-3"
+                      style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}
+                    >
+                      {Array.from({ length: timingChart.displayDays }, (_, index) => {
+                        const day = index + 1;
+                        const inCycle = day <= row.cycleLength;
+                        const isActive = row.activeDays.includes(day);
+                        return (
+                          <div key={day} className="flex flex-col items-center gap-1">
+                            <div
+                              className={[
+                                'h-3 w-full rounded-full transition',
+                                !inCycle ? 'bg-black/5' : isActive ? 'bg-[rgb(var(--color-primary-dark))]' : 'bg-[rgb(var(--color-accent)/0.22)]',
+                              ].join(' ')}
+                              title={`Day ${day}${isActive ? ': active' : ''}`}
+                            />
+                            {((day <= 3) || (day === timingChart.displayDays) || (day % 4 === 0)) ? (
+                              <span className="text-[10px] text-[rgb(var(--color-text-secondary))]">{day}</span>
+                            ) : (
+                              <span className="text-[10px] opacity-0 select-none">0</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-stretch sm:justify-end">
+                <label className="w-full sm:w-auto">
+                  <span className="sr-only">Choose symptom</span>
+                  <select
+                    value={selectedTimingMetric?.id ?? ''}
+                    onChange={(event) => setSelectedTimingMetricId(event.target.value)}
+                    className="w-full sm:min-w-[260px] rounded-full border border-[rgb(var(--color-accent)/0.28)] bg-white px-4 py-3 text-sm text-[rgb(var(--color-text))] shadow-sm outline-none transition focus:border-[rgb(var(--color-primary-dark)/0.42)] focus:ring-2 focus:ring-[rgb(var(--color-primary-dark)/0.12)]"
+                  >
+                    {rhythmMetricOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-neutral-700">Need at least 2 logged cycles with this symptom to start spotting its usual timing in your rhythm.</p>
+              <div className="flex justify-stretch sm:justify-end">
+                <label className="w-full sm:w-auto">
+                  <span className="sr-only">Choose symptom</span>
+                  <select
+                    value={selectedTimingMetric?.id ?? ''}
+                    onChange={(event) => setSelectedTimingMetricId(event.target.value)}
+                    className="w-full sm:min-w-[260px] rounded-full border border-[rgb(var(--color-accent)/0.28)] bg-white px-4 py-3 text-sm text-[rgb(var(--color-text))] shadow-sm outline-none transition focus:border-[rgb(var(--color-primary-dark)/0.42)] focus:ring-2 focus:ring-[rgb(var(--color-primary-dark)/0.12)]"
+                  >
+                    {rhythmMetricOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* What usually comes next */}
         <div className="eb-card p-6">
