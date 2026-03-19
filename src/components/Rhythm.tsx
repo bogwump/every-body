@@ -680,7 +680,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
     const avgDuration = Math.round(rows.reduce((sum, row) => sum + row.durationDays, 0) / rows.length);
     const phaseLabel = phaseFromDay(avgStart, timingChart.displayDays, null).soft.replace(' Phase', '');
     const approxDaysBeforeBleed = Math.max(0, timingChart.displayDays - avgStart + 1);
-    if (phaseLabel === 'Protective' && approxDaysBeforeBleed >= 2) {
+    if (approxDaysBeforeBleed >= 2 && approxDaysBeforeBleed <= 9) {
       return `${selectedTimingMetric.label} usually shows up in your ${phaseLabel.toLowerCase()} window, around ${approxDaysBeforeBleed} day${approxDaysBeforeBleed === 1 ? '' : 's'} before bleeding, and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
     }
     return `${selectedTimingMetric.label} usually shows up in your ${phaseLabel.toLowerCase()} window, around day ${avgStart}, and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
@@ -946,12 +946,12 @@ export function Rhythm({ userData }: { userData?: UserData }) {
                                     : isActive
                                       ? 'bg-[rgb(var(--color-primary-dark))]'
                                       : phaseFromDay(day, row.cycleLength, null).key === 'reset'
-                                        ? 'bg-[rgb(var(--color-accent)/0.24)]'
+                                        ? 'bg-[rgb(var(--color-accent)/0.42)]'
                                         : phaseFromDay(day, row.cycleLength, null).key === 'rebuilding'
-                                          ? 'bg-[rgb(var(--color-accent)/0.16)]'
+                                          ? 'bg-[rgb(var(--color-accent)/0.30)]'
                                           : phaseFromDay(day, row.cycleLength, null).key === 'expressive'
-                                            ? 'bg-[rgb(var(--color-primary)/0.14)]'
-                                            : 'bg-[rgb(var(--color-primary-dark)/0.16)]',
+                                            ? 'bg-[rgb(var(--color-primary)/0.28)]'
+                                            : 'bg-[rgb(var(--color-primary-dark)/0.34)]',
                                 ].join(' ')}
                                 title={`Day ${day}${isActive ? ': active' : ''}`}
                               />
