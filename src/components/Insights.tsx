@@ -1924,24 +1924,51 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   // --- Cycle phase chart (restored) ---
   type PhaseMetric = SymptomKey | 'mood';
-  const PHASE_METRICS: Array<{ key: PhaseMetric; label: string }> = useMemo(
+  const PHASE_GRAPH_ALLOWLIST: PhaseMetric[] = useMemo(
     () => [
-      { key: 'energy', label: 'Energy' },
-      { key: 'sleep', label: 'Sleep' },
-      { key: 'stress', label: 'Stress' },
-      { key: 'pain', label: 'Pain' },
-      { key: 'bloating', label: 'Bloating' },
-      { key: 'fatigue', label: 'Fatigue' },
-      { key: 'brainFog', label: 'Brain fog' },
-      { key: 'focus', label: 'Clarity' },
-      { key: 'nightSweats', label: 'Night sweats' },
-      { key: 'flow', label: 'Bleeding/spotting' },
-      { key: 'mood', label: 'Mood' },
+      'mood',
+      'energy',
+      'sleep',
+      'stress',
+      'pain',
+      'bloating',
+      'fatigue',
+      'brainFog',
+      'focus',
+      'nightSweats',
+      'flow',
+      'cramps',
+      'breastTenderness',
+      'libido',
+      'appetite',
+      'acidReflux',
     ],
     [],
   );
 
-  const defaultPhaseMetrics = useMemo(() => (['energy', 'mood', 'pain'] as [PhaseMetric, PhaseMetric, PhaseMetric]), []);
+  const PHASE_METRICS: Array<{ key: PhaseMetric; label: string }> = useMemo(() => {
+    const enabledSet = new Set((allMetricKeys as MetricKey[]).map((key) => String(key)));
+    return PHASE_GRAPH_ALLOWLIST.filter((key) => key === 'mood' || enabledSet.has(String(key))).map((key) => ({
+      key,
+      label: labelFor(key as MetricKey, userData),
+    }));
+  }, [PHASE_GRAPH_ALLOWLIST, allMetricKeys, userData]);
+
+  const defaultPhaseMetrics = useMemo<[PhaseMetric, PhaseMetric, PhaseMetric]>(() => {
+    const defaults: PhaseMetric[] = ['energy', 'mood', 'pain'];
+    const available = PHASE_METRICS.map((opt) => opt.key);
+    const picked: PhaseMetric[] = [];
+    for (const key of defaults) {
+      if (available.includes(key) && !picked.includes(key)) picked.push(key);
+    }
+    for (const key of available) {
+      if (!picked.includes(key)) picked.push(key);
+      if (picked.length === 3) break;
+    }
+    while (picked.length < 3) picked.push((available[0] ?? 'mood') as PhaseMetric);
+    return [picked[0]!, picked[1]!, picked[2]!];
+  }, [PHASE_METRICS]);
+
   const [phaseMetrics, setPhaseMetrics] = useState<[PhaseMetric, PhaseMetric, PhaseMetric]>(() => {
     try {
       const raw = localStorage.getItem('insights:phaseMetrics');
@@ -1950,16 +1977,34 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     } catch {
       // ignore
     }
-    return defaultPhaseMetrics;
+    return ['energy', 'mood', 'pain'] as [PhaseMetric, PhaseMetric, PhaseMetric];
   });
 
   useEffect(() => {
+    const allowed = new Set(PHASE_METRICS.map((opt) => opt.key));
+    const repaired: PhaseMetric[] = [];
+    for (const key of phaseMetrics) {
+      if (allowed.has(key) && !repaired.includes(key)) repaired.push(key);
+    }
+    for (const fallback of defaultPhaseMetrics) {
+      if (!repaired.includes(fallback)) repaired.push(fallback);
+      if (repaired.length === 3) break;
+    }
+    if (
+      repaired.length !== 3 ||
+      repaired[0] !== phaseMetrics[0] ||
+      repaired[1] !== phaseMetrics[1] ||
+      repaired[2] !== phaseMetrics[2]
+    ) {
+      setPhaseMetrics([repaired[0]!, repaired[1]!, repaired[2]!]);
+      return;
+    }
     try {
       localStorage.setItem('insights:phaseMetrics', JSON.stringify(phaseMetrics));
     } catch {
       // ignore
     }
-  }, [phaseMetrics]);
+  }, [PHASE_METRICS, defaultPhaseMetrics, phaseMetrics]);
 
   const hasFlow = useMemo(
     () => entriesAllSorted.some((e) => {
