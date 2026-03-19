@@ -453,16 +453,21 @@ function getEntryMetricValue(entry: CheckInEntry, option: RhythmMetricOption): n
 
 function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption, maxCycles = 4): { rows: CycleStripRow[]; displayDays: number } {
   const starts = detectCycleStarts(sorted);
-  if (starts.length < 2) return { rows: [], displayDays: 28 };
+  const datedEntries = sorted.filter((entry) => typeof (entry as any).dateISO === 'string');
+  const lastLoggedISO = datedEntries.length ? String((datedEntries[datedEntries.length - 1] as any).dateISO) : null;
+  if (!starts.length || !lastLoggedISO) return { rows: [], displayDays: 28 };
 
   const rows: CycleStripRow[] = [];
-  for (let i = Math.max(0, starts.length - maxCycles - 1); i < starts.length - 1; i++) {
+  const firstCycleIndex = Math.max(0, starts.length - maxCycles);
+
+  for (let i = firstCycleIndex; i < starts.length; i++) {
     const cycleStartISO = starts[i];
-    const nextStartISO = starts[i + 1];
-    const cycleLength = Math.max(1, daysBetween(cycleStartISO, nextStartISO));
+    const nextStartISO = starts[i + 1] ?? null;
+    const cycleEndExclusiveISO = nextStartISO ?? addDaysISO(lastLoggedISO, 1);
+    const cycleLength = Math.max(1, daysBetween(cycleStartISO, cycleEndExclusiveISO));
     const cycleEntries = sorted.filter((entry) => {
       const iso = (entry as any).dateISO;
-      return typeof iso === 'string' && iso >= cycleStartISO && iso < nextStartISO;
+      return typeof iso === 'string' && iso >= cycleStartISO && iso < cycleEndExclusiveISO;
     });
     const activeDays = cycleEntries
       .map((entry) => {
@@ -482,9 +487,11 @@ function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption,
   }
 
   const recentRows = rows.slice(-maxCycles).reverse();
-  const avgLen = recentRows.length
-    ? Math.round(recentRows.reduce((sum, row) => sum + row.cycleLength, 0) / recentRows.length)
-    : 28;
+  const completedRows = recentRows.filter((row) => row.cycleStartISO !== starts[starts.length - 1] || starts.length > 1);
+  const lengthSource = (completedRows.length ? completedRows : recentRows).filter((row) => row.cycleLength > 0);
+  const avgLen = lengthSource.length
+    ? Math.round(lengthSource.reduce((sum, row) => sum + row.cycleLength, 0) / lengthSource.length)
+    : recentRows[0]?.cycleLength ?? 28;
   return { rows: recentRows, displayDays: Math.max(20, Math.min(35, avgLen || 28)) };
 }
 
@@ -675,7 +682,13 @@ export function Rhythm({ userData }: { userData?: UserData }) {
   }, [sorted, selectedTimingMetric]);
   const timingSummary = useMemo(() => {
     const rows = timingChart.rows.filter((row) => row.firstActiveDay != null && row.durationDays > 0);
-    if (!selectedTimingMetric || rows.length < 2) return null;
+    if (!selectedTimingMetric || rows.length < 1) return null;
+    if (rows.length === 1) {
+      const row = rows[0];
+      const startDay = row.firstActiveDay ?? 1;
+      const phaseLabel = phaseFromDay(startDay, Math.max(row.cycleLength, timingChart.displayDays), null).soft.replace(' Phase', '');
+      return `${selectedTimingMetric.label} has shown up so far in this cycle around your ${phaseLabel.toLowerCase()} window, starting around day ${startDay}. As you log more cycles, your usual timing will get clearer.`;
+    }
     const avgStart = Math.round(rows.reduce((sum, row) => sum + (row.firstActiveDay ?? 0), 0) / rows.length);
     const avgDuration = Math.round(rows.reduce((sum, row) => sum + row.durationDays, 0) / rows.length);
     const phaseLabel = phaseFromDay(avgStart, timingChart.displayDays, null).soft.replace(' Phase', '');
@@ -910,7 +923,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
             <div className="eb-icon-frame"><Leaf className="w-5 h-5" /></div>
           </div>
 
-          {selectedTimingMetric && timingChart.rows.length >= 2 ? (
+          {selectedTimingMetric && timingChart.rows.length >= 1 ? (
             <div className="space-y-4">
               {timingSummary ? (
                 <p className="text-neutral-700">{timingSummary}</p>
@@ -999,7 +1012,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-neutral-700">Need at least 2 logged cycles with this symptom to start spotting its usual timing in your rhythm.</p>
+              <p className="text-neutral-700">This chart will start filling in from your first cycle. As you log more, your usual timing will get clearer.</p>
               <div className="flex justify-stretch sm:justify-end">
                 <label className="w-full sm:w-auto">
                   <span className="sr-only">Choose symptom</span>
