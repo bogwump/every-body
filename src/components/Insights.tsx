@@ -974,54 +974,71 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [sleepSeries]);
 
   // --- metric selection (for analysis) ---
+  const preferredMetricOrder: SymptomKey[] = useMemo(
+    () =>
+      [
+        'energy',
+        'stress',
+        'jointPain',
+        'anxiety',
+        'brainFog',
+        'appetite',
+        'nightSweats',
+        'sleep',
+        'nausea',
+        'hairShedding',
+        'fatigue',
+        'flow',
+        'acidReflux',
+        'breastTenderness',
+        'headache',
+        'libido',
+        'facialSpots',
+        'digestion',
+        'dizziness',
+        'irritability',
+        'hotFlushes',
+        'cysts',
+        'focus',
+        'cramps',
+        'bloating',
+        'pain',
+      ].filter(Boolean) as SymptomKey[],
+    [],
+  );
+
   const selectableKeys: MetricKey[] = useMemo(() => {
     const customs = (userData.customSymptoms ?? [])
       .filter((s) => s && s.enabled)
       .map((s) => (`custom:${s.id}` as MetricKey));
 
-    // Keep the built-in picker order visually balanced for the modal's wrapped chip layout.
-    // This is intentionally hand-curated rather than driven by module order so the pills wrap
-    // into calmer-looking rows across common mobile and tablet widths.
-    const preferredOrder: SymptomKey[] = [
-      'energy',
-      'stress',
-      'jointPain',
-      'anxiety',
-      'brainFog',
-      'appetite',
-      'nightSweats',
-      'sleep',
-      'nausea',
-      'hairShedding',
-      'fatigue',
-      'flow',
-      'acidReflux',
-      'breastTenderness',
-      'headache',
-      'libido',
-      'facialSpots',
-      'digestion',
-      'dizziness',
-      'irritability',
-      'hotFlushes',
-      'cysts',
-      'focus',
-      'cramps',
-      'bloating',
-      'pain',
-    ].filter(Boolean) as SymptomKey[];
-
     const enabled = new Set((userData.enabledModules ?? []) as SymptomKey[]);
-    const ordered = preferredOrder.filter((key) => enabled.has(key));
+    const ordered = preferredMetricOrder.filter((key) => enabled.has(key));
     const remainingEnabled = Array.from(enabled).filter((key) => !ordered.includes(key));
     const allBuiltIns = [...ordered, ...remainingEnabled];
 
     return Array.from(new Set<MetricKey>([...allBuiltIns, ...customs]));
-  }, [userData.enabledModules, userData.customSymptoms]);
+  }, [preferredMetricOrder, userData.enabledModules, userData.customSymptoms]);
 
-  // Backwards-compatible alias: older logic refers to allMetricKeys.
-  // Keep them identical so we do not accidentally change behaviour.
-  const allMetricKeys = selectableKeys;
+  const allMetricKeys: MetricKey[] = useMemo(() => {
+    const allCustoms = (userData.customSymptoms ?? [])
+      .filter((s) => s)
+      .map((s) => (`custom:${s.id}` as MetricKey));
+
+    return Array.from(new Set<MetricKey>([...preferredMetricOrder, ...allCustoms]));
+  }, [preferredMetricOrder, userData.customSymptoms]);
+
+  const isMetricEnabledForTracking = useCallback(
+    (key: MetricKey) => {
+      if (key === 'mood') return true;
+      if (typeof key === 'string' && key.startsWith('custom:')) {
+        const id = key.slice('custom:'.length);
+        return Boolean((userData.customSymptoms ?? []).find((s) => s.id === id && s.enabled));
+      }
+      return Boolean((userData.enabledModules ?? []).includes(key as SymptomKey));
+    },
+    [userData.customSymptoms, userData.enabledModules],
+  );
 
   const allTrackedMetricKeys: MetricKey[] = useMemo(() => {
     const enabledBuiltIns = Array.from(new Set((userData.enabledModules ?? []) as SymptomKey[]));
@@ -1031,11 +1048,10 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     return Array.from(new Set<MetricKey>(['mood', ...enabledBuiltIns, ...enabledCustoms]));
   }, [userData.enabledModules, userData.customSymptoms]);
 
-
   const [selected, setSelected] = useState<Array<MetricKey>>(() => {
     const defaultKeys: Array<MetricKey> = ['mood', 'sleep', 'energy', 'stress'];
     // Add a couple more if available so the Insights panels have enough to work with.
-    const extras = allMetricKeys.filter((k) => !defaultKeys.includes(k)).slice(0, 2);
+    const extras = selectableKeys.filter((k) => !defaultKeys.includes(k)).slice(0, 2);
     const fallback = [...defaultKeys, ...extras].slice(0, 6);
 
     try {
@@ -1064,7 +1080,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }
   }, [selected]);
 
-  const toggleMetric = (k: SymptomKey | 'mood') => {
+  const toggleMetric = (k: MetricKey) => {
     setSelected((prev) => {
       const has = prev.includes(k);
       if (has) return prev.filter((x) => x !== k);
@@ -1973,7 +1989,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   );
 
   const PHASE_METRICS: Array<{ key: PhaseMetric; label: string }> = useMemo(() => {
-    const builtInAllowed = PHASE_GRAPH_ALLOWLIST.filter((key) => key === 'mood' || allMetricKeys.includes(key));
+    const builtInAllowed = PHASE_GRAPH_ALLOWLIST.filter((key) => key === 'mood' || selectableKeys.includes(key));
     const enabledCustoms = (userData.customSymptoms ?? [])
       .filter((s) => s && s.enabled)
       .map((s) => ({ key: `custom:${s.id}` as PhaseMetric, label: s.label }));
@@ -1984,7 +2000,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     }));
 
     return [...builtInOptions, ...enabledCustoms];
-  }, [PHASE_GRAPH_ALLOWLIST, allMetricKeys, userData]);
+  }, [PHASE_GRAPH_ALLOWLIST, selectableKeys, userData]);
 
   const defaultPhaseMetrics = useMemo<[PhaseMetric, PhaseMetric, PhaseMetric]>(() => {
     const defaults: PhaseMetric[] = ['energy', 'mood', 'pain'];
@@ -5397,39 +5413,41 @@ const tryNextPrompts = useMemo(() => {
 
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
 
-                    <button type="button" className={chipClass(selected.includes('mood'))} data-selected={selected.includes('mood') ? 'true' : undefined} onClick={() => toggleMetric('mood')}>
-
+                    <button
+                      type="button"
+                      className={chipClass(selected.includes('mood'))}
+                      data-selected={selected.includes('mood') ? 'true' : undefined}
+                      data-surface={!isMetricEnabledForTracking('mood') && !selected.includes('mood') ? 'plain' : undefined}
+                      onClick={() => toggleMetric('mood')}
+                      title="Mood"
+                    >
                       Mood
-
                     </button>
 
 
-                    {selectableKeys.map((k) => (
-
-                      <button
-
-                        type="button"
-
-                        key={k}
-
-                        className={chipClass(selected.includes(k))}
-                        data-selected={selected.includes(k) ? 'true' : undefined}
-                        onClick={() => toggleMetric(k)}
-
-                        title={labelFor(k, userData)}
-
-                      >
-
-                        {labelFor(k, userData)}
-
-                      </button>
-
-                    ))}
+                    {allMetricKeys.map((k) => {
+                      const active = selected.includes(k);
+                      const enabled = isMetricEnabledForTracking(k);
+                      return (
+                        <button
+                          type="button"
+                          key={k}
+                          className={chipClass(active)}
+                          data-selected={active ? 'true' : undefined}
+                          data-surface={!enabled && !active ? 'plain' : undefined}
+                          onClick={() => toggleMetric(k)}
+                          title={!enabled ? `${labelFor(k, userData)} is not currently tracked in Daily Check-in` : labelFor(k, userData)}
+                        >
+                          {labelFor(k, userData)}
+                        </button>
+                      );
+                    })}
 
                   </div>
 
 
-                  <div className="mt-3 text-sm eb-muted">Tip: if this feels like too much, pick your &quot;top 3&quot; and stick with them for a week.</div>
+                  <div className="mt-3 text-sm eb-muted">White pills are not currently tracked in Daily Check-in, but saved history can still be analysed.</div>
+                  <div className="mt-2 text-sm eb-muted">Tip: if this feels like too much, pick your &quot;top 3&quot; and stick with them for a week.</div>
 
                 </div>
 
@@ -5444,8 +5462,8 @@ const tryNextPrompts = useMemo(() => {
 
 
       {dataEvidenceOpen ? (
-        <div className="space-y-6">
-          <div id="eb-full-insights" className="eb-card">
+        <div className="space-y-6 min-w-0 overflow-x-hidden">
+          <div id="eb-full-insights" className="eb-card min-w-0 overflow-hidden">
             <div className="eb-card-header">
               <div>
                 <div className="eb-card-title">Your data view</div>
@@ -5606,9 +5624,9 @@ const tryNextPrompts = useMemo(() => {
       
 
       {/* Trends */}
-      <div className="eb-card">
+      <div className="eb-card min-w-0 overflow-hidden">
         <div className="eb-card-header">
-          <div className="flex items-start justify-between gap-4 w-full">
+          <div className="flex min-w-0 items-start justify-between gap-4 w-full">
             <div>
               <div className="eb-card-title">Trends</div>
               <div className="eb-card-sub">Your selected metrics over time (0-10). The key is underneath.</div>
@@ -5626,7 +5644,7 @@ const tryNextPrompts = useMemo(() => {
           </div>
         </div>
 
-        <div className="mt-3 eb-chart">
+        <div className="mt-3 eb-chart min-w-0 overflow-hidden">
           {(() => {
             // Recharts' Legend is rendered inside the SVG. If it wraps onto multiple lines (eg 6 long labels),
             // the extra lines can get clipped. Reserve enough height for 1–3 legend rows.
@@ -5635,7 +5653,7 @@ const tryNextPrompts = useMemo(() => {
             const chartHeight = 280 + Math.max(0, legendHeight - 36);
 
             return (
-              <div style={{ width: '100%', height: chartHeight }}>
+              <div className="w-full min-w-0 max-w-full overflow-hidden" style={{ width: '100%', height: chartHeight }}>
                 <ResponsiveContainer>
                   <LineChart data={seriesForChart} margin={{ left: 0, right: 8, top: 10, bottom: 6 }}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -5679,8 +5697,8 @@ const tryNextPrompts = useMemo(() => {
             </div>
           </div>
 
-          <div className="mt-3 eb-chart">
-            <div style={{ width: '100%', height: 220 }}>
+          <div className="mt-3 eb-chart min-w-0 overflow-hidden">
+            <div className="w-full min-w-0 max-w-full overflow-hidden" style={{ width: '100%', height: 220 }}>
               <ResponsiveContainer>
                 <PieChart>
                   <Pie
@@ -5745,7 +5763,7 @@ const tryNextPrompts = useMemo(() => {
                 <div key={String(it.key)} className="eb-inset rounded-2xl p-4 flex flex-col justify-center min-h-[86px]">
                   <div className="text-sm font-semibold">{labelFor(it.key, userData)}</div>
                   <div className="mt-1 text-sm eb-muted">
-                    {describeHighValue(it.key as any, it.count, days)}
+                    {`${it.count} day${it.count === 1 ? '' : 's'} at the more noticeable end of your scale in the last ${days}.`}
                   </div>
                 </div>
               ))
@@ -5780,8 +5798,8 @@ const tryNextPrompts = useMemo(() => {
           </div>
         ) : (
           <>
-            <div className="mt-3 w-full min-w-0 overflow-hidden">
-              <div className="w-full min-w-0 overflow-hidden" style={{ height: 300 }}>
+            <div className="mt-3 w-full min-w-0 max-w-full overflow-hidden">
+              <div className="w-full min-w-0 max-w-full overflow-hidden" style={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cycleData} margin={{ left: 6, right: 16, top: 10, bottom: 6 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
@@ -5861,8 +5879,8 @@ const tryNextPrompts = useMemo(() => {
           </div>
         </div>
 
-        <div className="mt-3 eb-chart">
-          <div style={{ width: '100%', height: 220 }}>
+        <div className="mt-3 eb-chart min-w-0 overflow-hidden">
+          <div className="w-full min-w-0 max-w-full overflow-hidden" style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>
               <BarChart data={weekdayBar} margin={{ left: 0, right: 8, top: 10, bottom: 6 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />

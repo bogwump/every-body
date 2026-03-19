@@ -395,6 +395,18 @@ body.eb-chat-typing .eb-mobile-nav {
     color: rgb(var(--color-primary-dark) / 0.52);
   }
 
+  .eb-choice-pill[data-surface="plain"] {
+    background: rgb(255 255 255 / 0.96);
+    border-color: rgb(0 0 0 / 0.10);
+    color: rgb(0 0 0 / 0.62);
+  }
+
+  .eb-choice-pill[data-surface="plain"]:hover {
+    background: rgb(255 255 255 / 0.96);
+    border-color: rgb(0 0 0 / 0.14);
+    color: rgb(0 0 0 / 0.68);
+  }
+
   /* Hero pills sit on a much stronger coloured surface, so use the same soft inset
      surface as the hero insert rather than transparent theme tinting. */
   .eb-hero-rich .eb-choice-pill,
