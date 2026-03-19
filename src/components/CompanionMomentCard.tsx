@@ -38,15 +38,35 @@ export function CompanionMomentCard(props: { moment: CompanionMoment; onNavigate
   const copy = getMomentDisplayCopy(props.moment);
 
   const completeInteractionAndNavigate = (screen: string, focusTarget?: string | null) => {
-    dismissMoment(props.moment.id, 'interacted');
-    props.onDismiss?.();
     if (focusTarget) setPageFocus(focusTarget);
     props.onNavigate(screen);
+
+    const finishDismiss = () => {
+      dismissMoment(props.moment.id, 'interacted');
+      props.onDismiss?.();
+    };
+
+    if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
+      window.setTimeout(finishDismiss, 0);
+      return;
+    }
+
+    finishDismiss();
   };
 
   const handlePrimaryAction = () => {
     const data = props.moment.data ?? {};
     const focusTarget = getMomentFocusTarget(props.moment) ?? null;
+    if (props.moment.type === 'experiment_result_ready') {
+      try {
+        localStorage.setItem('everybody:v2:page_focus', 'insights:experiments');
+      } catch {
+        // ignore
+      }
+      completeInteractionAndNavigate('insights', 'insights:experiments');
+      return;
+    }
+
     if (props.moment.type === 'experiment_suggestion') {
       const inferred = inferPendingExperimentLaunchFromText(
         typeof data.title === 'string' ? data.title : copy.title,
