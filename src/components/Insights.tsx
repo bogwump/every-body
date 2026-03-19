@@ -53,6 +53,7 @@ import { getSuggestedDriverOptionsForMetrics } from '../lib/patternDrivers';
 import { buildPatternMemory, getLagPatternForPair, getPatternContextForSignal, getPatternRecordForLag, getPatternRecordForSignal, getRepeatPatternLine } from '../lib/patternIntelligence';
 import { classifyPatternStateForSignal, getPatternStateSummaryScore, type PairPatternStateResult } from '../lib/patternState';
 import { getMetricPolarity } from '../lib/metricSemantics';
+import { getCurrentPhaseEntry } from '../lib/phaseHistory';
 
 interface InsightsProps {
   userData: UserData;
@@ -2380,10 +2381,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   const { experiment, setExperiment, clearExperiment } = useExperiment();
   const { history: experimentHistory, upsertHistoryItem, setHistory } = useExperimentHistory();
 
-  const helpfulPatterns = useMemo(
-    () => getHelpfulPatternsFromExperiments().filter((item) => item.confidence !== 'low').slice(0, 3),
-    [experimentHistory, entriesAllSorted.length],
-  );
+  const helpfulPatterns = useMemo(() => {
+    const phaseStartISO = userData.cycleTrackingMode === 'cycle' ? getCurrentPhaseEntry()?.startDate ?? null : null;
+
+    return getHelpfulPatternsFromExperiments({ sinceDateISO: phaseStartISO })
+      .filter((item) => item.confidence !== 'low')
+      .slice(0, 3);
+  }, [experimentHistory, entriesAllSorted.length, userData.cycleTrackingMode]);
   const helpfulHeroLine = helpfulPatterns[0]?.text ?? null;
 
   const bodyWeatherLines = useMemo(() => getBodyWeatherLines({
