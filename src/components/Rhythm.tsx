@@ -453,16 +453,13 @@ function getEntryMetricValue(entry: CheckInEntry, option: RhythmMetricOption): n
 
 function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption, maxCycles = 4): { rows: CycleStripRow[]; displayDays: number } {
   const starts = detectCycleStarts(sorted);
-  if (starts.length < 2) return { rows: [], displayDays: 28 };
-
   const rows: CycleStripRow[] = [];
-  for (let i = Math.max(0, starts.length - maxCycles - 1); i < starts.length - 1; i++) {
-    const cycleStartISO = starts[i];
-    const nextStartISO = starts[i + 1];
-    const cycleLength = Math.max(1, daysBetween(cycleStartISO, nextStartISO));
+  const todayISO = isoToday();
+
+  const buildRow = (label: string, cycleStartISO: string, cycleEndExclusiveISO: string, cycleLength: number) => {
     const cycleEntries = sorted.filter((entry) => {
       const iso = (entry as any).dateISO;
-      return typeof iso === 'string' && iso >= cycleStartISO && iso < nextStartISO;
+      return typeof iso === 'string' && iso >= cycleStartISO && iso < cycleEndExclusiveISO;
     });
     const activeDays = cycleEntries
       .map((entry) => {
@@ -472,13 +469,38 @@ function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption,
       })
       .filter((day): day is number => typeof day === 'number' && day >= 1 && day <= cycleLength);
     rows.push({
-      label: `Cycle ${i + 1}`,
+      label,
       cycleStartISO,
       cycleLength,
       activeDays,
       firstActiveDay: activeDays.length ? Math.min(...activeDays) : null,
       durationDays: activeDays.length,
     });
+  };
+
+  if (starts.length >= 2) {
+    for (let i = Math.max(0, starts.length - maxCycles - 1); i < starts.length - 1; i++) {
+      const cycleStartISO = starts[i];
+      const nextStartISO = starts[i + 1];
+      const cycleLength = Math.max(1, daysBetween(cycleStartISO, nextStartISO));
+      buildRow(`Cycle ${i + 1}`, cycleStartISO, nextStartISO, cycleLength);
+    }
+  }
+
+  if (starts.length >= 1) {
+    const currentStartISO = starts[starts.length - 1];
+    const currentLength = Math.max(1, daysBetween(currentStartISO, todayISO) + 1);
+    const tomorrow = new Date(todayISO + 'T00:00:00');
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    buildRow('Current cycle', currentStartISO, tomorrow.toISOString().slice(0, 10), currentLength);
+  } else if (sorted.length) {
+    const firstISO = (sorted[0] as any)?.dateISO;
+    if (typeof firstISO === 'string') {
+      const currentLength = Math.max(1, daysBetween(firstISO, todayISO) + 1);
+      const tomorrow = new Date(todayISO + 'T00:00:00');
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      buildRow('Cycle 1', firstISO, tomorrow.toISOString().slice(0, 10), currentLength);
+    }
   }
 
   const recentRows = rows.slice(-maxCycles).reverse();
@@ -675,11 +697,26 @@ export function Rhythm({ userData }: { userData?: UserData }) {
   }, [sorted, selectedTimingMetric]);
   const timingSummary = useMemo(() => {
     const rows = timingChart.rows.filter((row) => row.firstActiveDay != null && row.durationDays > 0);
-    if (!selectedTimingMetric || rows.length < 2) return null;
+    if (!selectedTimingMetric || rows.length < 1) return null;
     const avgStart = Math.round(rows.reduce((sum, row) => sum + (row.firstActiveDay ?? 0), 0) / rows.length);
     const avgDuration = Math.round(rows.reduce((sum, row) => sum + row.durationDays, 0) / rows.length);
     const phaseLabel = phaseFromDay(avgStart, timingChart.displayDays, null).soft.replace(' Phase', '');
     const approxDaysBeforeBleed = Math.max(0, timingChart.displayDays - avgStart + 1);
+
+    if (rows.length === 1) {
+      if (approxDaysBeforeBleed >= 2 && approxDaysBeforeBleed <= 9) {
+        return `Here’s what ${selectedTimingMetric.label.toLowerCase()} looks like so far: it has shown up in your ${phaseLabel.toLowerCase()} window, around ${approxDaysBeforeBleed} day${approxDaysBeforeBleed === 1 ? '' : 's'} before bleeding. As you log more cycles, your usual timing will get clearer.`;
+      }
+      return `Here’s what ${selectedTimingMetric.label.toLowerCase()} looks like so far: it has shown up in your ${phaseLabel.toLowerCase()} window, around day ${avgStart}. As you log more cycles, your usual timing will get clearer.`;
+    }
+
+    if (rows.length === 2) {
+      if (approxDaysBeforeBleed >= 2 && approxDaysBeforeBleed <= 9) {
+        return `${selectedTimingMetric.label} may be starting to cluster in your ${phaseLabel.toLowerCase()} window, around ${approxDaysBeforeBleed} day${approxDaysBeforeBleed === 1 ? '' : 's'} before bleeding, and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
+      }
+      return `${selectedTimingMetric.label} may be starting to cluster in your ${phaseLabel.toLowerCase()} window, around day ${avgStart}, and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
+    }
+
     if (approxDaysBeforeBleed >= 2 && approxDaysBeforeBleed <= 9) {
       return `${selectedTimingMetric.label} usually shows up in your ${phaseLabel.toLowerCase()} window, around ${approxDaysBeforeBleed} day${approxDaysBeforeBleed === 1 ? '' : 's'} before bleeding, and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
     }
@@ -910,7 +947,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
             <div className="eb-icon-frame"><Leaf className="w-5 h-5" /></div>
           </div>
 
-          {selectedTimingMetric && timingChart.rows.length >= 2 ? (
+          {selectedTimingMetric && timingChart.rows.length >= 1 ? (
             <div className="space-y-4">
               {timingSummary ? (
                 <p className="text-neutral-700">{timingSummary}</p>
@@ -999,7 +1036,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-neutral-700">Need at least 2 logged cycles with this symptom to start spotting its usual timing in your rhythm.</p>
+              <p className="text-neutral-700">Here’s what this looks like so far. As you log more cycles, your usual timing will get clearer.</p>
               <div className="flex justify-stretch sm:justify-end">
                 <label className="w-full sm:w-auto">
                   <span className="sr-only">Choose symptom</span>
