@@ -673,7 +673,6 @@ export function Rhythm({ userData }: { userData?: UserData }) {
     if (!selectedTimingMetric) return { rows: [], displayDays: 28 };
     return buildCycleStripRows(sorted, selectedTimingMetric, 4);
   }, [sorted, selectedTimingMetric]);
-  const timingPhaseSegments = useMemo(() => getCycleStripPhaseSegments(timingChart.displayDays), [timingChart.displayDays]);
   const timingSummary = useMemo(() => {
     const rows = timingChart.rows.filter((row) => row.firstActiveDay != null && row.durationDays > 0);
     if (!selectedTimingMetric || rows.length < 2) return null;
@@ -906,6 +905,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
             <div className="min-w-0 flex-1">
               <h3 className="mb-1 font-semibold tracking-tight">When this usually shows up</h3>
               <p className="text-sm text-[rgb(var(--color-text-secondary))]">See where a symptom tends to land in your rhythm across recent cycles.</p>
+              <p className="text-xs text-[rgb(var(--color-text-secondary))] mt-1">Showing your 4 most recent cycles to keep this card readable.</p>
             </div>
             <div className="eb-icon-frame"><Leaf className="w-5 h-5" /></div>
           </div>
@@ -965,7 +965,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
                         })}
                       </div>
                       <div className="mt-2 grid gap-2 text-[11px] text-[rgb(var(--color-text-secondary))] sm:text-xs" style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}>
-                        {timingPhaseSegments.map((segment) => (
+                        {getCycleStripPhaseSegments(row.cycleLength).map((segment) => (
                           <div
                             key={`${row.cycleStartISO}-${segment.key}`}
                             className="text-center font-medium"
