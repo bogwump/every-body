@@ -584,6 +584,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
   // Back-compat: some older wiring passed entries via userData. Prefer store entries.
   const entries: CheckInEntry[] = (Array.isArray((userData as any)?.entries) ? ((userData as any).entries as any[]) : storeEntries) as any;
   const phaseHistory = useMemo(() => getPhaseHistory(), [entries]);
+  const [timingCardOpen, setTimingCardOpen] = useState(false);
 
   const daysLogged = useMemo(() => {
     try {
@@ -958,127 +959,144 @@ export function Rhythm({ userData }: { userData?: UserData }) {
         <PhaseHistoryCard history={phaseHistory} />
 
         <div className="eb-card p-6">
-          <div className="eb-card-header mb-4">
-            <div className="min-w-0 flex-1">
-              <h3 className="mb-1 font-semibold tracking-tight">When this usually shows up</h3>
-              <p className="text-sm text-[rgb(var(--color-text-secondary))]">See where a symptom tends to land in your rhythm across recent cycles.</p>
-              <p className="text-xs text-[rgb(var(--color-text-secondary))] mt-1">Showing your 4 most recent cycles to keep this card readable.</p>
-            </div>
-            <div className="eb-icon-frame"><Leaf className="w-5 h-5" /></div>
-          </div>
-
-          {selectedTimingMetric && timingChart.rows.length >= 1 ? (
-            <div className="space-y-4">
-              {timingSummary ? (
-                <p className="text-neutral-700">{timingSummary}</p>
-              ) : null}
-
-              <div className="space-y-3">
-                {timingChart.rows.map((row) => (
-                  <div key={row.cycleStartISO} className="space-y-2">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <div className="font-medium text-neutral-800">{row.label}</div>
-                      {row.durationDays > 0 ? (
-                        row.isCurrentCycle ? (
-                          <div className="text-[rgb(var(--color-text-secondary))]">Logged on {row.durationDays} day{row.durationDays === 1 ? '' : 's'} so far{row.firstActiveDay ? ` · first on day ${row.firstActiveDay}` : ''}</div>
-                        ) : (
-                          <div className="text-[rgb(var(--color-text-secondary))]">Starts day {row.firstActiveDay} · {row.durationDays} day{row.durationDays === 1 ? '' : 's'}</div>
-                        )
-                      ) : (
-                        <div className="text-[rgb(var(--color-text-secondary))]">{row.isCurrentCycle ? 'Not logged yet this cycle' : 'No logged days this cycle'}</div>
-                      )}
-                    </div>
-                    <div className="rounded-2xl eb-inset-callout p-3">
-                      <div
-                        className="grid gap-1.5"
-                        style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}
-                      >
-                        {Array.from({ length: timingChart.displayDays }, (_, index) => {
-                          const day = index + 1;
-                          const inCycle = day <= row.cycleLength;
-                          const isActive = row.activeDays.includes(day);
-                          return (
-                            <div key={day} className="flex flex-col items-center gap-1">
-                              <div
-                                className={[
-                                  'h-3 w-full rounded-full transition',
-                                  !inCycle
-                                    ? 'bg-black/5'
-                                    : isActive
-                                      ? 'bg-[rgb(var(--color-primary-dark))]'
-                                      : phaseFromDay(day, row.cycleLength, null).key === 'reset'
-                                        ? 'bg-[rgb(var(--color-accent)/0.42)]'
-                                        : phaseFromDay(day, row.cycleLength, null).key === 'rebuilding'
-                                          ? 'bg-[rgb(var(--color-accent)/0.30)]'
-                                          : phaseFromDay(day, row.cycleLength, null).key === 'expressive'
-                                            ? 'bg-[rgb(var(--color-primary)/0.28)]'
-                                            : 'bg-[rgb(var(--color-primary-dark)/0.34)]',
-                                ].join(' ')}
-                                title={`Day ${day}${isActive ? ': active' : ''}`}
-                              />
-                              {((day <= 3) || (day === timingChart.displayDays) || (day % 4 === 0)) ? (
-                                <span className="text-[10px] text-[rgb(var(--color-text-secondary))]">{day}</span>
-                              ) : (
-                                <span className="text-[10px] opacity-0 select-none">0</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-2 grid gap-2 text-[11px] text-[rgb(var(--color-text-secondary))] sm:text-xs" style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}>
-                        {getCycleStripPhaseSegments(row.cycleLength).map((segment) => (
-                          <div
-                            key={`${row.cycleStartISO}-${segment.key}`}
-                            className="text-center font-medium"
-                            style={{ gridColumn: `${segment.start} / ${segment.end + 1}` }}
-                          >
-                            {segment.label}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+          <button
+            type="button"
+            className="w-full text-left"
+            onClick={() => setTimingCardOpen((open) => !open)}
+            aria-expanded={timingCardOpen}
+          >
+            <div className="eb-card-header">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-3">
+                  <ChevronDown className={[
+                    'mt-1 h-4 w-4 shrink-0 text-[rgb(var(--color-text-secondary))] transition-transform',
+                    timingCardOpen ? 'rotate-180' : ''
+                  ].join(' ')} />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="mb-1 font-semibold tracking-tight">When this usually shows up</h3>
+                    <p className="text-sm text-[rgb(var(--color-text-secondary))]">See where a symptom tends to land in your rhythm across recent cycles.</p>
+                    <p className="text-xs text-[rgb(var(--color-text-secondary))] mt-1">Showing your 4 most recent cycles to keep this card readable.</p>
                   </div>
-                ))}
+                </div>
               </div>
+              <div className="eb-icon-frame"><Leaf className="w-5 h-5" /></div>
+            </div>
+          </button>
 
-              <div className="flex justify-stretch sm:justify-end">
-                <label className="w-full sm:w-auto">
-                  <span className="sr-only">Choose symptom</span>
-                  <select
-                    value={selectedTimingMetric?.id ?? ''}
-                    onChange={(event) => setSelectedTimingMetricId(event.target.value)}
-                    className="w-full sm:min-w-[260px] rounded-full border border-[rgb(var(--color-accent)/0.28)] bg-white px-4 py-3 text-sm text-[rgb(var(--color-text))] shadow-sm outline-none transition focus:border-[rgb(var(--color-primary-dark)/0.42)] focus:ring-2 focus:ring-[rgb(var(--color-primary-dark)/0.12)]"
-                  >
-                    {rhythmMetricOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+          {timingCardOpen ? (
+            selectedTimingMetric && timingChart.rows.length >= 1 ? (
+              <div className="mt-6 space-y-4">
+                {timingSummary ? (
+                  <p className="text-neutral-700">{timingSummary}</p>
+                ) : null}
+
+                <div className="space-y-3">
+                  {timingChart.rows.map((row) => (
+                    <div key={row.cycleStartISO} className="space-y-2">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <div className="font-medium text-neutral-800">{row.label}</div>
+                        {row.durationDays > 0 ? (
+                          row.isCurrentCycle ? (
+                            <div className="text-[rgb(var(--color-text-secondary))]">Logged on {row.durationDays} day{row.durationDays === 1 ? '' : 's'} so far{row.firstActiveDay ? ` · first on day ${row.firstActiveDay}` : ''}</div>
+                          ) : (
+                            <div className="text-[rgb(var(--color-text-secondary))]">Starts day {row.firstActiveDay} · {row.durationDays} day{row.durationDays === 1 ? '' : 's'}</div>
+                          )
+                        ) : (
+                          <div className="text-[rgb(var(--color-text-secondary))]">{row.isCurrentCycle ? 'Not logged yet this cycle' : 'No logged days this cycle'}</div>
+                        )}
+                      </div>
+                      <div className="rounded-2xl eb-inset-callout p-3">
+                        <div
+                          className="grid gap-1.5"
+                          style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}
+                        >
+                          {Array.from({ length: timingChart.displayDays }, (_, index) => {
+                            const day = index + 1;
+                            const inCycle = day <= row.cycleLength;
+                            const isActive = row.activeDays.includes(day);
+                            return (
+                              <div key={day} className="flex flex-col items-center gap-1">
+                                <div
+                                  className={[
+                                    'h-3 w-full rounded-full transition',
+                                    !inCycle
+                                      ? 'bg-black/5'
+                                      : isActive
+                                        ? 'bg-[rgb(var(--color-primary-dark))]'
+                                        : phaseFromDay(day, row.cycleLength, null).key === 'reset'
+                                          ? 'bg-[rgb(var(--color-accent)/0.42)]'
+                                          : phaseFromDay(day, row.cycleLength, null).key === 'rebuilding'
+                                            ? 'bg-[rgb(var(--color-accent)/0.30)]'
+                                            : phaseFromDay(day, row.cycleLength, null).key === 'expressive'
+                                              ? 'bg-[rgb(var(--color-primary)/0.28)]'
+                                              : 'bg-[rgb(var(--color-primary-dark)/0.34)]',
+                                  ].join(' ')}
+                                  title={`Day ${day}${isActive ? ': active' : ''}`}
+                                />
+                                {((day <= 3) || (day === timingChart.displayDays) || (day % 4 === 0)) ? (
+                                  <span className="text-[10px] text-[rgb(var(--color-text-secondary))]">{day}</span>
+                                ) : (
+                                  <span className="text-[10px] opacity-0 select-none">0</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2 grid gap-2 text-[11px] text-[rgb(var(--color-text-secondary))] sm:text-xs" style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}>
+                          {getCycleStripPhaseSegments(row.cycleLength).map((segment) => (
+                            <div
+                              key={`${row.cycleStartISO}-${segment.key}`}
+                              className="text-center font-medium"
+                              style={{ gridColumn: `${segment.start} / ${segment.end + 1}` }}
+                            >
+                              {segment.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-stretch sm:justify-end">
+                  <label className="w-full sm:w-auto">
+                    <span className="sr-only">Choose symptom</span>
+                    <select
+                      value={selectedTimingMetric?.id ?? ''}
+                      onChange={(event) => setSelectedTimingMetricId(event.target.value)}
+                      className="w-full sm:min-w-[260px] rounded-full border border-[rgb(var(--color-accent)/0.28)] bg-white px-4 py-3 text-sm text-[rgb(var(--color-text))] shadow-sm outline-none transition focus:border-[rgb(var(--color-primary-dark)/0.42)] focus:ring-2 focus:ring-[rgb(var(--color-primary-dark)/0.12)]"
+                    >
+                      {rhythmMetricOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-neutral-700">Here’s what this looks like so far. As you log more cycles, your usual timing will get clearer.</p>
-              <div className="flex justify-stretch sm:justify-end">
-                <label className="w-full sm:w-auto">
-                  <span className="sr-only">Choose symptom</span>
-                  <select
-                    value={selectedTimingMetric?.id ?? ''}
-                    onChange={(event) => setSelectedTimingMetricId(event.target.value)}
-                    className="w-full sm:min-w-[260px] rounded-full border border-[rgb(var(--color-accent)/0.28)] bg-white px-4 py-3 text-sm text-[rgb(var(--color-text))] shadow-sm outline-none transition focus:border-[rgb(var(--color-primary-dark)/0.42)] focus:ring-2 focus:ring-[rgb(var(--color-primary-dark)/0.12)]"
-                  >
-                    {rhythmMetricOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            ) : (
+              <div className="mt-6 space-y-3">
+                <p className="text-neutral-700">Here’s what this looks like so far. As you log more cycles, your usual timing will get clearer.</p>
+                <div className="flex justify-stretch sm:justify-end">
+                  <label className="w-full sm:w-auto">
+                    <span className="sr-only">Choose symptom</span>
+                    <select
+                      value={selectedTimingMetric?.id ?? ''}
+                      onChange={(event) => setSelectedTimingMetricId(event.target.value)}
+                      className="w-full sm:min-w-[260px] rounded-full border border-[rgb(var(--color-accent)/0.28)] bg-white px-4 py-3 text-sm text-[rgb(var(--color-text))] shadow-sm outline-none transition focus:border-[rgb(var(--color-primary-dark)/0.42)] focus:ring-2 focus:ring-[rgb(var(--color-primary-dark)/0.12)]"
+                    >
+                      {rhythmMetricOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          ) : null}
         </div>
 
         {/* What usually comes next */}
