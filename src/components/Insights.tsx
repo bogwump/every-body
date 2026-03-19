@@ -1023,6 +1023,14 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   // Keep them identical so we do not accidentally change behaviour.
   const allMetricKeys = selectableKeys;
 
+  const allTrackedMetricKeys: MetricKey[] = useMemo(() => {
+    const enabledBuiltIns = Array.from(new Set((userData.enabledModules ?? []) as SymptomKey[]));
+    const enabledCustoms = (userData.customSymptoms ?? [])
+      .filter((s) => s && s.enabled)
+      .map((s) => (`custom:${s.id}` as MetricKey));
+    return Array.from(new Set<MetricKey>(['mood', ...enabledBuiltIns, ...enabledCustoms]));
+  }, [userData.enabledModules, userData.customSymptoms]);
+
 
   const [selected, setSelected] = useState<Array<MetricKey>>(() => {
     const defaultKeys: Array<MetricKey> = ['mood', 'sleep', 'energy', 'stress'];
@@ -1130,7 +1138,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     // Scan across all currently tracked symptoms in the active Insights timeframe,
     // not just the metrics chosen for the other charts.
     // Require at least 2 logged entries so one random score does not dominate.
-    const items = selectableKeys.map((k) => {
+    const items = allTrackedMetricKeys.map((k) => {
       let count = 0;
       let loggedCount = 0;
       entriesSorted.forEach((e) => {
@@ -1144,7 +1152,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
     items.sort((a, b) => (b.count - a.count) || (b.loggedCount - a.loggedCount));
     return items.filter((x) => x.loggedCount >= 2 && x.count > 0).slice(0, 4);
-  }, [entriesSorted, selectableKeys, userData]);
+  }, [allTrackedMetricKeys, entriesSorted, userData]);
 
   // --- Highlights / findings ---
   const minDaysForDeep = 7;
@@ -1941,8 +1949,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [entriesSorted, selected, weekdayMetric]);
 
   // --- Cycle phase chart (restored) ---
-  type PhaseMetric = SymptomKey | 'mood';
-  const PHASE_GRAPH_ALLOWLIST: PhaseMetric[] = useMemo(
+  type PhaseMetric = MetricKey;
+  const PHASE_GRAPH_ALLOWLIST: MetricKey[] = useMemo(
     () => [
       'mood',
       'energy',
@@ -1965,11 +1973,17 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   );
 
   const PHASE_METRICS: Array<{ key: PhaseMetric; label: string }> = useMemo(() => {
-    const enabledSet = new Set((allMetricKeys as MetricKey[]).map((key) => String(key)));
-    return PHASE_GRAPH_ALLOWLIST.filter((key) => key === 'mood' || enabledSet.has(String(key))).map((key) => ({
-      key,
+    const builtInAllowed = PHASE_GRAPH_ALLOWLIST.filter((key) => key === 'mood' || allMetricKeys.includes(key));
+    const enabledCustoms = (userData.customSymptoms ?? [])
+      .filter((s) => s && s.enabled)
+      .map((s) => ({ key: `custom:${s.id}` as PhaseMetric, label: s.label }));
+
+    const builtInOptions = builtInAllowed.map((key) => ({
+      key: key as PhaseMetric,
       label: labelFor(key as MetricKey, userData),
     }));
+
+    return [...builtInOptions, ...enabledCustoms];
   }, [PHASE_GRAPH_ALLOWLIST, allMetricKeys, userData]);
 
   const defaultPhaseMetrics = useMemo<[PhaseMetric, PhaseMetric, PhaseMetric]>(() => {
@@ -5656,8 +5670,8 @@ const tryNextPrompts = useMemo(() => {
           <div className="mt-2 text-sm eb-muted">We connect across missed days so you still see the story.</div>
         </div>
       {/* Distribution + high symptom days */}
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="eb-card">
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0 overflow-x-hidden">
+        <div className="eb-card min-w-0 overflow-hidden">
           <div className="eb-card-header items-start gap-3 flex-col sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
               <div className="eb-card-title">Symptom distribution</div>
@@ -5713,7 +5727,7 @@ const tryNextPrompts = useMemo(() => {
           </div>
         </div>
 
-        <div className="eb-card">
+        <div className="eb-card min-w-0 overflow-hidden">
           <div className="eb-card-header">
             <div>
               <div className="eb-card-title">Notable intensity days</div>
@@ -5743,7 +5757,7 @@ const tryNextPrompts = useMemo(() => {
       </div>
 
       {/* Symptoms by cycle phase (restored) */}
-      <div className="eb-card">
+      <div className="eb-card min-w-0 overflow-hidden">
         <div className="eb-card-header">
           <div>
             <div className="eb-card-title">Symptoms by cycle phase</div>
@@ -5766,8 +5780,9 @@ const tryNextPrompts = useMemo(() => {
           </div>
         ) : (
           <>
-            <div className="mt-3">
-              <ResponsiveContainer width="100%" height={300}>
+            <div className="mt-3 w-full min-w-0 overflow-hidden">
+              <div className="w-full min-w-0 overflow-hidden" style={{ height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cycleData} margin={{ left: 6, right: 16, top: 10, bottom: 6 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
                   <XAxis dataKey="phase" stroke="rgba(0,0,0,0.45)" fontSize={12} />
@@ -5796,6 +5811,7 @@ const tryNextPrompts = useMemo(() => {
                   <Bar dataKey="m2" fill={phaseMetricColor(2)} radius={[10, 10, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
 
               <div className="mt-4 flex flex-wrap gap-3 justify-center text-sm">
                 {[0, 1, 2].map((i) => (
@@ -5808,11 +5824,11 @@ const tryNextPrompts = useMemo(() => {
 
               <div className="mt-6">
                 <div className="text-sm eb-muted mb-2">Pick 3 symptoms to show</div>
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-3 min-w-0 overflow-hidden">
                   {[0, 1, 2].map((i) => (
                     <select
                       key={i}
-                      className="eb-input !py-2 !h-10"
+                      className="eb-input !py-2 !h-10 w-full min-w-0"
                       value={phaseMetrics[i as 0 | 1 | 2]}
                       onChange={(e) => setPhaseMetricAt(i as 0 | 1 | 2, e.target.value as any)}
                       style={{ borderColor: phaseMetricColor(i as any) }}
@@ -5835,7 +5851,7 @@ const tryNextPrompts = useMemo(() => {
       {/* Relationship explorer removed */}
 
       {/* Weekday pattern */}
-      <div className="eb-card">
+      <div className="eb-card min-w-0 overflow-hidden">
         <div className="eb-card-header">
           <div className="min-w-0 flex-1">
             <div className="eb-card-title">Your week in pattern</div>
