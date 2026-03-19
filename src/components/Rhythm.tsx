@@ -7,6 +7,7 @@ import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../l
 import { getCycleTrustModel } from '../lib/cycleTrust';
 import { getExperimentLearnings, getWhatsComingPredictions } from '../lib/rhythmPredictions';
 import { getPhaseHistory } from '../lib/phaseHistory';
+import { getRhythmPersonalPhaseSentence } from '../lib/rhythmCopy';
 import { getRhythmPhaseState } from '../lib/phaseChange';
 import type { CheckInEntry, SymptomKey } from '../types';
 import type { UserData } from '../types';
@@ -33,7 +34,7 @@ const phaseContent: Record<PhaseKey, PhaseContent> = {
     heroBody:
       'This is your Reset window. Many people feel more inward, more tired, or a bit tender. If you’re craving comfort and simplicity, that makes sense here.',
     lookLikeIntro:
-      'These can be common signs in Reset. Over time, we’ll swap more of these for patterns that are uniquely yours.',
+      'These can be common signs in Reset. As you log more, we’ll get a clearer picture of how this phase tends to feel for you.',
     lookLikeBullets: [
       'More sleep need, slower mornings, or lower social energy',
       'Cramps, aches, headaches, or feeling a bit more sensitive',
@@ -60,7 +61,7 @@ const phaseContent: Record<PhaseKey, PhaseContent> = {
     heroBody:
       'This is your Rebuilding window. Many people notice energy, motivation, and mood begin to lift. It can feel like things are slowly coming back online.',
     lookLikeIntro:
-      'These can be common signs in Rebuilding. Over time, we’ll swap more of these for patterns that are uniquely yours.',
+      'These can be common signs in Rebuilding. As you log more, we’ll get a clearer picture of how this phase tends to feel for you.',
     lookLikeBullets: [
       'A steadier mood, clearer thinking, or a little more drive',
       'Energy returning gradually (not always in a straight line)',
@@ -87,7 +88,7 @@ const phaseContent: Record<PhaseKey, PhaseContent> = {
     heroBody:
       'This is your Expressive window. Many people feel more outward, more social, and a bit more energised. It can be a strong time for connection and getting things done.',
     lookLikeIntro:
-      'These can be common signs in Expressive. Over time, we’ll swap more of these for patterns that are uniquely yours.',
+      'These can be common signs in Expressive. As you log more, we’ll get a clearer picture of how this phase tends to feel for you.',
     lookLikeBullets: [
       'More confidence, spark, or desire for connection',
       'Energy and motivation peaking (or feeling more stable)',
@@ -115,7 +116,7 @@ const phaseContent: Record<PhaseKey, PhaseContent> = {
     heroBody:
       'This is your Protective window. Many people feel more inward, more sensitive, and benefit from softer pacing. It’s a good time to protect energy and be a little gentler with yourself.',
     lookLikeIntro:
-      'These can be common signs in Protective. Over time, we’ll swap more of these for patterns that are uniquely yours.',
+      'These can be common signs in Protective. As you log more, we’ll get a clearer picture of how this phase tends to feel for you.',
     lookLikeBullets: [
       'You may need a bit more sleep or downtime than usual',
       'Social energy can dip, even if you still want connection',
@@ -548,6 +549,14 @@ export function Rhythm({ userData }: { userData?: UserData }) {
   const nextPhasePlanning = getNextPhasePlanningCopy(computed.nextPhaseKey);
   const softMeta = softPhaseMeta(phaseKey);
 
+  const personalisedLookLikeLine = useMemo(() => {
+    try {
+      return getRhythmPersonalPhaseSentence(sorted as any, ((userData ?? ({} as any)) as UserData), phaseKey);
+    } catch {
+      return null;
+    }
+  }, [sorted, userData, phaseKey]);
+
   const rhythmStatusNote = useMemo(() => {
     if (userData?.cycleTrackingMode === 'cycle' && !cycleTrust.hasCycleAnchor) return 'Still learning your cycle. Log your first period or mark a cycle start in Calendar → Edit cycle before phase timing appears here.';
     const gapMode = (computed.phaseState as any)?.gapMode as string | undefined;
@@ -702,6 +711,10 @@ export function Rhythm({ userData }: { userData?: UserData }) {
               );
             })}
               </ul>
+
+            {personalisedLookLikeLine ? (
+              <p className="text-neutral-800 leading-6">{personalisedLookLikeLine}</p>
+            ) : null}
 
             <p className="text-neutral-700">{content.lookLikeDuration}</p>
           </div>

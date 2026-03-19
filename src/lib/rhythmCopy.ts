@@ -4,6 +4,7 @@ import { generateCandidateInsights, rankInsights, scoreInsights } from './insigh
 import { getExperimentsForSignal, getHelpfulPatternsForMetrics } from './experimentLearning';
 import { downgradeConfidence, normaliseConfidence } from './confidenceCopy';
 import { getSymptomCoverage } from './symptomCoverage';
+import { getMetricDisplayLabel, getMetricPolarity } from './metricSemantics';
 
 export type RhythmPhaseKey = 'reset' | 'rebuilding' | 'expressive' | 'protective';
 
@@ -184,6 +185,35 @@ export function getRhythmRelevantSignals(
   return out;
 }
 
+
+
+function getPhasePersonalSentence(signal: InsightSignal, userData: UserData, phaseKey: RhythmPhaseKey): string | null {
+  const metric = signal.metrics[0];
+  if (!metric) return null;
+
+  const label = getMetricDisplayLabel(metric, userData);
+  const polarity = getMetricPolarity(metric);
+  const phaseLabel = phaseKey === 'reset' ? 'Reset' : phaseKey === 'rebuilding' ? 'Rebuilding' : phaseKey === 'expressive' ? 'Expressive' : 'Protective';
+
+  if (signal.type !== 'phase_shift' && signal.type !== 'trend_shift') return null;
+  if (signal.confidence === 'very_low' || signal.confidence === 'low') return null;
+  if ((signal.sampleSize ?? 0) < 4) return null;
+
+  if (signal.direction === 'higher') {
+    if (polarity === 'positive') return `For you, ${phaseLabel} has sometimes come with higher ${label.toLowerCase()} than usual.`;
+    if (polarity === 'burden') return `For you, ${phaseLabel} has sometimes come with more noticeable ${label.toLowerCase()} than usual.`;
+    return `For you, ${phaseLabel} has sometimes come with stronger ${label.toLowerCase()} than usual.`;
+  }
+
+  if (signal.direction === 'lower') {
+    if (polarity === 'positive') return `For you, ${phaseLabel} has sometimes come with lower ${label.toLowerCase()} than usual.`;
+    if (polarity === 'burden') return `For you, ${phaseLabel} has sometimes come with less noticeable ${label.toLowerCase()} than usual.`;
+    return `For you, ${phaseLabel} has sometimes come with lower ${label.toLowerCase()} than usual.`;
+  }
+
+  return null;
+}
+
 export function getRhythmPatternLines(
   entries: CheckInEntry[],
   userData: UserData,
@@ -250,4 +280,27 @@ export function getRhythmLowDataPatternLines(): string[] {
 
 export function getRhythmLowDataNudge(): string {
   return 'Focus on noticing how you feel today. Small observations now help build clearer insights later.';
+}
+
+
+export function getRhythmPersonalPhaseSentence(
+  entries: CheckInEntry[],
+  userData: UserData,
+  phaseKey: RhythmPhaseKey,
+): string | null {
+  const signals = getRhythmRelevantSignals(entries, userData, phaseKey, 8);
+  const ranked = signals
+    .filter((signal) => signal.type === 'phase_shift' || signal.type === 'trend_shift')
+    .sort((a, b) => {
+      const typeBonusA = a.type === 'phase_shift' ? 20 : 0;
+      const typeBonusB = b.type === 'phase_shift' ? 20 : 0;
+      return (b.score + typeBonusB + (b.sampleSize ?? 0) * 2) - (a.score + typeBonusA + (a.sampleSize ?? 0) * 2);
+    });
+
+  for (const signal of ranked) {
+    const sentence = getPhasePersonalSentence(signal, userData, phaseKey);
+    if (sentence) return sentence;
+  }
+
+  return null;
 }
