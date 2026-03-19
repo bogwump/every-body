@@ -224,6 +224,107 @@ function Sparkline({ values }: { values: Array<number | null | undefined> }) {
   );
 }
 
+
+function getExperimentMetricSeries(
+  entries: CheckInEntry[],
+  metric: MetricKey,
+  beforeStartISO: string,
+  beforeEndISO: string,
+  duringStartISO: string,
+  duringEndISO: string,
+): { beforeValues: number[]; duringValues: number[] } {
+  const beforeValues: number[] = [];
+  const duringValues: number[] = [];
+  for (const entry of entries) {
+    const iso = String(entry?.dateISO || '');
+    if (!iso) continue;
+    const value = valueForMetric(entry, metric);
+    if (typeof value !== 'number') continue;
+    if (iso >= beforeStartISO && iso <= beforeEndISO) beforeValues.push(value);
+    if (iso >= duringStartISO && iso <= duringEndISO) duringValues.push(value);
+  }
+  return { beforeValues, duringValues };
+}
+
+function getExperimentDeltaSummary(metric: MetricKey, delta: number | null): { arrow: string; label: string; toneClass: string } {
+  const polarity = getMetricPolarity(metric as any);
+  if (delta == null || Math.abs(delta) < 0.35) {
+    return {
+      arrow: '→',
+      label: 'Flat so far',
+      toneClass: 'text-[rgb(var(--color-text))]',
+    };
+  }
+
+  const better = polarity === 'positive' ? delta > 0 : delta < 0;
+  if (better) {
+    return {
+      arrow: '↗',
+      label: Math.abs(delta) >= 1.2 ? 'Clearly shifting' : 'Gently shifting',
+      toneClass: 'text-[rgb(var(--color-primary-dark))]',
+    };
+  }
+
+  return {
+    arrow: '↘',
+    label: Math.abs(delta) >= 1.2 ? 'Leaning the other way' : 'Mixed so far',
+    toneClass: 'text-[rgb(var(--color-text))]',
+  };
+}
+
+function ExperimentMiniTrend({
+  beforeValues,
+  duringValues,
+}: {
+  beforeValues: number[];
+  duringValues: number[];
+}) {
+  const values = [...beforeValues, ...duringValues];
+  if (values.length < 2) {
+    return <div className="h-8 w-[92px] rounded-full bg-black/5" aria-hidden="true" />;
+  }
+
+  const w = 92;
+  const h = 28;
+  const pad = 2;
+  const min = 0;
+  const max = 10;
+  const xStep = (w - pad * 2) / Math.max(1, values.length - 1);
+  const points = values.map((v, i) => {
+    const x = pad + i * xStep;
+    const y = pad + (h - pad * 2) * (1 - (v - min) / (max - min));
+    return { x, y };
+  });
+  const path = points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ');
+  const dividerIndex = beforeValues.length > 0 ? beforeValues.length - 1 : -1;
+  const dividerX = dividerIndex >= 0 && dividerIndex < points.length ? points[dividerIndex].x : null;
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" className="shrink-0">
+      <path d={path} fill="none" stroke="rgb(var(--color-primary))" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
+      {dividerX != null ? (
+        <line
+          x1={dividerX}
+          x2={dividerX}
+          y1={pad}
+          y2={h - pad}
+          stroke="rgb(var(--color-text-secondary))"
+          strokeDasharray="2 2"
+          opacity={0.35}
+        />
+      ) : null}
+      {points.length ? (
+        <circle
+          cx={points[points.length - 1].x}
+          cy={points[points.length - 1].y}
+          r={2.4}
+          fill="rgb(var(--color-primary-dark))"
+        />
+      ) : null}
+    </svg>
+  );
+}
+
 function labelFor(key: MetricKey, user?: UserData): string {
   const map: Record<string, string> = {
     mood: 'Overall mood',
@@ -3659,7 +3760,12 @@ const tryNextPrompts = useMemo(() => {
   const lastOutcomeNoteExperimentIdRef = useRef<string | null>(null);
   const [showAllExperimentMetrics, setShowAllExperimentMetrics] = useState(false);
   const [experimentCompareMode, setExperimentCompareMode] = useState<'quick' | 'usual'>('quick');
+  const [expandedExperimentMetrics, setExpandedExperimentMetrics] = useState<Record<string, boolean>>({});
   const [whyOpen, setWhyOpen] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setExpandedExperimentMetrics({});
+  }, [experimentCompareMode, experimentStatus?.ex?.id, experimentStatus?.done]);
 
   const buildExperimentDigest = (cmp: any) => {
     if (!cmp) return undefined;
@@ -3925,7 +4031,6 @@ const tryNextPrompts = useMemo(() => {
     if (!experimentStatus) return null;
     const digest = (experimentStatus.ex as any)?.outcome?.digest;
 
-    // Normalise digest (supports old + new shapes)
     const digestQuickRaw = digest?.quick ? digest.quick : digest;
     const digestUsualRaw = digest?.usual;
 
@@ -3970,16 +4075,11 @@ const tryNextPrompts = useMemo(() => {
     const usualUsed = Number(((usual as any)?.baselineDaysUsed ?? 0));
     const hasUsual = Boolean(usual) && usualUsed >= usualNeed;
 
-    // Choose which baseline is currently shown
     const cmp = experimentCompareMode === 'usual' && hasUsual ? (usual as any) : (quick as any);
-    if (!cmp) return null;
+    if (!cmp || !Array.isArray(cmp.metrics) || !cmp.metrics.length) return null;
 
     const title = mode === 'progress' ? 'So far' : 'Before vs during';
-    const metricsWithAnyData = Array.isArray(cmp.metrics)
-      ? cmp.metrics.filter((m: any) => (Number(m?.before?.count ?? 0) > 0) || (Number(m?.during?.count ?? 0) > 0))
-      : [];
-    const canShowConclusionSummary = mode === 'conclusion' && metricsWithAnyData.length > 0;
-
+    const metricsWithAnyData = cmp.metrics.filter((m: any) => (Number(m?.before?.count ?? 0) > 0) || (Number(m?.during?.count ?? 0) > 0));
     const compareLabel =
       experimentCompareMode === 'usual' && hasUsual
         ? `Compared with your usual pattern (last ${Number((cmp as any).baselineDaysTarget ?? 30)} days)`
@@ -3994,44 +4094,40 @@ const tryNextPrompts = useMemo(() => {
           ? `Usual baseline: ${fmtDateUi(cmp.window.beforeStartISO, true)} → ${fmtDateUi(cmp.window.beforeEndISO, true)} (${Number((cmp as any).baselineDaysUsed ?? cmp.beforeDaysWithAny)} day(s)) · During: ${fmtDateUi(cmp.window.duringStartISO, true)} → ${fmtDateUi(cmp.window.duringEndISO, true)}`
           : `Before: ${fmtDateUi(cmp.window.beforeStartISO, mode === 'conclusion')} → ${fmtDateUi(cmp.window.beforeEndISO, mode === 'conclusion')} · During: ${fmtDateUi(cmp.window.duringStartISO, mode === 'conclusion')} → ${fmtDateUi(cmp.window.duringEndISO, mode === 'conclusion')}`;
 
-    if (!cmp.metrics.length) return null;
-
-    // If there isn't enough data, still show a conclusion summary once the experiment is finished.
-    if (!cmp.enoughData && !canShowConclusionSummary) {
+    if (!cmp.enoughData && !metricsWithAnyData.length) {
       return (
         <div className="mt-4 eb-inset rounded-2xl p-4">
           <div className="text-sm font-semibold">{title}</div>
           <div className="mt-1 text-sm eb-muted">{subtitle}</div>
-
-        <div className="mt-2 flex flex-col items-start gap-2">
-          <span className="text-xs eb-muted">Compared with:</span>
-          <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <button
-              type="button"
-              className="eb-choice-pill"
-              data-selected={experimentCompareMode === 'quick' ? 'true' : undefined}
-              onClick={() => setExperimentCompareMode('quick')}
-            >
-              Just before
-            </button>
-            <button
-              type="button"
-              className="eb-choice-pill"
-              data-selected={experimentCompareMode === 'usual' && hasUsual ? 'true' : undefined}
-              disabled={!hasUsual}
-              aria-disabled={!hasUsual}
-              onClick={() => {
-                if (hasUsual) setExperimentCompareMode('usual');
-              }}
-              title={hasUsual ? 'Compare with your usual pattern' : `Needs ${usualNeed} baseline days before you started (you have ${usualUsed}).`}
-            >
-              Usual month
-            </button>
+          <div className="mt-2 flex flex-col items-start gap-2">
+            <span className="text-xs eb-muted">Compared with:</span>
+            <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <button
+                type="button"
+                className="eb-choice-pill"
+                data-selected={experimentCompareMode === 'quick' ? 'true' : undefined}
+                onClick={() => setExperimentCompareMode('quick')}
+              >
+                Just before
+              </button>
+              <button
+                type="button"
+                className="eb-choice-pill"
+                data-selected={experimentCompareMode === 'usual' && hasUsual ? 'true' : undefined}
+                disabled={!hasUsual}
+                aria-disabled={!hasUsual}
+                onClick={() => {
+                  if (hasUsual) setExperimentCompareMode('usual');
+                }}
+                title={hasUsual ? 'Compare with your usual pattern' : `Needs ${usualNeed} baseline days before you started (you have ${usualUsed}).`}
+              >
+                Usual month
+              </button>
+            </div>
+            <span className="text-xs eb-muted sm:ml-1">{compareLabel}</span>
           </div>
-          <span className="text-xs eb-muted sm:ml-1">{compareLabel}</span>
-        </div>
           <div className="mt-3 text-sm eb-muted">
-            {experimentCompareMode === 'usual' && !hasUsual ? `Still early days. Usual month unlocks after ${usualNeed} baseline day(s) before you started (you have ${usualUsed}).` : 'Still early days. Keep logging and we’ll firm this up after a few more days.'}
+            {experimentCompareMode === 'usual' && !hasUsual ? `Still early days. Usual month unlocks after ${usualNeed} baseline day(s) before you started (you have ${usualUsed}).` : 'Still early days. Keep logging and your experiment view will start to take shape here.'}
           </div>
         </div>
       );
@@ -4044,13 +4140,13 @@ const tryNextPrompts = useMemo(() => {
       return `${s}${d.toFixed(1)}`;
     };
 
-    const visibleMetrics = showAllExperimentMetrics ? cmp.metrics : cmp.metrics.slice(0, 3);
+    const visibleMetrics = (showAllExperimentMetrics ? cmp.metrics : cmp.metrics.slice(0, 4)).filter((m: any) => (Number(m?.before?.count ?? 0) > 0) || (Number(m?.during?.count ?? 0) > 0));
     const confidenceText =
-      cmp.duringDaysWithAny < 3
-        ? `Low confidence (only ${cmp.duringDaysWithAny} day(s) logged so far)`
-        : cmp.duringDaysWithAny < 5
-          ? `Medium confidence (only ${cmp.duringDaysWithAny} day(s) logged so far)`
-          : 'Confidence improves as you log more days.';
+      cmp.duringDaysWithAny < 2
+        ? `Very early view. A couple more check-ins will make this clearer.`
+        : cmp.duringDaysWithAny < 4
+          ? `Early view. This is enough to spot direction, but it is still settling.`
+          : 'A steadier read now. Keep going and the pattern should become clearer.';
 
     return (
       <div className="mt-4 eb-inset rounded-2xl p-4">
@@ -4084,92 +4180,93 @@ const tryNextPrompts = useMemo(() => {
           </div>
           <span className="text-xs eb-muted sm:ml-1">{compareLabel}</span>
         </div>
+
         <div className="mt-2 text-xs eb-muted">
-          {canShowConclusionSummary && !cmp.enoughData
-            ? `A light read only. ${confidenceText}`
+          {experimentCompareMode === 'usual' && !hasUsual
+            ? `Usual month unlocks after ${usualNeed} baseline day(s) before you started. Right now you have ${usualUsed}.`
             : confidenceText}
         </div>
 
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-          {visibleMetrics.slice(0, 5).map((m) => {
+        <div className="mt-3 space-y-2">
+          {visibleMetrics.map((m: any) => {
+            const metricKey = String(m.key);
+            const expanded = Boolean(expandedExperimentMetrics[metricKey]);
+            const trend = getExperimentMetricSeries(
+              entriesAllSorted,
+              m.key as MetricKey,
+              String(cmp.window.beforeStartISO),
+              String(cmp.window.beforeEndISO),
+              String(cmp.window.duringStartISO),
+              String(cmp.window.duringEndISO),
+            );
+            const summary = getExperimentDeltaSummary(m.key as MetricKey, typeof m.delta === 'number' ? m.delta : null);
+            const hasComparableData = Number(m.before.count) > 0 && Number(m.during.count) > 0;
             const hasAnyData = Number(m.before.count) > 0 || Number(m.during.count) > 0;
-            const hasComparableData = (Number(m.before.count) > 0 && Number(m.during.count) > 0);
-            const beforeValue = typeof m.before.avg === 'number' ? Math.max(0, Math.min(10, m.before.avg)) : null;
-            const duringValue = typeof m.during.avg === 'number' ? Math.max(0, Math.min(10, m.during.avg)) : null;
-            return (
-            <div key={String(m.key)} className="eb-inset-soft rounded-2xl p-4">
-              <div className="text-sm font-semibold">{labelFor(m.key as any, userData)}</div>
-              {hasComparableData ? (
-                <>
-                  <div className="mt-2 text-sm eb-muted">
-                    Before: <b>{fmt(m.before.avg)}</b>/10 · During: <b>{fmt(m.during.avg)}</b>/10
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] eb-muted"><span>Before</span><span>{fmt(m.before.avg)}/10</span></div>
-                      <div className="mt-1 h-2 rounded-full bg-black/6 overflow-hidden">
-                        <div className="h-full rounded-full bg-black/20" style={{ width: `${((beforeValue ?? 0) / 10) * 100}%` }} />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] eb-muted"><span>During</span><span>{fmt(m.during.avg)}/10</span></div>
-                      <div className="mt-1 h-2 rounded-full bg-black/6 overflow-hidden">
-                        <div className="h-full rounded-full bg-[rgb(var(--color-primary))]" style={{ width: `${((duringValue ?? 0) / 10) * 100}%` }} />
-                      </div>
-                    </div>
-                  </div>
 
-                  {m.delta != null ? (
+            return (
+              <div key={metricKey} className="eb-inset-soft overflow-hidden rounded-2xl border border-black/6">
+                <button
+                  type="button"
+                  className="flex w-full min-w-0 items-center gap-3 px-3 py-3 text-left"
+                  onClick={() => setExpandedExperimentMetrics((current) => ({ ...current, [metricKey]: !current[metricKey] }))}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold">{labelFor(m.key as any, userData)}</div>
+                    <div className="mt-1 flex items-center gap-2 text-xs eb-muted">
+                      <ExperimentMiniTrend beforeValues={trend.beforeValues} duringValues={trend.duringValues} />
+                      <span className="truncate">{hasAnyData ? `${m.before.count} before · ${m.during.count} during` : 'Not enough data yet'}</span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className={`text-sm font-semibold ${summary.toneClass}`}>
+                      <span className="mr-1">{summary.arrow}</span>
+                      {summary.label}
+                    </div>
+                    <div className="mt-1 flex items-center justify-end gap-1 text-[11px] eb-muted">
+                      <span>{expanded ? 'Hide detail' : 'See detail'}</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                    </div>
+                  </div>
+                </button>
+
+                {expanded ? (
+                  <div className="border-t border-black/6 px-3 pb-3 pt-3">
+                    {hasComparableData ? (
+                      <>
+                        <div className="text-sm eb-muted">
+                          Baseline <b>{fmt(m.before.avg)}</b> · During <b>{fmt(m.during.avg)}</b> · Change <b>{fmtDelta(m.delta)}</b>
+                        </div>
+                        <div className="mt-2 text-xs eb-muted">
+                          {Math.abs(Number(m.delta ?? 0)) < 0.35
+                            ? 'This has stayed fairly steady across the experiment so far.'
+                            : summary.label === 'Leaning the other way'
+                              ? 'This is moving away from the direction you were hoping for, so it may be worth watching for another day or two before deciding what it means.'
+                              : summary.label === 'Mixed so far'
+                                ? 'There is a hint of movement, but it is still a bit mixed.'
+                                : 'There is a gentle shift here already.'}
+                        </div>
+                      </>
+                    ) : hasAnyData ? (
+                      <div className="text-sm eb-muted">
+                        A light read only so far. Keep logging and this should fill out soon.
+                      </div>
+                    ) : (
+                      <div className="text-sm eb-muted">
+                        Not enough data for this measure yet.
+                      </div>
+                    )}
+
                     <div className="mt-2 text-xs eb-muted">
-                      {Math.abs(m.delta) < 0.4
-                        ? 'This stayed fairly steady across the experiment.'
-                        : m.delta > 0
-                          ? `During was ${fmtDelta(m.delta)} points higher.`
-                          : `During was ${fmtDelta(m.delta)} points lower.`}
-                    </div>
-                  ) : null}
-                  <div className="mt-2 text-xs eb-muted">
-                    Data: {m.before.count} baseline points · {m.during.count} during points
-                  </div>
-                </>
-              ) : hasAnyData ? (
-                <>
-                  <div className="mt-2 text-sm eb-muted">
-                    We only caught a light read for this one, so treat it as directional rather than firm.
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] eb-muted"><span>Before</span><span>{fmt(m.before.avg)}/10</span></div>
-                      <div className="mt-1 h-2 rounded-full bg-black/6 overflow-hidden">
-                        <div className="h-full rounded-full bg-black/20" style={{ width: `${((beforeValue ?? 0) / 10) * 100}%` }} />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] eb-muted"><span>During</span><span>{fmt(m.during.avg)}/10</span></div>
-                      <div className="mt-1 h-2 rounded-full bg-black/6 overflow-hidden">
-                        <div className="h-full rounded-full bg-[rgb(var(--color-primary))]" style={{ width: `${((duringValue ?? 0) / 10) * 100}%` }} />
-                      </div>
+                      {compareLabel}
                     </div>
                   </div>
-                  <div className="mt-2 text-xs eb-muted">
-                    Data: {m.before.count} baseline points · {m.during.count} during points
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="mt-2 text-sm eb-muted">
-                    Not enough data for this measure yet.
-                  </div>
-                  <div className="mt-2 text-xs eb-muted">
-                    Data: {m.before.count} baseline points · {m.during.count} during points
-                  </div>
-                </>
-              )}
-            </div>
-          );})}
+                ) : null}
+              </div>
+            );
+          })}
         </div>
 
-        {cmp.metrics.length > 3 && (
+        {cmp.metrics.length > 4 ? (
           <div className="mt-3 flex items-center justify-end">
             <button
               type="button"
@@ -4179,10 +4276,9 @@ const tryNextPrompts = useMemo(() => {
               {showAllExperimentMetrics ? 'Show fewer' : `Show all (${cmp.metrics.length})`}
             </button>
           </div>
-        )}
-	
-	</div>
-	);
+        ) : null}
+      </div>
+    );
   };
 
 
