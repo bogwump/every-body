@@ -7,6 +7,7 @@ import { useEntries, useExperiment } from '../lib/appStore';
 import { computeBleedStats, computeCycleStats, estimatePhaseByFlow, getCycleStarts, getRhythmModel, sortByDateAsc } from '../lib/analytics';
 import { getRhythmTimingModel } from '../lib/rhythmTiming';
 import { getCycleTrustModel } from '../lib/cycleTrust';
+import { getMoodLabel } from '../lib/metricSemantics';
 
 type Props = {
   userData: UserData;
@@ -118,13 +119,6 @@ function prettyDate(d: Date): string {
     month: 'long',
     year: 'numeric',
   });
-}
-
-function moodLabel(m?: number): string | null {
-  if (m === 1) return 'Low';
-  if (m === 2) return 'Okay';
-  if (m === 3) return 'Good';
-  return null;
 }
 
 function isExperimentActiveOnISO(experiment: any, dateISO: string): boolean {
@@ -586,7 +580,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
     const influences = influencesFromEntry(e);
     const note = typeof (e as any)?.notes === 'string' ? String((e as any).notes).trim() : '';
     const moodNum = (e as any)?.mood as number | undefined;
-    const mood = moodLabel(moodNum);
+    const mood = getMoodLabel(moodNum) ?? null;
     const sexLogged = Boolean((e as any)?.events?.sex);
     const experimentActive = isExperimentActiveOnISO(experiment, summaryISO);
 

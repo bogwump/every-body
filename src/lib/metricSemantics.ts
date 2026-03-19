@@ -1,4 +1,5 @@
-import type { SymptomKey } from '../types';
+import type { SymptomKey, InsightMetricKey, UserData } from '../types';
+import { SYMPTOM_META } from './symptomMeta';
 
 export type AppMetricKey = 'mood' | SymptomKey | string;
 export type MetricPolarity = 'positive' | 'burden' | 'neutral';
@@ -58,9 +59,33 @@ export function isBurdenMetric(metric: AppMetricKey): boolean {
 
 export function getMoodLabel(value: number | null | undefined): string | undefined {
   if (value == null || !Number.isFinite(value)) return undefined;
+  if (value === 1) return 'Low';
+  if (value === 2) return 'Okay';
+  if (value === 3) return 'Good';
   if (value <= 3) return 'Low';
   if (value <= 7) return 'Okay';
   return 'Good';
+}
+
+export function getMoodValue10(value: number | null | undefined): number | undefined {
+  if (value == null || !Number.isFinite(value)) return undefined;
+  if (value === 1) return 1;
+  if (value === 2) return 5;
+  if (value === 3) return 10;
+  const rounded = Math.round(value * 10) / 10;
+  return Math.max(0, Math.min(10, rounded));
+}
+
+export function getMetricDisplayLabel(metric: InsightMetricKey | AppMetricKey, user?: UserData): string {
+  if (metric === 'mood') return 'Mood';
+  if (typeof metric === 'string' && metric.startsWith('custom:')) {
+    const id = metric.slice('custom:'.length);
+    return user?.customSymptoms?.find((item) => item.id === id)?.label ?? 'Custom symptom';
+  }
+  if (typeof metric === 'string' && metric in SYMPTOM_META) {
+    return SYMPTOM_META[metric as SymptomKey].label;
+  }
+  return String(metric);
 }
 
 export function formatMetricDisplayValue(metric: AppMetricKey, value: number | null | undefined): string | undefined {

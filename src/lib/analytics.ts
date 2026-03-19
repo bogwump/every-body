@@ -1,5 +1,6 @@
 import type { CheckInEntry, SymptomKey, InfluenceKey, UserData } from "../types";
 import { isoFromDateLocal, isoTodayLocal } from "./date";
+import { getMoodValue10 } from "./metricSemantics";
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
@@ -542,11 +543,7 @@ function getNumericSymptom(e: any, key: SymptomKey): number | undefined {
 }
 
 function getMoodAs10(e: any): number | undefined {
-  const m = e?.mood as 1 | 2 | 3 | undefined;
-  if (m === 1) return 3;
-  if (m === 2) return 6;
-  if (m === 3) return 9;
-  return undefined;
+  return getMoodValue10(e?.mood as 1 | 2 | 3 | undefined);
 }
 
 type SymptomShift = { key: "mood" | SymptomKey; label: string; delta: number; logsA: number; logsB: number };

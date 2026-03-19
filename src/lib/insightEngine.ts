@@ -5,6 +5,7 @@ import { isMetricInScope } from './insightsScope';
 import { getSymptomCoverage } from './symptomCoverage';
 import { downgradeConfidence } from './confidenceCopy';
 import { SYMPTOM_META } from './symptomMeta';
+import { getMoodValue10 } from './metricSemantics';
 
 export type InsightConfidence = 'very_low' | 'low' | 'medium' | 'high';
 export type InsightStrength = 'weak' | 'moderate' | 'strong';
@@ -62,8 +63,7 @@ function normalise10(v: unknown): number | undefined {
 }
 
 function moodTo10(mood?: 1 | 2 | 3): number | undefined {
-  if (!mood) return undefined;
-  return mood === 1 ? 2 : mood === 2 ? 5 : 8;
+  return getMoodValue10(mood);
 }
 
 function mean(xs: number[]): number {

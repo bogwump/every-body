@@ -33,7 +33,7 @@ import { isMetricInScope } from '../lib/insightsScope';
 import { type InsightSignal, getTopInsights, markPatternsDiscovered, metricLabelsForSignal, selectStableHeroInsights } from '../lib/insightEngine';
 import { computeExperimentComparison } from '../lib/experimentAnalysis';
 import { getSupportSuggestion } from '../lib/patternSupport';
-import { describeHighValue } from '../lib/metricSemantics';
+import { describeHighValue, getMoodValue10 } from '../lib/metricSemantics';
 import { getExperimentForSignal, scoreExperimentSuggestion } from '../lib/experimentSuggestions';
 import { getSavedActions, isDismissedAction, isSavedAction, removeSavedAction, saveAction } from '../lib/savedActions';
 import { clearExperimentOutcomeRecord, recordExperimentOutcome } from '../lib/experimentOutcomes';
@@ -167,8 +167,7 @@ function experimentSummarySentence(
 }
 
 function moodTo10(mood?: 1 | 2 | 3): number | undefined {
-  if (!mood) return undefined;
-  return mood === 1 ? 2 : mood === 2 ? 5 : 8;
+  return getMoodValue10(mood);
 }
 
 // Read a metric value from an entry.
@@ -2699,14 +2698,12 @@ const confirmFinishExperiment = () => {
     setReplaceExperimentConfirm(null);
     setExperimentOpen(false);
     setIsCustomExperiment(false);
-    setExperimentStartedFlash(true);
     try {
       const el = document.getElementById('eb-experiments');
       safeScrollIntoView(el, { behavior: 'smooth', block: 'start' });
     } catch {
       // ignore
     }
-    window.setTimeout(() => setExperimentStartedFlash(false), 3200);
   };
 
 

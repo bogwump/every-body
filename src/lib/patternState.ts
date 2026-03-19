@@ -2,7 +2,7 @@ import type { CheckInEntry, InsightMetricKey, UserData } from '../types';
 import type { InsightSignal } from './insightEngine';
 import { getCycleStarts, getRhythmModel, sortByDateAsc } from './analytics';
 import { isoTodayLocal } from './date';
-import { getMetricPolarity } from './metricSemantics';
+import { getMetricPolarity, getMoodValue10 } from './metricSemantics';
 import { buildPatternMemory, getLagPatternForPair, getPatternRecordForSignal } from './patternIntelligence';
 
 export type PairPatternState =
@@ -67,10 +67,7 @@ function daysBetweenISO(fromISO: string, toISO: string): number {
 function normaliseMetricValue(entry: CheckInEntry, key: InsightMetricKey): number | null {
   if (!entry) return null;
   if (key === 'mood') {
-    const mood = (entry as any).mood;
-    if (mood === 1) return 2;
-    if (mood === 2) return 5;
-    if (mood === 3) return 8;
+    const mood = getMoodValue10((entry as any).mood);
     return typeof mood === 'number' ? mood : null;
   }
   if (typeof key === 'string' && key.startsWith('custom:')) {

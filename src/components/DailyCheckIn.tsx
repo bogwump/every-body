@@ -106,6 +106,7 @@ const sliderMeta: Record<SymptomKey, { label: string; icon: React.ElementType; h
   breastTenderness: { label: 'Breast tenderness', icon: Heart, hint: 'Sore or tender breasts', leftLabel: 'None', rightLabel: 'Severe' },
   hotFlushes: { label: 'Hot flushes', icon: Sparkles, hint: 'Sudden heat and flushing', leftLabel: 'None', rightLabel: 'Severe' },
   nightSweats: { label: 'Night sweats', icon: Moon, hint: 'Waking sweaty at night', leftLabel: 'None', rightLabel: 'Severe' },
+  restlessLegs: { label: 'Restless legs', icon: Moon, hint: 'Urge to move your legs or uncomfortable sensations at night', leftLabel: 'None', rightLabel: 'Severe' },
 };
 
 function clamp(n: number, min: number, max: number) {

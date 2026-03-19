@@ -96,6 +96,13 @@ export const SYMPTOM_META: Record<SymptomKey, SymptomMeta> = {
     kind: 'physio',
     hormonal: false,
   },
+  acidReflux: {
+    key: 'acidReflux',
+    label: 'Acid reflux',
+    description: 'Heartburn or reflux symptoms',
+    kind: 'physio',
+    hormonal: false,
+  },
   constipation: {
     key: 'constipation',
     label: 'Constipation',

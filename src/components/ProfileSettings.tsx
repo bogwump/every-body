@@ -39,6 +39,7 @@ import { useEntries, useChat, useExperiment } from '../lib/appStore';
 import { calculateStreak, isoToday } from '../lib/analytics';
 import { getSymptomCoverage } from '../lib/symptomCoverage';
 import { buildAIExportContext, buildChatGPTPrompt, getPresetMeta, type AIExportPreset } from '../lib/aiExportBuilder';
+import { formatMetricDisplayValue } from '../lib/metricSemantics';
 
 
 interface ProfileSettingsProps {

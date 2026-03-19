@@ -23,7 +23,8 @@ import { generateMoments } from '../lib/generateMoments';
 import { CompanionMomentCard } from './CompanionMomentCard';
 import { getCycleTrustModel } from '../lib/cycleTrust';
 import { compareExperimentOutcomes, findPreviousExperimentRun } from '../lib/experimentMeta';
-import { getMoodLabel, isPositiveMetric } from '../lib/metricSemantics';
+import { getMetricDisplayLabel, getMoodLabel, getMoodValue10, isPositiveMetric } from '../lib/metricSemantics';
+import { SYMPTOM_META } from '../lib/symptomMeta';
 
 interface DashboardProps {
   userName: string;
@@ -42,31 +43,7 @@ function labelDayShort(iso: string): string {
 
 const METRIC_LABELS: Record<DashboardMetric, string> = {
   mood: 'Mood',
-  energy: 'Energy',
-  sleep: 'Sleep',
-  stress: 'Stress',
-  anxiety: 'Anxiety',
-  irritability: 'Irritability',
-  focus: 'Clarity',
-  bloating: 'Bloating',
-  digestion: 'Digestion',
-  nausea: 'Nausea',
-  pain: 'Pain',
-  headache: 'Headache',
-  cramps: 'Cramps',
-  jointPain: 'Joint pain',
-  flow: 'Flow',
-  hairShedding: 'Hair shedding',
-  facialSpots: 'Facial spots',
-  cysts: 'Cysts',
-  brainFog: 'Brain fog',
-  fatigue: 'Fatigue',
-  dizziness: 'Dizziness',
-  appetite: 'Appetite',
-  libido: 'Libido',
-  breastTenderness: 'Breast tenderness',
-  hotFlushes: 'Hot flushes',
-  nightSweats: 'Night sweats',
+  ...(Object.fromEntries(Object.values(SYMPTOM_META).map((item) => [item.key, item.label])) as Record<SymptomKey, string>),
 };
 
 // A mixed palette pulled from all theme families so multi-line charts stay readable
@@ -178,10 +155,7 @@ function metricValue(entry: any | undefined, metric: DashboardMetric): number | 
   if (metric === 'mood') {
     const m = entry?.mood as 1 | 2 | 3 | undefined;
     // Keep everything on a 0-10 feel for the chart.
-    if (m === 1) return 3;
-    if (m === 2) return 6;
-    if (m === 3) return 9;
-    return undefined;
+    return getMoodValue10(m);
   }
   const v = entry?.values?.[metric as SymptomKey];
   return typeof v === 'number' ? v : undefined;
@@ -1155,7 +1129,7 @@ export function Dashboard({
     const phaseHeadline = typeof dashboardRhythm.headline === 'string' ? dashboardRhythm.headline.toLowerCase() : '';
     const shouldPointToRhythm = userData.cycleTrackingMode === 'cycle' && (
       cycleTrust.phaseTrust !== 'confirmed'
-      || cycleTrust.predictionTrust !== 'steady'
+      || cycleTrust.predictionTrust !== 'established'
       || phaseHeadline.includes('estimated')
       || Boolean(todayPhase)
     );
