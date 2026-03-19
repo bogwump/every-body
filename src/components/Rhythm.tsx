@@ -403,6 +403,7 @@ type CycleStripRow = {
   activeDays: number[];
   firstActiveDay: number | null;
   durationDays: number;
+  isCurrentCycle?: boolean;
 };
 
 type CycleStripPhaseSegment = {
@@ -456,7 +457,7 @@ function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption,
   const rows: CycleStripRow[] = [];
   const todayISO = isoToday();
 
-  const buildRow = (label: string, cycleStartISO: string, cycleEndExclusiveISO: string, cycleLength: number) => {
+  const buildRow = (label: string, cycleStartISO: string, cycleEndExclusiveISO: string, cycleLength: number, isCurrentCycle = false) => {
     const cycleEntries = sorted.filter((entry) => {
       const iso = (entry as any).dateISO;
       return typeof iso === 'string' && iso >= cycleStartISO && iso < cycleEndExclusiveISO;
@@ -475,6 +476,7 @@ function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption,
       activeDays,
       firstActiveDay: activeDays.length ? Math.min(...activeDays) : null,
       durationDays: activeDays.length,
+      isCurrentCycle,
     });
   };
 
@@ -492,14 +494,14 @@ function buildCycleStripRows(sorted: CheckInEntry[], option: RhythmMetricOption,
     const currentLength = Math.max(1, daysBetween(currentStartISO, todayISO) + 1);
     const tomorrow = new Date(todayISO + 'T00:00:00');
     tomorrow.setDate(tomorrow.getDate() + 1);
-    buildRow('Current cycle', currentStartISO, tomorrow.toISOString().slice(0, 10), currentLength);
+    buildRow('Current cycle', currentStartISO, tomorrow.toISOString().slice(0, 10), currentLength, true);
   } else if (sorted.length) {
     const firstISO = (sorted[0] as any)?.dateISO;
     if (typeof firstISO === 'string') {
       const currentLength = Math.max(1, daysBetween(firstISO, todayISO) + 1);
       const tomorrow = new Date(todayISO + 'T00:00:00');
       tomorrow.setDate(tomorrow.getDate() + 1);
-      buildRow('Cycle 1', firstISO, tomorrow.toISOString().slice(0, 10), currentLength);
+      buildRow('Cycle 1', firstISO, tomorrow.toISOString().slice(0, 10), currentLength, true);
     }
   }
 
@@ -696,21 +698,37 @@ export function Rhythm({ userData }: { userData?: UserData }) {
     return buildCycleStripRows(sorted, selectedTimingMetric, 4);
   }, [sorted, selectedTimingMetric]);
   const timingSummary = useMemo(() => {
-    const rows = timingChart.rows.filter((row) => row.firstActiveDay != null && row.durationDays > 0);
-    if (!selectedTimingMetric || rows.length < 1) return null;
-    const avgStart = Math.round(rows.reduce((sum, row) => sum + (row.firstActiveDay ?? 0), 0) / rows.length);
-    const avgDuration = Math.round(rows.reduce((sum, row) => sum + row.durationDays, 0) / rows.length);
+    if (!selectedTimingMetric) return null;
+    const activeRows = timingChart.rows.filter((row) => row.firstActiveDay != null && row.durationDays > 0);
+    if (activeRows.length < 1) return null;
+
+    const completedRows = activeRows.filter((row) => !row.isCurrentCycle);
+    const summaryRows = completedRows.length >= 1 ? completedRows : activeRows;
+    const avgStart = Math.round(summaryRows.reduce((sum, row) => sum + (row.firstActiveDay ?? 0), 0) / summaryRows.length);
+    const avgDuration = Math.max(1, Math.round(summaryRows.reduce((sum, row) => sum + row.durationDays, 0) / summaryRows.length));
     const phaseLabel = phaseFromDay(avgStart, timingChart.displayDays, null).soft.replace(' Phase', '');
     const approxDaysBeforeBleed = Math.max(0, timingChart.displayDays - avgStart + 1);
+    const lowerLabel = selectedTimingMetric.label.toLowerCase();
 
-    if (rows.length === 1) {
-      if (approxDaysBeforeBleed >= 2 && approxDaysBeforeBleed <= 9) {
-        return `Here’s what ${selectedTimingMetric.label.toLowerCase()} looks like so far: it has shown up in your ${phaseLabel.toLowerCase()} window, around ${approxDaysBeforeBleed} day${approxDaysBeforeBleed === 1 ? '' : 's'} before bleeding. As you log more cycles, your usual timing will get clearer.`;
+    if (completedRows.length === 0) {
+      const currentRow = activeRows.find((row) => row.isCurrentCycle) ?? activeRows[0];
+      const currentStart = currentRow.firstActiveDay ?? avgStart;
+      const currentPhaseLabel = phaseFromDay(currentStart, timingChart.displayDays, null).soft.replace(' Phase', '').toLowerCase();
+      const currentDaysBeforeBleed = Math.max(0, timingChart.displayDays - currentStart + 1);
+      if (currentDaysBeforeBleed >= 2 && currentDaysBeforeBleed <= 9) {
+        return `Here’s what ${lowerLabel} looks like so far this cycle: it has shown up in your ${currentPhaseLabel} window, around ${currentDaysBeforeBleed} day${currentDaysBeforeBleed === 1 ? '' : 's'} before bleeding. As you log more cycles, your usual timing will get clearer.`;
       }
-      return `Here’s what ${selectedTimingMetric.label.toLowerCase()} looks like so far: it has shown up in your ${phaseLabel.toLowerCase()} window, around day ${avgStart}. As you log more cycles, your usual timing will get clearer.`;
+      return `Here’s what ${lowerLabel} looks like so far this cycle: it has shown up in your ${currentPhaseLabel} window, around day ${currentStart}. As you log more cycles, your usual timing will get clearer.`;
     }
 
-    if (rows.length === 2) {
+    if (completedRows.length === 1) {
+      if (approxDaysBeforeBleed >= 2 && approxDaysBeforeBleed <= 9) {
+        return `Here’s what ${lowerLabel} looks like so far: it has shown up in your ${phaseLabel.toLowerCase()} window, around ${approxDaysBeforeBleed} day${approxDaysBeforeBleed === 1 ? '' : 's'} before bleeding. As you log more cycles, your usual timing will get clearer.`;
+      }
+      return `Here’s what ${lowerLabel} looks like so far: it has shown up in your ${phaseLabel.toLowerCase()} window, around day ${avgStart}. As you log more cycles, your usual timing will get clearer.`;
+    }
+
+    if (completedRows.length === 2) {
       if (approxDaysBeforeBleed >= 2 && approxDaysBeforeBleed <= 9) {
         return `${selectedTimingMetric.label} may be starting to cluster in your ${phaseLabel.toLowerCase()} window, around ${approxDaysBeforeBleed} day${approxDaysBeforeBleed === 1 ? '' : 's'} before bleeding, and lasts about ${avgDuration} day${avgDuration === 1 ? '' : 's'}.`;
       }
@@ -959,9 +977,13 @@ export function Rhythm({ userData }: { userData?: UserData }) {
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <div className="font-medium text-neutral-800">{row.label}</div>
                       {row.durationDays > 0 ? (
-                        <div className="text-[rgb(var(--color-text-secondary))]">Starts day {row.firstActiveDay} · {row.durationDays} day{row.durationDays === 1 ? '' : 's'}</div>
+                        row.isCurrentCycle ? (
+                          <div className="text-[rgb(var(--color-text-secondary))]">Logged on {row.durationDays} day{row.durationDays === 1 ? '' : 's'} so far{row.firstActiveDay ? ` · first on day ${row.firstActiveDay}` : ''}</div>
+                        ) : (
+                          <div className="text-[rgb(var(--color-text-secondary))]">Starts day {row.firstActiveDay} · {row.durationDays} day{row.durationDays === 1 ? '' : 's'}</div>
+                        )
                       ) : (
-                        <div className="text-[rgb(var(--color-text-secondary))]">No logged days this cycle</div>
+                        <div className="text-[rgb(var(--color-text-secondary))]">{row.isCurrentCycle ? 'Not logged yet this cycle' : 'No logged days this cycle'}</div>
                       )}
                     </div>
                     <div className="rounded-2xl eb-inset-callout p-3">
