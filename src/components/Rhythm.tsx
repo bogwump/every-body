@@ -6,6 +6,7 @@ import { useEntries, useExperimentHistory } from '../lib/appStore';
 import { computeCycleStats, getRhythmModel, isoToday, sortByDateAsc } from '../lib/analytics';
 import { getCycleTrustModel } from '../lib/cycleTrust';
 import { getExperimentLearnings, getWhatsComingPredictions } from '../lib/rhythmPredictions';
+import { getRhythmTimingModel } from '../lib/rhythmTiming';
 import { getPhaseHistory } from '../lib/phaseHistory';
 import { getRhythmPersonalPhaseSentence } from '../lib/rhythmCopy';
 import { getRhythmPhaseState } from '../lib/phaseChange';
@@ -378,27 +379,6 @@ function softPhaseMeta(key: PhaseKey) {
   }
 }
 
-function estimateDaysToNext(key: PhaseKey, dayInCycle: number | null, cycleLen: number | null): number | null {
-  if (dayInCycle != null && cycleLen != null) {
-    const flowPhase = phaseFromDay(dayInCycle, cycleLen, null);
-    const bounds = () => {
-      const ovulationCenter = Math.round(clamp(cycleLen - 14, 10, cycleLen - 10));
-      const ovStart = clamp(ovulationCenter - 1, 8, cycleLen - 8);
-      const ovEnd = clamp(ovulationCenter + 1, ovStart + 1, cycleLen - 6);
-      if (key === 'reset') return 6; // to rebuilding start
-      if (key === 'rebuilding') return ovStart;
-      if (key === 'expressive') return ovEnd + 1;
-      return cycleLen + 1; // next cycle start (approx)
-    };
-    const nextStart = bounds();
-    const remaining = nextStart - dayInCycle;
-    return remaining > 0 ? remaining : null;
-  }
-  // signal-based fallback
-  const defaults: Record<PhaseKey, number> = { reset: 3, rebuilding: 5, expressive: 3, protective: 5 };
-  return defaults[key] ?? 5;
-}
-
 function formatSourceLine(source: any): string {
   if (source === 'override') return 'Based on your cycle start.';
   if (source === 'bleed') return 'Based on your logged bleeding.';
@@ -474,8 +454,9 @@ export function Rhythm({ userData }: { userData?: UserData }) {
     const reasons = rm.reasons ?? [];
 
     const cycleStats = computeCycleStats(sorted);
+    const timing = getRhythmTimingModel(sorted as any, ud);
 
-    const daysToNext = estimateDaysToNext(phaseKey, dayInCycle, cycleLen);
+    const daysToNext = timing.daysRemaining;
     const nextPhaseKey = (() => {
       if (phaseKey === 'reset') return 'rebuilding' as PhaseKey;
       if (phaseKey === 'rebuilding') return 'expressive' as PhaseKey;
@@ -507,6 +488,7 @@ export function Rhythm({ userData }: { userData?: UserData }) {
       source,
       phaseState,
       reasons,
+      timing,
       daysToNext,
       nextPhaseKey,
       nextSci,
