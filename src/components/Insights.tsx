@@ -4297,12 +4297,6 @@ const tryNextPrompts = useMemo(() => {
                     </div>
                   </div>
                   <div className="mt-3 text-sm eb-muted">{supportingLine}</div>
-                  {((((p as any).displayState) ?? p.patternState?.state ?? 'unclear_interesting') as ConnectionDisplayState) !== 'unclear_interesting' ? (
-                    <div className="mt-3 eb-inset-white rounded-2xl px-4 py-3">
-                      {(p as any).meaningLine ? <div className="text-sm font-medium text-[rgb(var(--color-text-primary))]">{(p as any).meaningLine}</div> : null}
-                      {(p as any).watchLine ? <div className="mt-1 text-xs eb-muted">{(p as any).watchLine}</div> : null}
-                    </div>
-                  ) : null}
                   {p.contextLine && ((((p as any).displayState) ?? p.patternState?.state ?? 'unclear_interesting') as ConnectionDisplayState) === 'unclear_interesting' ? <div className="mt-2 text-xs eb-muted">{p.contextLine}</div> : null}
                   <details className="eb-disclosure eb-disclosure--white mt-3">
                     <summary><span>Why am I seeing this?</span><ChevronDown className="w-4 h-4" /></summary>
