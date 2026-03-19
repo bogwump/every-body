@@ -102,5 +102,5 @@ export function describeHighValue(metric: AppMetricKey, count: number, days: num
   if (isPositiveMetric(metric)) {
     return `${count} day${count === 1 ? '' : 's'} at the stronger end of your scale in the last ${days}.`;
   }
-  return `${count} day${count === 1 ? '' : 's'} at 7+ in the last ${days}.`;
+  return `${count} day${count === 1 ? '' : 's'} at the more noticeable end of your scale in the last ${days}.`;
 }

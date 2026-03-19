@@ -1113,20 +1113,24 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
   }, [entriesSorted, distributionMetric]);
 
   const highSymptomDays = useMemo(() => {
-    // Keep this polarity-aware so positive metrics like mood, energy, or sleep
-    // do not get framed as 'bad symptoms' when they are high.
-    const items = selected.map((k) => {
+    // Scan across all currently tracked symptoms in the active Insights timeframe,
+    // not just the metrics chosen for the other charts.
+    // Require at least 2 logged entries so one random score does not dominate.
+    const items = selectableKeys.map((k) => {
       let count = 0;
+      let loggedCount = 0;
       entriesSorted.forEach((e) => {
         const v = getMetricValue(e, k, userData);
-        if (typeof v === 'number' && v >= 7) count += 1;
+        if (typeof v !== 'number') return;
+        loggedCount += 1;
+        if (v >= 7) count += 1;
       });
-      return { key: k, count, polarity: getMetricPolarity(k) };
+      return { key: k, count, loggedCount, polarity: getMetricPolarity(k) };
     });
 
-    items.sort((a, b) => b.count - a.count);
-    return items.filter((x) => x.count > 0).slice(0, 4);
-  }, [entriesSorted, selected, userData]);
+    items.sort((a, b) => (b.count - a.count) || (b.loggedCount - a.loggedCount));
+    return items.filter((x) => x.loggedCount >= 2 && x.count > 0).slice(0, 4);
+  }, [entriesSorted, selectableKeys, userData]);
 
   // --- Highlights / findings ---
   const minDaysForDeep = 7;
@@ -5643,7 +5647,7 @@ const tryNextPrompts = useMemo(() => {
           <div className="eb-card-header items-start gap-3 flex-col sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
               <div className="eb-card-title">Symptom distribution</div>
-              <div className="eb-card-sub">How often your chosen metric sits low, mid, or high.</div>
+              <div className="eb-card-sub">{`Across the last ${days} days, how often your chosen metric sat low, mid, or high.`}</div>
             </div>
           </div>
 
@@ -5699,7 +5703,7 @@ const tryNextPrompts = useMemo(() => {
           <div className="eb-card-header">
             <div>
               <div className="eb-card-title">Notable intensity days</div>
-              <div className="eb-card-sub">Days where a metric sat at the stronger end of its scale.</div>
+              <div className="eb-card-sub">{`Across the last ${days} days, which of your tracked symptoms most often reached the more noticeable end of their scale.`}</div>
             </div>
           </div>
 
