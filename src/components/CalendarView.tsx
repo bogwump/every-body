@@ -381,6 +381,19 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
   const [editMode, setEditMode] = useState(false);
   const [editISO, setEditISO] = useState<string | null>(null);
   const [summaryISO, setSummaryISO] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!summaryISO) return;
+    const { body } = document;
+    const prevOverflow = body.style.overflow;
+    const prevTouchAction = body.style.touchAction;
+    body.style.overflow = 'hidden';
+    body.style.touchAction = 'none';
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.touchAction = prevTouchAction;
+    };
+  }, [summaryISO]);
   const [sleepPeekOpen, setSleepPeekOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -607,7 +620,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
       const v = vRaw > 10 ? Math.round(vRaw / 10) : vRaw;
       rows.push({ label: overlayLabel(k), value: `${clamp(v, 0, 10)}/10` });
     }
-    const topRows = rows.slice(0, 5);
+    const allRows = rows;
 
     const isPeriod = periodSet.has(summaryISO);
     const isFertile = fertileSet.has(summaryISO);
@@ -638,7 +651,7 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
           aria-label="Close"
           onClick={() => setSummaryISO(null)}
         />
-        <div className="relative w-full max-w-md eb-card p-5 max-h-[85vh] overflow-y-auto">
+        <div className="relative w-full max-w-md eb-card p-5 max-h-[85vh] overflow-hidden">
           <div className="mb-4">
             <div className="flex items-center gap-2 text-xl font-semibold">
               {moodNum ? (
@@ -687,14 +700,18 @@ function isAllowedOverlayKey(v: any, allowed: OverlayKey[]): v is OverlayKey {
             ) : null;
           })()}
 
-          {topRows.length ? (
-            <div className="mb-4 space-y-2">
-              {topRows.map((r) => (
-                <div key={r.label} className="flex items-center justify-between">
-                  <span className="text-[rgb(var(--color-text-secondary))]">{r.label}</span>
-                  <span className="font-medium">{r.value}</span>
+          {allRows.length ? (
+            <div className="mb-4 rounded-2xl border border-neutral-200/80 bg-white/35">
+              <div className="max-h-48 overflow-y-auto px-1 py-1 overscroll-contain">
+                <div className="space-y-2 px-3 py-2">
+                  {allRows.map((r) => (
+                    <div key={r.label} className="flex items-center justify-between gap-4">
+                      <span className="min-w-0 text-[rgb(var(--color-text-secondary))]">{r.label}</span>
+                      <span className="shrink-0 font-medium">{r.value}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           ) : hasEntry ? (
             <div className="mb-4 text-sm text-[rgb(var(--color-text-secondary))]">No symptom sliders were logged for this day.</div>
