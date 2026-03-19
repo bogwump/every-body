@@ -46,6 +46,16 @@ function getMetricValue(e: CheckInEntry, k: MetricKey): number | null {
   return typeof v === 'number' ? v : null;
 }
 
+
+function metricLabel(k: MetricKey, userData: UserData): string {
+  if (k === 'mood') return 'Mood';
+  if (typeof k === 'string' && k.startsWith('custom:')) {
+    const id = k.slice('custom:'.length);
+    return userData.customSymptoms?.find((item) => item.id === id)?.label ?? 'that symptom';
+  }
+  return String(k).replace(/([A-Z])/g, ' $1').replace(/^./, (m) => m.toUpperCase());
+}
+
 /**
  * Pattern-aware prompts: small, gentle experiment ideas based on recent logs.
  * Conservative: only triggers when we have enough recent data to be useful.
@@ -62,9 +72,17 @@ export function computePatternExperimentPrompts(entriesAll: CheckInEntry[], user
   const recent = scoped.slice(-14);
   if (recent.length < 7) return [];
 
-  // Candidate metrics (only those in scope and commonly useful).
-  const candidates: MetricKey[] = ['sleep', 'energy', 'stress', 'anxiety', 'brainFog', 'fatigue', 'headache', 'mood'];
-  const enabled = new Set<MetricKey>([...(userData.enabledModules ?? []), 'mood'] as any);
+  // Candidate metrics: built-ins plus any enabled custom symptoms.
+  const builtInCandidates: MetricKey[] = ['sleep', 'energy', 'stress', 'anxiety', 'brainFog', 'fatigue', 'headache', 'mood'];
+  const customCandidates: MetricKey[] = (userData.customSymptoms ?? [])
+    .filter((symptom) => symptom && symptom.enabled && typeof symptom.id === 'string' && symptom.id.trim())
+    .map((symptom) => (`custom:${symptom.id}` as MetricKey));
+  const candidates: MetricKey[] = Array.from(new Set<MetricKey>([...builtInCandidates, ...customCandidates]));
+  const enabled = new Set<MetricKey>([
+    ...(userData.enabledModules ?? []),
+    ...customCandidates,
+    'mood',
+  ] as any);
   const inScopeCandidates = candidates.filter((k) => enabled.has(k) && isMetricInScope(k as any, userData));
 
   const stats = inScopeCandidates
@@ -158,6 +176,32 @@ export function computePatternExperimentPrompts(entriesAll: CheckInEntry[], user
         note: 'If caffeine helps you function, keep it. This test is about timing, not deprivation.',
       });
     }
+  }
+
+
+  const customStats = stats
+    .filter((item) => typeof item.k === 'string' && item.k.startsWith('custom:'))
+    .sort((a, b) => (b.sd + b.avg / 10) - (a.sd + a.avg / 10));
+  const topCustom = customStats[0] ?? null;
+  if (topCustom && prompts.length < 2) {
+    const customLabel = metricLabel(topCustom.k, userData);
+    prompts.push({
+      id: `custom-support-${String(topCustom.k).replace(/[^a-z0-9:]/gi, '').toLowerCase()}`,
+      title: `3-day ${customLabel.toLowerCase()} support test`,
+      reason:
+        topCustom.sd >= 2
+          ? `${customLabel} has been more up-and-down recently. A gentler few days could help you spot whether anything steadies it.`
+          : `${customLabel} has been more noticeable lately. A short support test could help you see whether anything eases it at all.`,
+      durationDays: 3,
+      metrics: [topCustom.k, 'mood', 'stress', 'sleep'].filter((k) => enabled.has(k as any)) as any,
+      changeKey: (userData.enabledInfluences ?? []).includes('stressfulDay') ? 'stressfulDay' : undefined,
+      steps: [
+        'Pick one small support change you can realistically keep for 3 days.',
+        'Keep the rest of the week as similar as you reasonably can.',
+        `Log ${customLabel.toLowerCase()} each day and see whether it softens, stays the same, or becomes easier to predict.`,
+      ],
+      note: 'The aim is not to fix everything. It is to learn whether a lighter, steadier few days changes the pattern at all.',
+    });
   }
 
   // If nothing triggered yet, offer ONE gentle starter experiment so this section never feels broken.

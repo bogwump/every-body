@@ -608,10 +608,11 @@ type Finding = {
   signalId?: string;
 };
 
-function buildExperimentPlan(metrics: Array<MetricKey>): { title: string; steps: string[]; note: string } {
-  const keys = metrics
-    .filter((k) => typeof k === 'string' && (k === 'mood' || !k.startsWith('custom:')))
-    .filter(Boolean) as Array<SymptomKey | 'mood'>;
+function buildExperimentPlan(metrics: Array<MetricKey>, userData: UserData): { title: string; steps: string[]; note: string } {
+  const keys = metrics.filter(Boolean) as Array<MetricKey>;
+  const customLabels = keys
+    .filter((k): k is `custom:${string}` => typeof k === 'string' && k.startsWith('custom:'))
+    .map((k) => labelFor(k, userData));
   const has = (k: any) => keys.includes(k);
 
   // A few gentle, "soft" experiments. These are suggestions, not medical advice.
@@ -660,6 +661,19 @@ function buildExperimentPlan(metrics: Array<MetricKey>): { title: string; steps:
         'Try a 5-minute slow breathing wind-down before bed.',
       ],
       note: 'If night sweats improve, keep the "cooler nights" routine as your default.',
+    };
+  }
+
+  if (customLabels.length) {
+    const joined = customLabels.slice(0, 2).join(' and ');
+    return {
+      title: `3-day ${joined.toLowerCase()} support test`,
+      steps: [
+        'Pick one small support change you can realistically repeat for 3 days.',
+        'Keep the rest of the day as similar as you can, so the signal stays clearer.',
+        `Log ${joined.toLowerCase()} each day and note whether it softens, stays steady, or becomes easier to predict.`,
+      ],
+      note: 'This is a gentle test to learn what helps, not a promise that the symptom will disappear.',
     };
   }
 
@@ -2494,7 +2508,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
       return;
     }
 
-    const plan = buildExperimentPlan(focus);
+    const plan = buildExperimentPlan(focus, userData);
     setExperimentMetrics(focus);
     setExperimentPlan(plan);
     setIsCustomExperiment(false);
@@ -4760,7 +4774,7 @@ const tryNextPrompts = useMemo(() => {
                     setExperimentOpen(true);
                   } else {
                     const focus = (next?.metrics && next.metrics.length ? next.metrics : selected).slice(0, 5);
-                    const plan = next?.plan ? next.plan : buildExperimentPlan(focus);
+                    const plan = next?.plan ? next.plan : buildExperimentPlan(focus, userData);
                     setExperimentMetrics(focus);
                     setExperimentPlan(plan);
                     setExperimentDurationDays(next?.durationDays ?? 3);

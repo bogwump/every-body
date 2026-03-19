@@ -278,7 +278,13 @@ export function generateCandidateInsights(
     ];
   }
 
-  const candidateMetrics = Array.from(new Set<InsightMetricKey>([...selectedMetrics, ...DEFAULT_METRICS]));
+    const enabledCustomMetrics = (userData.customSymptoms ?? [])
+    .filter((symptom) => symptom && symptom.enabled && typeof symptom.id === 'string' && symptom.id.trim())
+    .map((symptom) => (`custom:${symptom.id}` as InsightMetricKey));
+
+  const candidateMetrics = Array.from(
+    new Set<InsightMetricKey>([...selectedMetrics, ...enabledCustomMetrics, ...DEFAULT_METRICS]),
+  );
   const currentPhase = getCurrentPhase(entries, userData);
   const phaseBuckets = getPhaseBuckets(entries, userData);
   const preferred = metricPrioritiesForPhase(currentPhase);

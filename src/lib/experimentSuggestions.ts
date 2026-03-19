@@ -38,6 +38,13 @@ function uniqueMetrics(metrics: Array<InsightMetricKey | string>): string[] {
   return metrics.map((metric) => String(metric)).filter((value, idx, arr) => value && arr.indexOf(value) === idx);
 }
 
+
+function metricDisplayLabel(metric: string): string {
+  if (!metric) return 'that symptom';
+  if (metric.startsWith('custom:')) return metric.slice('custom:'.length).replace(/[-_]+/g, ' ');
+  return metric.replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+}
+
 export function getExperimentForSignal(signal: InsightSignal): ExperimentForSignal | null {
   const metric = String(signal.metrics?.[0] ?? '');
   const metrics = uniqueMetrics(signal.metrics ?? []);
@@ -135,6 +142,19 @@ export function getExperimentForSignal(signal: InsightSignal): ExperimentForSign
       changeKey: 'caffeine',
     };
   }
+
+  if (metric.startsWith('custom:')) {
+    const readable = metricDisplayLabel(metric);
+    return {
+      experimentId: `custom_support:${metric}`,
+      experimentName: `${readable.charAt(0).toUpperCase() + readable.slice(1)} support experiment`,
+      experimentDescription: `A gentler, lower-friction few days can help you test whether ${readable} settles at all or keeps feeling much the same.`,
+      metrics: uniqueMetrics([metric, 'mood', 'stress', 'sleep', ...metrics]).slice(0, 5),
+      durationDays: 3,
+      changeKey: 'stressfulDay',
+    };
+  }
+
 
   return null;
 }
