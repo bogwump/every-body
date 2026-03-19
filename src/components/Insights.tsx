@@ -1100,8 +1100,8 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
   useEffect(() => {
     if (!selectableKeys.includes(weekdayMetric)) setWeekdayMetric((selectableKeys[0] ?? 'mood') as MetricKey);
-    if (!selected.includes(distributionMetric)) setDistributionMetric((selected[0] ?? 'mood') as MetricKey);
-  }, [selectableKeys, selected, weekdayMetric, distributionMetric]);
+    if (!selectableKeys.includes(distributionMetric)) setDistributionMetric((selectableKeys[0] ?? 'mood') as MetricKey);
+  }, [selectableKeys, weekdayMetric, distributionMetric]);
 
   // --- Series for trends chart ---
     const seriesForChart = useMemo(() => {
