@@ -917,33 +917,6 @@ export function Rhythm({ userData }: { userData?: UserData }) {
               ) : null}
 
               <div className="space-y-3">
-                <div className="rounded-2xl eb-inset-callout p-3">
-                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}>
-                    {Array.from({ length: timingChart.displayDays }, (_, index) => {
-                      const day = index + 1;
-                      const phase = phaseFromDay(day, timingChart.displayDays, null).key;
-                      const bandClass = phase === 'reset'
-                        ? 'bg-[rgb(var(--color-accent)/0.18)]'
-                        : phase === 'rebuilding'
-                          ? 'bg-[rgb(var(--color-accent)/0.12)]'
-                          : phase === 'expressive'
-                            ? 'bg-[rgb(var(--color-primary)/0.12)]'
-                            : 'bg-[rgb(var(--color-primary-dark)/0.18)]';
-                      return <div key={`phase-${day}`} className={`h-2 w-full rounded-full ${bandClass}`} />;
-                    })}
-                  </div>
-                  <div className="mt-2 grid gap-2 text-[11px] text-[rgb(var(--color-text-secondary))] sm:text-xs" style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}>
-                    {timingPhaseSegments.map((segment) => (
-                      <div
-                        key={segment.key}
-                        className="text-center font-medium"
-                        style={{ gridColumn: `${segment.start} / ${segment.end + 1}` }}
-                      >
-                        {segment.label}
-                      </div>
-                    ))}
-                  </div>
-                </div>
                 {timingChart.rows.map((row) => (
                   <div key={row.cycleStartISO} className="space-y-2">
                     <div className="flex items-center justify-between gap-3 text-sm">
@@ -954,41 +927,54 @@ export function Rhythm({ userData }: { userData?: UserData }) {
                         <div className="text-[rgb(var(--color-text-secondary))]">No logged days this cycle</div>
                       )}
                     </div>
-                    <div
-                      className="grid gap-1.5 rounded-2xl eb-inset-callout p-3"
-                      style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}
-                    >
-                      {Array.from({ length: timingChart.displayDays }, (_, index) => {
-                        const day = index + 1;
-                        const inCycle = day <= row.cycleLength;
-                        const isActive = row.activeDays.includes(day);
-                        return (
-                          <div key={day} className="flex flex-col items-center gap-1">
-                            <div
-                              className={[
-                                'h-3 w-full rounded-full transition',
-                                !inCycle
-                                  ? 'bg-black/5'
-                                  : isActive
-                                    ? 'bg-[rgb(var(--color-primary-dark))]'
-                                    : phaseFromDay(day, row.cycleLength, null).key === 'reset'
-                                      ? 'bg-[rgb(var(--color-accent)/0.24)]'
-                                      : phaseFromDay(day, row.cycleLength, null).key === 'rebuilding'
-                                        ? 'bg-[rgb(var(--color-accent)/0.16)]'
-                                        : phaseFromDay(day, row.cycleLength, null).key === 'expressive'
-                                          ? 'bg-[rgb(var(--color-primary)/0.14)]'
-                                          : 'bg-[rgb(var(--color-primary-dark)/0.16)]',
-                              ].join(' ')}
-                              title={`Day ${day}${isActive ? ': active' : ''}`}
-                            />
-                            {((day <= 3) || (day === timingChart.displayDays) || (day % 4 === 0)) ? (
-                              <span className="text-[10px] text-[rgb(var(--color-text-secondary))]">{day}</span>
-                            ) : (
-                              <span className="text-[10px] opacity-0 select-none">0</span>
-                            )}
+                    <div className="rounded-2xl eb-inset-callout p-3">
+                      <div
+                        className="grid gap-1.5"
+                        style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}
+                      >
+                        {Array.from({ length: timingChart.displayDays }, (_, index) => {
+                          const day = index + 1;
+                          const inCycle = day <= row.cycleLength;
+                          const isActive = row.activeDays.includes(day);
+                          return (
+                            <div key={day} className="flex flex-col items-center gap-1">
+                              <div
+                                className={[
+                                  'h-3 w-full rounded-full transition',
+                                  !inCycle
+                                    ? 'bg-black/5'
+                                    : isActive
+                                      ? 'bg-[rgb(var(--color-primary-dark))]'
+                                      : phaseFromDay(day, row.cycleLength, null).key === 'reset'
+                                        ? 'bg-[rgb(var(--color-accent)/0.24)]'
+                                        : phaseFromDay(day, row.cycleLength, null).key === 'rebuilding'
+                                          ? 'bg-[rgb(var(--color-accent)/0.16)]'
+                                          : phaseFromDay(day, row.cycleLength, null).key === 'expressive'
+                                            ? 'bg-[rgb(var(--color-primary)/0.14)]'
+                                            : 'bg-[rgb(var(--color-primary-dark)/0.16)]',
+                                ].join(' ')}
+                                title={`Day ${day}${isActive ? ': active' : ''}`}
+                              />
+                              {((day <= 3) || (day === timingChart.displayDays) || (day % 4 === 0)) ? (
+                                <span className="text-[10px] text-[rgb(var(--color-text-secondary))]">{day}</span>
+                              ) : (
+                                <span className="text-[10px] opacity-0 select-none">0</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-2 grid gap-2 text-[11px] text-[rgb(var(--color-text-secondary))] sm:text-xs" style={{ gridTemplateColumns: `repeat(${timingChart.displayDays}, minmax(0, 1fr))` }}>
+                        {timingPhaseSegments.map((segment) => (
+                          <div
+                            key={`${row.cycleStartISO}-${segment.key}`}
+                            className="text-center font-medium"
+                            style={{ gridColumn: `${segment.start} / ${segment.end + 1}` }}
+                          >
+                            {segment.label}
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ))}
