@@ -2787,6 +2787,12 @@ const confirmFinishExperiment = () => {
       if (focus === 'insights:connections') {
         window.setTimeout(() => scrollToInsightsSection('eb-connections'), 60);
       }
+      if (focus === 'insights:helpful') {
+        window.setTimeout(() => scrollToInsightsSection('eb-helpful-patterns'), 60);
+      }
+      if (focus === 'insights:sleep') {
+        window.setTimeout(() => scrollToInsightsSection('eb-sleep-trend'), 60);
+      }
       localStorage.removeItem('everybody:v2:page_focus');
     } catch {
       // ignore
@@ -4254,9 +4260,11 @@ const tryNextPrompts = useMemo(() => {
         </div>
       </div>
 
-      <WhatsHelpingCard items={helpfulPatterns.map((item) => item.text)} />
+      <div id="eb-helpful-patterns">
+        <WhatsHelpingCard items={helpfulPatterns.map((item) => item.text)} />
+      </div>
 
-      <div className="eb-card">
+      <div id="eb-connections" className="eb-card">
         <div className="eb-card-header">
           <div className="min-w-0 flex-1">
             <div className="eb-card-title">Connections in your body</div>

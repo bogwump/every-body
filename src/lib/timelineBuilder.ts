@@ -171,6 +171,14 @@ function helpfulEvidenceText(item: { evidenceCount?: number; experimentIds?: str
   return 'Based on experiment history and symptom logs.';
 }
 
+
+function getInsightTargetForSignals(signals: string[] | undefined, kind?: string): string {
+  const joined = (Array.isArray(signals) ? signals : []).join(' ').toLowerCase();
+  if (kind === 'helpful_pattern') return 'insights:helpful';
+  if (joined.includes('sleep') || joined.includes('restless legs') || joined.includes('restlesslegs')) return 'insights:sleep';
+  return 'insights:connections';
+}
+
 function patternSignalsFromData(data: Record<string, unknown>): string[] {
   const raw = Array.isArray((data as any).signals) ? (data as any).signals : [];
   if (!raw.length && typeof (data as any).signalId === 'string') return describeSignalId(String((data as any).signalId)).signals;
@@ -193,7 +201,7 @@ function mapMomentToEvent(moment: CompanionMoment): TimelineEvent | null {
         confidence: typeof (data as any).confidence === 'string' ? String((data as any).confidence) : undefined,
         source: 'moments',
         actionLabel: 'Open related insight',
-        actionTarget: 'insights',
+        actionTarget: getInsightTargetForSignals(patternSignalsFromData(data), 'pattern_discovered'),
         metadata: { signalId: (data as any).signalId },
       };
     }
@@ -209,7 +217,7 @@ function mapMomentToEvent(moment: CompanionMoment): TimelineEvent | null {
         confidence: typeof (data as any).confidence === 'string' ? String((data as any).confidence) : undefined,
         source: 'moments',
         actionLabel: 'Review helpful insight',
-        actionTarget: 'insights',
+        actionTarget: getInsightTargetForSignals(patternSignalsFromData(data), 'helpful_pattern'),
         metadata: { signalId: (data as any).signalId },
       };
     }
@@ -287,7 +295,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         confidence: item.confidence,
         source: 'archive',
         actionLabel: item.button,
-        actionTarget: item.focusTarget || item.screen,
+        actionTarget: item.focusTarget || (item.type === 'helpful_pattern_detected' ? 'insights:helpful' : item.type === 'new_pattern' ? getInsightTargetForSignals(item.signals, 'pattern_discovered') : item.screen),
         metadata,
       };
     case 'helpful_pattern_detected':
@@ -302,7 +310,7 @@ function mapArchivedMomentToEvent(item: ArchivedCompanionMoment): TimelineEvent 
         confidence: item.confidence,
         source: 'archive',
         actionLabel: item.button,
-        actionTarget: item.focusTarget || item.screen,
+        actionTarget: item.focusTarget || (item.type === 'helpful_pattern_detected' ? 'insights:helpful' : item.type === 'new_pattern' ? getInsightTargetForSignals(item.signals, 'pattern_discovered') : item.screen),
         metadata,
       };
     case 'rhythm_shift':
@@ -478,7 +486,7 @@ function buildPatternEvents(): TimelineEvent[] {
       confidence: item.confidence,
       source: 'insights' as const,
       actionLabel: 'Open related insight',
-      actionTarget: 'insights',
+      actionTarget: getInsightTargetForSignals(described.signals, 'pattern_discovered'),
       metadata: {
         signalId: item.id,
         confidence: item.confidence,
@@ -501,7 +509,7 @@ function buildPatternEvents(): TimelineEvent[] {
         confidence: item.confidence,
         source: 'insights' as const,
         actionLabel: 'Open related insight',
-        actionTarget: 'insights',
+        actionTarget: getInsightTargetForSignals(described.signals, 'pattern_discovered'),
         metadata: {
           signalId: item.id,
           confidence: item.confidence,
@@ -534,7 +542,7 @@ function buildHelpfulPatternEvents(): TimelineEvent[] {
       confidence: item.confidence,
       source: 'experiments' as const,
       actionLabel: 'Review helpful insight',
-      actionTarget: 'insights',
+      actionTarget: getInsightTargetForSignals(Array.isArray(item.metrics) ? item.metrics.map((metric) => metricLabel(String(metric))) : [], 'helpful_pattern'),
       metadata: {
         signal: item.signal,
         intervention: item.intervention,
