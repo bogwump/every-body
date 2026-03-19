@@ -1000,7 +1000,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     const enabled = new Set((userData.enabledModules ?? []) as SymptomKey[]);
     const ordered = preferredOrder.filter((key) => enabled.has(key));
     const remainingEnabled = Array.from(enabled).filter((key) => !ordered.includes(key));
-    const allBuiltIns = [...ordered, ...preferredOrder.filter((key) => !ordered.includes(key)), ...remainingEnabled];
+    const allBuiltIns = [...ordered, ...remainingEnabled];
 
     return Array.from(new Set<MetricKey>([...allBuiltIns, ...customs]));
   }, [userData.enabledModules, userData.customSymptoms]);
@@ -5826,7 +5826,7 @@ const tryNextPrompts = useMemo(() => {
           <div className="min-w-0 flex-1">
             <div className="eb-card-title">Your week in pattern</div>
             <div className="eb-card-sub">
-              How your chosen metric has tended to sit on each weekday.
+              How your chosen metric has tended to average on each weekday.
             </div>
           </div>
         </div>
