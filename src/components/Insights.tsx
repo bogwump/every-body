@@ -1057,13 +1057,13 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
     if (selected.length === 1) setSelected((prev) => [...prev, 'sleep']);
   }, [selected.length]);
 
-  const [weekdayMetric, setWeekdayMetric] = useState<MetricKey>(() => (selected[0] ?? 'mood') as MetricKey);
+  const [weekdayMetric, setWeekdayMetric] = useState<MetricKey>(() => (selectableKeys[0] ?? 'mood') as MetricKey);
   const [distributionMetric, setDistributionMetric] = useState<MetricKey>(() => (selected[0] ?? 'mood') as MetricKey);
 
   useEffect(() => {
-    if (!selected.includes(weekdayMetric)) setWeekdayMetric((selected[0] ?? 'mood') as MetricKey);
+    if (!selectableKeys.includes(weekdayMetric)) setWeekdayMetric((selectableKeys[0] ?? 'mood') as MetricKey);
     if (!selected.includes(distributionMetric)) setDistributionMetric((selected[0] ?? 'mood') as MetricKey);
-  }, [selected, weekdayMetric, distributionMetric]);
+  }, [selectableKeys, selected, weekdayMetric, distributionMetric]);
 
   // --- Series for trends chart ---
     const seriesForChart = useMemo(() => {
@@ -1910,7 +1910,7 @@ const days = TIMEFRAMES.find((t) => t.key === timeframe)?.days ?? 30;
 
 // --- Weekday pattern ---
   const weekdayBar = useMemo(() => {
-    const key = (weekdayMetric as any) ?? (selected[0] ?? 'mood');
+    const key = (weekdayMetric as any) ?? (selectableKeys[0] ?? 'mood');
     const buckets: Record<string, number[]> = { Mon: [], Tue: [], Wed: [], Thu: [], Fri: [], Sat: [], Sun: [] };
     entriesSorted.forEach((e) => {
       const dt = new Date(e.dateISO + 'T00:00:00');
@@ -5689,7 +5689,7 @@ const tryNextPrompts = useMemo(() => {
                 onChange={(e) => setDistributionMetric(e.target.value as any)}
                 aria-label="Choose distribution metric"
               >
-                {selected.map((k) => (
+                {selectableKeys.map((k) => (
                   <option key={String(k)} value={String(k)}>
                     {labelFor(k, userData)}
                   </option>
@@ -5824,9 +5824,9 @@ const tryNextPrompts = useMemo(() => {
       <div className="eb-card">
         <div className="eb-card-header">
           <div className="min-w-0 flex-1">
-            <div className="eb-card-title">Week pattern</div>
+            <div className="eb-card-title">Your week in pattern</div>
             <div className="eb-card-sub">
-              Average by weekday for your chosen metric.
+              How your chosen metric has tended to sit on each weekday.
             </div>
           </div>
         </div>
@@ -5840,7 +5840,7 @@ const tryNextPrompts = useMemo(() => {
                 <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} width={28} />
                 <Tooltip
                   contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)' }}
-                  formatter={(value: any) => [value == null ? '-' : Number(value).toFixed(1), labelFor(selected[0] ?? 'mood', userData)]}
+                  formatter={(value: any) => [value == null ? '-' : Number(value).toFixed(1), `Average ${labelFor((weekdayMetric ?? 'mood') as any, userData)}`]}
                 />
                 <Bar dataKey="avg" fill="rgb(var(--color-primary))" radius={[10, 10, 10, 10]} />
               </BarChart>
@@ -5851,9 +5851,9 @@ const tryNextPrompts = useMemo(() => {
               className="eb-input !w-full !py-2 !h-10"
               value={weekdayMetric as any}
               onChange={(e) => setWeekdayMetric(e.target.value as any)}
-              aria-label="Week pattern metric"
+              aria-label="Your week in pattern metric"
             >
-              {selected.map((k) => (
+              {selectableKeys.map((k) => (
                 <option key={String(k)} value={k as any}>
                   {labelFor(k as any, userData)}
                 </option>
