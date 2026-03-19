@@ -351,22 +351,7 @@ export function ProfileSettings({ userData, onUpdateTheme, onUpdateUserData, onN
   const [customSymptomError, setCustomSymptomError] = useState<string>('');
 
   const [lifestyleOpen, setLifestyleOpen] = useState(false);
-  const [showCycleTracking, setShowCycleTracking] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem('profile:cycle-tracking-open');
-      return raw ? JSON.parse(raw) !== false : false;
-    } catch {
-      return false;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('profile:cycle-tracking-open', JSON.stringify(showCycleTracking));
-    } catch {
-      // ignore
-    }
-  }, [showCycleTracking]);
+  const [showCycleTracking, setShowCycleTracking] = useState<boolean>(false);
 
   const setEnabledModules = (next: SymptomKey[]) => {
     onUpdateUserData((prev) => ({ ...prev, enabledModules: next }));
