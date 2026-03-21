@@ -51,7 +51,11 @@ export type CompanionMomentDisplayCopy = {
 };
 
 export function getMomentFocusTarget(moment: CompanionMoment): string | undefined {
-  const labels = toSignalLabels(moment.data).join(' ').toLowerCase();
+  const labels = toSignalLabels(moment.data);
+  if(labels == null) {
+	  return undefined;
+  }
+  const joinedLables = labels.join(' ').toLowerCase();
   switch (moment.type) {
     case 'experiment_suggestion':
     case 'experiment_result_ready':
@@ -59,7 +63,7 @@ export function getMomentFocusTarget(moment: CompanionMoment): string | undefine
     case 'helpful_pattern_detected':
       return 'insights:helpful';
     case 'new_pattern':
-      if (labels.includes('sleep') || labels.includes('restless legs') || labels.includes('restlesslegs')) return 'insights:sleep';
+      if (joinedLables.includes('sleep') || joinedLables.includes('restless legs') || joinedLables.includes('restlesslegs')) return 'insights:sleep';
       return 'insights:connections';
     case 'unlock_milestone':
       return 'insights:connections';
