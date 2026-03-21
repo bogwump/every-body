@@ -11,6 +11,8 @@ import { ScreenErrorBoundary } from './components/ScreenErrorBoundary';
 import { CalendarView } from './components/CalendarView';
 import { Navigation } from './components/Navigation';
 
+import { Analytics } from "@vercel/analytics/react"
+
 import type { UserData } from './types';
 import { DEFAULT_USER } from './lib/defaultUser';
 import { APP_NAME, useEntries, useUser, initSelfHealingStorage} from './lib/appStore';
@@ -307,6 +309,7 @@ const handleOnboardingComplete = (data: { name: string; goal: UserData['goal']; 
             : ''
         }
       >
+		<Analytics />
         {main}
       </main>
     </div>
