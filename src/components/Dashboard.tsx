@@ -1508,11 +1508,11 @@ export function Dashboard({
           </div>
 
           <div className="min-w-0">
-            <div className="flex justify-end">
+            <div className="mt-3 flex justify-end">
               <button
                 type="button"
                 onClick={() => setTipOffset((v) => v + 1)}
-                className="text-sm text-[rgb(var(--color-primary))] hover:underline"
+                className="inline-flex items-center gap-1 text-sm text-[rgb(var(--color-primary))] hover:underline"
               >
                 Another tip
               </button>
